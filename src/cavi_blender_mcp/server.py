@@ -7,6 +7,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field, StrictBool, StrictInt
 
 from .client import BridgeClient
+from .generation import generate
 
 mcp = FastMCP(
     "cavi-blender-mcp",
@@ -55,6 +56,40 @@ def create_primitive(
     return call("create_primitive", name=name, kind=kind, location=location)
 
 
+@mcp.tool(annotations=ADDITIVE)
+def generate_mesh(
+    image: Annotated[
+        str, Field(description="Workspace image of one isolated object on white or alpha.")
+    ],
+    path: Annotated[str, Field(description="New workspace .glb path; existing files refused.")],
+    resolution: Annotated[StrictInt, Field(ge=64, le=192)] = 128,
+) -> dict[str, Any]:
+    """Reconstruct an original colored mesh with locally configured TripoSR weights.
+
+    Runs offline on CPU in a separate worker, capped at 180 seconds. Requires configured
+    CAVI_TRIPOSR_PYTHON, CAVI_TRIPOSR_SOURCE and CAVI_TRIPOSR_WEIGHTS. Never downloads weights.
+    """
+    workspace = call("scene_info")["workspace"]
+    return generate(workspace, image, path, resolution)
+
+
+@mcp.tool(annotations=ADDITIVE)
+def create_mesh(
+    name: Annotated[str, Field(min_length=1, max_length=63)],
+    vertices: Annotated[list[Vector3], Field(min_length=3, max_length=10000)],
+    faces: Annotated[
+        list[Annotated[list[StrictInt], Field(min_length=3, max_length=64)]],
+        Field(min_length=1, max_length=20000),
+    ],
+) -> dict[str, Any]:
+    """Create custom geometry from local-space vertices and zero-based face indices.
+
+    Use outward face winding. Rejects invalid topology, duplicate names and oversized payloads.
+    Disconnected shells are allowed for later voxel remeshing. Does not execute code.
+    """
+    return call("create_mesh", name=name, vertices=vertices, faces=faces)
+
+
 @mcp.tool(annotations=MUTATING)
 def transform_object(
     name: ObjectName,
@@ -90,19 +125,24 @@ def set_color(
     return call("set_color", name=name, rgba=rgba)
 
 
-@mcp.tool(annotations=ADDITIVE)
+@mcp.tool(annotations=MUTATING)
 def add_modifier(
     name: ObjectName,
-    kind: Annotated[Literal["bevel", "decimate"], Field(description="Modifier type to add.")],
+    kind: Annotated[
+        Literal["bevel", "decimate", "subdivision", "voxel_remesh"],
+        Field(description="Modifier type to add."),
+    ],
     amount: Annotated[
         Number,
         Field(
-            description="Bevel width greater than 0 up to 100, or decimate ratio greater than 0 up to 1."
+            description="Bevel width (0,100], decimate ratio (0,1], subdivision integer 1–3, "
+            "or voxel size [0.005,1] in local units. Evaluated geometry is bounded."
         ),
     ],
+    apply: Annotated[StrictBool, Field(description="Bake into single-user mesh geometry.")] = False,
 ) -> dict[str, Any]:
-    """Add a non-destructive bevel (width) or decimate (ratio) modifier."""
-    return call("add_modifier", name=name, kind=kind, amount=amount)
+    """Add a surface modifier, optionally baking it on an object without existing modifiers."""
+    return call("add_modifier", name=name, kind=kind, amount=amount, apply=apply)
 
 
 @mcp.tool(annotations=MUTATING)
@@ -162,9 +202,21 @@ def render_preview(
     resolution: Annotated[
         StrictInt, Field(description="Square PNG size in pixels, between 64 and 2048.")
     ] = 512,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=1000)] = None,
+    direction: Annotated[
+        Vector3, Field(description="Nonzero camera direction from the model center.")
+    ] = (1.5, -2, 1.4),
+    color_mode: Literal["material", "vertex"] = "material",
 ) -> Image:
-    """Render a material-color preview of scene meshes to a new workspace PNG."""
-    result = call("render_preview", path=path, resolution=resolution)
+    """Render scene meshes or named meshes; restore visibility and camera afterward."""
+    result = call(
+        "render_preview",
+        path=path,
+        resolution=resolution,
+        names=names,
+        direction=direction,
+        color_mode=color_mode,
+    )
     return Image(path=result["path"])
 
 

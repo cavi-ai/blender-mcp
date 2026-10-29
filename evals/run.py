@@ -32,18 +32,22 @@ def pointer(value, path):
     return value
 
 
-async def exercise(mode, env, workspace, adapter=None):
+async def exercise(mode, env, workspace, adapter=None, include_model=False):
     corpus = json.loads((ROOT / "evals/cases.json").read_text())
     if len({case["id"] for case in corpus}) != len(corpus):
         raise ValueError("Corpus case IDs must be unique")
-    selected = [case for case in corpus if mode in case["modes"]]
+    selected = [
+        case
+        for case in corpus
+        if mode in case["modes"] or (include_model and "model" in case["modes"])
+    ]
     results = []
     params = StdioServerParameters(
         command=sys.executable, args=["-m", f"cavi_{APP}_mcp.server"], env=env
     )
     async with (
         stdio_client(params) as (reader, writer),
-        ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=90)) as session,
+        ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=210)) as session,
     ):
         await session.initialize()
         tools = {tool.name: tool for tool in (await session.list_tools()).tools}
@@ -122,7 +126,14 @@ def main():
     parser.add_argument(
         "--blender", default="blender", help="Blender executable (native mode only)"
     )
+    parser.add_argument(
+        "--model-image",
+        type=Path,
+        help="Also run configured offline reconstruction on this original image",
+    )
     args = parser.parse_args()
+    if args.model_image and (args.mode != "native" or not args.model_image.is_file()):
+        parser.error("--model-image requires native mode and an existing image")
     evaluator = ROOT / "node_modules/.bin/mcpeval"
     if not evaluator.exists():
         parser.error("Install the pinned evaluator with npm ci first")
@@ -131,6 +142,8 @@ def main():
     output = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=output_root))
     workspace = output / "workspace"
     workspace.mkdir()
+    if args.model_image:
+        shutil.copyfile(args.model_image, workspace / "input-model.png")
     (output / "outside").mkdir()
     (output / "outside/input.spp").write_bytes(b"outside-project")
     (output / "outside/input.obj").write_bytes(b"outside-mesh")
@@ -205,13 +218,15 @@ def main():
             stack.callback(worker.join)
             stack.callback(endpoint.shutdown)
             env["CAVI_PAINTER_PORT"] = str(endpoint.server_address[1])
-        results = asyncio.run(exercise(args.mode, env, workspace, adapter))
+        results = asyncio.run(
+            exercise(args.mode, env, workspace, adapter, include_model=bool(args.model_image))
+        )
         report = {
             "mode": args.mode,
             "application": APP,
             "cases": results,
             "native_evidence": args.mode == "native",
-            "model_evaluation": "not supported",
+            "model_evaluation": "local image-to-3D" if args.model_image else "not run",
         }
         (output / "cases.json").write_text(json.dumps(report, indent=2) + "\n")
         manifest = "protocol" if args.mode == "protocol" else "core"

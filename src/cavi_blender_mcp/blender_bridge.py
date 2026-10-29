@@ -16,6 +16,7 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+from .geometry import validate_mesh
 from .paths import destination
 
 _server = None
@@ -118,6 +119,30 @@ def dispatch(operation, p):
         }
     if operation == "object_info":
         return info(obj(p["name"]))
+    if operation == "create_mesh":
+        name = p["name"]
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or len(name) > 63
+            or name in bpy.data.objects
+        ):
+            raise ValueError("Object name must be unique, nonempty, and at most 63 characters")
+        if bpy.context.mode != "OBJECT":
+            raise ValueError("Switch Blender to Object Mode before creating geometry")
+        vertices, faces = validate_mesh(p["vertices"], p["faces"])
+        mesh = bpy.data.meshes.new(name)
+        try:
+            mesh.from_pydata(vertices, [], faces)
+            if mesh.validate():
+                raise ValueError("Blender rejected the supplied topology")
+            mesh.update()
+            value = bpy.data.objects.new(name, mesh)
+            bpy.context.scene.collection.objects.link(value)
+        except Exception:
+            bpy.data.meshes.remove(mesh)
+            raise
+        return info(value)
     if operation == "create_primitive":
         name = p["name"]
         if (
@@ -169,7 +194,12 @@ def dispatch(operation, p):
         value.data.materials.append(material)
         return info(value)
     if operation == "add_modifier":
-        value = obj(p["name"], mesh=True)
+        bake = p.get("apply", False)
+        if type(bake) is not bool:
+            raise ValueError("apply must be boolean")
+        value = editable_mesh(p["name"]) if bake else obj(p["name"], mesh=True)
+        if bake and (value.modifiers or bpy.context.mode != "OBJECT"):
+            raise ValueError("Baking requires Object Mode and no existing modifiers")
         amount = vector([p["amount"]], 1)[0]
         if p["kind"] == "bevel" and 0 < amount <= 100:
             modifier = value.modifiers.new("Bevel", "BEVEL")
@@ -177,8 +207,37 @@ def dispatch(operation, p):
         elif p["kind"] == "decimate" and 0 < amount <= 1:
             modifier = value.modifiers.new("Decimate", "DECIMATE")
             modifier.ratio = amount
+        elif p["kind"] in {"subdivision", "voxel_remesh"}:
+            # Refuse stacked surface operations: their combined cost is not bounded by base counts.
+            if value.modifiers:
+                raise ValueError("Organic modifiers require a mesh without existing modifiers")
+            if p["kind"] == "subdivision":
+                facets = sum(max(4, len(face.vertices)) for face in value.data.polygons)
+                if amount not in (1, 2, 3) or facets * 4 ** (amount - 1) > 500000:
+                    raise ValueError(
+                        "Subdivision needs integer levels 1–3 and at most 500000 faces"
+                    )
+                modifier = value.modifiers.new("Subdivision", "SUBSURF")
+                modifier.levels = modifier.render_levels = int(amount)
+            else:
+                bpy.context.view_layer.update()
+                local = [Vector(c) for c in value.bound_box]
+                extents = [max(v[i] for v in local) - min(v[i] for v in local) for i in range(3)]
+                if (
+                    not 0.005 <= amount <= 1
+                    or math.prod(max(v, amount) / amount + 2 for v in extents) > 2000000
+                ):
+                    raise ValueError("Voxel size must be [0.005,1] and fit 2000000 bounding voxels")
+                modifier = value.modifiers.new("Voxel Remesh", "REMESH")
+                modifier.mode = "VOXEL"
+                modifier.voxel_size = amount
+                modifier.use_smooth_shade = True
         else:
             raise ValueError("Invalid modifier or amount")
+        if bake:
+            with selected([value]):
+                if "FINISHED" not in bpy.ops.object.modifier_apply(modifier=modifier.name):
+                    raise RuntimeError("Modifier baking did not finish")
         return info(value)
     if operation == "shade_mesh":
         value = editable_mesh(p["name"])
@@ -238,21 +297,30 @@ def preview(p):
     resolution = p.get("resolution", 512)
     if type(resolution) is not int or not 64 <= resolution <= 2048:
         raise ValueError("Resolution must be between 64 and 2048")
+    color_mode = p.get("color_mode", "material")
+    if color_mode not in {"material", "vertex"}:
+        raise ValueError("Color mode must be material or vertex")
     scene = bpy.context.scene
-    points = [
-        v.matrix_world @ Vector(c)
-        for v in scene.objects
-        if v.type == "MESH" and not v.hide_render
-        for c in v.bound_box
-    ]
+    direction = Vector(vector(p.get("direction", [1.5, -2, 1.4])))
+    if direction.length < 1e-6:
+        raise ValueError("Camera direction must be nonzero")
+    names = p.get("names")
+    if names is not None:
+        if not isinstance(names, list) or not 1 <= len(names) <= 1000:
+            raise ValueError("Provide between 1 and 1000 mesh names")
+        meshes = [obj(name, mesh=True) for name in names]
+    else:
+        meshes = [v for v in scene.objects if v.type == "MESH" and not v.hide_render]
+    bpy.context.view_layer.update()
+    points = [v.matrix_world @ Vector(c) for v in meshes for c in v.bound_box]
     if not points:
         raise ValueError("Scene has no visible meshes")
-    center = sum(points, Vector()) / len(points)
+    center = Vector([(min(p[i] for p in points) + max(p[i] for p in points)) / 2 for i in range(3)])
     radius = max((v - center).length for v in points)
     camera_data = bpy.data.cameras.new("MCP Preview")
     camera = bpy.data.objects.new("MCP Preview", camera_data)
     scene.collection.objects.link(camera)
-    camera.location = center + Vector((1.5, -2, 1.4)).normalized() * max(radius * 3.5, 2)
+    camera.location = center + direction.normalized() * max(radius * 3.5, 2)
     camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
     render = scene.render
     original = (
@@ -266,20 +334,26 @@ def preview(p):
         scene.display.shading.light,
         scene.display.shading.color_type,
     )
+    visibility = [(v, v.hide_render) for v in scene.objects if v.type == "MESH"]
     try:
+        if names is not None:
+            for value, _ in visibility:
+                value.hide_render = value not in meshes
         scene.camera = camera
         render.engine = "BLENDER_WORKBENCH"
         render.resolution_x = render.resolution_y = resolution
         render.resolution_percentage = 100
         render.image_settings.file_format = "PNG"
         scene.display.shading.light = "STUDIO"
-        scene.display.shading.color_type = "MATERIAL"
+        scene.display.shading.color_type = color_mode.upper()
         with output_file(p["path"], {".png"}) as path:
             render.filepath = str(path)
             if "FINISHED" not in bpy.ops.render.render(write_still=True):
                 raise RuntimeError("Preview render did not finish")
         return {"path": str(path)}
     finally:
+        for value, hidden in visibility:
+            value.hide_render = hidden
         (
             scene.camera,
             render.engine,
