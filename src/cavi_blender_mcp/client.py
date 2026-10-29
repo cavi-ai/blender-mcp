@@ -12,6 +12,7 @@ OPERATIONS = frozenset(
         "scene_info",
         "object_info",
         "create_primitive",
+        "create_mesh",
         "transform_object",
         "set_color",
         "add_modifier",

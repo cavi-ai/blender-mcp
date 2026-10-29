@@ -1004,5 +1004,251 @@
       "native"
     ],
     "error": "parent"
+  },
+  {
+    "id": "custom-mesh-success",
+    "tool": "create_mesh",
+    "arguments": {
+      "name": "CustomSurface",
+      "vertices": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          2,
+          0,
+          3
+        ]
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/vertices": 4,
+      "/polygons": 4
+    }
+  },
+  {
+    "id": "custom-mesh-schema",
+    "tool": "create_mesh",
+    "arguments": {},
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "custom-mesh-topology",
+    "tool": "create_mesh",
+    "arguments": {
+      "name": "BadSurface",
+      "vertices": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          1,
+          4
+        ]
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "indices"
+  },
+  {
+    "id": "custom-mesh-duplicate",
+    "tool": "create_mesh",
+    "arguments": {
+      "name": "CustomSurface",
+      "vertices": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          2,
+          0,
+          3
+        ]
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "custom-subdivision",
+    "tool": "add_modifier",
+    "arguments": {
+      "name": "CustomSurface",
+      "kind": "subdivision",
+      "amount": 2
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/modifiers/0/type"
+    ]
+  },
+  {
+    "id": "custom-subdivision-stacking",
+    "tool": "add_modifier",
+    "arguments": {
+      "name": "CustomSurface",
+      "kind": "subdivision",
+      "amount": 2
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "existing modifiers"
+  },
+  {
+    "id": "generate-original-mesh",
+    "tool": "generate_mesh",
+    "arguments": {
+      "image": "input-model.png",
+      "path": "generated.glb",
+      "resolution": 192
+    },
+    "kind": "success",
+    "modes": [
+      "model"
+    ],
+    "equals": {
+      "/provider": "TripoSR",
+      "/device": "cpu"
+    },
+    "required": [
+      "/vertices",
+      "/triangles",
+      "/input_sha256"
+    ],
+    "files": [
+      "generated.glb"
+    ]
+  },
+  {
+    "id": "generate-schema",
+    "tool": "generate_mesh",
+    "arguments": {},
+    "kind": "invalid",
+    "modes": [
+      "native",
+      "protocol"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "generate-image-traversal",
+    "tool": "generate_mesh",
+    "arguments": {
+      "image": "../private.png",
+      "path": "generated.glb"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
   }
 ]

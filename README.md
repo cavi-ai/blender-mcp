@@ -30,10 +30,12 @@ Call `scene_info` first. The bridge must be running inside Blender; the MCP serv
 
 - `scene_info`, `object_info`: inspect scene and geometry.
 - `create_primitive`, `transform_object`, `set_color`: create and edit objects.
-- `add_modifier`, `shade_mesh`, `unwrap_mesh`: non-destructive bevel/decimate, shading, UVs.
+- `create_mesh`: indexed custom geometry, with bounded vertices, faces and coordinates.
+- `generate_mesh`: reconstruct a colored GLB from one original image using a configured local TripoSR worker.
+- `add_modifier`, `shade_mesh`, `unwrap_mesh`: bevel, decimation, subdivision, voxel remeshing, shading and UVs.
 - `export_mesh`: export named meshes as FBX or GLB.
 - `save_project`: save a new Blender project.
-- `render_preview`: render a PNG and return an MCP image.
+- `render_preview`: render a PNG and return an MCP image. Optional mesh names isolate an asset; a camera direction selects its view. Visibility and camera settings are restored afterward.
 
 Materials are Blender preview colors. Exported assets still need the destination game's materials, scale, collision and import settings.
 Material, shading and UV edits refuse shared mesh data to avoid changing linked objects implicitly. Make the mesh single-user in Blender before editing it.
@@ -46,6 +48,26 @@ The bridge binds only to `127.0.0.1` on an ephemeral port and requires a random 
 
 There is no arbitrary Python tool, telemetry or external asset download. Changes are not retried after a timeout; inspect the scene before resubmitting an uncertain mutation. Blender operations run on the main thread. The bridge stops when its Blender process exits.
 
+Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 face indices within the 1-MiB request limit. Faces use zero-based indices and outward winding. Invalid indices, repeated vertices and zero-area faces are refused before creating a Blender datablock. Disconnected shells are allowed for voxel fusion. Subdivision supports integer levels 1–3 within 500,000 estimated faces; remeshing requires a voxel size of 0.005–1 local units within a two-million-voxel bounding volume. Both organic modifiers require an object without existing modifiers to bound evaluation cost.
+
+`add_modifier` defaults to a non-destructive modifier. Its optional `apply` flag bakes the result into a single-user mesh without an existing modifier stack, allowing fusion, smoothing and reduction in sequence.
+
+## Local image-to-3D
+
+Generation is optional and runs in a separate Python 3.11 environment. The MCP process does not import PyTorch, download weights or send images to a remote service. The worker uses [TripoSR](https://github.com/VAST-AI-Research/TripoSR), with CPU mesh extraction through scikit-image. Code and weights are MIT licensed. Its generated surfaces still require inspection, animation rigging and game import work.
+
+Prepare a separate runtime with `uv venv --python 3.11 /path/to/neural-env` and `uv pip install --python /path/to/neural-env/bin/python -r requirements-neural.txt`. Check out upstream TripoSR at commit `107cefdc244c39106fa830359024f6a2f1c78871`. Download `config.yaml` and `model.ckpt` from the public `stabilityai/TripoSR` model at revision `5b521936b01fbe1890f6f9baed0254ab6351c04a`, plus `facebook/dino-vitb16/config.json` saved as `dino-config.json` in the same weights directory.
+
+Configure these absolute local paths in the MCP server environment:
+
+```text
+CAVI_TRIPOSR_PYTHON=/path/to/neural-env/bin/python
+CAVI_TRIPOSR_SOURCE=/path/to/TripoSR
+CAVI_TRIPOSR_WEIGHTS=/path/to/weights
+```
+
+Put an image of one isolated object on white or transparency inside the Blender workspace. Call `generate_mesh` with its relative `image` path and a new `.glb` output `path`. Generation runs offline on CPU with four threads, chunked field queries and a 180-second timeout. Resolution is bounded to 64–192; input images are at most 16 MiB and 4096 pixels per side. Outputs are published without replacing existing files. The returned counts and input SHA-256 identify the generated artifact. Generation creates a GLB file without changing the open scene.
+
 ## Validation
 
 ```sh
@@ -55,6 +77,8 @@ blender --background --factory-startup --python-exit-code 1 --python tests/blend
 ```
 
 The native smoke creates a disposable scene, edits a mesh, unwraps UVs, exports FBX/GLB, saves a project, and renders a preview. It does not edit a game project.
+
+The additional `tests/blender_organic.py` native check exercises custom topology, evaluated subdivision/remeshing, resource limits, preview isolation and a GLB export/import round trip. Invoke it with the same Blender command and a separate empty workspace.
 
 ## MCP evaluation
 
@@ -67,7 +91,9 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The checked-in corpus calls all 11 tools through a real stdio MCP session and checks returned fields, PNG image data, and nonempty files. It covers every primitive, both modifiers and mesh export formats, invalid arguments, duplicate names, positive scale, shared mesh protection, path traversal, symlink escapes, and existing-file refusal. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 13 tools through real stdio MCP sessions, including PNG image data and nonempty exports. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+
+To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 
 Native evaluation starts its own factory scene with a private connection and disposable workspace. It does not connect to an existing Blender session. Reports and application logs remain under `.tmp/evals/`; connection files, scenes, and outputs are ignored by Git. An unavailable executable fails the command rather than producing a native pass. CI runs protocol checks; native checks require Blender and run separately.
 
