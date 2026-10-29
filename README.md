@@ -55,3 +55,20 @@ blender --background --factory-startup --python-exit-code 1 --python tests/blend
 ```
 
 The native smoke creates a disposable scene, edits a mesh, unwraps UVs, exports FBX/GLB, saves a project, and renders a preview. It does not edit a game project.
+
+## MCP evaluation
+
+Install the locked Python and evaluator dependencies, then run the protocol checks:
+
+```sh
+uv sync --locked --dev
+npm ci
+npm run eval:protocol
+npm run eval:core -- --blender /path/to/blender
+```
+
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The checked-in corpus calls all 11 tools through a real stdio MCP session and checks returned fields, PNG image data, and nonempty files. It covers every primitive, both modifiers and mesh export formats, invalid arguments, duplicate names, positive scale, shared mesh protection, path traversal, symlink escapes, and existing-file refusal. No-argument read tools have no tool-specific invalid inputs.
+
+Native evaluation starts its own factory scene with a private connection and disposable workspace. It does not connect to an existing Blender session. Reports and application logs remain under `.tmp/evals/`; connection files, scenes, and outputs are ignored by Git. An unavailable executable fails the command rather than producing a native pass. CI runs protocol checks; native checks require Blender and run separately.
+
+These are deterministic protocol and native application evaluations. MCP Eval does not invoke a model; results do not establish model task quality or game integration.

@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "probes": [
+    {
+      "id": "discovery-budget",
+      "probe": "discovery-cost",
+      "access": "read_only",
+      "max_tools": 11,
+      "max_schema_bytes": 18000
+    },
+    {
+      "id": "token-budget",
+      "probe": "token-cost",
+      "access": "read_only",
+      "max_total_tokens": 4500,
+      "max_tool_tokens": 700
+    },
+    {
+      "id": "catalog-pagination",
+      "probe": "pagination",
+      "access": "read_only",
+      "max_pages": 2
+    },
+    {
+      "id": "declared-surfaces",
+      "probe": "surface-listing",
+      "access": "read_only",
+      "max_pages": 2
+    },
+    {
+      "id": "protocol-version",
+      "probe": "protocol-negotiation",
+      "access": "read_only",
+      "bogus_version": "2099-01-01"
+    },
+    {
+      "id": "scene_info-schema-guessability",
+      "probe": "schema-guessability",
+      "tool": "scene_info",
+      "access": "read_only",
+      "arguments": {}
+    },
+    {
+      "id": "scene_info-output-schema",
+      "probe": "output-schema",
+      "tool": "scene_info",
+      "access": "read_only",
+      "arguments": {}
+    },
+    {
+      "id": "object_info-schema-guessability",
+      "probe": "schema-guessability",
+      "tool": "object_info",
+      "access": "read_only",
+      "arguments": {
+        "name": "EvalProp"
+      }
+    },
+    {
+      "id": "object_info-output-schema",
+      "probe": "output-schema",
+      "tool": "object_info",
+      "access": "read_only",
+      "arguments": {
+        "name": "EvalProp"
+      }
+    },
+    {
+      "id": "status-repeat",
+      "probe": "degradation-over-n",
+      "tool": "scene_info",
+      "access": "read_only",
+      "arguments": {},
+      "max_attempts": 3
+    },
+    {
+      "id": "status-contention",
+      "probe": "contention",
+      "tool": "scene_info",
+      "access": "read_only",
+      "arguments": {}
+    }
+  ]
+}

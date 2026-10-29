@@ -8,3 +8,5 @@ dist/
 *.fbx
 *.glb
 connection.json
+node_modules/
+.tmp/
