@@ -40,6 +40,13 @@ pebble.name = "AAA_Pebble"
 for owner in list(pebble.users_collection):
     owner.objects.unlink(pebble)
 props.objects.link(pebble)
+bpy.ops.object.armature_add(location=(0, 0, -30))
+rig = bpy.context.object
+rig.name = "EvalRig"
+skin = bpy.data.objects.new("EvalSkin", source.data.copy())
+bpy.context.scene.collection.objects.link(skin)
+skin.modifiers.new("Skin", "ARMATURE").object = rig
+skin.vertex_groups.new(name="Bone").add(list(range(len(skin.data.vertices))), 1, "REPLACE")
 for value in bpy.context.selected_objects:
     value.select_set(False)
 

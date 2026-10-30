@@ -32,7 +32,7 @@ _workspace = None
 _lease = Lease()
 _project_epoch = secrets.token_hex(16)
 LEASE_FREE = frozenset(
-    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "render_preview",
+    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "inspect_rig", "render_preview",
      "review_sheet"}
 )
 GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
@@ -252,7 +252,7 @@ def dispatch(operation, p):
     if operation == "owned_edit":
         operation, p = p["operation"], p["params"]
         if operation in {"owned_edit", "session_control", "scene_info", "object_info",
-                         "runtime_status", "inspect_mesh_quality", "review_sheet"}:
+                         "runtime_status", "inspect_mesh_quality", "inspect_rig", "review_sheet"}:
             raise ValueError("Owned edit envelope requires a scene mutation")
     if operation == "session_control":
         return _lease.control(p, project_identity)
@@ -584,6 +584,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == "inspect_rig":
+        from .blender_rig import inspect
+
+        return {**inspect(p, obj), "project_id": project_identity()}
     if operation == "export_instances":
         operation, p = "export_mesh", {**p, "preserve_instances": True}
     if operation == "inspect_mesh_quality":

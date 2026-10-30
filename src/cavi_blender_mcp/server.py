@@ -31,7 +31,7 @@ READ_ONLY = ToolAnnotations(
 )
 LEASE_FREE = frozenset(
     {"scene_info", "object_info", "runtime_status", "session_control", "inspect_mesh_quality",
-     "render_preview", "review_sheet"}
+     "render_preview", "review_sheet", "inspect_rig"}
 )
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
 Check = Literal["naming", "topology", "lightmap", "transforms", "origin"]
@@ -112,6 +112,22 @@ async def inspect_mesh_quality(
                      checks=checks or [],
                      naming=naming.model_dump() if naming else None,
                      lightmap_uv=lightmap_uv, lightmap_resolution=lightmap_resolution)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def inspect_rig(
+    armature: ObjectName,
+    meshes: Annotated[list[ObjectName], Field(min_length=1, max_length=8)],
+    max_influences: Annotated[StrictInt, Field(ge=1, le=32)] = 4,
+) -> dict[str, Any]:
+    """Inspect skin weights, rest bones and linked clips without changing action or pose.
+
+    Exact meshes must each have one vertex-group armature modifier bound to the rig.
+    Influence limit is a caller-selected target, not a universal engine requirement.
+    This does not validate animation deformation or exported bindings.
+    """
+    return await run(call, "inspect_rig", armature=armature, meshes=meshes,
+                     max_influences=max_influences)
 
 
 @mcp.tool(annotations=ADDITIVE)
