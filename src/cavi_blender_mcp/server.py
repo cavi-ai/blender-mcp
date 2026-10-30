@@ -241,7 +241,7 @@ def export_mesh(
         str | None, Field(description="Edit lease from session_control claim.")
     ] = None,
 ) -> dict[str, Any]:
-    """Export only the named meshes as FBX or GLB within the output workspace."""
+    """Export named meshes as FBX or GLB; static FBX uses file units and baked space conversion."""
     return call("export_mesh", lease_id=lease_id, names=names, path=path)
 
 

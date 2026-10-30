@@ -393,6 +393,10 @@ def _dispatch(operation, p):
                     bake_anim=False,
                     axis_forward="-Z",
                     axis_up="Y",
+                    global_scale=1,
+                    apply_unit_scale=True,
+                    apply_scale_options="FBX_SCALE_UNITS",
+                    bake_space_transform=True,
                     path_mode="STRIP",
                 )
             else:

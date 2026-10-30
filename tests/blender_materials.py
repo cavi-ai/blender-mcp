@@ -32,6 +32,20 @@ with tempfile.TemporaryDirectory() as folder:
     assert abs(shader.inputs["Metallic"].default_value - .25) < 1e-5
     image = next(n.image for n in material.node_tree.nodes if n.type == "TEX_IMAGE")
     assert image.colorspace_settings.name == "sRGB" and image.packed_file
+    bridge.dispatch("export_mesh", {"names": ["Cube"], "path": "units.fbx", "lease_id": lease})
+    from io_scene_fbx import parse_fbx
+
+    document, _ = parse_fbx.parse(str(Path(folder) / "units.fbx"))
+    settings = next(item for item in document.elems if item.id == b"GlobalSettings")
+    properties = next(item for item in settings.elems if item.id == b"Properties70")
+    unit_scale = next(item.props[4] for item in properties.elems if item.props[0] == b"UnitScaleFactor")
+    assert unit_scale == 100.0, unit_scale
+    objects = next(item for item in document.elems if item.id == b"Objects")
+    for item in objects.elems:
+        if item.id == b"Model":
+            properties = next(value for value in item.elems if value.id == b"Properties70")
+            scale = next((value.props[4:] for value in properties.elems if value.props[0] == b"Lcl Scaling"), (1, 1, 1))
+            assert list(scale) == [1.0, 1.0, 1.0], scale
     before = (bpy.context.scene.camera, bpy.context.scene.world, bpy.context.scene.render.engine,
               set(bpy.data.objects), set(bpy.data.materials), set(bpy.data.lights), set(bpy.data.worlds))
     engines = []

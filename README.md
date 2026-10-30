@@ -65,7 +65,7 @@ After installing new tools, restart that client's MCP connection to discover the
 - `generate_mesh`: reconstruct a colored GLB from one original image using a configured local TripoSR worker.
 - `import_mesh`: import a self-contained static GLB into a new named collection, preserving existing objects and selection.
 - `add_modifier`, `shade_mesh`, `unwrap_mesh`: bevel, decimation, subdivision, voxel remeshing, shading and UVs.
-- `export_mesh`: export named meshes as FBX or GLB.
+- `export_mesh`: export named meshes as FBX or GLB. Static FBX uses file unit metadata and baked space conversion to preserve the source scale without adding 100-fold object scales.
 - `save_project`: save a new Blender project.
 - `render_preview`: render a PNG and return an MCP image. Optional mesh names isolate an asset; a camera direction selects its view. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Existing lights are excluded. Visibility, world, engine, and camera settings are restored afterward.
 
