@@ -4,7 +4,7 @@ Typed MCP tools for Blender scene inspection, mesh editing, previews, and game a
 
 ## Install
 
-Requires Python 3.11+, uv, and Blender. The native smoke was exercised on Blender 5.2.2 LTS; other Blender versions are unverified. Dependencies are pinned in `uv.lock`.
+Requires Python 3.11+, uv, and Blender. Native import and runtime checks have been exercised with Blender 5.2.3 LTS. Dependencies are pinned in `uv.lock`.
 
 ```sh
 uv sync --locked
@@ -24,19 +24,30 @@ Register the stdio server in your MCP client:
 {"mcpServers":{"blender":{"command":"/path/to/blender-mcp/.venv/bin/cavi-blender-mcp"}}}
 ```
 
-Call `scene_info` first. The bridge must be running inside Blender; the MCP server does not launch an application or authenticate accounts.
+Call `scene_info` first. The bridge must be running inside Blender; the stdio MCP server does not launch an application or authenticate accounts. Use the explicit runtime CLI to start a dedicated Blender session when needed.
 
 ### Runtime commands
 
 ```sh
+cavi-blender-mcp runtime start
+cavi-blender-mcp runtime start --project working-copy.blend
 cavi-blender-mcp runtime status
 cavi-blender-mcp runtime restart
 ```
 
-These commands control the bridge inside an already running Blender session. Restart replaces
+`start` reuses a connected session or launches Blender with factory settings, embedded
+script auto-execution disabled, and the packaged bridge. It starts only when the prior
+connection is missing or refused; timeouts and uncertain failures leave existing sessions
+untouched. `--project` selects an existing workspace-relative `.blend` and refuses to
+replace a different connected project. `CAVI_BLENDER_BIN` overrides executable discovery;
+otherwise the CLI uses Blender on PATH or the standard macOS installation. The connection
+file and workspace environment variables select the dedicated session. Launch acceptance
+does not prove readiness; require a successful status check before asset operations.
+
+`status` and `restart` control the bridge inside an already running Blender session. Restart replaces
 its local listener and credentials, then checks the new connection. It preserves the Blender
 process, open scene, unsaved edits, and selection. A failed request is never automatically retried.
-Both commands print JSON and exit nonzero when disconnected. `CAVI_BLENDER_CONNECTION` selects
+Commands print JSON and exit nonzero on failure. `CAVI_BLENDER_CONNECTION` selects
 the session to control. Sessions started with an older bridge need to be reopened with the
 updated `start_bridge.py` once before these commands are available.
 
