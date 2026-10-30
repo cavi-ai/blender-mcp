@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from cavi_blender_mcp import server
+from cavi_blender_mcp.client import OPERATIONS
 
-TOOLS = {"scene_info", "inspect_mesh_quality", "render_preview", "session_control",
+TOOLS = {"scene_info", "inspect_mesh_quality", "inspect_rig", "render_preview", "session_control",
          "object_edit", "mesh_edit", "assign_material", "asset_io", "review_sheet", "scatter"}
 
 
@@ -22,9 +23,23 @@ class SurfaceTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return calls
 
-    def test_catalog_has_ten_tools(self):
+    def test_catalog_has_expected_tools(self):
         tools = asyncio.run(server.mcp.list_tools())
         self.assertEqual({tool.name for tool in tools}, TOOLS)
+
+    def test_rig_inspection_is_read_only_and_bounded(self):
+        self.assertIn("inspect_rig", OPERATIONS)
+        calls = self.capture()
+        asyncio.run(server.inspect_rig("Rig", ["Skin"], max_influences=4))
+        self.assertEqual(calls, [("inspect_rig", {"armature": "Rig", "meshes": ["Skin"],
+                                                 "max_influences": 4})])
+
+        async def invalid():
+            return await server.mcp.call_tool("inspect_rig", {
+                "armature": "Rig", "meshes": ["Skin"], "max_influences": 33})
+
+        with self.assertRaisesRegex(Exception, "32"):
+            asyncio.run(invalid())
 
     def test_scene_info_pages_or_targets_one_object(self):
         calls = self.capture()
