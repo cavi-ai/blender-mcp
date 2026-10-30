@@ -111,10 +111,10 @@ class AAASurfaceTests(unittest.TestCase):
                          MAX_TIMEOUT)
         self.assertEqual(operation_timeout("review_sheet", {}), SLOW_TIMEOUT)
 
-    def test_presets_use_exporter_enums_and_keep_unity_defaults(self):
+    def test_presets_use_exporter_enums_and_unity_writes_identity_nodes(self):
         self.assertEqual(AXIS_PRESETS["unity"], {
-            "axis_forward": "-Z", "axis_up": "Y", "apply_unit_scale": True,
-            "apply_scale_options": "FBX_SCALE_UNITS", "bake_space_transform": True})
+            "axis_forward": "Y", "axis_up": "Z", "apply_unit_scale": True,
+            "apply_scale_options": "FBX_SCALE_UNITS", "bake_space_transform": False})
         for name, preset in AXIS_PRESETS.items():
             with self.subTest(name=name):
                 self.assertIn(preset["axis_forward"], FBX_AXES)

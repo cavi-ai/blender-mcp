@@ -86,10 +86,10 @@ After installing new tools, restart that client's MCP connection to discover the
 - `lods=true` adds every `<base>_LODn` sibling of each name so Unity builds a LODGroup.
 - `collision=true` adds `UCX_`/`UBX_`/`USP_<base>_NN` objects.
 - `bake_pair={"high": [...], "low": [...]}` writes `<stem>_low.fbx` and `<stem>_high.fbx`; objects and single-user meshes are temporarily named `<base>_low`/`<base>_high` for name-matched baking (Substance Designer), then restored. Each base needs exactly one low and one high object. Map baking is out of scope.
-- `axis` (FBX and USD; default unity): unity = -Z forward, Y up, FBX_SCALE_UNITS, baked space transform; unreal = X forward, Z up, FBX_SCALE_NONE, no bake; godot = -Z forward, Y up, FBX_SCALE_ALL, baked space transform. glTF is always +Y up.
+- `axis` (FBX and USD; default unity): unity = Y forward, Z up (FBX; Unity's `bakeAxisConversion` converts), FBX_SCALE_UNITS, no bake; USD -Z forward, Y up; unreal = X forward, Z up, FBX_SCALE_NONE, no bake; godot = -Z forward, Y up, FBX_SCALE_ALL, baked space transform. glTF is always +Y up.
 - USD export writes selected meshes and materials without animation, lights, cameras or texture copies.
 
-Static FBX exports use file unit metadata, baked space conversion, face smoothing and tangents. `include_empties` adds empty ancestors of the named meshes for hierarchy. GLB exports apply modifiers. `preserve_instances=true` shares geometry between local, unmodified static FBX sources with matching distinct populated material slots; source mesh data and bindings are restored after export.
+Static FBX exports use file unit metadata, Blender's native Z-up axes with identity node transforms (import in Unity with `bakeAxisConversion`), face smoothing and tangents. `include_empties` adds empty ancestors and empty descendants, such as sockets, of the named meshes. GLB exports apply modifiers. `preserve_instances=true` shares geometry between local, unmodified static FBX sources with matching distinct populated material slots; source mesh data and bindings are restored after export.
 
 Every mutation except `render_preview`, `review_sheet` and `generate` requires a `lease_id`. Unrelated or missing per-action parameters are refused before contacting Blender.
 
@@ -180,6 +180,8 @@ The additional `tests/blender_organic.py` native check exercises custom topology
 `tests/blender_harden.py` checks rotation modes, color material reuse, named UV layers, modifier budgets, lease-free previews, FBX settings, and the bridge's request cap and error statuses.
 
 `tests/blender_aaa.py` checks decimation, LOD chains, QuadriFlow, lightmap overlap, texel density, collision naming, cleanup deltas, transform/origin edits, sockets, inspection checks, LOD/collision/USD/bake-pair exports with FBX re-import, every review sheet mode and scatter budgets.
+
+`tests/blender_unity_axis.py` checks unity-axis FBX node transforms, socket export and upright re-import.
 
 `tests/blender_import.py` checks typed import on Blender 5.2.3, including transforms,
 UVs, vertex-color values, embedded image packing, name reuse, selection preservation,

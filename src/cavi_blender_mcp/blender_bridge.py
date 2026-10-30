@@ -483,6 +483,25 @@ def unwrap(p):
     return {**info(value), "uv_layer": layers.active.name}
 
 
+def with_empties(objects):
+    """Empty ancestors for hierarchy plus empty descendants such as sockets."""
+    scene = bpy.context.scene.objects
+    selection = list(objects)
+    for value in objects:
+        parent = value.parent
+        while parent is not None:
+            if parent.type == "EMPTY" and parent not in selection and parent.name in scene:
+                selection.append(parent)
+            parent = parent.parent
+    stack = [child for value in objects for child in value.children]
+    while stack:
+        child = stack.pop()
+        if child.type == "EMPTY" and child not in selection and child.name in scene:
+            selection.append(child)
+            stack.extend(child.children)
+    return selection
+
+
 def export_mesh(p):
     if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
         raise ValueError("Provide between 1 and 1000 mesh names")
@@ -493,15 +512,7 @@ def export_mesh(p):
         raise ValueError("preserve_instances and include_empties must be booleans")
     if preserve and Path(p["path"]).suffix.lower() != ".fbx":
         raise ValueError("preserve_instances applies to static FBX exports")
-    selection = list(objects)
-    if empties:
-        for value in objects:
-            parent = value.parent
-            while parent is not None:
-                if (parent.type == "EMPTY" and parent not in selection
-                        and parent.name in bpy.context.scene.objects):
-                    selection.append(parent)
-                parent = parent.parent
+    selection = with_empties(objects) if empties else list(objects)
     with output_file(p["path"], {".fbx", ".glb"}) as path, selected(selection):
         if path.suffix.lower() == ".fbx":
             from .export_instances import instance_meshes
