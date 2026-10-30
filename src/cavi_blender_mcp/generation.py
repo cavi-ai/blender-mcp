@@ -52,7 +52,10 @@ def generate(workspace, image, path, resolution):
                 "Local reconstruction exceeded 180 seconds; no asset published"
             ) from exc
         if result.returncode:
-            raise RuntimeError(f"Local reconstruction failed: {result.stderr[-2000:]}")
+            detail = result.stderr.strip() or result.stdout.strip() or "No worker diagnostics"
+            raise RuntimeError(
+                f"Local reconstruction failed (exit {result.returncode}): {detail[-2000:]}"
+            )
         report = json.loads(result.stdout)
         if not generated.is_file() or not 0 < generated.stat().st_size <= 64 * 1024 * 1024:
             raise RuntimeError("Reconstruction did not produce a bounded GLB")

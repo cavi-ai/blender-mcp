@@ -76,6 +76,29 @@ class GenerationTests(unittest.TestCase):
             self.assertFalse((work / "mesh.glb").exists())
             self.assertFalse(list(work.glob(".cavi-generation-*")))
 
+    def test_worker_failure_reports_exit_and_preserves_diagnostics(self):
+        for code, stderr, stdout, detail in (
+            (-9, "", "", "No worker diagnostics"),
+            (2, " import failed ", "", "import failed"),
+            (3, " ", "encoder stopped", "encoder stopped"),
+        ):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as root:
+                work = Path(root)
+                (work / "input.png").write_bytes(b"input")
+
+                def fail(command, exit_code=code, worker_stdout=stdout, worker_stderr=stderr, **kwargs):
+                    Path(command[3]).write_bytes(b"partial-glb")
+                    return SimpleNamespace(returncode=exit_code, stdout=worker_stdout, stderr=worker_stderr)
+
+                with (
+                    self.configured(work),
+                    patch("subprocess.run", side_effect=fail),
+                    self.assertRaisesRegex(RuntimeError, f"exit {code}.*{detail}"),
+                ):
+                    generate(work, "input.png", "mesh.glb", 128)
+                self.assertFalse((work / "mesh.glb").exists())
+                self.assertFalse(list(work.glob(".cavi-generation-*")))
+
     def test_a_competing_output_is_never_replaced(self):
         with tempfile.TemporaryDirectory() as root:
             work = Path(root)
