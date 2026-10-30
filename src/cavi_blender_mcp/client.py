@@ -12,6 +12,7 @@ OPERATIONS = frozenset(
         "scene_info",
         "object_info",
         "inspect_mesh_quality",
+        "inspect_rig",
         "create_primitive",
         "create_mesh",
         "import_mesh",
