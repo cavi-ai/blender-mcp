@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from cavi_blender_mcp import blender_bridge as bridge
 
 source = bpy.data.objects["Cube"]
+material_target = bpy.data.objects.new("MaterialTarget", source.data.copy())
+bpy.context.scene.collection.objects.link(material_target)
 shared = bpy.data.objects.new("SharedTarget", source.data)
 bpy.context.scene.collection.objects.link(shared)
 uv_target = bpy.data.objects.new("UVTarget", source.data.copy())

@@ -10,7 +10,7 @@ import secrets
 import tempfile
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -213,6 +213,10 @@ def dispatch(operation, p):
 
 
 def _dispatch(operation, p):
+    if operation == "assign_material":
+        from .blender_materials import assign
+
+        return assign(p, _workspace, obj)
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])
     if operation in {"runtime_status", "runtime_restart"}:
@@ -422,6 +426,11 @@ def preview(p):
     color_mode = p.get("color_mode", "material")
     if color_mode not in {"material", "vertex"}:
         raise ValueError("Color mode must be material or vertex")
+    renderer = p.get("renderer", "workbench")
+    if renderer not in {"workbench", "eevee"}:
+        raise ValueError("Renderer must be workbench or eevee")
+    if renderer == "eevee" and (resolution > 1024 or color_mode != "material"):
+        raise ValueError("Eevee previews require material colors and at most 1024 pixels")
     scene = bpy.context.scene
     direction = Vector(vector(p.get("direction", [1.5, -2, 1.4])))
     if direction.length < 1e-6:
@@ -462,13 +471,25 @@ def preview(p):
             for value, _ in visibility:
                 value.hide_render = value not in meshes
         scene.camera = camera
-        render.engine = "BLENDER_WORKBENCH"
+        if renderer == "eevee":
+            try:
+                render.engine = "BLENDER_EEVEE"
+            except TypeError:
+                render.engine = "BLENDER_EEVEE_NEXT"
+        else:
+            render.engine = "BLENDER_WORKBENCH"
         render.resolution_x = render.resolution_y = resolution
         render.resolution_percentage = 100
         render.image_settings.file_format = "PNG"
         scene.display.shading.light = "STUDIO"
         scene.display.shading.color_type = color_mode.upper()
-        with output_file(p["path"], {".png"}) as path:
+        if renderer == "eevee":
+            from .preview_studio import studio
+
+            lighting = studio(scene, center, radius, min(point.z for point in points))
+        else:
+            lighting = nullcontext()
+        with lighting, output_file(p["path"], {".png"}) as path:
             render.filepath = str(path)
             if "FINISHED" not in bpy.ops.render.render(write_still=True):
                 raise RuntimeError("Preview render did not finish")

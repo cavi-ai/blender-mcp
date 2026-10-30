@@ -26,6 +26,7 @@ OPERATIONS = frozenset(
         "runtime_restart",
         "session_control",
         "owned_edit",
+        "assign_material",
     }
 )
 
