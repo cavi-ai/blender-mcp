@@ -1548,7 +1548,7 @@
     "arguments": {
       "action": "import",
       "path": "prop.glb",
-      "name": "界界界界界界界界界界界界界界界界界界界界界界"
+      "name": "\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c"
     },
     "kind": "safety",
     "modes": [
@@ -3013,5 +3013,59 @@
       "native"
     ],
     "error": "inside"
+  },
+  {
+    "id": "rig-influence-bound",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "Rig",
+      "meshes": [
+        "Skin"
+      ],
+      "max_influences": 33
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "rig-mesh-not-armature",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "Cube",
+      "meshes": [
+        "Cube"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "armature"
+  },
+  {
+    "id": "rig-success",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRig",
+      "meshes": [
+        "EvalSkin"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/meshes/0/weights/unweighted_vertices": 0,
+      "/meshes/0/weights/unnormalized_vertices": 0
+    },
+    "required": [
+      "/bones/0/name",
+      "/project_id"
+    ]
   }
 ]
