@@ -3,11 +3,101 @@
 import math
 
 import bpy
+import numpy as np
 
 from .mapping import measure_triangle, summarize
+from .naming import lint, rules
 
 MAX_TRIANGLES = 100000
 MAX_VERTICES = 100000
+CHECKS = {"naming", "topology", "lightmap", "transforms", "origin"}
+
+
+def topology(mesh):
+    edge_faces = np.zeros(len(mesh.edges), np.int64)
+    loop_edges = np.empty(len(mesh.loops), np.int64)
+    mesh.loops.foreach_get("edge_index", loop_edges)
+    np.add.at(edge_faces, loop_edges, 1)
+    edge_verts = np.empty(len(mesh.edges) * 2, np.int64)
+    mesh.edges.foreach_get("vertices", edge_verts)
+    used = np.zeros(len(mesh.vertices), bool)
+    used[edge_verts] = True
+    totals = np.empty(len(mesh.polygons), np.int64)
+    mesh.polygons.foreach_get("loop_total", totals)
+    areas = np.empty(len(mesh.polygons), np.float64)
+    mesh.polygons.foreach_get("area", areas)
+    return {"non_manifold_edges": int(((edge_faces == 0) | (edge_faces > 2)).sum()),
+            "boundary_edges": int((edge_faces == 1).sum()),
+            "loose_vertices": int((~used).sum()),
+            "zero_area_faces": int((areas <= 1e-12).sum()),
+            "ngons": int((totals > 4).sum())}
+
+
+def transforms(value):
+    location, rotation, scale = value.matrix_basis.decompose()
+    delta = (any(abs(c) > 1e-6 for c in value.delta_location)
+             or any(abs(c - 1) > 1e-6 for c in value.delta_scale)
+             or value.delta_rotation_quaternion.angle > 1e-6
+             or any(abs(c) > 1e-6 for c in value.delta_rotation_euler))
+    return {"scale_applied": all(abs(c - 1) <= 1e-5 for c in scale),
+            "rotation_applied": rotation.angle <= 1e-5,
+            "location_zero": location.length <= 1e-6, "delta_transforms": delta}
+
+
+def origin(points):
+    if not points:
+        return None
+    low = [min(p[axis] for p in points) for axis in range(3)]
+    high = [max(p[axis] for p in points) for axis in range(3)]
+    relative = [None if high[i] - low[i] <= 1e-9 else -low[i] / (high[i] - low[i])
+                for i in range(3)]
+
+    def near(axis, goal):
+        value = relative[axis]
+        return value is None and abs(low[axis]) <= 1e-6 or (
+            value is not None and abs(value - goal) <= 1e-3)
+
+    label = "other"
+    if near(0, .5) and near(1, .5):
+        label = "bounds_bottom_center" if near(2, 0) else (
+            "bounds_center" if near(2, .5) else "other")
+    return {"relative_to_bounds": relative, "classification": label,
+            "local_bounds": {"min": low, "max": high}}
+
+
+def run_checks(value, layer_name, requested, naming, lightmap_resolution):
+    from .uvmath import overlap
+
+    mesh = value.data
+    report = {}
+    if "naming" in requested:
+        result = lint(value.name, naming)
+        if result["role"] == "collision" and result["base"] and not any(
+            name in bpy.context.scene.objects
+            for name in (result["base"], result["base"] + "_LOD0")
+        ):
+            result["issues"].append("collision_without_mesh")
+        report["naming"] = result
+    if "topology" in requested:
+        report["topology"] = topology(mesh)
+    if "lightmap" in requested:
+        layer = mesh.uv_layers.get(layer_name)
+        entry = {"uv_layer": layer_name, "present": layer is not None}
+        if layer is not None:
+            loops = np.empty(len(mesh.loop_triangles) * 3, np.int64)
+            mesh.loop_triangles.foreach_get("loops", loops)
+            uv = np.empty(len(mesh.loops) * 2, np.float64)
+            layer.data.foreach_get("uv", uv)
+            triangles = uv.reshape(-1, 2)[loops].reshape(-1, 3, 2)
+            entry.update(overlap(triangles, lightmap_resolution))
+            entry["outside_unit_square"] = bool(len(uv) and (uv.min() < -1e-6
+                                                             or uv.max() > 1 + 1e-6))
+        report["lightmap"] = entry
+    if "transforms" in requested:
+        report["transforms"] = transforms(value)
+    if "origin" in requested:
+        report["origin"] = origin([vertex.co[:] for vertex in mesh.vertices])
+    return report
 
 
 def inspect(params, find_object):
@@ -21,6 +111,16 @@ def inspect(params, find_object):
         raise ValueError("Texture dimensions must be integers from 1 to 4096")
     if bpy.context.mode != "OBJECT":
         raise ValueError("Inspect a working copy in Object Mode")
+    selected_checks = params.get("checks") or []
+    if not isinstance(selected_checks, list) or any(c not in CHECKS for c in selected_checks):
+        raise ValueError(f"checks must be a list from {sorted(CHECKS)}")
+    naming = rules(params.get("naming"))
+    lightmap_layer = params.get("lightmap_uv", "UVMap_Lightmap")
+    if not isinstance(lightmap_layer, str) or not lightmap_layer or len(lightmap_layer) > 63:
+        raise ValueError("lightmap_uv must be a UV layer name")
+    lightmap_resolution = params.get("lightmap_resolution", 64)
+    if type(lightmap_resolution) is not int or not 16 <= lightmap_resolution <= 4096:
+        raise ValueError("lightmap_resolution must be an integer from 16 to 4096")
     objects = [find_object(name, mesh=True) for name in names]
     if sum(len(value.material_slots) for value in objects) > 64:
         raise ValueError("Inspect at most 64 material slots per call")
@@ -122,6 +222,8 @@ def inspect(params, find_object):
                 },
                 "mapping": summarize(samples),
                 "surfaces": bound_surfaces,
+                **({"checks": run_checks(value, lightmap_layer, selected_checks, naming,
+                                         lightmap_resolution)} if selected_checks else {}),
             }
         )
     return {
@@ -137,5 +239,6 @@ def inspect(params, find_object):
         "unique_meshes": len({value.data.as_pointer() for value in objects}),
         "unique_materials": len(materials),
         "images": list(images.values()),
-        "not_checked": ["UV overlaps", "seam continuity", "shader appearance"],
+        "not_checked": ["UV overlaps" if "lightmap" not in selected_checks else "texture UV overlaps",
+                        "seam continuity", "shader appearance"],
     }

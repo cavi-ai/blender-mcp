@@ -80,7 +80,7 @@ async def exercise(mode, env, workspace, adapter=None, include_model=False):
 
                 arguments = dict(case["arguments"])
                 if mode != "protocol":
-                    lease_free = (case["tool"] in {"session_control", "render_preview"}
+                    lease_free = (case["tool"] in {"session_control", "render_preview", "review_sheet"}
                                   or arguments.get("action") == "generate")
                     needs_lease = (not lease_free
                                    and not tools[case["tool"]].annotations.readOnlyHint

@@ -22,6 +22,7 @@ from .geometry import validate_mesh
 from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .lease import Lease
 from .paths import destination
+from .presets import AXIS_PRESETS
 
 _server = None
 _jobs = queue.Queue(maxsize=8)
@@ -31,8 +32,13 @@ _workspace = None
 _lease = Lease()
 _project_epoch = secrets.token_hex(16)
 LEASE_FREE = frozenset(
-    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "render_preview"}
+    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "render_preview",
+     "review_sheet"}
 )
+GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
+                      "collision", "cleanup_mesh"})
+OBJECTS = frozenset({"apply_transforms", "set_origin", "snap_to_grid", "rename_object",
+                     "add_socket"})
 MAX_MODIFIERS = 16
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"
@@ -245,7 +251,8 @@ def import_glb(path, name):
 def dispatch(operation, p):
     if operation == "owned_edit":
         operation, p = p["operation"], p["params"]
-        if operation in {"owned_edit", "session_control", "scene_info", "object_info", "runtime_status", "inspect_mesh_quality"}:
+        if operation in {"owned_edit", "session_control", "scene_info", "object_info",
+                         "runtime_status", "inspect_mesh_quality", "review_sheet"}:
             raise ValueError("Owned edit envelope requires a scene mutation")
     if operation == "session_control":
         return _lease.control(p, project_identity)
@@ -508,13 +515,9 @@ def export_mesh(p):
                     use_tspace=True,
                     add_leaf_bones=False,
                     bake_anim=False,
-                    axis_forward="-Z",
-                    axis_up="Y",
                     global_scale=1,
-                    apply_unit_scale=True,
-                    apply_scale_options="FBX_SCALE_UNITS",
-                    bake_space_transform=True,
                     path_mode="STRIP",
+                    **AXIS_PRESETS["unity"],
                 )
         else:
             result = bpy.ops.export_scene.gltf(
@@ -582,6 +585,26 @@ def _dispatch(operation, p):
         return assign(p, _workspace, obj)
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])
+    if operation == "review_sheet":
+        from .blender_review import review
+
+        return review(p)
+    if operation == "scatter":
+        from .blender_scatter import scatter
+
+        return scatter(p)
+    if operation == "export_asset":
+        from .blender_export import export_asset
+
+        return export_asset(p)
+    if operation in GEOMETRY:
+        from .blender_geometry import HANDLERS
+
+        return HANDLERS[operation](p)
+    if operation in OBJECTS:
+        from .blender_objects import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation in {"runtime_status", "runtime_restart"}:
         return runtime(operation, p)
     if operation == "object_info":

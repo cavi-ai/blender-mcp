@@ -29,15 +29,32 @@ OPERATIONS = frozenset(
         "session_control",
         "owned_edit",
         "assign_material",
+        "decimate_to",
+        "remesh_quad",
+        "lod_chain",
+        "lightmap_uv",
+        "texel_density",
+        "collision",
+        "cleanup_mesh",
+        "apply_transforms",
+        "set_origin",
+        "snap_to_grid",
+        "rename_object",
+        "add_socket",
+        "export_asset",
+        "review_sheet",
+        "scatter",
     }
 )
 SLOW_OPERATIONS = frozenset(
     {"import_mesh", "export_mesh", "export_instances", "add_modifier", "render_preview",
-     "save_project"}
+     "save_project", "decimate_to", "lightmap_uv", "texel_density", "collision", "cleanup_mesh",
+     "export_asset", "review_sheet", "scatter"}
 )
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain"})
 MAX_REQUEST_BYTES = 8 * 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
@@ -60,6 +77,8 @@ def default_connection() -> Path:
 
 def operation_timeout(operation, params):
     inner = params.get("operation") if operation == "owned_edit" else operation
+    if inner in LONG_OPERATIONS:
+        return MAX_TIMEOUT
     return SLOW_TIMEOUT if inner in SLOW_OPERATIONS else DEFAULT_TIMEOUT
 
 

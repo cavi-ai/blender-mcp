@@ -6,7 +6,7 @@ from unittest.mock import patch
 from cavi_blender_mcp import server
 
 TOOLS = {"scene_info", "inspect_mesh_quality", "render_preview", "session_control",
-         "object_edit", "mesh_edit", "assign_material", "asset_io"}
+         "object_edit", "mesh_edit", "assign_material", "asset_io", "review_sheet", "scatter"}
 
 
 class SurfaceTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class SurfaceTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return calls
 
-    def test_catalog_has_eight_tools(self):
+    def test_catalog_has_ten_tools(self):
         tools = asyncio.run(server.mcp.list_tools())
         self.assertEqual({tool.name for tool in tools}, TOOLS)
 

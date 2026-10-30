@@ -1909,5 +1909,1109 @@
       "protocol"
     ],
     "error": "validation"
+  },
+  {
+    "id": "decimate-to-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "decimate_to",
+      "name": "AAA_Rock",
+      "target_triangles": 400
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/triangles",
+      "/triangles_before"
+    ]
+  },
+  {
+    "id": "decimate-to-unrelated",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "decimate_to",
+      "name": "AAA_Rock",
+      "target_faces": 100
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: target_faces"
+  },
+  {
+    "id": "decimate-to-both-targets",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "decimate_to",
+      "name": "AAA_Rock",
+      "target_triangles": 100,
+      "amount": 0.5
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "exactly one"
+  },
+  {
+    "id": "decimate-to-shared",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "decimate_to",
+      "name": "AAA_SharedA",
+      "amount": 0.5
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "shared"
+  },
+  {
+    "id": "decimate-to-unowned",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "decimate_to",
+      "name": "AAA_Rock",
+      "amount": 0.5
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "lease_id",
+    "without_lease": true
+  },
+  {
+    "id": "remesh-quad-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "remesh_quad",
+      "name": "AAA_Blob",
+      "target_faces": 200
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/faces",
+      "/quad_ratio"
+    ]
+  },
+  {
+    "id": "remesh-quad-missing-target",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "remesh_quad",
+      "name": "AAA_Blob"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: target_faces"
+  },
+  {
+    "id": "remesh-quad-preserve",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "remesh_quad",
+      "name": "AAA_Blob",
+      "target_faces": 200,
+      "preserve": [
+        "seams"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "preserve accepts only"
+  },
+  {
+    "id": "remesh-quad-shared",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "remesh_quad",
+      "name": "AAA_SharedA",
+      "target_faces": 200
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "shared"
+  },
+  {
+    "id": "lod-chain-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lod_chain",
+      "name": "AAA_Rock",
+      "ratios": [
+        0.5,
+        0.25
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/collection": "AAA_Rock_LODs",
+      "/levels/0/name": "AAA_Rock_LOD0",
+      "/levels/2/name": "AAA_Rock_LOD2"
+    },
+    "required": [
+      "/levels/2/triangles"
+    ]
+  },
+  {
+    "id": "lod-chain-ratio-bound",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lod_chain",
+      "name": "AAA_Rock",
+      "ratios": [
+        1.5
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "lod-chain-both",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lod_chain",
+      "name": "AAA_Rock",
+      "ratios": [
+        0.5
+      ],
+      "triangle_targets": [
+        10
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "not both"
+  },
+  {
+    "id": "lod-chain-repeat",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lod_chain",
+      "name": "AAA_Rock"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
+  },
+  {
+    "id": "lightmap-uv-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lightmap_uv",
+      "name": "AAA_Crate",
+      "lightmap_resolution": 128
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/uv_layer": "UVMap_Lightmap",
+      "/overlap_ratio": 0.0
+    }
+  },
+  {
+    "id": "lightmap-uv-resolution-bound",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lightmap_uv",
+      "name": "AAA_Crate",
+      "lightmap_resolution": 8
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "lightmap-uv-shared",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "lightmap_uv",
+      "name": "AAA_SharedA"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "shared"
+  },
+  {
+    "id": "texel-density-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "texel_density",
+      "name": "AAA_Crate",
+      "target_px_per_m": 256
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/target_px_per_m": 256.0
+    },
+    "required": [
+      "/density_before",
+      "/density_after"
+    ]
+  },
+  {
+    "id": "texel-density-missing-target",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "texel_density",
+      "name": "AAA_Crate"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: target_px_per_m"
+  },
+  {
+    "id": "texel-density-missing-layer",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "texel_density",
+      "name": "AAA_Crate",
+      "target_px_per_m": 256,
+      "uv_layer": "Missing"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not exist"
+  },
+  {
+    "id": "collision-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "collision",
+      "name": "AAA_Crate"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/count": 1,
+      "/objects/0/name": "UCX_AAA_Crate_00"
+    }
+  },
+  {
+    "id": "collision-hull-bound",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "collision",
+      "name": "AAA_Crate",
+      "max_hull_vertices": 300
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "collision-repeat",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "collision",
+      "name": "AAA_Crate",
+      "shape": "box"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
+  },
+  {
+    "id": "cleanup-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "cleanup",
+      "name": "AAA_Pair",
+      "steps": [
+        "merge",
+        "recalc_normals",
+        "triangulate"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/after/faces": 12
+    },
+    "required": [
+      "/delta",
+      "/merged_vertices"
+    ]
+  },
+  {
+    "id": "cleanup-unknown-step",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "cleanup",
+      "name": "AAA_Pair",
+      "steps": [
+        "explode"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "cleanup-shared",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "cleanup",
+      "name": "AAA_SharedA"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "shared"
+  },
+  {
+    "id": "apply-transforms-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "apply_transforms",
+      "name": "AAA_Box"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "/applied": [
+        "rotation",
+        "scale"
+      ]
+    }
+  },
+  {
+    "id": "apply-transforms-component",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "apply_transforms",
+      "name": "AAA_Box",
+      "components": [
+        "shear"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "apply-transforms-shared",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "apply_transforms",
+      "name": "AAA_SharedA"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "make_single_user"
+  },
+  {
+    "id": "set-origin-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_origin",
+      "name": "AAA_Box"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/origin": "bounds_bottom_center"
+    }
+  },
+  {
+    "id": "set-origin-missing-point",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_origin",
+      "name": "AAA_Box",
+      "origin": "point"
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "location is required"
+  },
+  {
+    "id": "set-origin-shared",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_origin",
+      "name": "AAA_SharedA"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "shared"
+  },
+  {
+    "id": "snap-to-grid-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "snap_to_grid",
+      "name": "AAA_Box",
+      "grid": 0.5
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/grid": 0.5
+    }
+  },
+  {
+    "id": "snap-to-grid-bound",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "snap_to_grid",
+      "name": "AAA_Box",
+      "grid": 0
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "snap-to-grid-missing-object",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "snap_to_grid",
+      "name": "Missing",
+      "grid": 1
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not exist"
+  },
+  {
+    "id": "rename-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "rename",
+      "name": "AAA_Box",
+      "new_name": "SM_AAA_Box"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/name": "SM_AAA_Box",
+      "/mesh": "SM_AAA_Box"
+    }
+  },
+  {
+    "id": "rename-missing-name",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "rename",
+      "name": "SM_AAA_Box"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: new_name"
+  },
+  {
+    "id": "rename-existing",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "rename",
+      "name": "SM_AAA_Box",
+      "new_name": "Cube"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "add-socket-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "add_socket",
+      "name": "SM_AAA_Box",
+      "new_name": "Grip",
+      "location": [
+        0,
+        0,
+        1
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/name": "SOCKET_Grip",
+      "/parent": "SM_AAA_Box",
+      "/location": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "id": "add-socket-unrelated",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "add_socket",
+      "name": "SM_AAA_Box",
+      "new_name": "Grip2",
+      "grid": 1
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: grid"
+  },
+  {
+    "id": "add-socket-duplicate",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "add_socket",
+      "name": "SM_AAA_Box",
+      "new_name": "Grip"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "quality-checks-success",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "AAA_Crate",
+        "AAA_Rock_LOD1",
+        "UCX_AAA_Crate_00"
+      ],
+      "checks": [
+        "naming",
+        "topology",
+        "lightmap",
+        "transforms",
+        "origin"
+      ],
+      "naming": {
+        "mesh_prefix": "SM_"
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/objects/0/checks/lightmap/present": true,
+      "/objects/1/checks/naming/role": "lod",
+      "/objects/2/checks/naming/role": "collision",
+      "/objects/0/checks/origin/classification": "bounds_center"
+    },
+    "required": [
+      "/objects/0/checks/topology/non_manifold_edges",
+      "/objects/0/checks/lightmap/overlap_ratio"
+    ]
+  },
+  {
+    "id": "quality-checks-unknown",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "AAA_Crate"
+      ],
+      "checks": [
+        "bogus"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "quality-naming-extra-key",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "AAA_Crate"
+      ],
+      "naming": {
+        "suffix": "_LOD"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "export-lods-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Rock_LOD0"
+      ],
+      "path": "rock-lods.fbx",
+      "lods": true,
+      "axis": "unity"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/lods": [
+        "AAA_Rock_LOD0",
+        "AAA_Rock_LOD1",
+        "AAA_Rock_LOD2"
+      ]
+    },
+    "files": [
+      "rock-lods.fbx"
+    ]
+  },
+  {
+    "id": "export-collision-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Crate"
+      ],
+      "path": "crate-ue.fbx",
+      "collision": true,
+      "axis": "unreal"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/collision": [
+        "UCX_AAA_Crate_00"
+      ],
+      "/axis": "unreal"
+    },
+    "files": [
+      "crate-ue.fbx"
+    ]
+  },
+  {
+    "id": "export-usd-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Crate"
+      ],
+      "path": "layout.usdc"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "files": [
+      "layout.usdc"
+    ]
+  },
+  {
+    "id": "export-bake-pair-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "pair.fbx",
+      "bake_pair": {
+        "high": [
+          "AAA_Pair_high"
+        ],
+        "low": [
+          "AAA_Pair"
+        ]
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/low/objects": [
+        "AAA_Pair_low"
+      ],
+      "/high/objects": [
+        "AAA_Pair_high"
+      ]
+    },
+    "files": [
+      "pair_low.fbx",
+      "pair_high.fbx"
+    ]
+  },
+  {
+    "id": "export-bake-pair-names",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "bad.fbx",
+      "names": [
+        "AAA_Pair"
+      ],
+      "bake_pair": {
+        "high": [
+          "AAA_Pair_high"
+        ],
+        "low": [
+          "AAA_Pair"
+        ]
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: names"
+  },
+  {
+    "id": "export-axis-glb",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Crate"
+      ],
+      "path": "crate.glb",
+      "axis": "unreal"
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "glTF",
+    "absent": [
+      "crate.glb"
+    ]
+  },
+  {
+    "id": "export-lods-missing",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Crate"
+      ],
+      "path": "nolods.fbx",
+      "lods": true
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "LOD0",
+    "absent": [
+      "nolods.fbx"
+    ]
+  },
+  {
+    "id": "export-bake-pair-overwrite",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "pair.fbx",
+      "bake_pair": {
+        "high": [
+          "AAA_Pair_high"
+        ],
+        "low": [
+          "AAA_Pair"
+        ]
+      }
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "overwrite"
+  },
+  {
+    "id": "export-usd-escape",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "names": [
+        "AAA_Crate"
+      ],
+      "path": "../escape.usdc"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
+  },
+  {
+    "id": "review-sheet-success",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "sheet.png",
+      "names": [
+        "AAA_Crate"
+      ],
+      "resolution": 384
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "image": true,
+    "files": [
+      "sheet.png"
+    ]
+  },
+  {
+    "id": "review-sheet-heatmap",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "heat.png",
+      "names": [
+        "AAA_Crate"
+      ],
+      "mode": "texel_heatmap",
+      "target_px_per_m": 256,
+      "views": [
+        "front",
+        "persp"
+      ],
+      "resolution": 256
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "image": true,
+    "files": [
+      "heat.png"
+    ]
+  },
+  {
+    "id": "review-sheet-missing-path",
+    "tool": "review_sheet",
+    "arguments": {},
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "review-sheet-resolution-bound",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "big.png",
+      "resolution": 4096
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "review-sheet-unrelated",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "unrelated.png",
+      "target_px_per_m": 10
+    },
+    "kind": "invalid",
+    "modes": [
+      "native"
+    ],
+    "error": "texel_heatmap",
+    "absent": [
+      "unrelated.png"
+    ]
+  },
+  {
+    "id": "review-sheet-overwrite",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "existing.png",
+      "resolution": 256
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "overwrite"
+  },
+  {
+    "id": "review-sheet-escape",
+    "tool": "review_sheet",
+    "arguments": {
+      "path": "escape/sheet.png",
+      "resolution": 256
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
+  },
+  {
+    "id": "scatter-success",
+    "tool": "scatter",
+    "arguments": {
+      "name": "AAA_Blob",
+      "collection": "AAA_Props",
+      "density": 4,
+      "seed": 3,
+      "min_distance": 0.1,
+      "scale_range": [
+        0.5,
+        1.5
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/modifier": "CAVI Scatter",
+      "/collection": "AAA_Props",
+      "/seed": 3
+    },
+    "required": [
+      "/instances",
+      "/estimated_instances"
+    ]
+  },
+  {
+    "id": "scatter-missing-density",
+    "tool": "scatter",
+    "arguments": {
+      "name": "AAA_Blob",
+      "collection": "AAA_Props"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "scatter-budget",
+    "tool": "scatter",
+    "arguments": {
+      "name": "AAA_Blob",
+      "collection": "AAA_Props",
+      "density": 10000
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "budget"
+  },
+  {
+    "id": "scatter-recursion",
+    "tool": "scatter",
+    "arguments": {
+      "name": "AAA_Pebble",
+      "collection": "AAA_Props",
+      "density": 1
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "inside"
   }
 ]
