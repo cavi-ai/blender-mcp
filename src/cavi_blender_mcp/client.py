@@ -24,6 +24,8 @@ OPERATIONS = frozenset(
         "render_preview",
         "runtime_status",
         "runtime_restart",
+        "session_control",
+        "owned_edit",
     }
 )
 

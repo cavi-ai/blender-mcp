@@ -23,6 +23,8 @@ dispatch = bridge.dispatch
 
 def checked_dispatch(operation, params):
     result = dispatch(operation, params)
+    if operation == "owned_edit":
+        operation, params = params["operation"], params["params"]
     if operation == "shade_mesh":
         assert all(
             polygon.use_smooth == params["smooth"]

@@ -14,12 +14,25 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from cavi_blender_mcp import blender_bridge as bridge
 
+fixture_state = bridge.dispatch("session_control", {"action": "inspect"})
+fixture_lease = bridge.dispatch("session_control", {
+    "action": "claim", "owner": "native-fixture",
+    "expected_project": fixture_state["project_id"],
+})["lease_id"]
+
+
+def owned_dispatch(operation, params):
+    return bridge.dispatch(operation, {**params, "lease_id": fixture_lease}
+                           if operation not in {"scene_info", "object_info", "runtime_status"}
+                           else params)
+
+
 python = sys.argv[sys.argv.index("--") + 1]
 
 
 def cli(action, requests):
     process = subprocess.Popen(
-        [str(Path(python).with_name("cavi-blender-mcp")), "runtime", action],
+        [str(Path(python).with_name("cavi-blender-mcp")), "runtime", action, *([] if action != "restart" else ["--lease-id", fixture_lease])],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -46,11 +59,11 @@ with tempfile.TemporaryDirectory() as folder:
     bridge.register()
     try:
         bpy.data.objects["Cube"].location.z = 3.25
-        before = bridge.dispatch("scene_info", {})
+        before = owned_dispatch("scene_info", {})
         dirty = bpy.data.is_dirty
         selection = [item.name for item in bpy.context.selected_objects]
         old_config = json.loads((root / "connection.json").read_text())
-        old_runtime = bridge.dispatch("runtime_status", {})
+        old_runtime = owned_dispatch("runtime_status", {})
         status = cli("status", 1)
         assert status["pid"] == os.getpid()
         result = cli("restart", 2)
@@ -60,7 +73,7 @@ with tempfile.TemporaryDirectory() as folder:
         assert result["generation"] != old_runtime["generation"]
         assert new_config["port"] != old_config["port"]
         assert new_config["token"] != old_config["token"]
-        assert bridge.dispatch("scene_info", {}) == before
+        assert owned_dispatch("scene_info", {}) == before
         assert bpy.data.is_dirty == dirty
         assert [item.name for item in bpy.context.selected_objects] == selection
         with socket.socket() as probe:
@@ -69,14 +82,14 @@ with tempfile.TemporaryDirectory() as folder:
         current_config = (root / "connection.json").read_bytes()
         with patch.object(bridge.os, "replace", side_effect=OSError("read-only connection directory")):
             try:
-                bridge.dispatch("runtime_restart", {})
+                owned_dispatch("runtime_restart", {})
             except OSError:
                 pass
             else:
                 raise AssertionError("Failed connection publication was accepted")
         assert (root / "connection.json").read_bytes() == current_config
         assert cli("status", 1)["generation"] == result["generation"]
-        assert bridge.dispatch("scene_info", {}) == before
+        assert owned_dispatch("scene_info", {}) == before
         print(json.dumps({"native_runtime": "passed", "scene_preserved": True,
                           "pid_preserved": True, "credentials_rotated": True,
                           "publication_failure_preserves_connection": True}))
