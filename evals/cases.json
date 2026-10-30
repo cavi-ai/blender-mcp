@@ -1250,5 +1250,56 @@
       "native"
     ],
     "error": "workspace"
+  },
+  {
+    "id": "import-schema", "tool": "import_mesh", "arguments": {},
+    "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"
+  },
+  {
+    "id": "import-empty-name", "tool": "import_mesh",
+    "arguments": {"path": "prop.glb", "name": ""},
+    "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"
+  },
+  {
+    "id": "import-success", "tool": "import_mesh",
+    "arguments": {"path": "prop.glb", "name": "ImportedEval"},
+    "kind": "success", "modes": ["native"],
+    "equals": {"/collection": "ImportedEval", "/objects/0/name": "ImportedEval"},
+    "required": ["/sha256", "/imported_vertices", "/imported_triangles"]
+  },
+  {
+    "id": "import-duplicate-refused", "tool": "import_mesh",
+    "arguments": {"path": "prop.glb", "name": "ImportedEval"},
+    "kind": "safety", "modes": ["native"], "error": "already exists"
+  },
+  {
+    "id": "import-existing-object-refused", "tool": "import_mesh",
+    "arguments": {"path": "prop.glb", "name": "Cube"},
+    "kind": "safety", "modes": ["native"], "error": "already exists"
+  },
+  {
+    "id": "import-path-escape", "tool": "import_mesh",
+    "arguments": {"path": "../outside/prop.glb", "name": "Escape"},
+    "kind": "safety", "modes": ["native"], "error": "workspace"
+  },
+  {
+    "id": "import-symlink-escape", "tool": "import_mesh",
+    "arguments": {"path": "escape/prop.glb", "name": "Escape"},
+    "kind": "safety", "modes": ["native"], "error": "workspace"
+  },
+  {
+    "id": "import-invalid-container", "tool": "import_mesh",
+    "arguments": {"path": "existing.glb", "name": "Malformed"},
+    "kind": "safety", "modes": ["native"], "error": "GLB"
+  },
+  {
+    "id": "import-wrong-extension", "tool": "import_mesh",
+    "arguments": {"path": "existing.png", "name": "WrongFormat"},
+    "kind": "safety", "modes": ["native"], "error": "GLB"
+  },
+  {
+    "id": "import-long-unicode-name", "tool": "import_mesh",
+    "arguments": {"path": "prop.glb", "name": "界界界界界界界界界界界界界界界界界界界界界界"},
+    "kind": "safety", "modes": ["native"], "error": "UTF-8"
   }
 ]
