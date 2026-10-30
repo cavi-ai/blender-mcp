@@ -20,6 +20,29 @@ bpy.context.scene.collection.objects.link(uv_target)
 for layer in list(uv_target.data.uv_layers):
     uv_target.data.uv_layers.remove(layer)
 
+for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
+                             ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),
+                             ("AAA_Pair", "cube", (12, 6, 0)),
+                             ("AAA_Pair_high", "sphere", (12, 6, 0))):
+    add = (bpy.ops.mesh.primitive_uv_sphere_add if kind == "sphere"
+           else bpy.ops.mesh.primitive_cube_add)
+    add(location=location)
+    bpy.context.object.name = bpy.context.object.data.name = name
+bpy.data.objects["AAA_Box"].scale = (2, 2, 2)
+pair = bpy.data.objects.new("AAA_SharedA", bpy.data.meshes["AAA_Crate"].copy())
+bpy.context.scene.collection.objects.link(pair)
+bpy.context.scene.collection.objects.link(bpy.data.objects.new("AAA_SharedB", pair.data))
+props = bpy.data.collections.new("AAA_Props")
+bpy.context.scene.collection.children.link(props)
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.1, location=(0, 0, -20))
+pebble = bpy.context.object
+pebble.name = "AAA_Pebble"
+for owner in list(pebble.users_collection):
+    owner.objects.unlink(pebble)
+props.objects.link(pebble)
+for value in bpy.context.selected_objects:
+    value.select_set(False)
+
 dispatch = bridge.dispatch
 
 

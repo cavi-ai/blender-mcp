@@ -63,16 +63,35 @@ After installing new tools, restart that client's MCP connection to discover the
 
 - `session_control`: `action` = inspect | claim | renew | release application edit ownership.
 - `scene_info`: version, file, workspace and a page of objects (`limit` 1–1000, default 200; `offset`; returns `total`). With `name`, returns that object's details.
-- `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
+- `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Optional `checks`: `naming` (lint against `naming` = `mesh_prefix`, `lod_suffix` `_LOD{n}`, `collision_prefixes`), `topology` (non-manifold and boundary edges, loose vertices, zero-area faces, n-gons), `lightmap` (presence and rasterized `overlap_ratio` of `lightmap_uv` at `lightmap_resolution`), `transforms` (applied scale/rotation), `origin` (position relative to local bounds). Texture-UV overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
 - `render_preview`: render a PNG and return an MCP image; no lease needed. `names` isolates meshes (other renderable objects are hidden), `direction` picks the view, `orthographic` switches the camera. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Scene state is restored afterward.
-- `object_edit`: `action` = `create_primitive` (`kind`, `location`), `create_mesh` (`vertices`, `faces`), `transform` (`location`, `rotation_degrees` XYZ Euler, honoring the object's rotation mode, `scale`), `set_color` (`rgba`, `slot`=0; reuses one color material per object slot), `shade` (`smooth`).
-- `mesh_edit`: `action` = `modifier` (`kind` bevel | decimate | subdivision | voxel_remesh, `amount`, `apply`) or `unwrap` (Smart UV Project then pack; `angle_limit_degrees`=66, `island_margin`=0.02, optional `uv_layer`, created if missing).
+- `object_edit`: `action` = `create_primitive` (`kind`, `location`), `create_mesh` (`vertices`, `faces`), `transform` (`location`, `rotation_degrees` XYZ Euler, honoring the object's rotation mode, `scale`), `set_color` (`rgba`, `slot`=0; reuses one color material per object slot), `shade` (`smooth`), `apply_transforms` (`components`=[rotation, scale]; shared mesh data needs `make_single_user`=true; children keep their world transforms), `set_origin` (`origin` = bounds_bottom_center | bounds_center | world_origin | point with world `location`; geometry stays in place), `snap_to_grid` (`grid`), `rename` (`new_name`; also renames single-user mesh data), `add_socket` (empty `SOCKET_<new_name>` parented at local `location`, `rotation_degrees`).
+- `mesh_edit`: `action` =
+  - `modifier` (`kind` bevel | decimate | subdivision | voxel_remesh, `amount`, `apply`)
+  - `unwrap` (Smart UV Project then pack; `angle_limit_degrees`=66, `island_margin`=0.02, optional `uv_layer`, created if missing)
+  - `decimate_to` (`target_triangles` or ratio `amount`; collapse with `symmetry_axis`; `preserve`=[seams] weights UV seams, UV island borders and open boundaries; up to three passes; returns achieved `triangles`)
+  - `remesh_quad` (QuadriFlow to `target_faces`; `preserve` sharp | boundary, default boundary; needs a manifold mesh; UV layers are not kept)
+  - `lod_chain` (`ratios`=[0.5, 0.25, 0.125] or `triangle_targets`; creates `<base>_LOD1..n` with the same materials and UVs in collection `<base>_LODs`; a source not ending in `_LOD0` is copied to `<base>_LOD0` unless `rename_source`=true)
+  - `lightmap_uv` (Smart UV Project and pack into `uv_layer`=UVMap_Lightmap with margin `margin_px`/`lightmap_resolution`; keeps the render-active layer; returns `overlap_ratio` rasterized at `lightmap_resolution`)
+  - `texel_density` (uniformly scales the layer around its UV bounds center to `target_px_per_m` at `texture_resolution`, measured as in `inspect_mesh_quality`; `pack` rearranges islands without rescaling)
+  - `collision` (`shape` convex | box | sphere → `UCX_`/`UBX_`/`USP_<base>_NN` per loose part, unparented, world transform of the source; convex hulls are capped at `max_hull_vertices` (≤255) by farthest-point sampling; `<base>` drops a `_LODn` suffix)
+  - `cleanup` (`merge_distance`, `steps` from merge, delete_loose, recalc_normals, triangulate, clear_custom_normals; returns count deltas)
 - `assign_material`: bind a new material to exact mesh slots, pack a bounded workspace PNG as sRGB base color, and set raw roughness and metallic values. Other slots are preserved; UVs and single-user mesh data are required for textured assignment.
-- `asset_io`: `action` = `import` (static GLB `path`, new `name`), `export` (`names`, `.fbx`/`.glb` `path`, `preserve_instances`, `include_empties`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease).
+- `asset_io`: `action` = `import` (static GLB `path`, new `name`), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease).
+- `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) at `resolution` ≤ 2048 px wide; `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
+- `scatter`: adds a fixed Geometry Nodes modifier that instances `collection` over the mesh surface: `density` per m², `seed`, `min_distance` (Poisson), `scale_range`, `rotation_jitter_degrees` about Z, `realize`. Bounded to 100,000 estimated instances and 2,000,000 realized triangles; no caller-authored node graphs.
+
+### Engine exports
+
+- `lods=true` adds every `<base>_LODn` sibling of each name so Unity builds a LODGroup.
+- `collision=true` adds `UCX_`/`UBX_`/`USP_<base>_NN` objects.
+- `bake_pair={"high": [...], "low": [...]}` writes `<stem>_low.fbx` and `<stem>_high.fbx`; objects and single-user meshes are temporarily named `<base>_low`/`<base>_high` for name-matched baking (Substance Designer), then restored. Each base needs exactly one low and one high object. Map baking is out of scope.
+- `axis` (FBX and USD; default unity): unity = -Z forward, Y up, FBX_SCALE_UNITS, baked space transform; unreal = X forward, Z up, FBX_SCALE_NONE, no bake; godot = -Z forward, Y up, FBX_SCALE_ALL, baked space transform. glTF is always +Y up.
+- USD export writes selected meshes and materials without animation, lights, cameras or texture copies.
 
 Static FBX exports use file unit metadata, baked space conversion, face smoothing and tangents. `include_empties` adds empty ancestors of the named meshes for hierarchy. GLB exports apply modifiers. `preserve_instances=true` shares geometry between local, unmodified static FBX sources with matching distinct populated material slots; source mesh data and bindings are restored after export.
 
-Every mutation except `render_preview` and `generate` requires a `lease_id`. Unrelated or missing per-action parameters are refused before contacting Blender.
+Every mutation except `render_preview`, `review_sheet` and `generate` requires a `lease_id`. Unrelated or missing per-action parameters are refused before contacting Blender.
 
 Materials are Blender preview colors. Exported assets still need the destination game's materials, scale, collision and import settings.
 Material, shading and UV edits refuse shared mesh data to avoid changing linked objects implicitly. Make the mesh single-user in Blender before editing it.
@@ -83,11 +102,13 @@ Material, shading and UV edits refuse shared mesh data to avoid changing linked 
 
 The bridge binds only to `127.0.0.1` on an ephemeral port and requires a random session token. `CAVI_BLENDER_CONNECTION` selects its private connection file, defaulting to `~/.cavi/blender-mcp/connection.json`. Keep it out of repositories. Separate concurrent sessions require separate connection files configured in both Blender and the MCP server.
 
-There is no arbitrary Python tool, telemetry or external asset download. Changes are not retried after a timeout; inspect the scene before resubmitting an uncertain mutation. Requests time out after 60 s (import, export, modifier, render and save: 300 s; cap 600 s). Bridge failures return JSON errors: 400 bad request, 413 too large, 503 queue full, 504 not started in time. Blender operations run on the main thread. The bridge stops when its Blender process exits.
+There is no arbitrary Python tool, telemetry or external asset download. Changes are not retried after a timeout; inspect the scene before resubmitting an uncertain mutation. Requests time out after 60 s (import, export, modifier, render, save and most geometry actions: 300 s; `remesh_quad` and `lod_chain`: 600 s, the cap). Bridge failures return JSON errors: 400 bad request, 413 too large, 503 queue full, 504 not started in time. Blender operations run on the main thread. The bridge stops when its Blender process exits.
 
 Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 face indices within the 8-MiB request limit. Faces use zero-based indices and outward winding. Invalid indices, repeated vertices and zero-area faces are refused before creating a Blender datablock. Disconnected shells are allowed for voxel fusion. Subdivision supports integer levels 1–3 within 500,000 estimated faces; remeshing requires a voxel size of 0.005–1 local units within a two-million-voxel bounding volume. Both organic modifiers require an object without existing modifiers to bound evaluation cost.
 
 Bevel is bounded by the evaluated geometry; unapplied modifier stacks are limited to 16.
+
+Geometry actions need Object Mode, single-user mesh data without modifiers or shape keys, and at most 500,000 triangles (`remesh_quad`, `collision`, `lightmap_uv`, `texel_density`: 200,000; `remesh_quad` targets 16–100,000 faces; `lod_chain` 1–6 levels; collision 1–64 loose parts). Reductions bake through the evaluated mesh rather than context operators; QuadriFlow and UV packing run through Blender operators, including in `runtime start --background`.
 
 `mesh_edit` `modifier` defaults to a non-destructive modifier. Its optional `apply` flag bakes the result into a single-user mesh without an existing modifier stack, allowing fusion, smoothing and reduction in sequence.
 
@@ -158,6 +179,8 @@ The additional `tests/blender_organic.py` native check exercises custom topology
 
 `tests/blender_harden.py` checks rotation modes, color material reuse, named UV layers, modifier budgets, lease-free previews, FBX settings, and the bridge's request cap and error statuses.
 
+`tests/blender_aaa.py` checks decimation, LOD chains, QuadriFlow, lightmap overlap, texel density, collision naming, cleanup deltas, transform/origin edits, sockets, inspection checks, LOD/collision/USD/bake-pair exports with FBX re-import, every review sheet mode and scatter budgets.
+
 `tests/blender_import.py` checks typed import on Blender 5.2.3, including transforms,
 UVs, vertex-color values, embedded image packing, name reuse, selection preservation,
 and rollback after a partial native import. It uses a disposable factory scene and
@@ -174,7 +197,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 8 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 10 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, every geometry action, review sheets, scatter, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 
