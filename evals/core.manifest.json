@@ -5,14 +5,14 @@
       "id": "discovery-budget",
       "probe": "discovery-cost",
       "access": "read_only",
-      "max_tools": 17,
-      "max_schema_bytes": 18000
+      "max_tools": 8,
+      "max_schema_bytes": 12000
     },
     {
       "id": "token-budget",
       "probe": "token-cost",
       "access": "read_only",
-      "max_total_tokens": 4500,
+      "max_total_tokens": 3100,
       "max_tool_tokens": 700
     },
     {
@@ -48,18 +48,18 @@
       "arguments": {}
     },
     {
-      "id": "object_info-schema-guessability",
+      "id": "scene_info-object-schema-guessability",
       "probe": "schema-guessability",
-      "tool": "object_info",
+      "tool": "scene_info",
       "access": "read_only",
       "arguments": {
         "name": "EvalProp"
       }
     },
     {
-      "id": "object_info-output-schema",
+      "id": "scene_info-object-output-schema",
       "probe": "output-schema",
-      "tool": "object_info",
+      "tool": "scene_info",
       "access": "read_only",
       "arguments": {
         "name": "EvalProp"

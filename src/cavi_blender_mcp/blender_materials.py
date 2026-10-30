@@ -20,6 +20,29 @@ def linear(value):
     return value / 12.92 if value <= .04045 else ((value + .055) / 1.055) ** 2.4
 
 
+def stored_path(path):
+    if not bpy.data.filepath:
+        return path
+    try:
+        return bpy.path.relpath(path)
+    except ValueError:
+        return path
+
+
+def multiply_node(tree):
+    try:
+        node = tree.nodes.new("ShaderNodeMix")
+    except RuntimeError:
+        node = tree.nodes.new("ShaderNodeMixRGB")
+        node.blend_type = "MULTIPLY"
+        return node.inputs[0], node.inputs[1], node.inputs[2], node.outputs[0]
+    node.data_type = "RGBA"
+    node.blend_type = "MULTIPLY"
+    inputs = {socket.identifier: socket for socket in node.inputs}
+    outputs = {socket.identifier: socket for socket in node.outputs}
+    return inputs["Factor_Float"], inputs["A_Color"], inputs["B_Color"], outputs["Result_Color"]
+
+
 def assign(params, workspace, find_object):
     names = params["names"]
     name = params["material_name"]
@@ -70,15 +93,14 @@ def assign(params, workspace, find_object):
                     raise ValueError("Blender did not decode the expected PNG dimensions")
                 image.colorspace_settings.name = "sRGB"
                 image.pack()
-                image.filepath = receipt["path"]
+                image.filepath = stored_path(receipt["path"])
             node = material.node_tree.nodes.new("ShaderNodeTexImage")
             node.image = image
-            multiply = material.node_tree.nodes.new("ShaderNodeMixRGB")
-            multiply.blend_type = "MULTIPLY"
-            multiply.inputs[0].default_value = 1
-            multiply.inputs[2].default_value = material.diffuse_color
-            material.node_tree.links.new(node.outputs["Color"], multiply.inputs[1])
-            material.node_tree.links.new(multiply.outputs[0], shader.inputs["Base Color"])
+            factor, color_in, tint, result = multiply_node(material.node_tree)
+            factor.default_value = 1
+            tint.default_value = material.diffuse_color
+            material.node_tree.links.new(node.outputs["Color"], color_in)
+            material.node_tree.links.new(result, shader.inputs["Base Color"])
         for value in values:
             if not value.material_slots:
                 value.data.materials.append(material)
