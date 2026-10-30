@@ -11,6 +11,7 @@ OPERATIONS = frozenset(
     {
         "scene_info",
         "object_info",
+        "inspect_mesh_quality",
         "create_primitive",
         "create_mesh",
         "import_mesh",
@@ -20,6 +21,7 @@ OPERATIONS = frozenset(
         "shade_mesh",
         "unwrap_mesh",
         "export_mesh",
+        "export_instances",
         "save_project",
         "render_preview",
         "runtime_status",

@@ -21,3 +21,20 @@ class LegacyBridgeTests(unittest.TestCase):
         ):
             server.create_primitive("Prop", "cube", lease_id="unvalidated-token")
         self.assertEqual(effects, [])
+
+    def test_instance_export_refuses_legacy_bridge_before_writing(self):
+        effects = []
+
+        def legacy(operation, params):
+            self.assertEqual(operation, "owned_edit")
+            if params["operation"] == "export_instances":
+                raise RuntimeError("Unknown operation: export_instances")
+            effects.append("file-written")
+            return {}
+
+        with (
+            patch.object(server, "BridgeClient", return_value=SimpleNamespace(call=legacy)),
+            self.assertRaisesRegex(RuntimeError, "export_instances"),
+        ):
+            server.export_mesh(["Prop"], "prop.fbx", preserve_instances=True, lease_id="token")
+        self.assertEqual(effects, [])

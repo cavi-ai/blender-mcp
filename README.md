@@ -61,11 +61,12 @@ After installing new tools, restart that client's MCP connection to discover the
 - `scene_info`, `object_info`: inspect scene and geometry.
 - `create_primitive`, `transform_object`, `set_color`: create and edit objects.
 - `assign_material`: bind a new material to exact mesh slots, pack a bounded workspace PNG as sRGB base color, and set raw roughness and metallic values. Other slots are preserved; UVs and single-user mesh data are required for textured assignment.
+- `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Choose the consuming texture resolution. Overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
 - `create_mesh`: indexed custom geometry, with bounded vertices, faces and coordinates.
 - `generate_mesh`: reconstruct a colored GLB from one original image using a configured local TripoSR worker.
 - `import_mesh`: import a self-contained static GLB into a new named collection, preserving existing objects and selection.
 - `add_modifier`, `shade_mesh`, `unwrap_mesh`: bevel, decimation, subdivision, voxel remeshing, shading and UVs.
-- `export_mesh`: export named meshes as FBX or GLB. Static FBX uses file unit metadata and baked space conversion to preserve the source scale without adding 100-fold object scales.
+- `export_mesh`: export named meshes as FBX or GLB. Static FBX uses file unit metadata and baked space conversion to preserve the source scale without adding 100-fold object scales. Opt into `preserve_instances=true` for local, unmodified static FBX sources with distinct populated material slots: matching mesh/material layouts share geometry, and different finishes remain separate. Source mesh data and object material bindings are restored after export.
 - `save_project`: save a new Blender project.
 - `render_preview`: render a PNG and return an MCP image. Optional mesh names isolate an asset; a camera direction selects its view. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Existing lights are excluded. Visibility, world, engine, and camera settings are restored afterward.
 
@@ -165,7 +166,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 16 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 17 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 

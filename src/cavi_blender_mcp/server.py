@@ -29,7 +29,7 @@ READ_ONLY = ToolAnnotations(
 
 def call(operation, **params):
     client = BridgeClient()
-    if operation not in {"scene_info", "object_info", "runtime_status", "session_control"}:
+    if operation not in {"scene_info", "object_info", "runtime_status", "session_control", "inspect_mesh_quality"}:
         # Legacy bridges reject this envelope instead of ignoring a lease parameter.
         return client.call("owned_edit", {"operation": operation, "params": params})
     return client.call(operation, params)
@@ -45,6 +45,21 @@ def scene_info() -> dict[str, Any]:
 def object_info(name: ObjectName) -> dict[str, Any]:
     """Inspect geometry counts, transforms, materials, and modifiers."""
     return call("object_info", name=name)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def inspect_mesh_quality(
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
+    texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
+                              Annotated[StrictInt, Field(ge=1, le=4096)]] = (1024, 1024),
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+) -> dict[str, Any]:
+    """Measure static mesh budgets, physical texel density, UV stretching, and material sharing.
+
+    Uses the render-active UV layer unless named. No overlaps or visual acceptance
+    are inferred. Unbaked modifiers, rigs, and shape keys are refused.
+    """
+    return call("inspect_mesh_quality", names=names, texture_resolution=texture_resolution, uv_layer=uv_layer)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -237,12 +252,17 @@ def export_mesh(
             description="New output path relative to the configured workspace; existing files are refused."
         ),
     ],
+    preserve_instances: Annotated[
+        StrictBool, Field(description="FBX only: share static geometry when resolved material slots match.")
+    ] = False,
     lease_id: Annotated[
         str | None, Field(description="Edit lease from session_control claim.")
     ] = None,
 ) -> dict[str, Any]:
     """Export named meshes as FBX or GLB; static FBX uses file units and baked space conversion."""
-    return call("export_mesh", lease_id=lease_id, names=names, path=path)
+    # A distinct bridge operation makes older bridges fail before writing a file.
+    return call("export_instances" if preserve_instances else "export_mesh", lease_id=lease_id, names=names, path=path,
+                preserve_instances=preserve_instances)
 
 
 @mcp.tool(annotations=ADDITIVE)

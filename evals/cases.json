@@ -1523,5 +1523,133 @@
     "absent": [
       "too-large.png"
     ]
+  },
+  {
+    "id": "quality-inspection-success",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "texture_resolution": [
+        1024,
+        1024
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/density_unit": "pixels_per_meter",
+      "/objects/0/name": "MaterialTarget"
+    },
+    "required": [
+      "/objects/0/mapping/density_area_weighted",
+      "/unique_materials",
+      "/images"
+    ]
+  },
+  {
+    "id": "quality-inspection-missing-arguments",
+    "tool": "inspect_mesh_quality",
+    "arguments": {},
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "quality-inspection-duplicate-names",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "MaterialTarget",
+        "MaterialTarget"
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "quality-inspection-resolution-bound",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "texture_resolution": [
+        100000,
+        1024
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "instance-export-success",
+    "tool": "export_mesh",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "path": "instances.fbx",
+      "preserve_instances": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/preserve_instances": true
+    },
+    "files": [
+      "instances.fbx"
+    ]
+  },
+  {
+    "id": "instance-export-glb-refused",
+    "tool": "export_mesh",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "path": "instances.glb",
+      "preserve_instances": true
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "static FBX",
+    "absent": [
+      "instances.glb"
+    ]
+  },
+  {
+    "id": "instance-export-string-flag",
+    "tool": "export_mesh",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "path": "flag.fbx",
+      "preserve_instances": "true"
+    },
+    "kind": "invalid",
+    "modes": [
+      "native",
+      "protocol"
+    ],
+    "error": "validation"
   }
 ]
