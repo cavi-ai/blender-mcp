@@ -19,6 +19,7 @@ from mathutils import Vector
 
 from .geometry import validate_mesh
 from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
+from .lease import Lease
 from .paths import destination
 
 _server = None
@@ -26,6 +27,19 @@ _jobs = queue.Queue(maxsize=8)
 _token = None
 _connection = None
 _workspace = None
+_lease = Lease()
+_project_epoch = secrets.token_hex(16)
+
+
+@bpy.app.handlers.persistent
+def project_loaded(_):
+    global _project_epoch
+    _project_epoch = secrets.token_hex(16)
+
+
+def project_identity():
+    value = (os.getpid(), _project_epoch, bpy.data.filepath, bpy.context.scene.as_pointer())
+    return hashlib.sha256(repr(value).encode()).hexdigest()
 
 
 def vector(values, size=3):
@@ -185,6 +199,20 @@ def import_glb(path, name):
 
 
 def dispatch(operation, p):
+    if operation == "owned_edit":
+        operation, p = p["operation"], p["params"]
+        if operation in {"owned_edit", "session_control", "scene_info", "object_info", "runtime_status"}:
+            raise ValueError("Owned edit envelope requires a scene mutation")
+    if operation == "session_control":
+        return _lease.control(p, project_identity)
+    if operation in {"scene_info", "object_info", "runtime_status"}:
+        return _dispatch(operation, p)
+    params = dict(p)
+    with _lease.edit(params.pop("lease_id", None), project_identity):
+        return _dispatch(operation, params)
+
+
+def _dispatch(operation, p):
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])
     if operation in {"runtime_status", "runtime_restart"}:
@@ -594,6 +622,8 @@ def register():
     _workspace.mkdir(parents=True, exist_ok=True)
     _workspace = _workspace.resolve()
     replace_server()
+    if project_loaded not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(project_loaded)
     bpy.app.timers.register(pump, persistent=True)
 
 
@@ -605,6 +635,8 @@ def unregister():
         _server = None
     if bpy.app.timers.is_registered(pump):
         bpy.app.timers.unregister(pump)
+    if project_loaded in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(project_loaded)
     if _connection and _connection.exists():
         try:
             if json.loads(_connection.read_text()).get("token") == _token:

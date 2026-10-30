@@ -13,6 +13,7 @@ def main(argv=None):
     runtime = commands.add_parser("runtime", help="Inspect or restart the running Blender bridge")
     runtime.add_argument("action", choices=("start", "status", "restart"))
     runtime.add_argument("--project", help="Existing workspace-relative .blend to open on startup")
+    runtime.add_argument("--lease-id", help="Current edit lease, required for restart")
     args = parser.parse_args(argv)
     if args.project is not None and args.action != "start":
         parser.error("--project is only supported by runtime start")
@@ -21,7 +22,10 @@ def main(argv=None):
             print(json.dumps(start_runtime(args.project)))
             return 0
         client = BridgeClient()
-        restarted = client.call("runtime_restart") if args.action == "restart" else None
+        restarted = (
+            client.call("runtime_restart", {"lease_id": args.lease_id})
+            if args.action == "restart" else None
+        )
         result = client.call("runtime_status")
         if restarted and result["generation"] != restarted["generation"]:
             raise RuntimeError("Bridge changed again after restart; inspect runtime status")

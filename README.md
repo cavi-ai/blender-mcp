@@ -32,7 +32,7 @@ Call `scene_info` first. The bridge must be running inside Blender; the stdio MC
 cavi-blender-mcp runtime start
 cavi-blender-mcp runtime start --project working-copy.blend
 cavi-blender-mcp runtime status
-cavi-blender-mcp runtime restart
+cavi-blender-mcp runtime restart --lease-id <current-lease>
 ```
 
 `start` reuses a connected session or launches Blender with factory settings, embedded
@@ -57,6 +57,7 @@ After installing new tools, restart that client's MCP connection to discover the
 
 ## Tools
 
+- `session_control`: inspect, claim, renew, or release application edit ownership.
 - `scene_info`, `object_info`: inspect scene and geometry.
 - `create_primitive`, `transform_object`, `set_color`: create and edit objects.
 - `create_mesh`: indexed custom geometry, with bounded vertices, faces and coordinates.
@@ -111,6 +112,30 @@ CAVI_TRIPOSR_WEIGHTS=/path/to/weights
 
 Put an image of one isolated object on white or transparency inside the Blender workspace. Call `generate_mesh` with its relative `image` path and a new `.glb` output `path`. Generation runs offline on CPU with four threads, chunked field queries and a 180-second timeout. Resolution is bounded to 64–192; input images are at most 16 MiB and 4096 pixels per side. Outputs are published without replacing existing files. The returned counts and input SHA-256 identify the generated artifact. Generation creates a GLB file without changing the open scene.
 
+
+## Shared application ownership
+
+Before editing, call `session_control` with `action="inspect"`, then claim the
+returned `project_id` with `action="claim"`, an `owner` label, and that exact
+`expected_project`. Claim returns a private `lease_id`; pass it on application
+mutations. Read-only inspection remains available without ownership.
+
+Claims last 30–3600 seconds, default 600. Renew with `action="renew"` and release
+with `action="release"`, both supplying the same `lease_id`. Release and expiry
+never save, close, or discard a project. Conflicting claims and missing, foreign,
+expired, or project-mismatched edit tokens are refused. An owned operation holds
+its exclusive section until it finishes. A successful owned save or project
+transition updates the claim's binding.
+
+Claims coordinate participating MCP clients, not direct human edits or arbitrary
+scripts. Upgrade every participating client. Keep lease IDs out of asset receipts
+and handoff documents; a new agent inspects and claims its own session.
+
+Blender also needs the upgraded bridge loaded. Preserve the scene before
+reopening its dedicated application session. New MCP edits use an owned-edit
+protocol envelope that older bridges reject. Listener restart does not reload
+bridge code and requires the current edit lease.
+
 ## Validation
 
 ```sh
@@ -139,7 +164,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 14 tools through real stdio MCP sessions, including PNG image data, nonempty exports, and GLB imports. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 15 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 

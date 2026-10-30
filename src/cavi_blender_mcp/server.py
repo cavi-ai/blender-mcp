@@ -13,7 +13,7 @@ mcp = FastMCP(
     "cavi-blender-mcp",
     instructions=(
         "Inspect the scene before editing. Saves and exports refuse existing paths. "
-        "Paths are relative to the Blender session workspace. Never retry an uncertain mutation."
+        "Paths are relative to the Blender session workspace. Claim session_control ownership before edits and pass lease_id. Never retry an uncertain mutation."
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
@@ -28,7 +28,11 @@ READ_ONLY = ToolAnnotations(
 
 
 def call(operation, **params):
-    return BridgeClient().call(operation, params)
+    client = BridgeClient()
+    if operation not in {"scene_info", "object_info", "runtime_status", "session_control"}:
+        # Legacy bridges reject this envelope instead of ignoring a lease parameter.
+        return client.call("owned_edit", {"operation": operation, "params": params})
+    return client.call(operation, params)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -51,9 +55,12 @@ def create_primitive(
         Field(description="Primitive mesh shape to create."),
     ],
     location: Annotated[Vector3, Field(description="Position in Blender scene units.")] = (0, 0, 0),
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Create a named primitive. Existing object names are refused."""
-    return call("create_primitive", name=name, kind=kind, location=location)
+    return call("create_primitive", lease_id=lease_id, name=name, kind=kind, location=location)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -81,23 +88,35 @@ def create_mesh(
         list[Annotated[list[StrictInt], Field(min_length=3, max_length=64)]],
         Field(min_length=1, max_length=20000),
     ],
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Create custom geometry from local-space vertices and zero-based face indices.
 
     Use outward face winding. Rejects invalid topology, duplicate names and oversized payloads.
     Disconnected shells are allowed for later voxel remeshing. Does not execute code.
     """
-    return call("create_mesh", name=name, vertices=vertices, faces=faces)
+    return call("create_mesh", lease_id=lease_id, name=name, vertices=vertices, faces=faces)
 
 
 @mcp.tool(annotations=ADDITIVE)
 def import_mesh(
     path: Annotated[str, Field(description="Workspace-relative static, self-contained GLB.")],
-    name: Annotated[str, Field(min_length=1, max_length=58,
-                              description="New asset collection/object prefix, at most 58 UTF-8 bytes.")],
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=58,
+            description="New asset collection/object prefix, at most 58 UTF-8 bytes.",
+        ),
+    ],
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Import bounded GLB geometry; preserve existing objects and selection, refuse name reuse."""
-    return call("import_mesh", path=path, name=name)
+    return call("import_mesh", lease_id=lease_id, path=path, name=name)
 
 
 @mcp.tool(annotations=MUTATING)
@@ -112,10 +131,14 @@ def transform_object(
     scale: Annotated[
         Vector3 | None, Field(description="Positive XYZ scale; omit to preserve it.")
     ] = None,
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Set explicitly supplied transform fields on one object."""
     return call(
         "transform_object",
+        lease_id=lease_id,
         name=name,
         location=location,
         rotation_degrees=rotation_degrees,
@@ -130,9 +153,12 @@ def set_color(
         tuple[Number, Number, Number, Number],
         Field(description="Red, green, blue and alpha components, each from 0 to 1."),
     ],
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Assign an object-specific flat preview material; components range from 0 to 1."""
-    return call("set_color", name=name, rgba=rgba)
+    return call("set_color", lease_id=lease_id, name=name, rgba=rgba)
 
 
 @mcp.tool(annotations=MUTATING)
@@ -150,9 +176,12 @@ def add_modifier(
         ),
     ],
     apply: Annotated[StrictBool, Field(description="Bake into single-user mesh geometry.")] = False,
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Add a surface modifier, optionally baking it on an object without existing modifiers."""
-    return call("add_modifier", name=name, kind=kind, amount=amount, apply=apply)
+    return call("add_modifier", lease_id=lease_id, name=name, kind=kind, amount=amount, apply=apply)
 
 
 @mcp.tool(annotations=MUTATING)
@@ -161,15 +190,23 @@ def shade_mesh(
     smooth: Annotated[
         StrictBool, Field(description="True for smooth shading; false for flat shading.")
     ] = False,
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Choose flat or smooth shading on one mesh."""
-    return call("shade_mesh", name=name, smooth=smooth)
+    return call("shade_mesh", lease_id=lease_id, name=name, smooth=smooth)
 
 
 @mcp.tool(annotations=MUTATING)
-def unwrap_mesh(name: ObjectName) -> dict[str, Any]:
+def unwrap_mesh(
+    name: ObjectName,
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
+) -> dict[str, Any]:
     """Generate UV coordinates with Blender Smart UV Project."""
-    return call("unwrap_mesh", name=name)
+    return call("unwrap_mesh", lease_id=lease_id, name=name)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -183,9 +220,12 @@ def export_mesh(
             description="New output path relative to the configured workspace; existing files are refused."
         ),
     ],
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Export only the named meshes as FBX or GLB within the output workspace."""
-    return call("export_mesh", names=names, path=path)
+    return call("export_mesh", lease_id=lease_id, names=names, path=path)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -196,9 +236,12 @@ def save_project(
             description="New output path relative to the configured workspace; existing files are refused."
         ),
     ],
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> dict[str, Any]:
     """Save a new .blend file in the output workspace; never overwrite a file."""
-    return call("save_project", path=path)
+    return call("save_project", lease_id=lease_id, path=path)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -217,10 +260,14 @@ def render_preview(
         Vector3, Field(description="Nonzero camera direction from the model center.")
     ] = (1.5, -2, 1.4),
     color_mode: Literal["material", "vertex"] = "material",
+    lease_id: Annotated[
+        str | None, Field(description="Edit lease from session_control claim.")
+    ] = None,
 ) -> Image:
     """Render scene meshes or named meshes; restore visibility and camera afterward."""
     result = call(
         "render_preview",
+        lease_id=lease_id,
         path=path,
         resolution=resolution,
         names=names,
@@ -228,6 +275,31 @@ def render_preview(
         color_mode=color_mode,
     )
     return Image(path=result["path"])
+
+
+@mcp.tool(annotations=ADDITIVE)
+def session_control(
+    action: Literal["inspect", "claim", "renew", "release"],
+    owner: Annotated[str | None, Field(max_length=128)] = None,
+    expected_project: Annotated[
+        str | None, Field(description="Exact project_id from inspect.")
+    ] = None,
+    lease_id: Annotated[str | None, Field(max_length=128)] = None,
+    ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600)] = 600,
+) -> dict[str, Any]:
+    """Inspect ownership or claim, renew or release an application edit lease.
+
+    Claim returns a private lease_id. Supply it on every edit. Expiry never closes
+    a project. Release does not save or discard changes.
+    """
+    return call(
+        "session_control",
+        action=action,
+        owner=owner,
+        expected_project=expected_project,
+        lease_id=lease_id,
+        ttl_seconds=ttl_seconds,
+    )
 
 
 def main():

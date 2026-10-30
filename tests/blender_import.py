@@ -11,6 +11,19 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from cavi_blender_mcp import blender_bridge as bridge
 
+fixture_state = bridge.dispatch("session_control", {"action": "inspect"})
+fixture_lease = bridge.dispatch("session_control", {
+    "action": "claim", "owner": "native-fixture",
+    "expected_project": fixture_state["project_id"],
+})["lease_id"]
+
+
+def owned_dispatch(operation, params):
+    return bridge.dispatch(operation, {**params, "lease_id": fixture_lease}
+                           if operation not in {"scene_info", "object_info", "runtime_status"}
+                           else params)
+
+
 with tempfile.TemporaryDirectory() as folder:
     bridge._workspace = Path(folder)
     bpy.ops.mesh.primitive_cube_add(location=(2, 3, 4))
@@ -19,11 +32,11 @@ with tempfile.TemporaryDirectory() as folder:
     colors = source.data.color_attributes.new(name="Color", type="BYTE_COLOR", domain="CORNER")
     for value in colors.data:
         value.color = (0.2, 0.5, 0.8, 1)
-    bridge.dispatch("export_mesh", {"names": [source.name], "path": "source.glb"})
-    before = bridge.dispatch("scene_info", {})
+    owned_dispatch("export_mesh", {"names": [source.name], "path": "source.glb"})
+    before = owned_dispatch("scene_info", {})
     selected = {obj.name for obj in bpy.context.selected_objects}
     active = bpy.context.view_layer.objects.active
-    result = bridge.dispatch("import_mesh", {"path": "source.glb", "name": "ImportedProp"})
+    result = owned_dispatch("import_mesh", {"path": "source.glb", "name": "ImportedProp"})
     assert result["collection"] == "ImportedProp"
     imported = [bpy.data.objects[item["name"]] for item in result["objects"]]
     meshes = [obj for obj in imported if obj.type == "MESH"]
@@ -42,17 +55,17 @@ with tempfile.TemporaryDirectory() as folder:
     assert {obj.name for obj in bpy.context.selected_objects} == selected
     assert bpy.context.view_layer.objects.active == active
     assert bpy.data.filepath == before["file"]
-    after = bridge.dispatch("scene_info", {})
+    after = owned_dispatch("scene_info", {})
     for original in before["objects"]:
         assert next(obj for obj in after["objects"] if obj["name"] == original["name"]) == original
     try:
-        bridge.dispatch("import_mesh", {"path": "source.glb", "name": "ImportedProp"})
+        owned_dispatch("import_mesh", {"path": "source.glb", "name": "ImportedProp"})
     except ValueError:
         pass
     else:
         raise AssertionError("Duplicate import name was accepted")
     try:
-        bridge.dispatch("import_mesh", {"path": "source.glb", "name": "界" * 22})
+        owned_dispatch("import_mesh", {"path": "source.glb", "name": "界" * 22})
     except ValueError:
         pass
     else:
@@ -68,7 +81,7 @@ with tempfile.TemporaryDirectory() as folder:
 
     with patch.object(bridge, "_load_glb", side_effect=partially_import):
         try:
-            bridge.dispatch("import_mesh", {"path": "source.glb", "name": "FailedProp"})
+            owned_dispatch("import_mesh", {"path": "source.glb", "name": "FailedProp"})
         except RuntimeError:
             pass
         else:
@@ -92,9 +105,9 @@ with tempfile.TemporaryDirectory() as folder:
     shader = material.node_tree.nodes.get("Principled BSDF")
     material.node_tree.links.new(texture.outputs["Color"], shader.inputs["Base Color"])
     textured.data.materials.append(material)
-    bridge.dispatch("export_mesh", {"names": [textured.name], "path": "textured.glb"})
+    owned_dispatch("export_mesh", {"names": [textured.name], "path": "textured.glb"})
     images_before = set(bpy.data.images)
-    bridge.dispatch("import_mesh", {"path": "textured.glb", "name": "TexturedProp"})
+    owned_dispatch("import_mesh", {"path": "textured.glb", "name": "TexturedProp"})
     images = set(bpy.data.images) - images_before
     assert images and all(image.packed_file for image in images)
     print(json.dumps({"native_import": "passed", "vertex_colors_preserved": True,
