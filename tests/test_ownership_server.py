@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -19,7 +20,8 @@ class LegacyBridgeTests(unittest.TestCase):
             patch.object(server, "BridgeClient", return_value=SimpleNamespace(call=legacy)),
             self.assertRaisesRegex(RuntimeError, "owned_edit"),
         ):
-            server.create_primitive("Prop", "cube", lease_id="unvalidated-token")
+            asyncio.run(server.object_edit("create_primitive", "Prop", kind="cube",
+                                           lease_id="unvalidated-token"))
         self.assertEqual(effects, [])
 
     def test_instance_export_refuses_legacy_bridge_before_writing(self):
@@ -36,5 +38,6 @@ class LegacyBridgeTests(unittest.TestCase):
             patch.object(server, "BridgeClient", return_value=SimpleNamespace(call=legacy)),
             self.assertRaisesRegex(RuntimeError, "export_instances"),
         ):
-            server.export_mesh(["Prop"], "prop.fbx", preserve_instances=True, lease_id="token")
+            asyncio.run(server.asset_io("export", "prop.fbx", names=["Prop"],
+                                        preserve_instances=True, lease_id="token"))
         self.assertEqual(effects, [])

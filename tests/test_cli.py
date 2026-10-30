@@ -25,3 +25,11 @@ class RuntimeCliTests(unittest.TestCase):
             capture_output=True, text=True, timeout=5, check=False,
         )
         self.assertEqual(result.returncode, 2)
+
+    def test_background_is_only_for_start(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "cavi_blender_mcp.cli", "runtime", "status", "--background"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--background", result.stderr)

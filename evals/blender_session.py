@@ -39,9 +39,4 @@ bridge.dispatch = checked_dispatch
 bridge.register()
 with socket.socket(fileno=int(os.environ["CAVI_EVAL_READY_FD"])) as ready:
     ready.sendall(b"ready")
-# Requests block on the same queue used by the production bridge. The fixture process
-# is terminated by its owner after evaluation, without touching another Blender session.
-for _ in iter(int, 1):
-    with bridge._jobs.not_empty:
-        bridge._jobs.not_empty.wait_for(lambda: bool(bridge._jobs.queue))
-    bridge.pump()
+bridge.serve_background()

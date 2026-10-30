@@ -12,11 +12,9 @@ import socket
 import subprocess
 import sys
 import tempfile
-import threading
 from contextlib import ExitStack
 from datetime import timedelta
 from pathlib import Path
-from socketserver import BaseRequestHandler, TCPServer
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -82,7 +80,9 @@ async def exercise(mode, env, workspace, adapter=None, include_model=False):
 
                 arguments = dict(case["arguments"])
                 if mode != "protocol":
-                    needs_lease = (case["tool"] not in {"session_control", "generate_mesh"}
+                    lease_free = (case["tool"] in {"session_control", "render_preview"}
+                                  or arguments.get("action") == "generate")
+                    needs_lease = (not lease_free
                                    and not tools[case["tool"]].annotations.readOnlyHint
                                    and not case.get("without_lease"))
                     if needs_lease or case.get("fresh_lease"):
@@ -196,7 +196,6 @@ def main():
             "MCPEVAL_HOME": str(output / "store"),
             "CAVI_BLENDER_CONNECTION": str(output / "connection.json"),
             "CAVI_BLENDER_WORKSPACE": str(workspace),
-            "CAVI_SUBSTANCE_WORKSPACE": str(workspace),
         }
     )
     with ExitStack() as stack:
@@ -243,14 +242,6 @@ def main():
                 raise RuntimeError(
                     f"Blender bridge did not start; inspect {output / 'blender.log'}"
                 )
-        else:
-            # Accept then close: deterministic unavailability without accessing Painter.
-            endpoint = stack.enter_context(TCPServer(("127.0.0.1", 0), BaseRequestHandler))
-            worker = threading.Thread(target=endpoint.serve_forever, daemon=True)
-            worker.start()
-            stack.callback(worker.join)
-            stack.callback(endpoint.shutdown)
-            env["CAVI_PAINTER_PORT"] = str(endpoint.server_address[1])
         results = asyncio.run(
             exercise(args.mode, env, workspace, adapter, include_model=bool(args.model_image))
         )

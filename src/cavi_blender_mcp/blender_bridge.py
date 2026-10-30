@@ -15,8 +15,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Quaternion, Vector
 
+from .client import DEFAULT_TIMEOUT, MAX_REQUEST_BYTES, MAX_TIMEOUT
 from .geometry import validate_mesh
 from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .lease import Lease
@@ -29,6 +30,13 @@ _connection = None
 _workspace = None
 _lease = Lease()
 _project_epoch = secrets.token_hex(16)
+LEASE_FREE = frozenset(
+    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "render_preview"}
+)
+MAX_MODIFIERS = 16
+MAX_EVALUATED_FACES = 500000
+COLOR_TAG = "cavi_color_owner"
+RENDERLESS = frozenset({"CAMERA", "LIGHT", "LIGHT_PROBE", "LIGHTPROBE", "SPEAKER"})
 
 
 @bpy.app.handlers.persistent
@@ -50,6 +58,12 @@ def vector(values, size=3):
     return values
 
 
+def number(value, low, high, label):
+    if type(value) not in (float, int) or not math.isfinite(value) or not low <= value <= high:
+        raise ValueError(f"{label} must be a number from {low} to {high}")
+    return float(value)
+
+
 def obj(name, mesh=False):
     value = bpy.data.objects.get(name)
     if value is None or value.name not in bpy.context.scene.objects:
@@ -66,12 +80,41 @@ def editable_mesh(name):
     return value
 
 
+def rotation(value):
+    mode = value.rotation_mode
+    if mode == "QUATERNION":
+        return value.rotation_quaternion.normalized()
+    if mode == "AXIS_ANGLE":
+        angle, *axis = value.rotation_axis_angle
+        axis = Vector(axis)
+        return Quaternion() if axis.length < 1e-12 else Quaternion(axis.normalized(), angle)
+    return value.rotation_euler.to_quaternion()
+
+
+def set_rotation(value, degrees):
+    euler = Euler([math.radians(v) for v in degrees], "XYZ")
+    mode = value.rotation_mode
+    if mode == "QUATERNION":
+        value.rotation_quaternion = euler.to_quaternion()
+    elif mode == "AXIS_ANGLE":
+        axis, angle = euler.to_quaternion().to_axis_angle()
+        value.rotation_axis_angle = (angle, *axis)
+    elif mode == "XYZ":
+        value.rotation_euler = euler
+    else:
+        value.rotation_euler = euler.to_matrix().to_euler(mode, value.rotation_euler)
+
+
 def info(value):
+    angles = (
+        value.rotation_euler if value.rotation_mode == "XYZ" else rotation(value).to_euler("XYZ")
+    )
     result = {
         "name": value.name,
         "type": value.type,
         "location": list(value.location),
-        "rotation_degrees": [math.degrees(v) for v in value.rotation_euler],
+        "rotation_degrees": [math.degrees(v) for v in angles],
+        "rotation_mode": value.rotation_mode,
         "scale": list(value.scale),
         "modifiers": [{"name": m.name, "type": m.type} for m in value.modifiers],
     }
@@ -80,7 +123,8 @@ def info(value):
             vertices=len(value.data.vertices),
             polygons=len(value.data.polygons),
             uv_layers=len(value.data.uv_layers),
-            materials=[m.name if m else None for m in value.data.materials],
+            materials=[slot.material.name if slot.material else None
+                       for slot in value.material_slots],
         )
     return result
 
@@ -205,11 +249,324 @@ def dispatch(operation, p):
             raise ValueError("Owned edit envelope requires a scene mutation")
     if operation == "session_control":
         return _lease.control(p, project_identity)
-    if operation in {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality"}:
-        return _dispatch(operation, p)
+    if operation in LEASE_FREE:
+        params = dict(p)
+        params.pop("lease_id", None)
+        return _dispatch(operation, params)
     params = dict(p)
     with _lease.edit(params.pop("lease_id", None), project_identity):
         return _dispatch(operation, params)
+
+
+def new_name(name):
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or len(name) > 63
+        or name in bpy.data.objects
+    ):
+        raise ValueError("Object name must be unique, nonempty, and at most 63 characters")
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Switch Blender to Object Mode before creating geometry")
+    return name
+
+
+def scene_info(p):
+    limit, offset = p.get("limit", 200), p.get("offset", 0)
+    if type(limit) is not int or not 1 <= limit <= 1000:
+        raise ValueError("limit must be an integer from 1 to 1000")
+    if type(offset) is not int or offset < 0:
+        raise ValueError("offset must be a nonnegative integer")
+    objects = bpy.context.scene.objects
+    return {
+        "version": bpy.app.version_string,
+        "file": bpy.data.filepath,
+        "workspace": str(_workspace),
+        "total": len(objects),
+        "offset": offset,
+        "limit": limit,
+        "objects": [info(objects[i]) for i in range(offset, min(offset + limit, len(objects)))],
+    }
+
+
+def create_primitive(p):
+    name = new_name(p["name"])
+    constructors = {
+        "cube": bpy.ops.mesh.primitive_cube_add,
+        "sphere": bpy.ops.mesh.primitive_uv_sphere_add,
+        "cylinder": bpy.ops.mesh.primitive_cylinder_add,
+        "cone": bpy.ops.mesh.primitive_cone_add,
+        "plane": bpy.ops.mesh.primitive_plane_add,
+    }
+    if p.get("kind") not in constructors:
+        raise ValueError("Unknown primitive")
+    location = vector(p.get("location") or [0, 0, 0])
+    constructors[p["kind"]](location=location)
+    value = bpy.context.object
+    value.name = name
+    value.data.name = name
+    root = bpy.context.scene.collection
+    if root not in value.users_collection:
+        root.objects.link(value)
+    for owner in list(value.users_collection):
+        if owner != root:
+            owner.objects.unlink(value)
+    return info(value)
+
+
+def create_mesh(p):
+    name = new_name(p["name"])
+    vertices, faces = validate_mesh(p["vertices"], p["faces"])
+    mesh = bpy.data.meshes.new(name)
+    try:
+        mesh.from_pydata(vertices, [], faces)
+        if mesh.validate():
+            raise ValueError("Blender rejected the supplied topology")
+        mesh.update()
+        value = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(value)
+    except Exception:
+        bpy.data.meshes.remove(mesh)
+        raise
+    return info(value)
+
+
+def transform(p):
+    value = obj(p["name"])
+    updates = {
+        k: vector(p[k])
+        for k in ("location", "rotation_degrees", "scale")
+        if p.get(k) is not None
+    }
+    if "scale" in updates and any(v <= 0 for v in updates["scale"]):
+        raise ValueError("Scale components must be positive")
+    if "location" in updates:
+        value.location = updates["location"]
+    if "rotation_degrees" in updates:
+        set_rotation(value, updates["rotation_degrees"])
+    if "scale" in updates:
+        value.scale = updates["scale"]
+    return info(value)
+
+
+def set_color(p):
+    value = editable_mesh(p["name"])
+    color = vector(p["rgba"], 4)
+    if any(v < 0 or v > 1 for v in color):
+        raise ValueError("Color components must range from 0 to 1")
+    slot = p.get("slot", 0)
+    if type(slot) is not int or not 0 <= slot <= 31:
+        raise ValueError("Material slot must be 0 to 31")
+    slots = value.material_slots
+    if slot >= len(slots) and not (slot == 0 and not slots):
+        raise ValueError("Requested material slot does not exist")
+    key = f"{value.name}:{slot}"
+    label = f"{value.name} Color" if slot == 0 else f"{value.name} Color {slot}"
+    current = slots[slot].material if slots else None
+    stored = bpy.data.materials.get(label)
+    if current is not None and current.get(COLOR_TAG) == key and current.users <= 1:
+        material = current
+    elif stored is not None and stored.get(COLOR_TAG) == key and stored.users == 0:
+        material = stored
+    else:
+        material = bpy.data.materials.new(label)
+        material[COLOR_TAG] = key
+    material.diffuse_color = color
+    if not slots:
+        value.data.materials.append(material)
+    elif current != material:
+        slots[slot].material = material
+    return info(value)
+
+
+def add_modifier(p):
+    bake = p.get("apply", False)
+    if type(bake) is not bool:
+        raise ValueError("apply must be boolean")
+    value = editable_mesh(p["name"]) if bake else obj(p["name"], mesh=True)
+    if bake and (value.modifiers or bpy.context.mode != "OBJECT"):
+        raise ValueError("Baking requires Object Mode and no existing modifiers")
+    if len(value.modifiers) >= MAX_MODIFIERS:
+        raise ValueError(f"Modifier stack is limited to {MAX_MODIFIERS}; apply or remove some")
+    amount = vector([p["amount"]], 1)[0]
+    if p["kind"] == "bevel" and 0 < amount <= 100:
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        evaluated = value.evaluated_get(depsgraph).data
+        segments = 3
+        estimate = (len(evaluated.polygons) + len(evaluated.edges) * segments
+                    + len(evaluated.vertices) * segments * segments)
+        if estimate > MAX_EVALUATED_FACES:
+            raise ValueError(f"Bevel would exceed {MAX_EVALUATED_FACES} estimated faces")
+        modifier = value.modifiers.new("Bevel", "BEVEL")
+        modifier.width, modifier.segments = amount, segments
+    elif p["kind"] == "decimate" and 0 < amount <= 1:
+        modifier = value.modifiers.new("Decimate", "DECIMATE")
+        modifier.ratio = amount
+    elif p["kind"] in {"subdivision", "voxel_remesh"}:
+        # Refuse stacked surface operations: their combined cost is not bounded by base counts.
+        if value.modifiers:
+            raise ValueError("Organic modifiers require a mesh without existing modifiers")
+        if p["kind"] == "subdivision":
+            facets = sum(max(4, len(face.vertices)) for face in value.data.polygons)
+            if amount not in (1, 2, 3) or facets * 4 ** (amount - 1) > MAX_EVALUATED_FACES:
+                raise ValueError(
+                    "Subdivision needs integer levels 1–3 and at most 500000 faces"
+                )
+            modifier = value.modifiers.new("Subdivision", "SUBSURF")
+            modifier.levels = modifier.render_levels = int(amount)
+        else:
+            bpy.context.view_layer.update()
+            local = [Vector(c) for c in value.bound_box]
+            extents = [max(v[i] for v in local) - min(v[i] for v in local) for i in range(3)]
+            if (
+                not 0.005 <= amount <= 1
+                or math.prod(max(v, amount) / amount + 2 for v in extents) > 2000000
+            ):
+                raise ValueError("Voxel size must be [0.005,1] and fit 2000000 bounding voxels")
+            modifier = value.modifiers.new("Voxel Remesh", "REMESH")
+            modifier.mode = "VOXEL"
+            modifier.voxel_size = amount
+            modifier.use_smooth_shade = True
+    else:
+        raise ValueError("Invalid modifier or amount")
+    if bake:
+        with selected([value]):
+            if "FINISHED" not in bpy.ops.object.modifier_apply(modifier=modifier.name):
+                raise RuntimeError("Modifier baking did not finish")
+    return info(value)
+
+
+def unwrap(p):
+    value = editable_mesh(p["name"])
+    angle = number(p.get("angle_limit_degrees", 66), 1, 89, "angle_limit_degrees")
+    margin = number(p.get("island_margin", 0.02), 0, 0.5, "island_margin")
+    name = p.get("uv_layer")
+    if name is not None and (
+        not isinstance(name, str) or not name.strip() or len(name.encode()) > 63
+    ):
+        raise ValueError("UV layer name must be nonempty and at most 63 UTF-8 bytes")
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Switch Blender to Object Mode before this operation")
+    layers = value.data.uv_layers
+    created = None
+    previous = layers.active
+    if name is not None and layers.get(name) is None:
+        if len(layers) >= 8:
+            raise ValueError("Mesh already has the maximum of 8 UV layers")
+        created = layers.new(name=name)
+    try:
+        if name is not None:
+            layers.active = layers[name]
+        with selected([value]):
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            if "FINISHED" not in bpy.ops.uv.smart_project(
+                angle_limit=math.radians(angle), island_margin=margin
+            ):
+                raise RuntimeError("Smart UV Project did not finish")
+            bpy.ops.uv.select_all(action="SELECT")
+            if "FINISHED" not in bpy.ops.uv.pack_islands(margin=margin):
+                raise RuntimeError("UV island packing did not finish")
+    except Exception:
+        if created is not None:
+            layers.remove(layers[name])
+            if previous is not None:
+                layers.active = previous
+        raise
+    return {**info(value), "uv_layer": layers.active.name}
+
+
+def export_mesh(p):
+    if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
+        raise ValueError("Provide between 1 and 1000 mesh names")
+    objects = [obj(n, mesh=True) for n in p["names"]]
+    preserve = p.get("preserve_instances", False)
+    empties = p.get("include_empties", False)
+    if type(preserve) is not bool or type(empties) is not bool:
+        raise ValueError("preserve_instances and include_empties must be booleans")
+    if preserve and Path(p["path"]).suffix.lower() != ".fbx":
+        raise ValueError("preserve_instances applies to static FBX exports")
+    selection = list(objects)
+    if empties:
+        for value in objects:
+            parent = value.parent
+            while parent is not None:
+                if (parent.type == "EMPTY" and parent not in selection
+                        and parent.name in bpy.context.scene.objects):
+                    selection.append(parent)
+                parent = parent.parent
+    with output_file(p["path"], {".fbx", ".glb"}) as path, selected(selection):
+        if path.suffix.lower() == ".fbx":
+            from .export_instances import instance_meshes
+
+            with instance_meshes(objects) if preserve else nullcontext():
+                result = bpy.ops.export_scene.fbx(
+                    filepath=str(path),
+                    use_selection=True,
+                    object_types={"MESH", "EMPTY"} if empties else {"MESH"},
+                    mesh_smooth_type="FACE",
+                    use_tspace=True,
+                    add_leaf_bones=False,
+                    bake_anim=False,
+                    axis_forward="-Z",
+                    axis_up="Y",
+                    global_scale=1,
+                    apply_unit_scale=True,
+                    apply_scale_options="FBX_SCALE_UNITS",
+                    bake_space_transform=True,
+                    path_mode="STRIP",
+                )
+        else:
+            result = bpy.ops.export_scene.gltf(
+                filepath=str(path), export_format="GLB", use_selection=True, export_apply=True
+            )
+        if "FINISHED" not in result:
+            raise RuntimeError("Mesh export did not finish")
+    return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
+            "preserve_instances": preserve, "include_empties": empties}
+
+
+def save_project(p):
+    previous = bpy.context.preferences.filepaths.save_version
+    try:
+        bpy.context.preferences.filepaths.save_version = 0
+        with output_file(p["path"], {".blend"}) as path:
+            if "FINISHED" not in bpy.ops.wm.save_as_mainfile(
+                filepath=str(path), check_existing=False
+            ):
+                raise RuntimeError("Project save did not finish")
+    finally:
+        bpy.context.preferences.filepaths.save_version = previous
+    return {"path": str(path), "bytes": path.stat().st_size}
+
+
+def runtime(operation, p):
+    if p:
+        raise ValueError("Runtime commands do not accept parameters")
+    if _server is None:
+        raise RuntimeError("Blender bridge is not running")
+    if operation == "runtime_restart":
+        replace_server()
+    return {
+        "connected": True,
+        "pid": os.getpid(),
+        "generation": _server.bridge_generation,
+        "version": bpy.app.version_string,
+        "file": bpy.data.filepath,
+        "workspace": str(_workspace),
+        "object_count": len(bpy.context.scene.objects),
+        "dirty": bpy.data.is_dirty,
+        "background": bpy.app.background,
+    }
+
+
+def shade(p):
+    value = editable_mesh(p["name"])
+    if type(p["smooth"]) is not bool:
+        raise ValueError("smooth must be boolean")
+    for polygon in value.data.polygons:
+        polygon.use_smooth = p["smooth"]
+    return info(value)
 
 
 def _dispatch(operation, p):
@@ -226,216 +583,25 @@ def _dispatch(operation, p):
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])
     if operation in {"runtime_status", "runtime_restart"}:
-        if p:
-            raise ValueError("Runtime commands do not accept parameters")
-        if _server is None:
-            raise RuntimeError("Blender bridge is not running")
-        if operation == "runtime_restart":
-            replace_server()
-        return {
-            "connected": True,
-            "pid": os.getpid(),
-            "generation": _server.bridge_generation,
-            "version": bpy.app.version_string,
-            "file": bpy.data.filepath,
-            "workspace": str(_workspace),
-            "object_count": len(bpy.context.scene.objects),
-            "dirty": bpy.data.is_dirty,
-        }
-    if operation == "scene_info":
-        return {
-            "version": bpy.app.version_string,
-            "file": bpy.data.filepath,
-            "workspace": str(_workspace),
-            "objects": [info(v) for v in bpy.context.scene.objects],
-        }
+        return runtime(operation, p)
     if operation == "object_info":
         return info(obj(p["name"]))
-    if operation == "create_mesh":
-        name = p["name"]
-        if (
-            not isinstance(name, str)
-            or not name.strip()
-            or len(name) > 63
-            or name in bpy.data.objects
-        ):
-            raise ValueError("Object name must be unique, nonempty, and at most 63 characters")
-        if bpy.context.mode != "OBJECT":
-            raise ValueError("Switch Blender to Object Mode before creating geometry")
-        vertices, faces = validate_mesh(p["vertices"], p["faces"])
-        mesh = bpy.data.meshes.new(name)
-        try:
-            mesh.from_pydata(vertices, [], faces)
-            if mesh.validate():
-                raise ValueError("Blender rejected the supplied topology")
-            mesh.update()
-            value = bpy.data.objects.new(name, mesh)
-            bpy.context.scene.collection.objects.link(value)
-        except Exception:
-            bpy.data.meshes.remove(mesh)
-            raise
-        return info(value)
-    if operation == "create_primitive":
-        name = p["name"]
-        if (
-            not isinstance(name, str)
-            or not name.strip()
-            or len(name) > 63
-            or name in bpy.data.objects
-        ):
-            raise ValueError("Object name must be unique, nonempty, and at most 63 characters")
-        constructors = {
-            "cube": bpy.ops.mesh.primitive_cube_add,
-            "sphere": bpy.ops.mesh.primitive_uv_sphere_add,
-            "cylinder": bpy.ops.mesh.primitive_cylinder_add,
-            "cone": bpy.ops.mesh.primitive_cone_add,
-            "plane": bpy.ops.mesh.primitive_plane_add,
-        }
-        if p["kind"] not in constructors:
-            raise ValueError("Unknown primitive")
-        if bpy.context.mode != "OBJECT":
-            raise ValueError("Switch Blender to Object Mode before creating geometry")
-        constructors[p["kind"]](location=vector(p.get("location", [0, 0, 0])))
-        value = bpy.context.object
-        value.name = name
-        return info(value)
-    if operation == "transform_object":
-        value = obj(p["name"])
-        updates = {
-            k: vector(p[k])
-            for k in ("location", "rotation_degrees", "scale")
-            if p.get(k) is not None
-        }
-        if "scale" in updates and any(v <= 0 for v in updates["scale"]):
-            raise ValueError("Scale components must be positive")
-        for key, values in updates.items():
-            setattr(
-                value,
-                "rotation_euler" if key == "rotation_degrees" else key,
-                [math.radians(v) for v in values] if key == "rotation_degrees" else values,
-            )
-        return info(value)
-    if operation == "set_color":
-        value = editable_mesh(p["name"])
-        color = vector(p["rgba"], 4)
-        if any(v < 0 or v > 1 for v in color):
-            raise ValueError("Color components must range from 0 to 1")
-        material = bpy.data.materials.new(f"{value.name} Color")
-        material.diffuse_color = color
-        value.data.materials.clear()
-        value.data.materials.append(material)
-        return info(value)
-    if operation == "add_modifier":
-        bake = p.get("apply", False)
-        if type(bake) is not bool:
-            raise ValueError("apply must be boolean")
-        value = editable_mesh(p["name"]) if bake else obj(p["name"], mesh=True)
-        if bake and (value.modifiers or bpy.context.mode != "OBJECT"):
-            raise ValueError("Baking requires Object Mode and no existing modifiers")
-        amount = vector([p["amount"]], 1)[0]
-        if p["kind"] == "bevel" and 0 < amount <= 100:
-            modifier = value.modifiers.new("Bevel", "BEVEL")
-            modifier.width, modifier.segments = amount, 3
-        elif p["kind"] == "decimate" and 0 < amount <= 1:
-            modifier = value.modifiers.new("Decimate", "DECIMATE")
-            modifier.ratio = amount
-        elif p["kind"] in {"subdivision", "voxel_remesh"}:
-            # Refuse stacked surface operations: their combined cost is not bounded by base counts.
-            if value.modifiers:
-                raise ValueError("Organic modifiers require a mesh without existing modifiers")
-            if p["kind"] == "subdivision":
-                facets = sum(max(4, len(face.vertices)) for face in value.data.polygons)
-                if amount not in (1, 2, 3) or facets * 4 ** (amount - 1) > 500000:
-                    raise ValueError(
-                        "Subdivision needs integer levels 1–3 and at most 500000 faces"
-                    )
-                modifier = value.modifiers.new("Subdivision", "SUBSURF")
-                modifier.levels = modifier.render_levels = int(amount)
-            else:
-                bpy.context.view_layer.update()
-                local = [Vector(c) for c in value.bound_box]
-                extents = [max(v[i] for v in local) - min(v[i] for v in local) for i in range(3)]
-                if (
-                    not 0.005 <= amount <= 1
-                    or math.prod(max(v, amount) / amount + 2 for v in extents) > 2000000
-                ):
-                    raise ValueError("Voxel size must be [0.005,1] and fit 2000000 bounding voxels")
-                modifier = value.modifiers.new("Voxel Remesh", "REMESH")
-                modifier.mode = "VOXEL"
-                modifier.voxel_size = amount
-                modifier.use_smooth_shade = True
-        else:
-            raise ValueError("Invalid modifier or amount")
-        if bake:
-            with selected([value]):
-                if "FINISHED" not in bpy.ops.object.modifier_apply(modifier=modifier.name):
-                    raise RuntimeError("Modifier baking did not finish")
-        return info(value)
-    if operation == "shade_mesh":
-        value = editable_mesh(p["name"])
-        if type(p["smooth"]) is not bool:
-            raise ValueError("smooth must be boolean")
-        for polygon in value.data.polygons:
-            polygon.use_smooth = p["smooth"]
-        return info(value)
-    if operation == "unwrap_mesh":
-        value = editable_mesh(p["name"])
-        with selected([value]):
-            bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_all(action="SELECT")
-            bpy.ops.uv.smart_project()
-        return info(value)
-    if operation == "export_mesh":
-        if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
-            raise ValueError("Provide between 1 and 1000 mesh names")
-        objects = [obj(n, mesh=True) for n in p["names"]]
-        preserve = p.get("preserve_instances", False)
-        if type(preserve) is not bool:
-            raise ValueError("preserve_instances must be a boolean")
-        if preserve and Path(p["path"]).suffix.lower() != ".fbx":
-            raise ValueError("preserve_instances applies to static FBX exports")
-        with output_file(p["path"], {".fbx", ".glb"}) as path, selected(objects):
-            if path.suffix.lower() == ".fbx":
-                from .export_instances import instance_meshes
-
-                with instance_meshes(objects) if preserve else nullcontext():
-                    result = bpy.ops.export_scene.fbx(
-                        filepath=str(path),
-                        use_selection=True,
-                        object_types={"MESH"},
-                        add_leaf_bones=False,
-                        bake_anim=False,
-                        axis_forward="-Z",
-                        axis_up="Y",
-                        global_scale=1,
-                        apply_unit_scale=True,
-                        apply_scale_options="FBX_SCALE_UNITS",
-                        bake_space_transform=True,
-                        path_mode="STRIP",
-                    )
-            else:
-                result = bpy.ops.export_scene.gltf(
-                    filepath=str(path), export_format="GLB", use_selection=True
-                )
-            if "FINISHED" not in result:
-                raise RuntimeError("Mesh export did not finish")
-        return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
-                "preserve_instances": preserve}
-    if operation == "save_project":
-        previous = bpy.context.preferences.filepaths.save_version
-        try:
-            bpy.context.preferences.filepaths.save_version = 0
-            with output_file(p["path"], {".blend"}) as path:
-                if "FINISHED" not in bpy.ops.wm.save_as_mainfile(
-                    filepath=str(path), check_existing=False
-                ):
-                    raise RuntimeError("Project save did not finish")
-        finally:
-            bpy.context.preferences.filepaths.save_version = previous
-        return {"path": str(path), "bytes": path.stat().st_size}
-    if operation == "render_preview":
-        return preview(p)
-    raise ValueError(f"Unknown operation: {operation}")
+    handlers = {
+        "scene_info": scene_info,
+        "create_mesh": create_mesh,
+        "create_primitive": create_primitive,
+        "transform_object": transform,
+        "set_color": set_color,
+        "add_modifier": add_modifier,
+        "shade_mesh": shade,
+        "unwrap_mesh": unwrap,
+        "export_mesh": export_mesh,
+        "save_project": save_project,
+        "render_preview": preview,
+    }
+    if operation not in handlers:
+        raise ValueError(f"Unknown operation: {operation}")
+    return handlers[operation](p)
 
 
 def preview(p):
@@ -450,6 +616,9 @@ def preview(p):
         raise ValueError("Renderer must be workbench or eevee")
     if renderer == "eevee" and (resolution > 1024 or color_mode != "material"):
         raise ValueError("Eevee previews require material colors and at most 1024 pixels")
+    orthographic = p.get("orthographic", False)
+    if type(orthographic) is not bool:
+        raise ValueError("orthographic must be boolean")
     scene = bpy.context.scene
     direction = Vector(vector(p.get("direction", [1.5, -2, 1.4])))
     if direction.length < 1e-6:
@@ -466,11 +635,17 @@ def preview(p):
     if not points:
         raise ValueError("Scene has no visible meshes")
     center = Vector([(min(p[i] for p in points) + max(p[i] for p in points)) / 2 for i in range(3)])
-    radius = max((v - center).length for v in points)
+    radius = max(max((v - center).length for v in points), 1e-4)
+    distance = max(radius * 3.5, 2)
     camera_data = bpy.data.cameras.new("MCP Preview")
+    camera_data.clip_start = max(1e-4, min(0.1, (distance - radius) * 0.5))
+    camera_data.clip_end = distance + radius * 2
+    if orthographic:
+        camera_data.type = "ORTHO"
+        camera_data.ortho_scale = radius * 2.2
     camera = bpy.data.objects.new("MCP Preview", camera_data)
     scene.collection.objects.link(camera)
-    camera.location = center + direction.normalized() * max(radius * 3.5, 2)
+    camera.location = center + direction.normalized() * distance
     camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
     render = scene.render
     original = (
@@ -484,7 +659,8 @@ def preview(p):
         scene.display.shading.light,
         scene.display.shading.color_type,
     )
-    visibility = [(v, v.hide_render) for v in scene.objects if v.type == "MESH"]
+    visibility = [(v, v.hide_render) for v in scene.objects
+                  if v.type not in RENDERLESS and v != camera]
     try:
         if names is not None:
             for value, _ in visibility:
@@ -538,7 +714,7 @@ def pump():
         return 0.05
     with job["lock"]:
         if job["cancelled"] or time.monotonic() > job["deadline"]:
-            job["error"] = "Request expired before execution"
+            job["expired"] = True
             job["done"].set()
             return 0.01
         job["started"] = True
@@ -551,58 +727,108 @@ def pump():
     return 0.01
 
 
+def serve_background():
+    """Block Blender's main thread on the job queue; used when timers cannot run."""
+    import signal
+
+    def stop(*_):
+        raise SystemExit(0)
+
+    previous = signal.signal(signal.SIGTERM, stop)
+    try:
+        while _server is not None:
+            with _jobs.not_empty:
+                _jobs.not_empty.wait_for(lambda: bool(_jobs.queue), timeout=0.5)
+            pump()
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+        unregister()
+
+
+def request_timeout(value):
+    if value is None:
+        return DEFAULT_TIMEOUT
+    if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value <= MAX_TIMEOUT:
+        raise ValueError(f"timeout must be a number in (0, {MAX_TIMEOUT}]")
+    return float(value)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def reply(self, status, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self):
+        try:
+            self.handle_rpc()
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            pass
+
+    def handle_rpc(self):
         if self.path != "/rpc" or not hmac.compare_digest(
             self.headers.get("Authorization", ""), f"Bearer {self.server.bridge_token}"
         ):
-            self.send_error(403)
-            return
+            self.close_connection = True
+            return self.reply(403, {"error": "Unauthorized bridge request"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 1_048_576:
-                raise ValueError("Invalid request size")
-            self.connection.settimeout(5)
+        except ValueError:
+            length = 0
+        if length > MAX_REQUEST_BYTES:
+            self.close_connection = True
+            return self.reply(413, {"error": f"Request exceeds {MAX_REQUEST_BYTES} bytes"})
+        request_id = None
+        try:
+            if length <= 0:
+                raise ValueError("Missing request body")
+            self.connection.settimeout(30)
             request = json.loads(self.rfile.read(length))
             if not isinstance(request, dict) or not isinstance(request.get("id"), str):
-                raise TypeError("Invalid request")
-            job = {
-                "operation": request["operation"],
-                "params": request.get("params", {}),
-                "done": threading.Event(),
-                "lock": threading.Lock(),
-                "started": False,
-                "cancelled": False,
-                "deadline": time.monotonic() + 60,
-            }
+                raise TypeError("Request needs a string id")
+            request_id = request["id"]
+            operation, params = request.get("operation"), request.get("params", {})
+            if not isinstance(operation, str) or not isinstance(params, dict):
+                raise TypeError("Request needs an operation name and object params")
+            timeout = request_timeout(request.get("timeout"))
+        except (ValueError, TypeError) as exc:
+            self.close_connection = True
+            return self.reply(400, {"id": request_id, "error": f"Bad request: {exc}"})
+        job = {
+            "operation": operation,
+            "params": params,
+            "done": threading.Event(),
+            "lock": threading.Lock(),
+            "started": False,
+            "cancelled": False,
+            "deadline": time.monotonic() + timeout,
+        }
+        try:
             _jobs.put_nowait(job)
-            if not job["done"].wait(60):
-                with job["lock"]:
-                    job["cancelled"] = not job["started"]
-                result = {
-                    "error": "Timed out; inspect the scene before retrying. Outcome may be unknown."
-                }
-            else:
-                result = (
-                    {"error": job["error"]}
-                    if "error" in job
-                    else {
-                        "result": job.get("result"),
-                    }
-                )
-            body = json.dumps({"id": request["id"], **result}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        except (ValueError, TypeError, KeyError, queue.Full):
-            self.send_error(400)
-        except (BrokenPipeError, ConnectionResetError, TimeoutError):
-            pass
+        except queue.Full:
+            return self.reply(503, {"id": request_id,
+                                    "error": "Bridge queue is full; request was not executed"})
+        finished = job["done"].wait(timeout)
+        with job["lock"]:
+            if not finished and not job["started"]:
+                job["cancelled"] = True
+            not_started = job["cancelled"] or job.get("expired", False)
+        if not_started:
+            return self.reply(504, {"id": request_id, "error": (
+                f"Request was not started within {timeout:g}s; it was not executed")})
+        if not finished:
+            result = {"error": "Timed out; inspect the scene before retrying. Outcome may be unknown."}
+        elif "error" in job:
+            result = {"error": job["error"]}
+        else:
+            result = {"result": job.get("result")}
+        self.reply(200, {"id": request_id, **result})
 
 
 def replace_server():
@@ -619,7 +845,8 @@ def replace_server():
         fd, temporary = tempfile.mkstemp(dir=_connection.parent, prefix=".connection-")
         with os.fdopen(fd, "w") as stream:
             json.dump(
-                {"host": "127.0.0.1", "port": server.server_port, "token": server.bridge_token},
+                {"host": "127.0.0.1", "port": server.server_port, "token": server.bridge_token,
+                 "pid": os.getpid()},
                 stream,
             )
         os.replace(temporary, _connection)
@@ -641,18 +868,20 @@ def register():
     global _connection, _workspace
     if _server is not None:
         return
-    _connection = Path(
-        os.environ.get("CAVI_BLENDER_CONNECTION", Path.home() / ".cavi/blender-mcp/connection.json")
-    )
+    from .client import BridgeClient, BridgeOperationError, default_connection
+
+    _connection = default_connection()
     _connection.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if _connection.exists():
-        from .client import BridgeClient
-
         try:
-            BridgeClient(_connection).call("scene_info")
-        except (ConnectionError, ValueError):
-            pass
+            BridgeClient(_connection).call("scene_info", {"limit": 1}, timeout=5)
+        except BridgeOperationError:
+            owned = True
+        except (ConnectionError, ValueError, OSError, RuntimeError):
+            owned = False
         else:
+            owned = True
+        if owned:
             raise RuntimeError(
                 "Another Blender bridge owns this connection; choose CAVI_BLENDER_CONNECTION explicitly"
             )

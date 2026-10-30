@@ -7,6 +7,7 @@ import bpy
 from .mapping import measure_triangle, summarize
 
 MAX_TRIANGLES = 100000
+MAX_VERTICES = 100000
 
 
 def inspect(params, find_object):
@@ -23,8 +24,8 @@ def inspect(params, find_object):
     objects = [find_object(name, mesh=True) for name in names]
     if sum(len(value.material_slots) for value in objects) > 64:
         raise ValueError("Inspect at most 64 material slots per call")
-    if sum(len(value.data.vertices) for value in objects) > MAX_TRIANGLES:
-        raise ValueError("Inspection is bounded to 100000 total vertices")
+    if sum(len(value.data.vertices) for value in objects) > MAX_VERTICES:
+        raise ValueError(f"Inspection is bounded to {MAX_VERTICES} total vertices")
     triangle_budget = 0
     for value in objects:
         if value.modifiers or value.data.shape_keys or value.find_armature():
@@ -33,7 +34,7 @@ def inspect(params, find_object):
             )
         triangle_budget += sum(max(0, len(face.vertices) - 2) for face in value.data.polygons)
         if triangle_budget > MAX_TRIANGLES:
-            raise ValueError("Inspection is bounded to 100000 total triangles")
+            raise ValueError(f"Inspection is bounded to {MAX_TRIANGLES} total triangles")
     units = bpy.context.scene.unit_settings
     # Match Blender's FBX exporter: unitless scenes export one unit as one metre.
     unit_scale = 1.0 if units.system == "NONE" else units.scale_length

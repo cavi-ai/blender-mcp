@@ -14,12 +14,16 @@ def main(argv=None):
     runtime.add_argument("action", choices=("start", "status", "restart"))
     runtime.add_argument("--project", help="Existing workspace-relative .blend to open on startup")
     runtime.add_argument("--lease-id", help="Current edit lease, required for restart")
+    runtime.add_argument("--background", action="store_true",
+                         help="Start headless Blender (runtime start only)")
     args = parser.parse_args(argv)
     if args.project is not None and args.action != "start":
         parser.error("--project is only supported by runtime start")
+    if args.background and args.action != "start":
+        parser.error("--background is only supported by runtime start")
     try:
         if args.action == "start":
-            print(json.dumps(start_runtime(args.project)))
+            print(json.dumps(start_runtime(args.project, args.background)))
             return 0
         client = BridgeClient()
         restarted = (

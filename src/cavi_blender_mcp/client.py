@@ -31,23 +31,55 @@ OPERATIONS = frozenset(
         "assign_material",
     }
 )
+SLOW_OPERATIONS = frozenset(
+    {"import_mesh", "export_mesh", "export_instances", "add_modifier", "render_preview",
+     "save_project"}
+)
+DEFAULT_TIMEOUT = 60
+SLOW_TIMEOUT = 300
+MAX_TIMEOUT = 600
+MAX_REQUEST_BYTES = 8 * 1024 * 1024
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
 class BridgeError(ConnectionError):
     """A bridge protocol failure whose diagnostic must be preserved."""
 
 
+class BridgeOperationError(RuntimeError):
+    """A live bridge executed or refused the request and reported an error."""
+
+
+def default_connection() -> Path:
+    return Path(
+        os.environ.get(
+            "CAVI_BLENDER_CONNECTION", Path.home() / ".cavi/blender-mcp/connection.json"
+        )
+    )
+
+
+def operation_timeout(operation, params):
+    inner = params.get("operation") if operation == "owned_edit" else operation
+    return SLOW_TIMEOUT if inner in SLOW_OPERATIONS else DEFAULT_TIMEOUT
+
+
+def process_alive(pid):
+    if os.name == "nt":
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 class BridgeClient:
     def __init__(self, config: Path | None = None):
-        self.config = config or Path(
-            os.environ.get(
-                "CAVI_BLENDER_CONNECTION", Path.home() / ".cavi/blender-mcp/connection.json"
-            )
-        )
+        self.config = config or default_connection()
 
-    def call(self, operation: str, params: dict | None = None):
-        if operation not in OPERATIONS:
-            raise ValueError(f"Unknown operation: {operation}")
+    def read_config(self):
         try:
             fd = os.open(self.config, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         except FileNotFoundError as exc:
@@ -61,6 +93,32 @@ class BridgeClient:
             ):
                 raise PermissionError("Connection file must be private and owned by this user")
             config = json.load(stream)
+        if not isinstance(config, dict):
+            config = {}
+        pid = config.get("pid")
+        if pid is not None and (type(pid) is not int or pid <= 0):
+            raise ValueError("Invalid bridge connection file")
+        if pid is not None and not process_alive(pid):
+            self.discard(info)
+            raise ConnectionError(
+                "Blender bridge is not running; removed a stale connection file"
+            ) from FileNotFoundError(str(self.config))
+        return config
+
+    def discard(self, info):
+        try:
+            current = os.stat(self.config, follow_symlinks=False)
+            if (current.st_ino, current.st_dev) == (info.st_ino, info.st_dev):
+                os.unlink(self.config)
+        except FileNotFoundError:
+            pass
+
+    def call(self, operation: str, params: dict | None = None, timeout: float | None = None):
+        if operation not in OPERATIONS:
+            raise ValueError(f"Unknown operation: {operation}")
+        params = params or {}
+        timeout = min(timeout or operation_timeout(operation, params), MAX_TIMEOUT)
+        config = self.read_config()
         if config.get("host") != "127.0.0.1":
             raise ValueError("Bridge must use IPv4 loopback")
         port, token = config.get("port"), config.get("token")
@@ -72,31 +130,32 @@ class BridgeClient:
         ):
             raise ValueError("Invalid bridge connection file")
         request_id = uuid.uuid4().hex
-        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=65)
+        payload = json.dumps(
+            {"id": request_id, "operation": operation, "params": params, "timeout": timeout}
+        ).encode()
+        if len(payload) > MAX_REQUEST_BYTES:
+            raise ValueError(f"Request exceeds {MAX_REQUEST_BYTES} bytes")
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout + 5)
         try:
             connection.request(
                 "POST",
                 "/rpc",
-                json.dumps(
-                    {
-                        "id": request_id,
-                        "operation": operation,
-                        "params": params or {},
-                    }
-                ),
+                payload,
                 {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
             response = connection.getresponse()
-            body = response.read(8 * 1024 * 1024 + 1)
-            if len(body) > 8 * 1024 * 1024:
+            body = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(body) > MAX_RESPONSE_BYTES:
                 raise BridgeError("Bridge response exceeds size limit")
             if response.status != 200:
-                raise BridgeError(f"Bridge HTTP {response.status}; request was not retried")
+                raise BridgeError(
+                    f"Bridge HTTP {response.status}: {error_message(body)}; request was not retried"
+                )
             result = json.loads(body)
             if result.get("id") != request_id:
                 raise BridgeError("Bridge response ID mismatch")
             if "error" in result:
-                raise RuntimeError(result["error"])
+                raise BridgeOperationError(result["error"])
             return result["result"]
         except BridgeError:
             raise
@@ -106,3 +165,11 @@ class BridgeClient:
             ) from exc
         finally:
             connection.close()
+
+
+def error_message(body):
+    try:
+        message = json.loads(body).get("error")
+    except (ValueError, AttributeError):
+        message = None
+    return message if isinstance(message, str) and message else "no diagnostic"

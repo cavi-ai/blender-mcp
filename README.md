@@ -31,6 +31,7 @@ Call `scene_info` first. The bridge must be running inside Blender; the stdio MC
 ```sh
 cavi-blender-mcp runtime start
 cavi-blender-mcp runtime start --project working-copy.blend
+cavi-blender-mcp runtime start --background
 cavi-blender-mcp runtime status
 cavi-blender-mcp runtime restart --lease-id <current-lease>
 ```
@@ -43,6 +44,9 @@ replace a different connected project. `CAVI_BLENDER_BIN` overrides executable d
 otherwise the CLI uses Blender on PATH or the standard macOS installation. The connection
 file and workspace environment variables select the dedicated session. Launch acceptance
 does not prove readiness; require a successful status check before asset operations.
+`--background` launches headless Blender; the bridge blocks its main thread on the request queue
+and removes its connection file on SIGTERM. The connection file records the Blender pid; a file
+whose pid is no longer alive is treated as offline and removed.
 
 `status` and `restart` control the bridge inside an already running Blender session. Restart replaces
 its local listener and credentials, then checks the new connection. It preserves the Blender
@@ -57,18 +61,18 @@ After installing new tools, restart that client's MCP connection to discover the
 
 ## Tools
 
-- `session_control`: inspect, claim, renew, or release application edit ownership.
-- `scene_info`, `object_info`: inspect scene and geometry.
-- `create_primitive`, `transform_object`, `set_color`: create and edit objects.
+- `session_control`: `action` = inspect | claim | renew | release application edit ownership.
+- `scene_info`: version, file, workspace and a page of objects (`limit` 1–1000, default 200; `offset`; returns `total`). With `name`, returns that object's details.
+- `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
+- `render_preview`: render a PNG and return an MCP image; no lease needed. `names` isolates meshes (other renderable objects are hidden), `direction` picks the view, `orthographic` switches the camera. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Scene state is restored afterward.
+- `object_edit`: `action` = `create_primitive` (`kind`, `location`), `create_mesh` (`vertices`, `faces`), `transform` (`location`, `rotation_degrees` XYZ Euler, honoring the object's rotation mode, `scale`), `set_color` (`rgba`, `slot`=0; reuses one color material per object slot), `shade` (`smooth`).
+- `mesh_edit`: `action` = `modifier` (`kind` bevel | decimate | subdivision | voxel_remesh, `amount`, `apply`) or `unwrap` (Smart UV Project then pack; `angle_limit_degrees`=66, `island_margin`=0.02, optional `uv_layer`, created if missing).
 - `assign_material`: bind a new material to exact mesh slots, pack a bounded workspace PNG as sRGB base color, and set raw roughness and metallic values. Other slots are preserved; UVs and single-user mesh data are required for textured assignment.
-- `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Choose the consuming texture resolution. Overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
-- `create_mesh`: indexed custom geometry, with bounded vertices, faces and coordinates.
-- `generate_mesh`: reconstruct a colored GLB from one original image using a configured local TripoSR worker.
-- `import_mesh`: import a self-contained static GLB into a new named collection, preserving existing objects and selection.
-- `add_modifier`, `shade_mesh`, `unwrap_mesh`: bevel, decimation, subdivision, voxel remeshing, shading and UVs.
-- `export_mesh`: export named meshes as FBX or GLB. Static FBX uses file unit metadata and baked space conversion to preserve the source scale without adding 100-fold object scales. Opt into `preserve_instances=true` for local, unmodified static FBX sources with distinct populated material slots: matching mesh/material layouts share geometry, and different finishes remain separate. Source mesh data and object material bindings are restored after export.
-- `save_project`: save a new Blender project.
-- `render_preview`: render a PNG and return an MCP image. Optional mesh names isolate an asset; a camera direction selects its view. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Existing lights are excluded. Visibility, world, engine, and camera settings are restored afterward.
+- `asset_io`: `action` = `import` (static GLB `path`, new `name`), `export` (`names`, `.fbx`/`.glb` `path`, `preserve_instances`, `include_empties`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease).
+
+Static FBX exports use file unit metadata, baked space conversion, face smoothing and tangents. `include_empties` adds empty ancestors of the named meshes for hierarchy. GLB exports apply modifiers. `preserve_instances=true` shares geometry between local, unmodified static FBX sources with matching distinct populated material slots; source mesh data and bindings are restored after export.
+
+Every mutation except `render_preview` and `generate` requires a `lease_id`. Unrelated or missing per-action parameters are refused before contacting Blender.
 
 Materials are Blender preview colors. Exported assets still need the destination game's materials, scale, collision and import settings.
 Material, shading and UV edits refuse shared mesh data to avoid changing linked objects implicitly. Make the mesh single-user in Blender before editing it.
@@ -79,18 +83,20 @@ Material, shading and UV edits refuse shared mesh data to avoid changing linked 
 
 The bridge binds only to `127.0.0.1` on an ephemeral port and requires a random session token. `CAVI_BLENDER_CONNECTION` selects its private connection file, defaulting to `~/.cavi/blender-mcp/connection.json`. Keep it out of repositories. Separate concurrent sessions require separate connection files configured in both Blender and the MCP server.
 
-There is no arbitrary Python tool, telemetry or external asset download. Changes are not retried after a timeout; inspect the scene before resubmitting an uncertain mutation. Blender operations run on the main thread. The bridge stops when its Blender process exits.
+There is no arbitrary Python tool, telemetry or external asset download. Changes are not retried after a timeout; inspect the scene before resubmitting an uncertain mutation. Requests time out after 60 s (import, export, modifier, render and save: 300 s; cap 600 s). Bridge failures return JSON errors: 400 bad request, 413 too large, 503 queue full, 504 not started in time. Blender operations run on the main thread. The bridge stops when its Blender process exits.
 
-Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 face indices within the 1-MiB request limit. Faces use zero-based indices and outward winding. Invalid indices, repeated vertices and zero-area faces are refused before creating a Blender datablock. Disconnected shells are allowed for voxel fusion. Subdivision supports integer levels 1–3 within 500,000 estimated faces; remeshing requires a voxel size of 0.005–1 local units within a two-million-voxel bounding volume. Both organic modifiers require an object without existing modifiers to bound evaluation cost.
+Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 face indices within the 8-MiB request limit. Faces use zero-based indices and outward winding. Invalid indices, repeated vertices and zero-area faces are refused before creating a Blender datablock. Disconnected shells are allowed for voxel fusion. Subdivision supports integer levels 1–3 within 500,000 estimated faces; remeshing requires a voxel size of 0.005–1 local units within a two-million-voxel bounding volume. Both organic modifiers require an object without existing modifiers to bound evaluation cost.
 
-`add_modifier` defaults to a non-destructive modifier. Its optional `apply` flag bakes the result into a single-user mesh without an existing modifier stack, allowing fusion, smoothing and reduction in sequence.
+Bevel is bounded by the evaluated geometry; unapplied modifier stacks are limited to 16.
+
+`mesh_edit` `modifier` defaults to a non-destructive modifier. Its optional `apply` flag bakes the result into a single-user mesh without an existing modifier stack, allowing fusion, smoothing and reduction in sequence.
 
 ## Local image-to-3D
 
 Generation is optional and runs in a separate Python 3.11 environment. The MCP process does not import PyTorch, download weights or send images to a remote service. The worker uses [TripoSR](https://github.com/VAST-AI-Research/TripoSR), with CPU mesh extraction through scikit-image. Code and weights are MIT licensed. Its generated surfaces still require inspection, animation rigging and game import work.
 
-After generation, call `import_mesh(path, name)` with that workspace-relative GLB and
-a new asset name. Returned object names can be used with the editing and export tools.
+After generation, call `asset_io` with `action="import"`, that workspace-relative GLB `path`
+and a new asset `name`. Returned object names can be used with the editing and export tools.
 Imports preserve transforms, UVs, and vertex colors; embedded images are packed into
 Blender. A failed import removes its new datablocks and restores selection. The source
 file is hashed, validated, and copied to a private snapshot before Blender reads it.
@@ -112,7 +118,7 @@ CAVI_TRIPOSR_SOURCE=/path/to/TripoSR
 CAVI_TRIPOSR_WEIGHTS=/path/to/weights
 ```
 
-Put an image of one isolated object on white or transparency inside the Blender workspace. Call `generate_mesh` with its relative `image` path and a new `.glb` output `path`. Generation runs offline on CPU with four threads, chunked field queries and a 180-second timeout. Resolution is bounded to 64–192; input images are at most 16 MiB and 4096 pixels per side. Outputs are published without replacing existing files. The returned counts and input SHA-256 identify the generated artifact. Generation creates a GLB file without changing the open scene.
+Put an image of one isolated object on white or transparency inside the Blender workspace. Call `asset_io` with `action="generate"`, its relative `image` path and a new `.glb` output `path`. Generation runs offline on CPU with four threads, chunked field queries and a 180-second timeout. Resolution is bounded to 64–192; input images are at most 16 MiB and 4096 pixels per side. Outputs are published without replacing existing files. The returned counts and input SHA-256 identify the generated artifact. Generation creates a GLB file without changing the open scene.
 
 
 ## Shared application ownership
@@ -150,6 +156,8 @@ The native smoke creates a disposable scene, edits a mesh, unwraps UVs, exports 
 
 The additional `tests/blender_organic.py` native check exercises custom topology, evaluated subdivision/remeshing, resource limits, preview isolation and a GLB export/import round trip. Invoke it with the same Blender command and a separate empty workspace.
 
+`tests/blender_harden.py` checks rotation modes, color material reuse, named UV layers, modifier budgets, lease-free previews, FBX settings, and the bridge's request cap and error statuses.
+
 `tests/blender_import.py` checks typed import on Blender 5.2.3, including transforms,
 UVs, vertex-color values, embedded image packing, name reuse, selection preservation,
 and rollback after a partial native import. It uses a disposable factory scene and
@@ -166,7 +174,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 17 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 8 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 

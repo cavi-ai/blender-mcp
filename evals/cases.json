@@ -14,8 +14,41 @@
     ]
   },
   {
+    "id": "scene-pagination",
+    "tool": "scene_info",
+    "arguments": {
+      "limit": 1,
+      "offset": 1
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/limit": 1,
+      "/offset": 1
+    },
+    "required": [
+      "/total",
+      "/objects/0/name"
+    ]
+  },
+  {
+    "id": "scene-limit-bound",
+    "tool": "scene_info",
+    "arguments": {
+      "limit": 0
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "object-success",
-    "tool": "object_info",
+    "tool": "scene_info",
     "arguments": {
       "name": "Cube"
     },
@@ -39,8 +72,8 @@
     "error": "not running"
   },
   {
-    "id": "object_info-missing-argument",
-    "tool": "object_info",
+    "id": "object_edit-missing-argument",
+    "tool": "object_edit",
     "arguments": {},
     "kind": "invalid",
     "modes": [
@@ -50,8 +83,42 @@
     "error": "validation"
   },
   {
-    "id": "create_primitive-missing-argument",
-    "tool": "create_primitive",
+    "id": "object_edit-action-requires-kind",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "create_primitive",
+      "name": "NoKind"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: kind"
+  },
+  {
+    "id": "object_edit-unrelated-parameter",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shade",
+      "name": "EvalProp",
+      "rgba": [
+        1,
+        0,
+        0,
+        1
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: rgba"
+  },
+  {
+    "id": "mesh_edit-missing-argument",
+    "tool": "mesh_edit",
     "arguments": {},
     "kind": "invalid",
     "modes": [
@@ -61,74 +128,8 @@
     "error": "validation"
   },
   {
-    "id": "transform_object-missing-argument",
-    "tool": "transform_object",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "set_color-missing-argument",
-    "tool": "set_color",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "add_modifier-missing-argument",
-    "tool": "add_modifier",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "shade_mesh-missing-argument",
-    "tool": "shade_mesh",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "unwrap_mesh-missing-argument",
-    "tool": "unwrap_mesh",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "export_mesh-missing-argument",
-    "tool": "export_mesh",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
-    "id": "save_project-missing-argument",
-    "tool": "save_project",
+    "id": "asset_io-missing-argument",
+    "tool": "asset_io",
     "arguments": {},
     "kind": "invalid",
     "modes": [
@@ -150,8 +151,9 @@
   },
   {
     "id": "create-cube",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalProp",
       "kind": "cube"
     },
@@ -167,8 +169,9 @@
   },
   {
     "id": "create-sphere",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalSphere",
       "kind": "sphere"
     },
@@ -183,8 +186,9 @@
   },
   {
     "id": "create-cylinder",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalCylinder",
       "kind": "cylinder"
     },
@@ -199,8 +203,9 @@
   },
   {
     "id": "create-cone",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalCone",
       "kind": "cone"
     },
@@ -215,8 +220,9 @@
   },
   {
     "id": "create-plane",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalPlane",
       "kind": "plane"
     },
@@ -231,8 +237,9 @@
   },
   {
     "id": "primitive-kind",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "InvalidKind",
       "kind": "dragon"
     },
@@ -245,8 +252,9 @@
   },
   {
     "id": "primitive-location",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "InvalidVector",
       "kind": "cube",
       "location": [
@@ -263,8 +271,9 @@
   },
   {
     "id": "primitive-boolean-coordinate",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "BooleanCoordinate",
       "kind": "cube",
       "location": [
@@ -282,8 +291,9 @@
   },
   {
     "id": "duplicate",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "EvalProp",
       "kind": "cube"
     },
@@ -295,8 +305,9 @@
   },
   {
     "id": "empty-name",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "",
       "kind": "cube"
     },
@@ -308,8 +319,9 @@
   },
   {
     "id": "long-name",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "kind": "cube"
     },
@@ -321,8 +333,9 @@
   },
   {
     "id": "transform-success",
-    "tool": "transform_object",
+    "tool": "object_edit",
     "arguments": {
+      "action": "transform",
       "name": "EvalProp",
       "location": [
         1,
@@ -351,8 +364,9 @@
   },
   {
     "id": "transform-atomic-invalid",
-    "tool": "transform_object",
+    "tool": "object_edit",
     "arguments": {
+      "action": "transform",
       "name": "EvalProp",
       "location": [
         9,
@@ -373,7 +387,7 @@
   },
   {
     "id": "transform-unchanged",
-    "tool": "object_info",
+    "tool": "scene_info",
     "arguments": {
       "name": "EvalProp"
     },
@@ -388,7 +402,7 @@
   },
   {
     "id": "missing-object",
-    "tool": "object_info",
+    "tool": "scene_info",
     "arguments": {
       "name": "Missing"
     },
@@ -400,8 +414,9 @@
   },
   {
     "id": "color-success",
-    "tool": "set_color",
+    "tool": "object_edit",
     "arguments": {
+      "action": "set_color",
       "name": "EvalProp",
       "rgba": [
         0.2,
@@ -419,9 +434,51 @@
     ]
   },
   {
-    "id": "color-range",
-    "tool": "set_color",
+    "id": "color-repeat-reuses-material",
+    "tool": "object_edit",
     "arguments": {
+      "action": "set_color",
+      "name": "EvalProp",
+      "rgba": [
+        0.9,
+        0.1,
+        0.1,
+        1
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/materials/0": "EvalProp Color"
+    }
+  },
+  {
+    "id": "color-missing-slot",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_color",
+      "name": "EvalProp",
+      "rgba": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "slot": 5
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "slot does not exist"
+  },
+  {
+    "id": "color-range",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_color",
       "name": "EvalProp",
       "rgba": [
         2,
@@ -438,8 +495,9 @@
   },
   {
     "id": "color-width",
-    "tool": "set_color",
+    "tool": "object_edit",
     "arguments": {
+      "action": "set_color",
       "name": "EvalProp",
       "rgba": [
         1,
@@ -456,8 +514,9 @@
   },
   {
     "id": "modifier-bevel",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "EvalProp",
       "kind": "bevel",
       "amount": 0.05
@@ -475,8 +534,9 @@
   },
   {
     "id": "modifier-decimate",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "EvalProp",
       "kind": "decimate",
       "amount": 0.8
@@ -494,8 +554,9 @@
   },
   {
     "id": "modifier-range",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "EvalProp",
       "kind": "decimate",
       "amount": 2
@@ -508,8 +569,9 @@
   },
   {
     "id": "modifier-boolean",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "EvalProp",
       "kind": "decimate",
       "amount": true
@@ -523,8 +585,9 @@
   },
   {
     "id": "shade-flat",
-    "tool": "shade_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "shade",
       "name": "EvalProp",
       "smooth": false
     },
@@ -538,8 +601,9 @@
   },
   {
     "id": "shade-smooth",
-    "tool": "shade_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "shade",
       "name": "EvalProp",
       "smooth": true
     },
@@ -553,8 +617,9 @@
   },
   {
     "id": "shade-string-bool",
-    "tool": "shade_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "shade",
       "name": "EvalProp",
       "smooth": "false"
     },
@@ -567,7 +632,7 @@
   },
   {
     "id": "unwrap-precondition",
-    "tool": "object_info",
+    "tool": "scene_info",
     "arguments": {
       "name": "UVTarget"
     },
@@ -581,8 +646,9 @@
   },
   {
     "id": "unwrap-success",
-    "tool": "unwrap_mesh",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "unwrap",
       "name": "UVTarget"
     },
     "kind": "success",
@@ -594,9 +660,46 @@
     }
   },
   {
-    "id": "set_color-shared-data",
-    "tool": "set_color",
+    "id": "unwrap-named-layer",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "unwrap",
+      "name": "UVTarget",
+      "uv_layer": "Lightmap",
+      "angle_limit_degrees": 45,
+      "island_margin": 0.01
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/uv_layer": "Lightmap",
+      "/uv_layers": 2
+    }
+  },
+  {
+    "id": "mesh_edit-unrelated-parameter",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "modifier",
+      "name": "EvalProp",
+      "kind": "bevel",
+      "amount": 0.1,
+      "uv_layer": "UV"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: uv_layer"
+  },
+  {
+    "id": "set_color-shared-data",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "set_color",
       "name": "SharedTarget",
       "rgba": [
         1,
@@ -613,8 +716,9 @@
   },
   {
     "id": "shade_mesh-shared-data",
-    "tool": "shade_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "shade",
       "name": "SharedTarget",
       "smooth": true
     },
@@ -626,8 +730,9 @@
   },
   {
     "id": "unwrap_mesh-shared-data",
-    "tool": "unwrap_mesh",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "unwrap",
       "name": "SharedTarget"
     },
     "kind": "safety",
@@ -638,8 +743,9 @@
   },
   {
     "id": "add_modifier-nonmesh",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "Camera",
       "kind": "bevel",
       "amount": 0.1
@@ -652,8 +758,9 @@
   },
   {
     "id": "shade_mesh-nonmesh",
-    "tool": "shade_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "shade",
       "name": "Camera"
     },
     "kind": "invalid",
@@ -664,8 +771,9 @@
   },
   {
     "id": "unwrap_mesh-nonmesh",
-    "tool": "unwrap_mesh",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "unwrap",
       "name": "Camera"
     },
     "kind": "invalid",
@@ -676,8 +784,9 @@
   },
   {
     "id": "set_color-nonmesh",
-    "tool": "set_color",
+    "tool": "object_edit",
     "arguments": {
+      "action": "set_color",
       "name": "Camera",
       "rgba": [
         1,
@@ -694,8 +803,9 @@
   },
   {
     "id": "export-fbx",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -714,8 +824,9 @@
   },
   {
     "id": "export-glb",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -733,9 +844,32 @@
     ]
   },
   {
-    "id": "empty-export",
-    "tool": "export_mesh",
+    "id": "export-fbx-empties",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
+      "names": [
+        "EvalProp"
+      ],
+      "path": "hierarchy.fbx",
+      "include_empties": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/include_empties": true
+    },
+    "files": [
+      "hierarchy.fbx"
+    ]
+  },
+  {
+    "id": "empty-export",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
       "names": [],
       "path": "empty.glb"
     },
@@ -747,8 +881,9 @@
   },
   {
     "id": "save-success",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "scene.blend"
     },
     "kind": "success",
@@ -760,6 +895,26 @@
     ],
     "files": [
       "scene.blend"
+    ]
+  },
+  {
+    "id": "save-unrelated-parameter",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "save",
+      "path": "other.blend",
+      "names": [
+        "EvalProp"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: names",
+    "absent": [
+      "other.blend"
     ]
   },
   {
@@ -776,6 +931,26 @@
     "image": true,
     "files": [
       "preview.png"
+    ]
+  },
+  {
+    "id": "preview-orthographic",
+    "tool": "render_preview",
+    "arguments": {
+      "path": "ortho.png",
+      "resolution": 64,
+      "orthographic": true,
+      "names": [
+        "EvalProp"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "image": true,
+    "files": [
+      "ortho.png"
     ]
   },
   {
@@ -807,8 +982,9 @@
   },
   {
     "id": "export_mesh-overwrite",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -822,8 +998,9 @@
   },
   {
     "id": "export_mesh-escape",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -837,8 +1014,9 @@
   },
   {
     "id": "export_mesh-symlink",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -852,8 +1030,9 @@
   },
   {
     "id": "export_mesh-extension",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -867,8 +1046,9 @@
   },
   {
     "id": "export_mesh-parent",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "EvalProp"
       ],
@@ -882,8 +1062,9 @@
   },
   {
     "id": "save_project-overwrite",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "existing.blend"
     },
     "kind": "safety",
@@ -894,8 +1075,9 @@
   },
   {
     "id": "save_project-escape",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "../escape.blend"
     },
     "kind": "safety",
@@ -906,8 +1088,9 @@
   },
   {
     "id": "save_project-symlink",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "escape/escape.blend"
     },
     "kind": "safety",
@@ -918,8 +1101,9 @@
   },
   {
     "id": "save_project-extension",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "wrong.txt"
     },
     "kind": "safety",
@@ -930,8 +1114,9 @@
   },
   {
     "id": "save_project-parent",
-    "tool": "save_project",
+    "tool": "asset_io",
     "arguments": {
+      "action": "save",
       "path": "missing/asset.blend"
     },
     "kind": "safety",
@@ -1007,8 +1192,9 @@
   },
   {
     "id": "custom-mesh-success",
-    "tool": "create_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_mesh",
       "name": "CustomSurface",
       "vertices": [
         [
@@ -1065,20 +1251,10 @@
     }
   },
   {
-    "id": "custom-mesh-schema",
-    "tool": "create_mesh",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "protocol",
-      "native"
-    ],
-    "error": "validation"
-  },
-  {
     "id": "custom-mesh-topology",
-    "tool": "create_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_mesh",
       "name": "BadSurface",
       "vertices": [
         [
@@ -1118,8 +1294,9 @@
   },
   {
     "id": "custom-mesh-duplicate",
-    "tool": "create_mesh",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_mesh",
       "name": "CustomSurface",
       "vertices": [
         [
@@ -1174,8 +1351,9 @@
   },
   {
     "id": "custom-subdivision",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "CustomSurface",
       "kind": "subdivision",
       "amount": 2
@@ -1190,8 +1368,9 @@
   },
   {
     "id": "custom-subdivision-stacking",
-    "tool": "add_modifier",
+    "tool": "mesh_edit",
     "arguments": {
+      "action": "modifier",
       "name": "CustomSurface",
       "kind": "subdivision",
       "amount": 2
@@ -1204,8 +1383,9 @@
   },
   {
     "id": "generate-original-mesh",
-    "tool": "generate_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "generate",
       "image": "input-model.png",
       "path": "generated.glb",
       "resolution": 192
@@ -1228,20 +1408,10 @@
     ]
   },
   {
-    "id": "generate-schema",
-    "tool": "generate_mesh",
-    "arguments": {},
-    "kind": "invalid",
-    "modes": [
-      "native",
-      "protocol"
-    ],
-    "error": "validation"
-  },
-  {
     "id": "generate-image-traversal",
-    "tool": "generate_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "generate",
       "image": "../private.png",
       "path": "generated.glb"
     },
@@ -1252,55 +1422,139 @@
     "error": "workspace"
   },
   {
-    "id": "import-schema", "tool": "import_mesh", "arguments": {},
-    "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"
+    "id": "import-empty-name",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.glb",
+      "name": ""
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   },
   {
-    "id": "import-empty-name", "tool": "import_mesh",
-    "arguments": {"path": "prop.glb", "name": ""},
-    "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"
+    "id": "import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.glb",
+      "name": "ImportedEval"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/collection": "ImportedEval",
+      "/objects/0/name": "ImportedEval"
+    },
+    "required": [
+      "/sha256",
+      "/imported_vertices",
+      "/imported_triangles"
+    ]
   },
   {
-    "id": "import-success", "tool": "import_mesh",
-    "arguments": {"path": "prop.glb", "name": "ImportedEval"},
-    "kind": "success", "modes": ["native"],
-    "equals": {"/collection": "ImportedEval", "/objects/0/name": "ImportedEval"},
-    "required": ["/sha256", "/imported_vertices", "/imported_triangles"]
+    "id": "import-duplicate-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.glb",
+      "name": "ImportedEval"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   },
   {
-    "id": "import-duplicate-refused", "tool": "import_mesh",
-    "arguments": {"path": "prop.glb", "name": "ImportedEval"},
-    "kind": "safety", "modes": ["native"], "error": "already exists"
+    "id": "import-existing-object-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.glb",
+      "name": "Cube"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   },
   {
-    "id": "import-existing-object-refused", "tool": "import_mesh",
-    "arguments": {"path": "prop.glb", "name": "Cube"},
-    "kind": "safety", "modes": ["native"], "error": "already exists"
+    "id": "import-path-escape",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "../outside/prop.glb",
+      "name": "Escape"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
   },
   {
-    "id": "import-path-escape", "tool": "import_mesh",
-    "arguments": {"path": "../outside/prop.glb", "name": "Escape"},
-    "kind": "safety", "modes": ["native"], "error": "workspace"
+    "id": "import-symlink-escape",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "escape/prop.glb",
+      "name": "Escape"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
   },
   {
-    "id": "import-symlink-escape", "tool": "import_mesh",
-    "arguments": {"path": "escape/prop.glb", "name": "Escape"},
-    "kind": "safety", "modes": ["native"], "error": "workspace"
+    "id": "import-invalid-container",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "existing.glb",
+      "name": "Malformed"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "GLB"
   },
   {
-    "id": "import-invalid-container", "tool": "import_mesh",
-    "arguments": {"path": "existing.glb", "name": "Malformed"},
-    "kind": "safety", "modes": ["native"], "error": "GLB"
+    "id": "import-wrong-extension",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "existing.png",
+      "name": "WrongFormat"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "GLB"
   },
   {
-    "id": "import-wrong-extension", "tool": "import_mesh",
-    "arguments": {"path": "existing.png", "name": "WrongFormat"},
-    "kind": "safety", "modes": ["native"], "error": "GLB"
-  },
-  {
-    "id": "import-long-unicode-name", "tool": "import_mesh",
-    "arguments": {"path": "prop.glb", "name": "界界界界界界界界界界界界界界界界界界界界界界"},
-    "kind": "safety", "modes": ["native"], "error": "UTF-8"
+    "id": "import-long-unicode-name",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.glb",
+      "name": "界界界界界界界界界界界界界界界界界界界界界界"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "UTF-8"
   },
   {
     "id": "session-inspect",
@@ -1425,8 +1679,9 @@
   },
   {
     "id": "unowned-mutation",
-    "tool": "create_primitive",
+    "tool": "object_edit",
     "arguments": {
+      "action": "create_primitive",
       "name": "Unowned",
       "kind": "cube"
     },
@@ -1597,8 +1852,9 @@
   },
   {
     "id": "instance-export-success",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "MaterialTarget"
       ],
@@ -1618,8 +1874,9 @@
   },
   {
     "id": "instance-export-glb-refused",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "MaterialTarget"
       ],
@@ -1637,8 +1894,9 @@
   },
   {
     "id": "instance-export-string-flag",
-    "tool": "export_mesh",
+    "tool": "asset_io",
     "arguments": {
+      "action": "export",
       "names": [
         "MaterialTarget"
       ],
