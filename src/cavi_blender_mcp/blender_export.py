@@ -6,7 +6,7 @@ from pathlib import Path
 
 import bpy
 
-from .blender_bridge import obj, output_file, selected
+from .blender_bridge import obj, output_file, selected, with_empties
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base
 from .presets import AXIS_PRESETS, USD_AXES
 
@@ -110,15 +110,7 @@ def export_asset(p):
         for base in dict.fromkeys(base_name(item.name) for item in meshes):
             found += [item for item in collision_objects(base) if item not in objects]
         objects += found
-    selection = list(objects)
-    if empties:
-        for value in objects:
-            parent = value.parent
-            while parent is not None:
-                if (parent.type == "EMPTY" and parent not in selection
-                        and parent.name in bpy.context.scene.objects):
-                    selection.append(parent)
-                parent = parent.parent
+    selection = with_empties(objects) if empties else list(objects)
     with output_file(p["path"], FORMATS) as path:
         write(path, meshes if instances else objects, selection, preset, instances, empties)
     return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
