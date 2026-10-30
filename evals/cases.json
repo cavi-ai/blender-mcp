@@ -1436,5 +1436,92 @@
     ],
     "without_lease": true,
     "error": "lease_id"
+  },
+  {
+    "id": "texture-material-success",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "material_name": "EvalCeramic",
+      "base_color_texture": "color.png",
+      "roughness": 0.3,
+      "metallic": 0.1
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/texture_packed": true,
+      "/base_color_texture/width": 1
+    }
+  },
+  {
+    "id": "texture-material-missing-arguments",
+    "tool": "assign_material",
+    "arguments": {},
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "texture-material-escape",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "MaterialTarget"
+      ],
+      "material_name": "EscapeTexture",
+      "base_color_texture": "escape/external.png",
+      "roughness": 0.3,
+      "metallic": 0.1
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "inside the workspace"
+  },
+  {
+    "id": "lit-preview-success",
+    "tool": "render_preview",
+    "arguments": {
+      "path": "lit-preview.png",
+      "names": [
+        "MaterialTarget"
+      ],
+      "resolution": 128,
+      "renderer": "eevee"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "image": true,
+    "files": [
+      "lit-preview.png"
+    ]
+  },
+  {
+    "id": "lit-preview-over-budget",
+    "tool": "render_preview",
+    "arguments": {
+      "path": "too-large.png",
+      "resolution": 2048,
+      "renderer": "eevee"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "1024",
+    "absent": [
+      "too-large.png"
+    ]
   }
 ]

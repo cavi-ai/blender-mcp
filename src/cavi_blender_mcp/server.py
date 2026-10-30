@@ -185,6 +185,23 @@ def add_modifier(
 
 
 @mcp.tool(annotations=MUTATING)
+def assign_material(
+    names: Annotated[list[str], Field(min_length=1, max_length=32)],
+    material_name: Annotated[str, Field(min_length=1, max_length=63)],
+    base_color_texture: Annotated[str | None, Field(description="Workspace PNG base-color map, sRGB.")] = None,
+    base_color: tuple[Number, Number, Number, Number] = (1, 1, 1, 1),
+    roughness: Number = .5,
+    metallic: Number = 0,
+    slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
+    lease_id: str | None = None,
+) -> dict[str, Any]:
+    """Assign a new material to exact mesh slots; pack sRGB color PNGs and preserve other slots."""
+    return call("assign_material", names=names, material_name=material_name,
+                base_color_texture=base_color_texture, base_color=base_color,
+                roughness=roughness, metallic=metallic, slot=slot, lease_id=lease_id)
+
+
+@mcp.tool(annotations=MUTATING)
 def shade_mesh(
     name: ObjectName,
     smooth: Annotated[
@@ -224,7 +241,7 @@ def export_mesh(
         str | None, Field(description="Edit lease from session_control claim.")
     ] = None,
 ) -> dict[str, Any]:
-    """Export only the named meshes as FBX or GLB within the output workspace."""
+    """Export named meshes as FBX or GLB; static FBX uses file units and baked space conversion."""
     return call("export_mesh", lease_id=lease_id, names=names, path=path)
 
 
@@ -260,6 +277,7 @@ def render_preview(
         Vector3, Field(description="Nonzero camera direction from the model center.")
     ] = (1.5, -2, 1.4),
     color_mode: Literal["material", "vertex"] = "material",
+    renderer: Literal["workbench", "eevee"] = "workbench",
     lease_id: Annotated[
         str | None, Field(description="Edit lease from session_control claim.")
     ] = None,
@@ -273,6 +291,7 @@ def render_preview(
         names=names,
         direction=direction,
         color_mode=color_mode,
+        renderer=renderer,
     )
     return Image(path=result["path"])
 
