@@ -21,6 +21,8 @@ OPERATIONS = frozenset(
         "export_mesh",
         "save_project",
         "render_preview",
+        "runtime_status",
+        "runtime_restart",
     }
 )
 
