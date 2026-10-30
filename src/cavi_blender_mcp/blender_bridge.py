@@ -201,11 +201,11 @@ def import_glb(path, name):
 def dispatch(operation, p):
     if operation == "owned_edit":
         operation, p = p["operation"], p["params"]
-        if operation in {"owned_edit", "session_control", "scene_info", "object_info", "runtime_status"}:
+        if operation in {"owned_edit", "session_control", "scene_info", "object_info", "runtime_status", "inspect_mesh_quality"}:
             raise ValueError("Owned edit envelope requires a scene mutation")
     if operation == "session_control":
         return _lease.control(p, project_identity)
-    if operation in {"scene_info", "object_info", "runtime_status"}:
+    if operation in {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality"}:
         return _dispatch(operation, p)
     params = dict(p)
     with _lease.edit(params.pop("lease_id", None), project_identity):
@@ -213,6 +213,12 @@ def dispatch(operation, p):
 
 
 def _dispatch(operation, p):
+    if operation == "export_instances":
+        operation, p = "export_mesh", {**p, "preserve_instances": True}
+    if operation == "inspect_mesh_quality":
+        from .blender_quality import inspect
+
+        return {**inspect(p, obj), "project_id": project_identity()}
     if operation == "assign_material":
         from .blender_materials import assign
 
@@ -383,29 +389,38 @@ def _dispatch(operation, p):
         if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
             raise ValueError("Provide between 1 and 1000 mesh names")
         objects = [obj(n, mesh=True) for n in p["names"]]
+        preserve = p.get("preserve_instances", False)
+        if type(preserve) is not bool:
+            raise ValueError("preserve_instances must be a boolean")
+        if preserve and Path(p["path"]).suffix.lower() != ".fbx":
+            raise ValueError("preserve_instances applies to static FBX exports")
         with output_file(p["path"], {".fbx", ".glb"}) as path, selected(objects):
             if path.suffix.lower() == ".fbx":
-                result = bpy.ops.export_scene.fbx(
-                    filepath=str(path),
-                    use_selection=True,
-                    object_types={"MESH"},
-                    add_leaf_bones=False,
-                    bake_anim=False,
-                    axis_forward="-Z",
-                    axis_up="Y",
-                    global_scale=1,
-                    apply_unit_scale=True,
-                    apply_scale_options="FBX_SCALE_UNITS",
-                    bake_space_transform=True,
-                    path_mode="STRIP",
-                )
+                from .export_instances import instance_meshes
+
+                with instance_meshes(objects) if preserve else nullcontext():
+                    result = bpy.ops.export_scene.fbx(
+                        filepath=str(path),
+                        use_selection=True,
+                        object_types={"MESH"},
+                        add_leaf_bones=False,
+                        bake_anim=False,
+                        axis_forward="-Z",
+                        axis_up="Y",
+                        global_scale=1,
+                        apply_unit_scale=True,
+                        apply_scale_options="FBX_SCALE_UNITS",
+                        bake_space_transform=True,
+                        path_mode="STRIP",
+                    )
             else:
                 result = bpy.ops.export_scene.gltf(
                     filepath=str(path), export_format="GLB", use_selection=True
                 )
             if "FINISHED" not in result:
                 raise RuntimeError("Mesh export did not finish")
-        return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size}
+        return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
+                "preserve_instances": preserve}
     if operation == "save_project":
         previous = bpy.context.preferences.filepaths.save_version
         try:
