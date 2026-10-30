@@ -90,6 +90,16 @@ def create_mesh(
     return call("create_mesh", name=name, vertices=vertices, faces=faces)
 
 
+@mcp.tool(annotations=ADDITIVE)
+def import_mesh(
+    path: Annotated[str, Field(description="Workspace-relative static, self-contained GLB.")],
+    name: Annotated[str, Field(min_length=1, max_length=58,
+                              description="New asset collection/object prefix, at most 58 UTF-8 bytes.")],
+) -> dict[str, Any]:
+    """Import bounded GLB geometry; preserve existing objects and selection, refuse name reuse."""
+    return call("import_mesh", path=path, name=name)
+
+
 @mcp.tool(annotations=MUTATING)
 def transform_object(
     name: ObjectName,

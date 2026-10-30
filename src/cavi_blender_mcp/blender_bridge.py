@@ -1,5 +1,6 @@
 """Blender-side bridge; all bpy operations execute on Blender's main thread."""
 
+import hashlib
 import hmac
 import json
 import math
@@ -17,6 +18,7 @@ import bpy
 from mathutils import Vector
 
 from .geometry import validate_mesh
+from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .paths import destination
 
 _server = None
@@ -109,7 +111,82 @@ def output_file(path, extensions):
         raise
 
 
+def _load_glb(path):
+    if "FINISHED" not in bpy.ops.import_scene.gltf(filepath=path):
+        raise RuntimeError("Blender did not finish importing the GLB")
+
+
+def import_glb(path, name):
+    if not isinstance(name, str) or not name.strip() or len(name.encode("utf-8")) > 58:
+        raise ValueError("Import name must be nonempty and at most 58 UTF-8 bytes")
+    if name in bpy.data.collections or any(
+        item.name == name or item.name.startswith(name + ".") for item in bpy.data.objects
+    ):
+        raise ValueError("Import name already exists; choose a new asset name")
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Switch Blender to Object Mode before importing")
+    report = inspect_glb(_workspace, path)
+    with Path(report["path"]).open("rb") as stream:
+        payload = stream.read(MAX_BYTES + 1)
+    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
+        raise RuntimeError("GLB changed during preflight; inspect the source before retrying")
+    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
+             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+    previous = {key: set(getattr(bpy.data, key)) for key in pools}
+    selection = list(bpy.context.selected_objects)
+    active = bpy.context.view_layer.objects.active
+    scene = bpy.context.scene
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".glb", dir=_workspace)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+        _load_glb(temporary)
+        objects = sorted(set(bpy.data.objects) - previous["objects"], key=lambda item: item.name)
+        if not objects or any(
+            item.type not in {"MESH", "EMPTY"} for item in objects
+        ):
+            raise RuntimeError("GLB did not produce only static meshes and transform nodes")
+        if set(bpy.data.scenes) != previous["scenes"]:
+            raise RuntimeError("GLB import unexpectedly changed the scene set")
+        meshes = [item for item in objects if item.type == "MESH"]
+        vertices = sum(len(item.data.vertices) for item in meshes)
+        triangles = sum(len(poly.vertices) - 2 for item in meshes for poly in item.data.polygons)
+        if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
+                or not 0 < triangles <= MAX_GEOMETRY):
+            raise RuntimeError("Imported geometry exceeds the import budget")
+        collection = bpy.data.collections.new(name)
+        scene.collection.children.link(collection)
+        for index, item in enumerate(objects):
+            item.name = name if index == 0 else f"{name}.{index:03}"
+            for owner in list(item.users_collection):
+                owner.objects.unlink(item)
+            collection.objects.link(item)
+        for image in set(bpy.data.images) - previous["images"]:
+            if not image.packed_file:
+                image.pack()
+        return {**report, "collection": collection.name,
+                "objects": [info(item) for item in objects],
+                "imported_vertices": vertices, "imported_triangles": triangles}
+    except Exception:
+        for key in pools:
+            pool = getattr(bpy.data, key)
+            for item in set(pool) - previous[key]:
+                pool.remove(item, do_unlink=True)
+        raise
+    finally:
+        if bpy.context.window and bpy.context.window.scene != scene:
+            bpy.context.window.scene = scene
+        for item in bpy.context.selected_objects:
+            item.select_set(False)
+        for item in selection:
+            item.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        Path(temporary).unlink(missing_ok=True)
+
+
 def dispatch(operation, p):
+    if operation == "import_mesh":
+        return import_glb(p["path"], p["name"])
     if operation in {"runtime_status", "runtime_restart"}:
         if p:
             raise ValueError("Runtime commands do not accept parameters")

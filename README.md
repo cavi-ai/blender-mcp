@@ -4,7 +4,7 @@ Typed MCP tools for Blender scene inspection, mesh editing, previews, and game a
 
 ## Install
 
-Requires Python 3.11+, uv, and Blender. The native smoke was exercised on Blender 5.2.2 LTS; other Blender versions are unverified. Dependencies are pinned in `uv.lock`.
+Requires Python 3.11+, uv, and Blender. Native import and runtime checks have been exercised with Blender 5.2.3 LTS. Dependencies are pinned in `uv.lock`.
 
 ```sh
 uv sync --locked
@@ -24,19 +24,30 @@ Register the stdio server in your MCP client:
 {"mcpServers":{"blender":{"command":"/path/to/blender-mcp/.venv/bin/cavi-blender-mcp"}}}
 ```
 
-Call `scene_info` first. The bridge must be running inside Blender; the MCP server does not launch an application or authenticate accounts.
+Call `scene_info` first. The bridge must be running inside Blender; the stdio MCP server does not launch an application or authenticate accounts. Use the explicit runtime CLI to start a dedicated Blender session when needed.
 
 ### Runtime commands
 
 ```sh
+cavi-blender-mcp runtime start
+cavi-blender-mcp runtime start --project working-copy.blend
 cavi-blender-mcp runtime status
 cavi-blender-mcp runtime restart
 ```
 
-These commands control the bridge inside an already running Blender session. Restart replaces
+`start` reuses a connected session or launches Blender with factory settings, embedded
+script auto-execution disabled, and the packaged bridge. It starts only when the prior
+connection is missing or refused; timeouts and uncertain failures leave existing sessions
+untouched. `--project` selects an existing workspace-relative `.blend` and refuses to
+replace a different connected project. `CAVI_BLENDER_BIN` overrides executable discovery;
+otherwise the CLI uses Blender on PATH or the standard macOS installation. The connection
+file and workspace environment variables select the dedicated session. Launch acceptance
+does not prove readiness; require a successful status check before asset operations.
+
+`status` and `restart` control the bridge inside an already running Blender session. Restart replaces
 its local listener and credentials, then checks the new connection. It preserves the Blender
 process, open scene, unsaved edits, and selection. A failed request is never automatically retried.
-Both commands print JSON and exit nonzero when disconnected. `CAVI_BLENDER_CONNECTION` selects
+Commands print JSON and exit nonzero on failure. `CAVI_BLENDER_CONNECTION` selects
 the session to control. Sessions started with an older bridge need to be reopened with the
 updated `start_bridge.py` once before these commands are available.
 
@@ -50,6 +61,7 @@ After installing new tools, restart that client's MCP connection to discover the
 - `create_primitive`, `transform_object`, `set_color`: create and edit objects.
 - `create_mesh`: indexed custom geometry, with bounded vertices, faces and coordinates.
 - `generate_mesh`: reconstruct a colored GLB from one original image using a configured local TripoSR worker.
+- `import_mesh`: import a self-contained static GLB into a new named collection, preserving existing objects and selection.
 - `add_modifier`, `shade_mesh`, `unwrap_mesh`: bevel, decimation, subdivision, voxel remeshing, shading and UVs.
 - `export_mesh`: export named meshes as FBX or GLB.
 - `save_project`: save a new Blender project.
@@ -73,6 +85,19 @@ Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 f
 ## Local image-to-3D
 
 Generation is optional and runs in a separate Python 3.11 environment. The MCP process does not import PyTorch, download weights or send images to a remote service. The worker uses [TripoSR](https://github.com/VAST-AI-Research/TripoSR), with CPU mesh extraction through scikit-image. Code and weights are MIT licensed. Its generated surfaces still require inspection, animation rigging and game import work.
+
+After generation, call `import_mesh(path, name)` with that workspace-relative GLB and
+a new asset name. Returned object names can be used with the editing and export tools.
+Imports preserve transforms, UVs, and vertex colors; embedded images are packed into
+Blender. A failed import removes its new datablocks and restores selection. The source
+file is hashed, validated, and copied to a private snapshot before Blender reads it.
+
+Import is limited to one-scene static triangle GLBs of at most 64 MiB, 1000 nodes,
+500,000 vertices and triangles, and a combined 4096×4096 embedded-image pixels. PNG and JPEG
+images may be embedded; external dependencies, animation, skins, cameras, compressed
+geometry, and cyclic or excessively deep node hierarchies are refused. Rigged assets
+need their own import workflow.
+Import names accept at most 58 UTF-8 bytes to leave room for object suffixes.
 
 Prepare a separate runtime with `uv venv --python 3.11 /path/to/neural-env` and `uv pip install --python /path/to/neural-env/bin/python -r requirements-neural.txt`. Check out upstream TripoSR at commit `107cefdc244c39106fa830359024f6a2f1c78871`. Download `config.yaml` and `model.ckpt` from the public `stabilityai/TripoSR` model at revision `5b521936b01fbe1890f6f9baed0254ab6351c04a`, plus `facebook/dino-vitb16/config.json` saved as `dino-config.json` in the same weights directory.
 
@@ -98,6 +123,11 @@ The native smoke creates a disposable scene, edits a mesh, unwraps UVs, exports 
 
 The additional `tests/blender_organic.py` native check exercises custom topology, evaluated subdivision/remeshing, resource limits, preview isolation and a GLB export/import round trip. Invoke it with the same Blender command and a separate empty workspace.
 
+`tests/blender_import.py` checks typed import on Blender 5.2.3, including transforms,
+UVs, vertex-color values, embedded image packing, name reuse, selection preservation,
+and rollback after a partial native import. It uses a disposable factory scene and
+temporary workspace; no game project is opened.
+
 ## MCP evaluation
 
 Install the locked Python and evaluator dependencies, then run the protocol checks:
@@ -109,7 +139,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 13 tools through real stdio MCP sessions, including PNG image data and nonempty exports. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 14 tools through real stdio MCP sessions, including PNG image data, nonempty exports, and GLB imports. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 
