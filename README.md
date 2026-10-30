@@ -26,6 +26,24 @@ Register the stdio server in your MCP client:
 
 Call `scene_info` first. The bridge must be running inside Blender; the MCP server does not launch an application or authenticate accounts.
 
+### Runtime commands
+
+```sh
+cavi-blender-mcp runtime status
+cavi-blender-mcp runtime restart
+```
+
+These commands control the bridge inside an already running Blender session. Restart replaces
+its local listener and credentials, then checks the new connection. It preserves the Blender
+process, open scene, unsaved edits, and selection. A failed request is never automatically retried.
+Both commands print JSON and exit nonzero when disconnected. `CAVI_BLENDER_CONNECTION` selects
+the session to control. Sessions started with an older bridge need to be reopened with the
+updated `start_bridge.py` once before these commands are available.
+
+Runtime restart does not reload Python source or refresh an MCP client's cached tool catalog.
+After installing new tools, restart that client's MCP connection to discover them. Running
+`cavi-blender-mcp` without arguments continues to serve MCP over stdio.
+
 ## Tools
 
 - `scene_info`, `object_info`: inspect scene and geometry.

@@ -221,6 +221,12 @@ def render_preview(
 
 
 def main():
+    import sys
+
+    if len(sys.argv) > 1:
+        from .cli import main as cli_main
+
+        raise SystemExit(cli_main())
     mcp.run(transport="stdio")
 
 

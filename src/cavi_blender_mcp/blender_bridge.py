@@ -110,6 +110,23 @@ def output_file(path, extensions):
 
 
 def dispatch(operation, p):
+    if operation in {"runtime_status", "runtime_restart"}:
+        if p:
+            raise ValueError("Runtime commands do not accept parameters")
+        if _server is None:
+            raise RuntimeError("Blender bridge is not running")
+        if operation == "runtime_restart":
+            replace_server()
+        return {
+            "connected": True,
+            "pid": os.getpid(),
+            "generation": _server.bridge_generation,
+            "version": bpy.app.version_string,
+            "file": bpy.data.filepath,
+            "workspace": str(_workspace),
+            "object_count": len(bpy.context.scene.objects),
+            "dirty": bpy.data.is_dirty,
+        }
     if operation == "scene_info":
         return {
             "version": bpy.app.version_string,
@@ -395,7 +412,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path != "/rpc" or not hmac.compare_digest(
-            self.headers.get("Authorization", ""), f"Bearer {_token}"
+            self.headers.get("Authorization", ""), f"Bearer {self.server.bridge_token}"
         ):
             self.send_error(403)
             return
@@ -443,8 +460,40 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
 
+def replace_server():
+    """Publish a fresh listener before retiring the old one; never touch scene data."""
+    global _server, _token
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    server.bridge_token = secrets.token_hex(32)
+    server.bridge_generation = secrets.token_hex(16)
+    temporary = None
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        fd, temporary = tempfile.mkstemp(dir=_connection.parent, prefix=".connection-")
+        with os.fdopen(fd, "w") as stream:
+            json.dump(
+                {"host": "127.0.0.1", "port": server.server_port, "token": server.bridge_token},
+                stream,
+            )
+        os.replace(temporary, _connection)
+    except Exception:
+        server.shutdown()
+        server.server_close()
+        raise
+    finally:
+        if temporary:
+            Path(temporary).unlink(missing_ok=True)
+    previous = _server
+    _server, _token = server, server.bridge_token
+    if previous is not None:
+        previous.shutdown()
+        previous.server_close()
+
+
 def register():
-    global _server, _token, _connection, _workspace
+    global _connection, _workspace
     if _server is not None:
         return
     _connection = Path(
@@ -467,18 +516,8 @@ def register():
     ).expanduser()
     _workspace.mkdir(parents=True, exist_ok=True)
     _workspace = _workspace.resolve()
-    _token = secrets.token_hex(32)
-    _server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    _server.daemon_threads = True
-    fd, temporary = tempfile.mkstemp(dir=_connection.parent, prefix=".connection-")
-    try:
-        with os.fdopen(fd, "w") as stream:
-            json.dump({"host": "127.0.0.1", "port": _server.server_port, "token": _token}, stream)
-        os.replace(temporary, _connection)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
+    replace_server()
     bpy.app.timers.register(pump, persistent=True)
-    threading.Thread(target=_server.serve_forever, daemon=True).start()
 
 
 def unregister():
