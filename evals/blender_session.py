@@ -28,6 +28,10 @@ for layer in list(pbr_no_uv.data.uv_layers):
 pbr_custom = bpy.data.objects.new("PBRCustomTarget", source.data.copy())
 bpy.context.scene.collection.objects.link(pbr_custom)
 pbr_custom.data.materials.append(bpy.data.materials.new("PBRCustom"))
+bpy.ops.mesh.primitive_uv_sphere_add(location=(60, 0, 0))
+bpy.context.object.name = bpy.context.object.data.name = "RigMesh"
+bpy.ops.mesh.primitive_uv_sphere_add(location=(60, 5, 0))
+bpy.context.object.name = bpy.context.object.data.name = "RigMeshUnbound"
 
 for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
                              ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),

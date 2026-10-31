@@ -3677,5 +3677,302 @@
       "/objects/0/checks/materials/0/bindings/Normal/images/0",
       "/objects/0/checks/materials/0/uv_transform"
     ]
+  },
+  {
+    "id": "rig-create-missing-bones",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "EvalRigNew"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: bones"
+  },
+  {
+    "id": "rig-create-missing-tail",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "EvalRigNew",
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "rig-bind-missing-names",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "bind",
+      "name": "EvalRigNew"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: names"
+  },
+  {
+    "id": "rig-weights-bound",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "weights",
+      "name": "RigMesh",
+      "max_influences": 33
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "rig-create-success",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "EvalRigNew",
+      "location": [
+        60,
+        0,
+        0
+      ],
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            -1
+          ],
+          "tail": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "Spine",
+          "parent": "Root",
+          "head": [
+            0,
+            0,
+            0
+          ],
+          "tail": [
+            0,
+            0,
+            1
+          ],
+          "connect": true
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/type": "ARMATURE",
+      "/bone_count": 2,
+      "/bones/1/parent": "Root"
+    },
+    "required": [
+      "/bones/1/head",
+      "/bones/1/tail"
+    ]
+  },
+  {
+    "id": "rig-bind-success",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "bind",
+      "name": "EvalRigNew",
+      "names": [
+        "RigMesh"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/bindings": 1,
+      "/meshes/0/parent": "EvalRigNew",
+      "/meshes/0/armature_modifier": true
+    },
+    "required": [
+      "/meshes/0/weights/sum_max"
+    ]
+  },
+  {
+    "id": "rig-weights-success",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "weights",
+      "name": "RigMesh",
+      "max_influences": 1,
+      "normalize": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/after/over_limit_vertices": 0,
+      "/after/unnormalized_vertices": 0
+    },
+    "required": [
+      "/before/over_limit_vertices",
+      "/after/max_influences"
+    ]
+  },
+  {
+    "id": "rig-bind-existing",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "bind",
+      "name": "EvalRigNew",
+      "names": [
+        "EvalSkin"
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "no modifiers"
+  },
+  {
+    "id": "rig-weights-unbound",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "weights",
+      "name": "RigMeshUnbound"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "armature"
+  },
+  {
+    "id": "rig-create-duplicate",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "EvalRigNew",
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            0
+          ],
+          "tail": [
+            0,
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "rig-create-cycle",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "BadRig",
+      "bones": [
+        {
+          "name": "A",
+          "parent": "B",
+          "head": [
+            0,
+            0,
+            0
+          ],
+          "tail": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "name": "B",
+          "parent": "A",
+          "head": [
+            0,
+            0,
+            1
+          ],
+          "tail": [
+            0,
+            0,
+            2
+          ]
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "cycle"
+  },
+  {
+    "id": "rig-create-unowned",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "UnownedRig",
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            0
+          ],
+          "tail": [
+            0,
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "error": "lease_id"
   }
 ]
