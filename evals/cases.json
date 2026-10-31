@@ -4935,5 +4935,56 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "morph-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "morph.glb",
+      "name": "MorphImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/morph_targets": 1,
+      "/shape_key_meshes/0/shape_keys": 1
+    },
+    "required": [
+      "/shape_key_meshes/0/name"
+    ]
+  },
+  {
+    "id": "morph-object-shape-keys",
+    "tool": "scene_info",
+    "arguments": {
+      "name": "MorphImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/shape_keys": 1
+    },
+    "required": [
+      "/shape_key_names/0"
+    ]
+  },
+  {
+    "id": "morph-import-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "morph.glb",
+      "name": "MorphImport"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   }
 ]

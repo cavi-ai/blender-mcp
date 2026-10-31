@@ -67,7 +67,8 @@ def write(path, objects, selection, preset, instances, empties, animations=False
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
                 export_apply=not animations, export_animations=animations,
-                export_skins=animations, export_animation_mode="ACTIONS")
+                export_skins=animations, export_animation_mode="ACTIONS",
+                export_morph=True, export_morph_animation=False)
         else:
             result = usd(path, preset, instances)
     if "FINISHED" not in result:

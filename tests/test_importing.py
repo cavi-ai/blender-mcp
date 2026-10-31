@@ -40,6 +40,17 @@ def skinned():
     return document
 
 
+def morphed():
+    document = triangle()
+    document["buffers"][0]["byteLength"] = 1024
+    document["accessors"].append({"componentType": 5126, "count": 3, "type": "VEC3"})
+    document["meshes"][0]["primitives"][0]["targets"] = [{"POSITION": 2}]
+    document["meshes"][0]["weights"] = [0.5]
+    document["meshes"][0]["extras"] = {"targetNames": ["Expand"]}
+    document["nodes"][0]["weights"] = [0.25]
+    return document
+
+
 def animated():
     document = triangle()
     document["buffers"][0]["byteLength"] = 4096
@@ -282,6 +293,62 @@ class ImportPreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Light"):
                 inspect_glb(root, "prop.glb")
 
+    def test_morph_targets_are_bounded_and_reported(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            write_glb(root / "prop.glb", morphed(), b"\x00" * 1024)
+            report = inspect_glb(root, "prop.glb")
+            self.assertEqual((report["morph_targets"], report["shape_key_meshes"]), (1, 1))
+
+    def test_malformed_morph_targets_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cases = []
+
+            document = morphed()
+            document["accessors"][2]["type"] = "VEC2"
+            cases.append((document, "VEC3"))
+
+            document = morphed()
+            document["accessors"][2]["count"] = 2
+            cases.append((document, "position count"))
+
+            document = morphed()
+            document["meshes"][0]["weights"] = [0.5, 0.5]
+            cases.append((document, "Mesh morph weights"))
+
+            document = morphed()
+            document["nodes"][0]["weights"] = []
+            cases.append((document, "Node morph weights"))
+
+            document = morphed()
+            document["meshes"][0]["extras"] = {"targetNames": ["A", "B"]}
+            cases.append((document, "target names"))
+
+            document = morphed()
+            document["meshes"][0]["primitives"][0]["targets"] = [
+                {"POSITION": 2} for _ in range(65)]
+            cases.append((document, "64"))
+
+            document = morphed()
+            document["meshes"][0]["primitives"][0]["targets"] = [{"COLOR_0": 2}]
+            cases.append((document, "POSITION, NORMAL and TANGENT"))
+
+            document = animated()
+            document["animations"][0]["channels"][0]["target"]["path"] = "weights"
+            cases.append((document, "translation, rotation or scale"))
+
+            for index, (document, message) in enumerate(cases):
+                with self.subTest(case=index):
+                    write_glb(root / "prop.glb", document,
+                              b"\x00" * document["buffers"][0]["byteLength"])
+                    with self.assertRaisesRegex(ValueError, message):
+                        inspect_glb(root, "prop.glb")
+
     def test_malformed_animations_are_refused(self):
         from cavi_blender_mcp.importing import inspect_glb
 
@@ -423,7 +490,8 @@ class ImportPreflightTests(unittest.TestCase):
 
             for index, (document, message) in enumerate(cases):
                 with self.subTest(case=index):
-                    write_glb(root / "prop.glb", document, b"\x00" * 1024)
+                    write_glb(root / "prop.glb", document,
+                              b"\x00" * document["buffers"][0]["byteLength"])
                     with self.assertRaisesRegex(ValueError, message):
                         inspect_glb(root, "prop.glb")
 

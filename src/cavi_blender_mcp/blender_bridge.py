@@ -149,6 +149,11 @@ def info(value):
             uv_layers=len(value.data.uv_layers),
             materials=[slot.material.name if slot.material else None
                        for slot in value.material_slots],
+            shape_keys=(len(value.data.shape_keys.key_blocks) - 1
+                       if value.data.shape_keys is not None else 0),
+            shape_key_names=([block.name for block in
+                              value.data.shape_keys.key_blocks[1:]][:64]
+                             if value.data.shape_keys is not None else []),
         )
     return result
 
@@ -327,7 +332,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
         loader(temporary)
         objects = sorted(set(bpy.data.objects) - previous["objects"],
                          key=lambda item: (item.type != "ARMATURE", item.name))
-        armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
+        armatures, meshes, skinned, actions, bones, vertices, triangles = validate_imported(
             objects, previous, animations_allowed=animations_allowed,
             shape_keys_allowed=shape_keys_allowed)
         images = workspace_images(previous, objects, require_workspace=require_workspace)
@@ -337,7 +342,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
                 image.pack()
         if cleanup is not None:
             cleanup(previous, collection)
-        return {
+        result = {
             **report,
             "collection": collection.name,
             "objects": [info(item) for item in objects],
@@ -349,6 +354,30 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
             "imported_vertices": vertices,
             "imported_triangles": triangles,
         }
+        if shape_keys_allowed:
+            shape_key_meshes = []
+            morph_targets = 0
+            for item in meshes:
+                if item.data.shape_keys is None:
+                    continue
+                blocks = item.data.shape_keys.key_blocks
+                count = len(blocks) - 1
+                if count <= 0:
+                    continue
+                if count > 64:
+                    raise RuntimeError("Imported shape keys exceed the import budget")
+                names = [block.name for block in blocks[1:]]
+                if len(set(names)) != len(names) or any(
+                        len(block.encode()) > 63 for block in names):
+                    raise RuntimeError("Imported shape keys have invalid names")
+                morph_targets += count
+                if morph_targets > 256:
+                    raise RuntimeError("Imported morph targets exceed the import budget")
+                shape_key_meshes.append({"name": item.name, "shape_keys": count,
+                                         "names": names})
+            result["shape_key_meshes"] = shape_key_meshes
+            result["morph_targets"] = morph_targets
+        return result
     except Exception:
         for key in pools:
             pool = getattr(bpy.data, key)
@@ -731,8 +760,8 @@ def export_mesh(p):
                 )
         else:
             result = bpy.ops.export_scene.gltf(
-                filepath=str(path), export_format="GLB", use_selection=True, export_apply=True
-            )
+                filepath=str(path), export_format="GLB", use_selection=True,
+                export_apply=True, export_morph=True, export_morph_animation=False)
         if "FINISHED" not in result:
             raise RuntimeError("Mesh export did not finish")
     return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,

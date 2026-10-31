@@ -28,7 +28,7 @@ Imports:
 
 | Format | Supported | Refused |
 | --- | --- | --- |
-| GLB | Static, skinned, animated; embedded PNG/JPEG | Cameras, lights, morph targets, compressed geometry, external dependencies, cyclic or deep hierarchies |
+| GLB | Static, skinned, animated, morph targets/shape keys; embedded PNG/JPEG | Morph-target animation, cameras, lights, compressed geometry, external dependencies, cyclic or deep hierarchies |
 | FBX | Static, skinned, animated, ASCII or binary | Shape keys, cameras, lights, external textures |
 | OBJ | Static mesh and materials | External or missing MTL/textures |
 | USD | Static, materials, armatures, skinned meshes | Animation clips, blendshapes, cameras, lights, external texture paths |
@@ -61,6 +61,8 @@ Formats are `.fbx`, `.glb`, `.usd`, `.usda` and `.usdc`.
 - `animations=true` applies to FBX and GLB only. It includes the armatures of the
   named skinned meshes and exports every linked action. It refuses LODs,
   collision, instances and pair baking.
+- GLB exports include static shape keys/morph targets. Morph-target animation
+  export is deferred. FBX and USD shape-key animation remain out of scope.
 
 ### Axis presets
 

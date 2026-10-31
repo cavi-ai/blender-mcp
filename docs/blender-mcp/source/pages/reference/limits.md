@@ -106,6 +106,8 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | GLB joints per skin | 512 |
 | GLB total joints | 1,024 |
 | GLB skinned meshes | 64 |
+| GLB morph targets per mesh | 64 |
+| GLB total morph targets | 256 |
 | GLB influences per vertex | 4 |
 | GLB animations | 32 |
 | GLB channels and samplers | 1,024 |
