@@ -928,6 +928,10 @@ def _dispatch(operation, p):
         from .blender_bake import bake
 
         return bake(p)
+    if operation == "retarget_rig":
+        from .blender_retarget import retarget
+
+        return retarget(p)
     if operation == "review_sheet":
         from .blender_review import review
 
