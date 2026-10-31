@@ -105,7 +105,7 @@ cavi-blender-mcp runtime restart --lease-id <current-lease>
   Godot axis presets; LOD groups,
   collision naming and bake pairs.
 - **Rigging**: armature creation, automatic skin binding, weight repair, pose
-  authoring, action creation, animation QA and retargeting.
+  authoring, action creation, clip/NLA management, animation QA and retargeting.
 - **Previews**: isolated PNG previews, lit Eevee previews and multi-view review
   sheets.
 - **Scatter**: fixed Geometry Nodes instancing with explicit budgets.

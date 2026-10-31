@@ -869,6 +869,11 @@ def _dispatch(operation, p):
         from .blender_shape_keys import HANDLERS
 
         return HANDLERS[operation](p)
+    if operation in {"set_action", "rename_action", "delete_action", "nla_push",
+                     "nla_remove"}:
+        from .blender_nla import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation == "bake_map":
         from .blender_bake import bake
 
