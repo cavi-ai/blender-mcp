@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import math
 import re
 import struct
 from pathlib import Path
@@ -18,6 +19,9 @@ MAX_ANIMATIONS = 32
 MAX_CHANNELS = 1024
 MAX_KEYS_PER_CLIP = 100000
 MAX_TOTAL_KEYS = 256000
+MAX_MORPH_TARGETS = 64
+MAX_TOTAL_MORPH_TARGETS = 256
+TARGET_ATTRIBUTES = {"POSITION", "NORMAL", "TANGENT"}
 
 
 def image_size(data):
@@ -171,11 +175,14 @@ def inspect_glb(workspace, name):
         return accessor_at(index)["count"]
 
     mesh_sizes = []
+    mesh_targets = []
+    total_morph = 0
     for mesh in document.get("meshes", []):
         vertices = triangles = 0
+        target_count = None
         for primitive in mesh.get("primitives", []):
-            if primitive.get("mode", 4) != 4 or primitive.get("targets"):
-                raise ValueError("Only triangle geometry without morph targets is supported")
+            if primitive.get("mode", 4) != 4:
+                raise ValueError("Only triangle geometry is supported")
             attributes = primitive.get("attributes", {})
             if "POSITION" not in attributes:
                 raise ValueError("Triangle primitives need a POSITION accessor")
@@ -183,9 +190,66 @@ def inspect_glb(workspace, name):
             indices = count_at(primitive["indices"]) if "indices" in primitive else count
             if indices % 3:
                 raise ValueError("Triangle geometry has an invalid index count")
+            targets = primitive.get("targets")
+            if targets is None:
+                count_targets = 0
+            else:
+                if not isinstance(targets, list) or len(targets) > MAX_MORPH_TARGETS:
+                    raise ValueError(
+                        f"Morph targets are limited to {MAX_MORPH_TARGETS} per primitive")
+                count_targets = len(targets)
+                for target in targets:
+                    if not isinstance(target, dict) or not set(target) <= TARGET_ATTRIBUTES:
+                        raise ValueError(
+                            "Morph targets support POSITION, NORMAL and TANGENT")
+                    for accessor_index in target.values():
+                        accessor = accessor_at(accessor_index)
+                        if (accessor.get("type") != "VEC3"
+                                or accessor.get("componentType") != 5126):
+                            raise ValueError(
+                                "Morph target deltas must be FLOAT VEC3 accessors")
+                        if accessor.get("count") != count:
+                            raise ValueError(
+                                "Morph target counts must match the position count")
+            if target_count is None:
+                target_count = count_targets
+            elif target_count != count_targets:
+                raise ValueError(
+                    "All primitives in a mesh need the same morph target count")
             vertices += count
             triangles += indices // 3
         mesh_sizes.append((vertices, triangles))
+        mesh_targets.append(target_count or 0)
+        total_morph += target_count or 0
+    if total_morph > MAX_TOTAL_MORPH_TARGETS:
+        raise ValueError(f"Imports are limited to {MAX_TOTAL_MORPH_TARGETS} morph targets")
+    for index, mesh in enumerate(document.get("meshes", [])):
+        target_count = mesh_targets[index]
+        weights = mesh.get("weights")
+        if weights is not None and (
+                not isinstance(weights, list) or len(weights) != target_count
+                or any(type(weight) not in (int, float) or not math.isfinite(weight)
+                       or not 0 <= weight <= 1 for weight in weights)):
+            raise ValueError("Mesh morph weights must match the target count and range")
+        extras = mesh.get("extras")
+        names = extras.get("targetNames") if isinstance(extras, dict) else None
+        if names is not None and (
+                not isinstance(names, list) or len(names) != target_count
+                or any(not isinstance(name, str) or not name
+                       or len(name.encode()) > 63 for name in names)):
+            raise ValueError("Morph target names must match the target count")
+    for node in nodes:
+        if "weights" in node:
+            if "mesh" not in node:
+                raise ValueError("Node morph weights need a mesh")
+            index = node["mesh"]
+            if type(index) is not int or not 0 <= index < len(mesh_targets):
+                raise ValueError("Invalid mesh reference")
+            weights = node["weights"]
+            if (not isinstance(weights, list) or len(weights) != mesh_targets[index]
+                    or any(type(weight) not in (int, float) or not math.isfinite(weight)
+                           or not 0 <= weight <= 1 for weight in weights)):
+                raise ValueError("Node morph weights must match the target count and range")
     skins = document.get("skins", [])
     if not isinstance(skins, list) or len(skins) > MAX_SKINS:
         raise ValueError(f"Imports are limited to {MAX_SKINS} skins")
@@ -373,6 +437,8 @@ def inspect_glb(workspace, name):
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "vertices": vertices, "triangles": triangles, "skins": len(skins),
             "joints": total_joints, "skinned_meshes": len(skinned_meshes),
+            "morph_targets": total_morph,
+            "shape_key_meshes": sum(1 for count in mesh_targets if count),
             "animations": len(animations), "animation_channels": total_channels,
             "animation_keys": total_keys}
 

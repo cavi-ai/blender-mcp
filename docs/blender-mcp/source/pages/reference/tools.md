@@ -10,7 +10,7 @@ also runs without a lease, but import, export and save do not.
 ## scene_info
 
 Read-only. Returns Blender version, file, workspace, collection tree and a page
-of objects.
+of objects. Mesh objects report `shape_keys` and `shape_key_names`.
 
 | Parameter | Values |
 | --- | --- |

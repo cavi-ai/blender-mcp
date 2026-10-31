@@ -42,6 +42,24 @@ bpy.ops.mesh.primitive_cube_add(location=(70, 5, 0))
 bpy.context.object.name = bpy.context.object.data.name = "BakeNoUV"
 for layer in list(bpy.data.objects["BakeNoUV"].data.uv_layers):
     bpy.data.objects["BakeNoUV"].data.uv_layers.remove(layer)
+bpy.ops.mesh.primitive_cube_add(location=(80, 0, 0))
+morph = bpy.context.object
+morph.name = morph.data.name = "MorphSource"
+morph.shape_key_add(name="Basis")
+expand = morph.shape_key_add(name="Expand")
+for point in expand.data:
+    point.co.x *= 1.5
+for value in bpy.context.selected_objects:
+    value.select_set(False)
+morph.select_set(True)
+bpy.context.view_layer.objects.active = morph
+result = bpy.ops.export_scene.gltf(
+    filepath=str(Path(os.environ["CAVI_BLENDER_WORKSPACE"]) / "morph.glb"),
+    export_format="GLB", use_selection=True, export_apply=True,
+    export_morph=True, export_morph_animation=False)
+assert "FINISHED" in result
+for value in bpy.context.selected_objects:
+    value.select_set(False)
 
 for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
                              ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),

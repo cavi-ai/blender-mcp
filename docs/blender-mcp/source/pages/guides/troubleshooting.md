@@ -80,7 +80,7 @@ Imports are bounded and preflighted:
 
 - The file must be inside the workspace and at most 64 MiB.
 - The asset name must be new and at most 58 UTF-8 bytes.
-- External textures, cameras, lights, shape keys or unsupported animation are
+- External textures, cameras, lights, unsupported shape keys or animation are
   refused according to the format table in
   [Import and export assets](asset-import-export.md).
 - A changed source file is refused after preflight.
