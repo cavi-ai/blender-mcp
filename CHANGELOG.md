@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.30.0 — 2026-10-31
+
+### Changed
+
+- Requires the MCP Python SDK 2.3 or later, so it installs alongside
+  `cavi-substance-mcp`. Invalid arguments, refused paths and bridge failures
+  are still reported to the client; other exceptions are reported without
+  their details. `serverInfo.version` reports the package version.
+
 ## 0.29.0 — 2026-10-31
 
 ### Added
