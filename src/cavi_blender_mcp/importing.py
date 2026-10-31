@@ -1,4 +1,4 @@
-"""Preflight self-contained static GLB files before Blender allocates their data."""
+"""Preflight self-contained GLB files before Blender allocates their data."""
 
 import base64
 import hashlib
@@ -8,6 +8,10 @@ from pathlib import Path
 
 MAX_BYTES = 64 * 1024 * 1024
 MAX_GEOMETRY = 500_000
+MAX_SKINS = 16
+MAX_JOINTS = 512
+MAX_TOTAL_JOINTS = 1024
+MAX_SKINNED_MESHES = 64
 
 
 def image_size(data):
@@ -63,13 +67,18 @@ def inspect_glb(workspace, name):
     binary = chunks[1][1]
     if not isinstance(document, dict) or document.get("asset", {}).get("version") != "2.0":
         raise ValueError("Expected glTF 2.0 in the GLB")
-    if any(document.get(key) for key in ["animations", "skins", "cameras"]):
-        raise ValueError("Only static mesh GLB imports are supported")
+    if document.get("animations"):
+        raise ValueError("Animation clips need the animated import workflow")
+    if document.get("cameras"):
+        raise ValueError("Cameras are not supported by the import preflight")
     if len(document.get("scenes", [])) != 1 or not 0 < len(document.get("nodes", [])) <= 1000:
-        raise ValueError("Static GLB requires one scene and at most 1000 nodes")
+        raise ValueError("GLB imports require one scene and at most 1000 nodes")
     compressed = {"KHR_draco_mesh_compression", "EXT_meshopt_compression"}
-    if compressed.intersection(document.get("extensionsUsed", [])):
+    extensions = document.get("extensionsUsed", [])
+    if compressed.intersection(extensions):
         raise ValueError("Compressed geometry is not supported by the import preflight")
+    if "KHR_lights_punctual" in extensions:
+        raise ValueError("Light extensions are not supported by the import preflight")
 
     def check_references(value):
         if isinstance(value, dict):
@@ -121,28 +130,108 @@ def inspect_glb(workspace, name):
         count = accessor.get("count")
         if type(count) is not int or not 0 < count <= 3 * MAX_GEOMETRY:
             raise ValueError("Declared geometry exceeds the import budget")
-        allocated += count * components[accessor["type"]] * byte_sizes[accessor["componentType"]]
+        kind, component = accessor.get("type"), accessor.get("componentType")
+        if kind not in components or component not in byte_sizes:
+            raise ValueError("Invalid geometry accessor metadata")
+        allocated += count * components[kind] * byte_sizes[component]
     if allocated > MAX_BYTES:
         raise ValueError("Declared geometry exceeds the import budget")
 
-    def count_at(index):
+    def accessor_at(index):
         if type(index) is not int or not 0 <= index < len(accessors):
             raise ValueError("Invalid geometry accessor")
-        return accessors[index]["count"]
+        return accessors[index]
+
+    def count_at(index):
+        return accessor_at(index)["count"]
 
     mesh_sizes = []
     for mesh in document.get("meshes", []):
         vertices = triangles = 0
         for primitive in mesh.get("primitives", []):
             if primitive.get("mode", 4) != 4 or primitive.get("targets"):
-                raise ValueError("Only static triangle geometry is supported")
-            count = count_at(primitive["attributes"]["POSITION"])
+                raise ValueError("Only triangle geometry without morph targets is supported")
+            attributes = primitive.get("attributes", {})
+            if "POSITION" not in attributes:
+                raise ValueError("Triangle primitives need a POSITION accessor")
+            count = count_at(attributes["POSITION"])
             indices = count_at(primitive["indices"]) if "indices" in primitive else count
             if indices % 3:
                 raise ValueError("Triangle geometry has an invalid index count")
             vertices += count
             triangles += indices // 3
         mesh_sizes.append((vertices, triangles))
+    skins = document.get("skins", [])
+    if not isinstance(skins, list) or len(skins) > MAX_SKINS:
+        raise ValueError(f"Imports are limited to {MAX_SKINS} skins")
+    total_joints = 0
+    for skin in skins:
+        if not isinstance(skin, dict):
+            raise ValueError("Invalid skin definition")  # noqa: TRY004
+        joints = skin.get("joints")
+        if not isinstance(joints, list) or not 1 <= len(joints) <= MAX_JOINTS:
+            raise ValueError(f"Skins need 1 to {MAX_JOINTS} joints")
+        if any(type(joint) is not int or not 0 <= joint < len(nodes) for joint in joints):
+            raise ValueError("Skin joint references an invalid node")
+        if len(set(joints)) != len(joints):
+            raise ValueError("Skins need unique joints")
+        total_joints += len(joints)
+        if total_joints > MAX_TOTAL_JOINTS:
+            raise ValueError(f"Imports are limited to {MAX_TOTAL_JOINTS} joints")
+        if "inverseBindMatrices" in skin:
+            matrices = accessor_at(skin["inverseBindMatrices"])
+            if matrices.get("type") != "MAT4" or matrices.get("componentType") != 5126:
+                raise ValueError("Inverse bind matrices must be FLOAT MAT4 accessors")
+            if matrices.get("count") != len(joints):
+                raise ValueError("Inverse bind matrix count must match the joints")
+        if "skeleton" in skin:
+            node = skin["skeleton"]
+            if type(node) is not int or not 0 <= node < len(nodes):
+                raise ValueError("Skin skeleton references an invalid node")
+    skinned_meshes = set()
+    for node in nodes:
+        if "skin" in node:
+            index = node["skin"]
+            if type(index) is not int or not 0 <= index < len(skins):
+                raise ValueError("Invalid skin reference")
+            if "mesh" not in node:
+                raise ValueError("A skinned node must reference a mesh")
+            mesh_index = node["mesh"]
+            if type(mesh_index) is not int or not 0 <= mesh_index < len(mesh_sizes):
+                raise ValueError("Invalid skinned mesh reference")
+            skinned_meshes.add(mesh_index)
+    if len(skinned_meshes) > MAX_SKINNED_MESHES:
+        raise ValueError(f"Imports are limited to {MAX_SKINNED_MESHES} skinned meshes")
+    skinned_vertices = 0
+    for index in skinned_meshes:
+        if type(index) is not int or not 0 <= index < len(mesh_sizes):
+            raise ValueError("Invalid skinned mesh reference")
+        for primitive in document["meshes"][index].get("primitives", []):
+            attributes = primitive.get("attributes", {})
+            if "JOINTS_1" in attributes or "WEIGHTS_1" in attributes:
+                raise ValueError("Only four skin influences per vertex are supported")
+            if "JOINTS_0" not in attributes or "WEIGHTS_0" not in attributes:
+                raise ValueError("Skinned primitives need JOINTS_0 and WEIGHTS_0")
+            position = attributes.get("POSITION")
+            if type(position) is not int or not 0 <= position < len(accessors):
+                raise ValueError("Skinned primitives need a valid POSITION accessor")
+            count = accessors[position]["count"]
+            joint_accessor = accessor_at(attributes["JOINTS_0"])
+            weight_accessor = accessor_at(attributes["WEIGHTS_0"])
+            if (joint_accessor.get("type") != "VEC4"
+                    or joint_accessor.get("componentType") not in {5121, 5123}):
+                raise ValueError("JOINTS_0 must be an unsigned VEC4 accessor")
+            if (weight_accessor.get("type") != "VEC4"
+                    or weight_accessor.get("componentType") not in {5121, 5123, 5126}):
+                raise ValueError("WEIGHTS_0 must be a VEC4 accessor")
+            if (weight_accessor.get("componentType") in {5121, 5123}
+                    and weight_accessor.get("normalized") is not True):
+                raise ValueError("Integer WEIGHTS_0 accessors must be normalized")
+            if joint_accessor.get("count") != count or weight_accessor.get("count") != count:
+                raise ValueError("Skin attributes must match the position count")
+            skinned_vertices += count
+    if skinned_vertices > MAX_GEOMETRY:
+        raise ValueError("Skinned geometry exceeds the import budget")
     vertices = triangles = 0
     for node in document["nodes"]:
         if "mesh" in node:
@@ -173,4 +262,5 @@ def inspect_glb(workspace, name):
         if not 0 < width <= 4096 or not 0 < height <= 4096 or pixels > 4096 * 4096:
             raise ValueError("Embedded image dimensions exceed the import budget")
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-            "vertices": vertices, "triangles": triangles}
+            "vertices": vertices, "triangles": triangles, "skins": len(skins),
+            "joints": total_joints, "skinned_meshes": len(skinned_meshes)}

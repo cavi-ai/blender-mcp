@@ -24,6 +24,22 @@ def triangle():
     }
 
 
+def skinned():
+    document = triangle()
+    document["buffers"][0]["byteLength"] = 1024
+    document["accessors"] += [
+        {"componentType": 5121, "count": 3, "type": "VEC4"},
+        {"componentType": 5126, "count": 3, "type": "VEC4"},
+        {"componentType": 5126, "count": 1, "type": "MAT4"},
+    ]
+    document["meshes"][0]["primitives"][0]["attributes"].update(
+        {"JOINTS_0": 2, "WEIGHTS_0": 3})
+    document["nodes"] = [{"mesh": 0, "skin": 0}, {"name": "Joint"}]
+    document["scenes"] = [{"nodes": [0, 1]}]
+    document["skins"] = [{"joints": [1], "inverseBindMatrices": 4}]
+    return document
+
+
 class ImportPreflightTests(unittest.TestCase):
     def test_node_cycles_are_refused_before_blender_traverses_them(self):
         from cavi_blender_mcp.importing import inspect_glb
@@ -84,17 +100,97 @@ class ImportPreflightTests(unittest.TestCase):
                 with self.subTest(uri=uri), self.assertRaisesRegex(ValueError, "external"):
                     inspect_glb(root, "prop.glb")
 
-    def test_animation_and_skin_are_refused_before_import(self):
+    def test_skinned_glb_is_bounded_and_reported(self):
         from cavi_blender_mcp.importing import inspect_glb
 
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            for key in ["animations", "skins", "cameras"]:
+            write_glb(root / "prop.glb", skinned(), b"\x00" * 1024)
+            report = inspect_glb(root, "prop.glb")
+            self.assertEqual((report["skins"], report["joints"], report["skinned_meshes"]),
+                             (1, 1, 1))
+
+    def test_animations_cameras_and_lights_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for key, message in [("animations", "animated"), ("cameras", "Cameras")]:
                 document = triangle()
                 document[key] = [{}]
                 write_glb(root / "prop.glb", document)
-                with self.subTest(key=key), self.assertRaisesRegex(ValueError, "static"):
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, message):
                     inspect_glb(root, "prop.glb")
+            document = triangle()
+            document["extensionsUsed"] = ["KHR_lights_punctual"]
+            write_glb(root / "prop.glb", document)
+            with self.assertRaisesRegex(ValueError, "Light"):
+                inspect_glb(root, "prop.glb")
+
+    def test_malformed_skin_bindings_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cases = []
+
+            document = skinned()
+            del document["meshes"][0]["primitives"][0]["attributes"]["JOINTS_0"]
+            cases.append((document, "JOINTS_0"))
+
+            document = skinned()
+            document["meshes"][0]["primitives"][0]["attributes"]["JOINTS_1"] = 2
+            cases.append((document, "four skin"))
+
+            document = skinned()
+            document["skins"][0]["joints"] = [9]
+            cases.append((document, "invalid node"))
+
+            document = skinned()
+            document["skins"][0]["joints"] = [1, 1]
+            cases.append((document, "unique joints"))
+
+            document = skinned()
+            document["accessors"][4]["type"] = "VEC3"
+            cases.append((document, "MAT4"))
+
+            document = skinned()
+            document["accessors"][4]["count"] = 2
+            cases.append((document, "match the joints"))
+
+            document = skinned()
+            document["accessors"][3]["componentType"] = 5121
+            cases.append((document, "normalized"))
+
+            document = skinned()
+            document["accessors"][3]["type"] = "VEC3"
+            cases.append((document, "VEC4"))
+
+            document = skinned()
+            document["accessors"][2]["componentType"] = 5122
+            cases.append((document, "unsigned VEC4"))
+
+            document = skinned()
+            document["accessors"][2]["count"] = 2
+            cases.append((document, "position count"))
+
+            document = skinned()
+            document["nodes"][0] = {"skin": 0}
+            cases.append((document, "reference a mesh"))
+
+            document = skinned()
+            document["nodes"][0]["skin"] = 9
+            cases.append((document, "Invalid skin reference"))
+
+            document = skinned()
+            document["skins"] = [{"joints": [1]} for _ in range(17)]
+            cases.append((document, "16 skins"))
+
+            for index, (document, message) in enumerate(cases):
+                with self.subTest(case=index):
+                    write_glb(root / "prop.glb", document, b"\x00" * 1024)
+                    with self.assertRaisesRegex(ValueError, message):
+                        inspect_glb(root, "prop.glb")
 
     def test_declared_geometry_cannot_exceed_memory_budget(self):
         from cavi_blender_mcp.importing import inspect_glb

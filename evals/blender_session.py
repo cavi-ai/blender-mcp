@@ -69,6 +69,16 @@ skin.modifiers.new("Skin", "ARMATURE").object = rig
 skin.vertex_groups.new(name="Bone").add(list(range(len(skin.data.vertices))), 1, "REPLACE")
 for value in bpy.context.selected_objects:
     value.select_set(False)
+rig.select_set(True)
+skin.select_set(True)
+bpy.context.view_layer.objects.active = rig
+workspace = Path(os.environ["CAVI_BLENDER_WORKSPACE"])
+result = bpy.ops.export_scene.gltf(
+    filepath=str(workspace / "rigged.glb"), export_format="GLB", use_selection=True,
+    export_skins=True, export_animations=False, export_apply=False)
+assert "FINISHED" in result
+for value in bpy.context.selected_objects:
+    value.select_set(False)
 
 dispatch = bridge.dispatch
 

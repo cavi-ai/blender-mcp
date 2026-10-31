@@ -221,14 +221,38 @@ def import_glb(path, name):
         with os.fdopen(fd, "wb") as stream:
             stream.write(payload)
         _load_glb(temporary)
-        objects = sorted(set(bpy.data.objects) - previous["objects"], key=lambda item: item.name)
+        objects = sorted(set(bpy.data.objects) - previous["objects"],
+                         key=lambda item: (item.type != "ARMATURE", item.name))
         if not objects or any(
-            item.type not in {"MESH", "EMPTY"} for item in objects
+            item.type not in {"MESH", "EMPTY", "ARMATURE"} for item in objects
         ):
-            raise RuntimeError("GLB did not produce only static meshes and transform nodes")
+            raise RuntimeError("GLB produced an unsupported object type")
         if set(bpy.data.scenes) != previous["scenes"]:
             raise RuntimeError("GLB import unexpectedly changed the scene set")
+        if set(bpy.data.actions) != previous["actions"]:
+            raise RuntimeError("Animation clips need the animated import workflow")
+        armatures = [item for item in objects if item.type == "ARMATURE"]
+        if len(armatures) > 16:
+            raise RuntimeError("Imported armatures exceed the import budget")
+        bones = sum(len(item.data.bones) for item in armatures)
+        if any(not item.data.bones for item in armatures):
+            raise RuntimeError("Imported armatures need at least one bone")
+        if bones > 1024 or any(len(item.data.bones) > 512 for item in armatures):
+            raise RuntimeError("Imported bones exceed the import budget")
         meshes = [item for item in objects if item.type == "MESH"]
+        skinned = []
+        for item in meshes:
+            modifiers = [modifier for modifier in item.modifiers
+                         if modifier.type == "ARMATURE" and modifier.object is not None]
+            if not modifiers:
+                continue
+            if len(modifiers) != 1 or modifiers[0].object not in armatures:
+                raise RuntimeError("Imported skins need one armature modifier on an imported rig")
+            if not item.vertex_groups or len(item.vertex_groups) > 512:
+                raise RuntimeError("Imported skins exceed the vertex-group budget")
+            skinned.append(item)
+        if len(skinned) > 64:
+            raise RuntimeError("Imported skinned meshes exceed the import budget")
         vertices = sum(len(item.data.vertices) for item in meshes)
         triangles = sum(len(poly.vertices) - 2 for item in meshes for poly in item.data.polygons)
         if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
@@ -246,6 +270,9 @@ def import_glb(path, name):
                 image.pack()
         return {**report, "collection": collection.name,
                 "objects": [info(item) for item in objects],
+                "armatures": [item.name for item in armatures],
+                "skinned_meshes": [item.name for item in skinned],
+                "bone_count": bones,
                 "imported_vertices": vertices, "imported_triangles": triangles}
     except Exception:
         for key in pools:

@@ -4356,5 +4356,81 @@
     "absent": [
       "eval-lod.fbx"
     ]
+  },
+  {
+    "id": "rigged-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "rigged.glb",
+      "name": "ImportedRigged"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/skins": 1,
+      "/joints": 1,
+      "/bone_count": 1,
+      "/armatures/0": "ImportedRigged"
+    },
+    "required": [
+      "/skinned_meshes/0",
+      "/sha256"
+    ]
+  },
+  {
+    "id": "rigged-import-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "rigged.glb",
+      "name": "ImportedRigged"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
+  },
+  {
+    "id": "animated-glb-export",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "eval-anim.glb",
+      "names": [
+        "RigMesh"
+      ],
+      "animations": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/armatures/0": "EvalRigNew"
+    },
+    "required": [
+      "/animations/0/name"
+    ],
+    "files": [
+      "eval-anim.glb"
+    ]
+  },
+  {
+    "id": "animated-import-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "eval-anim.glb",
+      "name": "AnimatedImport"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "animated import workflow"
   }
 ]
