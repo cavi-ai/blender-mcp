@@ -1,7 +1,8 @@
 """Engine-targeted exports: LOD groups, collision, bake pairs, axis presets and USD."""
 
 import re
-from contextlib import ExitStack, nullcontext
+import shutil
+from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 
 import bpy
@@ -32,7 +33,7 @@ def collision_objects(base):
     return found
 
 
-def fbx(path, preset, empties=False, animations=False):
+def fbx(path, preset, empties=False, animations=False, textures=False):
     object_types = {"MESH", "EMPTY", "ARMATURE"} if animations else (
         {"MESH", "EMPTY"} if empties else {"MESH"})
     return bpy.ops.export_scene.fbx(
@@ -41,7 +42,8 @@ def fbx(path, preset, empties=False, animations=False):
         bake_anim=animations, bake_anim_use_all_bones=animations,
         bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations,
         bake_anim_force_startend_keying=animations,
-        global_scale=1, path_mode="STRIP", **AXIS_PRESETS[preset])
+        global_scale=1, path_mode="RELATIVE" if textures else "STRIP",
+        **AXIS_PRESETS[preset])
 
 
 def usd(path, preset, instances):
@@ -55,14 +57,15 @@ def usd(path, preset, instances):
         export_global_up_selection=up)
 
 
-def write(path, objects, selection, preset, instances, empties, animations=False):
+def write(path, objects, selection, preset, instances, empties, animations=False,
+          textures=False):
     suffix = path.suffix.lower()
     with selected(selection):
         if suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if instances else nullcontext():
-                result = fbx(path, preset, empties, animations)
+                result = fbx(path, preset, empties, animations, textures)
         elif suffix == ".glb":
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
@@ -144,6 +147,71 @@ def animation_targets(objects):
     return armatures, morph
 
 
+def used_images(objects):
+    images = set()
+    for value in objects:
+        for slot in value.material_slots:
+            material = slot.material
+            if material is None or not material.use_nodes:
+                continue
+            for node in material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image is not None:
+                    images.add(node.image)
+    return sorted(images, key=lambda item: item.name)
+
+
+@contextmanager
+def prepared_images(objects, directory):
+    saved = []
+    try:
+        directory.mkdir()
+        for index, image in enumerate(used_images(objects)):
+            saved.append((image, image.filepath, image.filepath_raw, image.file_format))
+            if not image.has_data and image.packed_file is None:
+                raise RuntimeError("Texture image has no data")
+            safe = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(image.name).stem) or "image"
+            target = directory / f"{index:02d}-{safe}.png"
+            image.filepath_raw = str(target)
+            image.file_format = "PNG"
+            image.save()
+            image.filepath = str(target)
+        yield
+    finally:
+        for image, filepath, raw, file_format in saved:
+            try:
+                image.filepath = filepath
+                image.filepath_raw = raw
+                image.file_format = file_format
+            except ReferenceError:
+                continue
+
+
+def sidecars(path):
+    directory = path.with_suffix(".fbm")
+    if directory.exists():
+        raise FileExistsError(f"Refusing to overwrite {directory.name}")
+    return directory
+
+
+def texture_receipt(directory):
+    if not directory.exists():
+        return []
+    files = sorted(item for item in directory.rglob("*") if item.is_file())
+    if len(files) > 64:
+        raise RuntimeError("Exported textures exceed the sidecar budget")
+    total = 0
+    report = []
+    for item in files:
+        if item.is_symlink():
+            raise RuntimeError("Exported textures must be regular files")
+        size = item.stat().st_size
+        total += size
+        if total > 64 * 1024 * 1024:
+            raise RuntimeError("Exported textures exceed the sidecar budget")
+        report.append({"name": item.name, "path": str(item), "bytes": size})
+    return report
+
+
 def export_asset(p):
     if p.get("bake_pair") is not None:
         return bake_pair(p)
@@ -160,6 +228,9 @@ def export_asset(p):
     preset = preset_for(p, suffix)
     lods, collision = flag(p, "lods"), flag(p, "collision")
     instances, empties = flag(p, "preserve_instances"), flag(p, "include_empties")
+    textures = flag(p, "textures")
+    if textures and suffix != ".fbx":
+        raise ValueError("textures applies to FBX exports")
     if instances and suffix == ".glb":
         raise ValueError("preserve_instances applies to static FBX or USD exports")
     if animations:
@@ -210,18 +281,38 @@ def export_asset(p):
         selected_objects = objects + armatures
         selection = with_empties(selected_objects) if empties else selected_objects
         with output_file(p["path"], FORMATS) as path:
-            write(path, objects, selection, preset, False, empties, animations=True)
+            directory = sidecars(path) if textures else None
+            try:
+                with prepared_images(objects, directory) if textures else nullcontext():
+                    write(path, objects, selection, preset, False, empties,
+                          animations=True, textures=textures)
+                    files = texture_receipt(directory) if directory else []
+            except Exception:
+                if directory is not None:
+                    shutil.rmtree(directory, ignore_errors=True)
+                raise
         return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
                 "objects": [item.name for item in selected_objects],
                 "armatures": [item.name for item in armatures],
                 "skinned_meshes": [item.name for item in skinned],
                 "morph_meshes": [item.name for item in morph_meshes],
                 "animations": actions,
-                "shape_key_animations": shape_key_animations}
+                "shape_key_animations": shape_key_animations,
+                "textures": files}
     selection = with_empties(objects) if empties else list(objects)
     with output_file(p["path"], FORMATS) as path:
-        write(path, meshes if instances else objects, selection, preset, instances, empties)
+        directory = sidecars(path) if textures else None
+        try:
+            with prepared_images(objects, directory) if textures else nullcontext():
+                write(path, meshes if instances else objects, selection, preset,
+                      instances, empties, textures=textures)
+                files = texture_receipt(directory) if directory else []
+        except Exception:
+            if directory is not None:
+                shutil.rmtree(directory, ignore_errors=True)
+            raise
     return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
+            "textures": files,
             "objects": [item.name for item in objects],
             "lods": [item.name for item in meshes if LOD.search(item.name)] if lods else [],
             "collision": [item.name for item in found]}
@@ -229,7 +320,7 @@ def export_asset(p):
 
 def bake_pair(p):
     if any(p.get(k) for k in ("names", "lods", "collision", "preserve_instances",
-                              "include_empties", "animations")):
+                              "include_empties", "animations", "textures")):
         raise ValueError("bake_pair is exported alone")
     pair = p["bake_pair"]
     if not isinstance(pair, dict) or set(pair) != {"high", "low"}:

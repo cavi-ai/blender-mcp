@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cavi-blender-mcp"
-version = "0.25.0"
+version = "0.26.0"
 description = "Local-first MCP tools for Blender scene editing and game asset export"
 readme = "README.md"
 license = "MIT"

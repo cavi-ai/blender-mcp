@@ -629,6 +629,7 @@ async def asset_io(
     lods: StrictBool | None = None,
     collision: StrictBool | None = None,
     animations: StrictBool | None = None,
+    textures: StrictBool | None = None,
     bake_pair: BakePair | None = None,
     axis: Literal["unity", "unreal", "godot"] | None = None,
     lease_id: LeaseId = None,
@@ -636,13 +637,14 @@ async def asset_io(
     """Move assets in or out. Params per action:
     import: GLB, FBX, OBJ or USD path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB only),
-    axis=unity; or bake_pair alone (writes <stem>_low.fbx, <stem>_high.fbx);
+    textures (FBX sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
+    <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
-              "bake_pair": bake_pair, "axis": axis}
+              "textures": textures, "bake_pair": bake_pair, "axis": axis}
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": 128})
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
@@ -664,11 +666,12 @@ async def asset_io(
     params = pick(action, values, ["names"], {"preserve_instances": False,
                                               "include_empties": False, "lods": False,
                                               "collision": False, "animations": False,
-                                              "axis": None})
-    if (params["lods"] or params["collision"] or params["animations"] or params["axis"]
+                                              "textures": False, "axis": None})
+    if (params["lods"] or params["collision"] or params["animations"]
+            or params["textures"] or params["axis"]
             or path.lower().endswith((".usd", ".usda", ".usdc"))):
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    for key in ("lods", "collision", "animations", "axis"):
+    for key in ("lods", "collision", "animations", "textures", "axis"):
         params.pop(key)
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"
