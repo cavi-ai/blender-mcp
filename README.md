@@ -85,6 +85,7 @@ After installing new tools, restart that client's MCP connection to discover the
   - `array` (`count`, constant object-space `offset`)
   - `solidify` (`thickness`, `offset`)
 - `assign_material`: bind a PBR material to exact mesh slots and pack bounded workspace PNG/JPEG maps: `base_color_texture`, `normal_texture`/`normal_strength`, `roughness_texture`, `metallic_texture`, `emission_texture`/`emission_strength`, and `alpha_texture`/`alpha_mode` (opaque | clip | blend). `uv_scale`, `uv_offset` and `uv_rotation_degrees` drive one Mapping node; base color and emission use sRGB, the remaining maps use Non-Color. `base_color`, `roughness` and `metallic` set scalar values when maps are absent. `update_existing` edits a material created by this tool that is bound to the slot, preserving unspecified settings and replacing supplied maps; untagged materials are refused and maps cannot be removed. Other slots are preserved; UVs and single-user mesh data are required for textured assignment. Each image is at most 16 MiB and 4096², with a combined 32-million-pixel budget.
+- `bake`: bake a `normal` or `ao` map into a new workspace `.png`. `high` names 1–64 high-poly meshes for selected-to-active baking; omit it for self-baking. `resolution` 64–4096, `samples` 1–256, `margin` 0–64, `cage_extrusion`, `max_ray_distance`, `normal_space` (normal only), `uv_layer`, and `isolate`. The low mesh is copied for baking, so materials, selection and scene state are restored.
 - `asset_io`: `action` = `import` (GLB or FBX `path`, new `name`; static, skinned or animated), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `animations`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease). `animations=true` applies to FBX and GLB only, includes the armatures of the named meshes, exports every linked action, and refuses LODs, collision, instances and pair baking.
 - `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) exactly `resolution` px wide (≤ 2048; tiles centered); `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
 - `scatter`: adds a fixed Geometry Nodes modifier that instances `collection` over the mesh surface: `density` per m², `seed`, `min_distance` (Poisson), `scale_range`, `rotation_jitter_degrees` about Z, `realize`. Bounded to 100,000 estimated instances and 2,000,000 realized triangles; no caller-authored node graphs.
@@ -122,6 +123,8 @@ Geometry actions need Object Mode, single-user mesh data without modifiers or sh
 Composition also requires Object Mode, single-user meshes without modifiers or shape keys. Booleans bound the two inputs and result to 500,000 triangles; `fast` selects Blender's float solver, `exact` its exact solver. `join` takes 1–64 sources, `separate` creates 1–64 parts, `array` allows 2–1000 copies within the 500,000-triangle result budget, and `duplicate` creates 1–256 objects. Failed booleans, joins, splits, duplicates and modifier bakes restore the original scene.
 
 Rigging requires Object Mode. Armatures accept 1–128 bones with unique names, non-zero lengths, acyclic parents, and connected bones that meet their parent tail. Automatic binding requires 1–16 single-user meshes without modifiers or shape keys, at most 50,000 vertices and 64 bones. Weight repair affects deform-bone groups only and is bounded to 100,000 vertices, 512 groups and one million assignments. Animation authoring is bounded to 32 frames per action, 128 poses per frame and 2,048 poses per call. Binding and repair restore mesh data, parents, transforms and modifiers on failure; action creation removes the new action and restores the previous action and pose on failure. Animated exports are bounded to 64 meshes, 100,000 vertices, 200,000 triangles, 128 bones per armature and 32 actions.
+
+Baking requires Object Mode and unmodified low/high meshes. The low-poly target needs a UV layer and at most 200,000 triangles; high-poly sources need at most 1,000,000 total triangles and 64 objects. Output is a new workspace PNG. Baking copies the low mesh, uses Cycles on CPU, and restores scene state, selection, materials and visibility afterward. Curvature and lightmap baking are not implemented yet.
 
 `decimate_to` and each `lod_chain` level report `target`, `achieved`, `preservation` (`seams`, `seams_unweighted`, `plain`) and `relaxed`. Seam preservation is relaxed in that order when it blocks a target; results still more than 10% over target are listed in `warnings`.
 
@@ -237,6 +240,9 @@ after a partial import.
 texture packing, animated action inspection and re-export, external texture/camera/light/
 shape-key refusal, duplicate names and partial-import rollback.
 
+`tests/blender_bake.py` checks normal and AO baking, output PNGs, scene restoration and
+invalid-target refusals.
+
 ## MCP evaluation
 
 Install the locked Python and evaluator dependencies, then run the protocol checks:
@@ -248,7 +254,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 12 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB/FBX imports, packed color materials, lit previews, geometry actions, rig creation/binding, rig inspection, review sheets, scatter, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 13 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB/FBX imports, baked maps, packed color materials, lit previews, geometry actions, rig creation/binding, rig inspection, review sheets, scatter, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 

@@ -768,6 +768,10 @@ def _dispatch(operation, p):
         return import_glb(p["path"], p["name"])
     if operation == "import_fbx":
         return import_fbx(p["path"], p["name"])
+    if operation == "bake_map":
+        from .blender_bake import bake
+
+        return bake(p)
     if operation == "review_sheet":
         from .blender_review import review
 

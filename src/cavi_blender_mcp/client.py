@@ -17,6 +17,7 @@ OPERATIONS = frozenset(
         "create_mesh",
         "import_mesh",
         "import_fbx",
+        "bake_map",
         "transform_object",
         "set_color",
         "add_modifier",
@@ -74,7 +75,7 @@ SLOW_OPERATIONS = frozenset(
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600
-LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain"})
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map"})
 MAX_REQUEST_BYTES = 8 * 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 

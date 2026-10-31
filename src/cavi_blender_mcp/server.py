@@ -512,6 +512,40 @@ async def assign_material(
                      slot=slot, lease_id=lease_id)
 
 
+@mcp.tool(annotations=MUTATING)
+async def bake(
+    map: Literal["normal", "ao"],
+    name: ObjectName,
+    path: Annotated[str, Field(description="New workspace .png path.")],
+    high: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
+    resolution: Annotated[StrictInt, Field(ge=64, le=4096)] = 1024,
+    samples: Annotated[StrictInt, Field(ge=1, le=256)] = 16,
+    margin: Annotated[StrictInt, Field(ge=0, le=64)] = 4,
+    cage_extrusion: Annotated[Number, Field(ge=0, le=1)] = 0.01,
+    max_ray_distance: Annotated[Number, Field(ge=0, le=10)] = 0.1,
+    normal_space: Literal["tangent", "object"] | None = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    isolate: StrictBool = True,
+    lease_id: LeaseId = None,
+) -> dict[str, Any]:
+    """Bake a normal or AO map into a new PNG; high-poly sources are optional.
+
+    normal: tangent or object space; ao: ambient occlusion. high enables selected-to-active.
+    The low-poly mesh is copied for baking, so the scene materials and selection are restored.
+    """
+    values = {"high": high, "resolution": resolution, "samples": samples, "margin": margin,
+              "cage_extrusion": cage_extrusion, "max_ray_distance": max_ray_distance,
+              "normal_space": normal_space, "uv_layer": uv_layer, "isolate": isolate}
+    defaults = {"high": None, "resolution": 1024, "samples": 16, "margin": 4,
+                "cage_extrusion": 0.01, "max_ray_distance": 0.1, "uv_layer": None,
+                "isolate": True}
+    if map == "normal":
+        defaults["normal_space"] = "tangent"
+    params = pick(map, values, (), defaults)
+    return await run(call, "bake_map", lease_id=lease_id, map=map, name=name, path=path,
+                     **params)
+
+
 @mcp.tool(annotations=ADDITIVE)
 async def asset_io(
     action: Literal["import", "export", "save", "generate"],
