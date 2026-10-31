@@ -105,8 +105,8 @@ cavi-blender-mcp runtime restart --lease-id <current-lease>
 - **Baking**: normal, ambient-occlusion, curvature and lightmap maps into a new
   workspace PNG.
 - **Assets**: bounded GLB, FBX, OBJ and USD import; GLB morph targets and
-  shape-key animation; static, skinned and animated FBX/GLB export; USD export; Unity, Unreal and
-  Godot axis presets; LOD groups,
+  shape-key animation; static, skinned and animated FBX/GLB export; FBX texture
+  sidecars; USD export; Unity, Unreal and Godot axis presets; LOD groups,
   collision naming and bake pairs.
 - **Rigging**: armature creation, automatic skin binding, weight repair, pose
   authoring, action creation, clip/NLA management, animation QA and retargeting.

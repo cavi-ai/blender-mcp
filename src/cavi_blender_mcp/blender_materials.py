@@ -326,7 +326,7 @@ def assign(params, workspace, find_object):
         for value in values:
             if not value.material_slots:
                 value.data.materials.append(material)
-            value.material_slots[slot].link = "OBJECT"
+            value.material_slots[slot].link = "DATA"
             value.material_slots[slot].material = material
         material[CONFIG_TAG] = json.dumps(config, sort_keys=True)
     except Exception:
