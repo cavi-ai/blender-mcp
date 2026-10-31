@@ -3465,5 +3465,217 @@
     "equals": {
       "/collections/0": "CMP_Props"
     }
+  },
+  {
+    "id": "pbr-material-invalid-alpha",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "BadAlpha",
+      "alpha_mode": "cutout"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "pbr-material-invalid-scale",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "BadScale",
+      "uv_scale": [
+        1
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "pbr-material-success",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "EvalPBR",
+      "base_color_texture": "color.png",
+      "base_color": [
+        0.8,
+        0.7,
+        0.6,
+        1
+      ],
+      "roughness": 0.6,
+      "metallic": 0.2,
+      "roughness_texture": "color.png",
+      "metallic_texture": "color.png",
+      "normal_texture": "color.png",
+      "normal_strength": 0.9,
+      "emission_texture": "color.png",
+      "emission_strength": 1.5,
+      "alpha_texture": "color.png",
+      "alpha_mode": "clip",
+      "uv_scale": [
+        2,
+        2
+      ],
+      "uv_offset": [
+        0.1,
+        0.1
+      ],
+      "uv_rotation_degrees": 15
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/updated": false,
+      "/texture_packed": true,
+      "/config/alpha_mode": "clip",
+      "/textures/normal_texture/width": 1
+    },
+    "required": [
+      "/config/roughness_texture",
+      "/config/normal_texture",
+      "/textures/alpha_texture/sha256"
+    ]
+  },
+  {
+    "id": "pbr-material-update",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "EvalPBR",
+      "update_existing": true,
+      "normal_strength": 2,
+      "base_color": [
+        0.5,
+        0.5,
+        0.5,
+        1
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/updated": true,
+      "/config/normal_texture": "color.png",
+      "/base_color_srgb/0": 0.5
+    },
+    "required": [
+      "/config/roughness_texture",
+      "/textures/base_color_texture/sha256"
+    ]
+  },
+  {
+    "id": "pbr-material-missing-uv",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRNoUV"
+      ],
+      "material_name": "NoUV",
+      "normal_texture": "color.png"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "UV layer"
+  },
+  {
+    "id": "pbr-material-missing-texture",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "MissingMap",
+      "normal_texture": "missing.png"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
+  },
+  {
+    "id": "pbr-material-untagged-update",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRCustomTarget"
+      ],
+      "material_name": "PBRCustom",
+      "update_existing": true
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "created by assign_material"
+  },
+  {
+    "id": "pbr-material-alpha-mode",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "material_name": "OpaqueAlpha",
+      "alpha_texture": "color.png",
+      "alpha_mode": "opaque"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "clip or blend"
+  },
+  {
+    "id": "pbr-materials-check",
+    "tool": "inspect_mesh_quality",
+    "arguments": {
+      "names": [
+        "PBRTarget"
+      ],
+      "checks": [
+        "materials"
+      ],
+      "texture_resolution": [
+        64,
+        64
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/objects/0/checks/materials/0/material": "EvalPBR",
+      "/objects/0/checks/materials/0/issues": []
+    },
+    "required": [
+      "/objects/0/checks/materials/0/bindings/Base Color/images/0",
+      "/objects/0/checks/materials/0/bindings/Normal/images/0",
+      "/objects/0/checks/materials/0/uv_transform"
+    ]
   }
 ]

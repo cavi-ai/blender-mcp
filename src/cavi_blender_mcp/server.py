@@ -20,6 +20,7 @@ mcp = FastMCP(
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+Vector2 = tuple[Number, Number]
 Vector3 = tuple[Number, Number, Number]
 RGBA = tuple[Number, Number, Number, Number]
 ObjectName = Annotated[str, Field(description="Exact object name from scene_info.")]
@@ -34,7 +35,7 @@ LEASE_FREE = frozenset(
      "render_preview", "review_sheet", "inspect_rig"}
 )
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
-Check = Literal["naming", "topology", "lightmap", "transforms", "origin"]
+Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
 View = Literal["front", "back", "left", "right", "top", "persp"]
 Preserve = Literal["seams", "sharp", "boundary"]
 Step = Literal["merge", "delete_loose", "recalc_normals", "triangulate", "clear_custom_normals"]
@@ -98,14 +99,15 @@ async def inspect_mesh_quality(
     texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
                               Annotated[StrictInt, Field(ge=1, le=4096)]] = (1024, 1024),
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    checks: Annotated[list[Check] | None, Field(max_length=5)] = None,
+    checks: Annotated[list[Check] | None, Field(max_length=6)] = None,
     naming: NamingRules | None = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63)] = "UVMap_Lightmap",
     lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096)] = 64,
 ) -> dict[str, Any]:
-    """Measure static mesh budgets, texel density, UV stretch and material sharing.
+    """Measure static mesh budgets, texel density, UV stretch and material bindings.
 
     Uses the render-active UV layer unless named. Refuses modifiers, rigs and shape keys.
+    The materials check reports PBR map bindings, color spaces, packing and graph issues.
     """
     return await run(call, "inspect_mesh_quality", names=names,
                      texture_resolution=texture_resolution, uv_layer=uv_layer,
@@ -392,17 +394,41 @@ def preserved(values, allowed):
 async def assign_material(
     names: Annotated[list[str], Field(min_length=1, max_length=32)],
     material_name: Annotated[str, Field(min_length=1, max_length=63)],
-    base_color_texture: Annotated[str | None, Field(description="Workspace sRGB PNG.")] = None,
-    base_color: RGBA = (1, 1, 1, 1),
-    roughness: Number = .5,
-    metallic: Number = 0,
+    base_color_texture: Annotated[str | None, Field(description="Workspace sRGB image.")] = None,
+    base_color: RGBA | None = None,
+    roughness: Number | None = None,
+    metallic: Number | None = None,
+    roughness_texture: str | None = None,
+    metallic_texture: str | None = None,
+    normal_texture: str | None = None,
+    normal_strength: Number | None = None,
+    emission_texture: str | None = None,
+    emission_strength: Number | None = None,
+    alpha_texture: str | None = None,
+    alpha_mode: Literal["opaque", "clip", "blend"] | None = None,
+    uv_scale: Vector2 | None = None,
+    uv_offset: Vector2 | None = None,
+    uv_rotation_degrees: Number | None = None,
+    update_existing: StrictBool | None = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
-    """Assign a new material to exact mesh slots; packs the PNG and preserves other slots."""
+    """Assign or update a PBR material. Maps are workspace PNG/JPEG files.
+
+    Normal, roughness, metallic and alpha maps are Non-Color; base color and emission
+    are sRGB. update_existing edits a material created by this tool and bound to the slot.
+    """
     return await run(call, "assign_material", names=names, material_name=material_name,
                      base_color_texture=base_color_texture, base_color=base_color,
-                     roughness=roughness, metallic=metallic, slot=slot, lease_id=lease_id)
+                     roughness=roughness, metallic=metallic,
+                     roughness_texture=roughness_texture,
+                     metallic_texture=metallic_texture, normal_texture=normal_texture,
+                     normal_strength=normal_strength, emission_texture=emission_texture,
+                     emission_strength=emission_strength, alpha_texture=alpha_texture,
+                     alpha_mode=alpha_mode, uv_scale=uv_scale, uv_offset=uv_offset,
+                     uv_rotation_degrees=uv_rotation_degrees,
+                     update_existing=False if update_existing is None else update_existing,
+                     slot=slot, lease_id=lease_id)
 
 
 @mcp.tool(annotations=ADDITIVE)

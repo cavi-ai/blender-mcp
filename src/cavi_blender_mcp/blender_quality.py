@@ -1,5 +1,6 @@
 """Bounded, read-only measurements of static Blender mesh sources."""
 
+import json
 import math
 
 import bpy
@@ -10,7 +11,10 @@ from .naming import lint, rules
 
 MAX_TRIANGLES = 100000
 MAX_VERTICES = 100000
-CHECKS = {"naming", "topology", "lightmap", "transforms", "origin"}
+CHECKS = {"naming", "topology", "lightmap", "transforms", "origin", "materials"}
+MATERIAL_INPUTS = {"Base Color": "sRGB", "Emission Color": "sRGB", "Normal": "Non-Color",
+                   "Roughness": "Non-Color", "Metallic": "Non-Color", "Alpha": "Non-Color"}
+CONFIG_TAG = "cavi_material_config"
 
 
 def topology(mesh):
@@ -65,6 +69,127 @@ def origin(points):
             "local_bounds": {"min": low, "max": high}}
 
 
+def upstream_images(socket, depth=0):
+    found = set()
+    if socket is None or depth > 8 or not socket.is_linked:
+        return found
+    for link in socket.links:
+        node = link.from_node
+        if node.type == "TEX_IMAGE":
+            if node.image is not None:
+                found.add(node.image)
+        else:
+            for candidate in node.inputs:
+                found |= upstream_images(candidate, depth + 1)
+    return found
+
+
+def material_report(value):
+    slots = []
+    for index, entry in enumerate(value.material_slots):
+        material = entry.material
+        item = {"slot": index, "material": None, "users": 0, "nodes": 0,
+                "bindings": {}, "images": [], "issues": []}
+        issues = set()
+
+        if material is None:
+            issues.add("empty_slot")
+            item["issues"] = sorted(issues)
+            slots.append(item)
+            continue
+        item["material"] = material.name
+        item["users"] = material.users
+        if not material.use_nodes:
+            issues.add("missing_nodes")
+            item["issues"] = sorted(issues)
+            slots.append(item)
+            continue
+        nodes = list(material.node_tree.nodes)
+        item["nodes"] = len(nodes)
+        if len(nodes) > 512:
+            raise ValueError("Inspect materials with at most 512 nodes")
+        shader = next((node for node in nodes if node.type == "BSDF_PRINCIPLED"), None)
+        if shader is None:
+            issues.add("missing_principled")
+        else:
+            base_images = upstream_images(shader.inputs.get("Base Color"))
+            for name, expected in MATERIAL_INPUTS.items():
+                socket = shader.inputs.get(name)
+                images = upstream_images(socket)
+                item["bindings"][name] = {
+                    "images": sorted(image.name for image in images),
+                    "expected_color_space": expected}
+                for image in images:
+                    if not image.has_data and image.packed_file is None:
+                        issues.add(f"{name}:missing_image_data")
+                    allowed = {expected}
+                    if name == "Alpha" and image in base_images:
+                        allowed.add("sRGB")
+                    if image.colorspace_settings.name not in allowed:
+                        issues.add(f"{name}:wrong_color_space")
+                    if image.packed_file is None:
+                        issues.add(f"{name}:not_packed")
+            normal = shader.inputs.get("Normal")
+            if normal is not None and normal.is_linked:
+                node = normal.links[0].from_node
+                if node.type == "NORMAL_MAP":
+                    item["normal_strength"] = node.inputs["Strength"].default_value
+        mapping = next((node for node in nodes if node.type == "MAPPING"), None)
+        if mapping is not None:
+            item["uv_transform"] = {
+                "scale": list(mapping.inputs["Scale"].default_value)[:2],
+                "offset": list(mapping.inputs["Location"].default_value)[:2],
+                "rotation_degrees": math.degrees(
+                    mapping.inputs["Rotation"].default_value[2]),
+            }
+        seen, images, sizes = set(), [], set()
+        for node in nodes:
+            if node.type != "TEX_IMAGE":
+                continue
+            image = node.image
+            if image is None:
+                issues.add("texture_without_image")
+                continue
+            if image.as_pointer() in seen:
+                continue
+            seen.add(image.as_pointer())
+            images.append({"name": image.name,
+                           "size": list(image.size) if image.has_data else None,
+                           "loaded": image.has_data,
+                           "color_space": image.colorspace_settings.name,
+                           "packed": image.packed_file is not None})
+            if image.has_data:
+                sizes.add(tuple(image.size))
+            if len(images) > 64:
+                raise ValueError("Inspect at most 64 image resources per call")
+        item["images"] = images
+        if len(sizes) > 1:
+            issues.add("texture_size_mismatch")
+        config = None
+        raw = material.get(CONFIG_TAG)
+        if isinstance(raw, str):
+            try:
+                config = json.loads(raw)
+                if isinstance(config, dict):
+                    item["config"] = config
+                else:
+                    config = None
+                    issues.add("invalid_material_config")
+            except ValueError:
+                config = None
+                issues.add("invalid_material_config")
+        alpha_mode = (config.get("alpha_mode", material.blend_method)
+                      if config else material.blend_method)
+        item["alpha_mode"] = alpha_mode
+        alpha = shader.inputs.get("Alpha") if shader is not None else None
+        if alpha_mode in {"clip", "blend", "CLIP", "BLEND"} and (
+                alpha is None or not alpha.is_linked):
+            issues.add("alpha_mode_without_texture")
+        item["issues"] = sorted(issues)
+        slots.append(item)
+    return slots
+
+
 def run_checks(value, layer_name, requested, naming, lightmap_resolution):
     from .uvmath import overlap
 
@@ -97,6 +222,8 @@ def run_checks(value, layer_name, requested, naming, lightmap_resolution):
         report["transforms"] = transforms(value)
     if "origin" in requested:
         report["origin"] = origin([vertex.co[:] for vertex in mesh.vertices])
+    if "materials" in requested:
+        report["materials"] = material_report(value)
     return report
 
 
