@@ -153,6 +153,41 @@ class RigSurfaceTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "validation error"):
                 asyncio.run(server.mcp.call_tool("inspect_rig", arguments))
 
+    def test_retarget_maps_to_an_owned_operation(self):
+        calls = self.capture()
+        asyncio.run(server.rig_edit("retarget", "Target", source="Source",
+                                    source_action="Walk", action_name="Retargeted",
+                                    mapping={"Root": "Bone"}, samples=4, lease_id="L"))
+        self.assertEqual(self.inner(calls)[0], ("retarget_rig", {
+            "lease_id": "L", "name": "Target", "source": "Source",
+            "source_action": "Walk", "action_name": "Retargeted",
+            "mapping": {"Root": "Bone"}, "samples": 4}))
+
+    def test_retarget_parameters_are_bounded(self):
+        calls = self.capture()
+        for coroutine, message in [
+            (server.rig_edit("retarget", "Target", source_action="Walk",
+                             action_name="Retargeted"), "requires: source"),
+            (server.rig_edit("retarget", "Target", source="Source",
+                             action_name="Retargeted"), "requires: source_action"),
+            (server.rig_edit("retarget", "Target", source="Source",
+                             source_action="Walk"), "requires: action_name"),
+            (server.rig_edit("retarget", "Target", source="Source",
+                             source_action="Walk", action_name="Retargeted",
+                             keyframes=[]), "does not accept: keyframes"),
+        ]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                asyncio.run(coroutine)
+        for arguments in (
+            {"action": "retarget", "name": "Target", "source": "Source",
+             "source_action": "Walk", "action_name": "Retargeted", "samples": 1},
+            {"action": "retarget", "name": "Target", "source": "Source",
+             "source_action": "Walk", "action_name": "Retargeted", "samples": 257},
+        ):
+            with self.assertRaisesRegex(Exception, "validation error"):
+                asyncio.run(server.mcp.call_tool("rig_edit", arguments))
+        self.assertEqual(calls, [])
+
     def test_invalid_bone_and_weight_inputs_are_bounded(self):
         for arguments in (
             {"action": "create", "name": "Rig", "bones": [{

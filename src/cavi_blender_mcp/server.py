@@ -165,7 +165,8 @@ async def inspect_rig(
 
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
-    action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose"],
+    action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
+                    "retarget"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -178,6 +179,10 @@ async def rig_edit(
     action_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
     reset: StrictBool | None = None,
+    source: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    source_action: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    mapping: Annotated[dict[str, str] | None, Field(max_length=128)] = None,
+    samples: Annotated[StrictInt | None, Field(ge=2, le=256)] = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Create an armature, bind or repair weights, or author an animation.
@@ -186,12 +191,15 @@ async def rig_edit(
     weights: name=mesh, max_influences=4, clean_threshold=.0001, normalize=true;
     pose: name=armature, poses, frame, reset=false;
     keyframe: name=armature, action_name, keyframes=[{frame, poses}];
-    clear_pose: name=armature, frame.
+    clear_pose: name=armature, frame;
+    retarget: name=target armature, source, source_action, action_name, mapping, samples.
     """
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
-              "action_name": action_name, "frame": frame, "reset": reset}
+              "action_name": action_name, "frame": frame, "reset": reset,
+              "source": source, "source_action": source_action, "mapping": mapping,
+              "samples": samples}
     if action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
@@ -213,6 +221,10 @@ async def rig_edit(
         params["keyframes"] = [
             {"frame": item.frame, "poses": [pose.model_dump() for pose in item.poses]}
             for item in params["keyframes"]]
+    elif action == "retarget":
+        operation = "retarget_rig"
+        params = pick(action, values, ["source", "source_action", "action_name"], {
+            "mapping": None, "samples": None})
     else:
         operation = "clear_pose"
         params = pick(action, values, (), {"frame": None})

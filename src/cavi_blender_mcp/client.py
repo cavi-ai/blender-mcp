@@ -57,6 +57,7 @@ OPERATIONS = frozenset(
         "pose_rig",
         "keyframe_rig",
         "clear_pose",
+        "retarget_rig",
         "apply_transforms",
         "set_origin",
         "snap_to_grid",
@@ -77,7 +78,7 @@ SLOW_OPERATIONS = frozenset(
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600
-LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map"})
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "retarget_rig"})
 MAX_REQUEST_BYTES = 8 * 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 

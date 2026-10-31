@@ -4816,5 +4816,124 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "rig-retarget-target",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "RetargetRig",
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            -1
+          ],
+          "tail": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "Spine",
+          "parent": "Root",
+          "head": [
+            0,
+            0,
+            0
+          ],
+          "tail": [
+            0,
+            0,
+            1
+          ],
+          "connect": true
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/bone_count": 2
+    }
+  },
+  {
+    "id": "rig-retarget-success",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "RetargetRig",
+      "source": "EvalRigNew",
+      "source_action": "EvalWalk",
+      "action_name": "RetargetWalk"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "RetargetWalk",
+      "/source_action": "EvalWalk"
+    },
+    "required": [
+      "/frames/0",
+      "/mapped/0/target"
+    ]
+  },
+  {
+    "id": "rig-retarget-missing-action",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "RetargetRig",
+      "source": "EvalRigNew",
+      "source_action": "Missing",
+      "action_name": "MissingRetarget"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not exist"
+  },
+  {
+    "id": "rig-retarget-invalid-mapping",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "RetargetRig",
+      "source": "EvalRigNew",
+      "source_action": "EvalWalk",
+      "action_name": "BadMapping",
+      "mapping": {
+        "Root": "Missing"
+      }
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "Target bone"
+  },
+  {
+    "id": "rig-retarget-existing",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "RetargetRig",
+      "source": "EvalRigNew",
+      "source_action": "EvalWalk",
+      "action_name": "RetargetWalk"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   }
 ]
