@@ -79,7 +79,7 @@ After installing new tools, restart that client's MCP connection to discover the
   - `cleanup` (`merge_distance`, `steps` from merge, delete_loose, recalc_normals, triangulate, clear_custom_normals; returns count deltas)
 - `assign_material`: bind a new material to exact mesh slots, pack a bounded workspace PNG as sRGB base color, and set raw roughness and metallic values. Other slots are preserved; UVs and single-user mesh data are required for textured assignment.
 - `asset_io`: `action` = `import` (static GLB `path`, new `name`), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease).
-- `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) at `resolution` ≤ 2048 px wide; `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
+- `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) exactly `resolution` px wide (≤ 2048; tiles centered); `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
 - `scatter`: adds a fixed Geometry Nodes modifier that instances `collection` over the mesh surface: `density` per m², `seed`, `min_distance` (Poisson), `scale_range`, `rotation_jitter_degrees` about Z, `realize`. Bounded to 100,000 estimated instances and 2,000,000 realized triangles; no caller-authored node graphs.
 
 ### Engine exports
@@ -110,6 +110,8 @@ Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 f
 Bevel is bounded by the evaluated geometry; unapplied modifier stacks are limited to 16.
 
 Geometry actions need Object Mode, single-user mesh data without modifiers or shape keys, and at most 500,000 triangles (`remesh_quad`, `collision`, `lightmap_uv`, `texel_density`: 200,000; `remesh_quad` targets 16–100,000 faces; `lod_chain` 1–6 levels; collision 1–64 loose parts). Reductions bake through the evaluated mesh rather than context operators; QuadriFlow and UV packing run through Blender operators, including in `runtime start --background`.
+
+`decimate_to` and each `lod_chain` level report `target`, `achieved`, `preservation` (`seams`, `seams_unweighted`, `plain`) and `relaxed`. Seam preservation is relaxed in that order when it blocks a target; results still more than 10% over target are listed in `warnings`.
 
 `mesh_edit` `modifier` defaults to a non-destructive modifier. Its optional `apply` flag bakes the result into a single-user mesh without an existing modifier stack, allowing fusion, smoothing and reduction in sequence.
 
@@ -181,6 +183,10 @@ The additional `tests/blender_organic.py` native check exercises custom topology
 `tests/blender_harden.py` checks rotation modes, color material reuse, named UV layers, modifier budgets, lease-free previews, FBX settings, and the bridge's request cap and error statuses.
 
 `tests/blender_aaa.py` checks decimation, LOD chains, QuadriFlow, lightmap overlap, texel density, collision naming, cleanup deltas, transform/origin edits, sockets, inspection checks, LOD/collision/USD/bake-pair exports with FBX re-import, every review sheet mode and scatter budgets.
+
+`tests/blender_golden.py` checks convex hulls of meshes with interior points, lightmap packing time, LOD/decimation relaxation and warnings, and exact review sheet width.
+
+`tests/blender_headless.py` starts `runtime start --background` from an installed-package layout with a shadowing server `numpy` and runs a numpy-backed inspection; pass the venv Python after `--`.
 
 `tests/blender_unity_axis.py` checks unity-axis FBX node transforms, socket export and upright re-import.
 

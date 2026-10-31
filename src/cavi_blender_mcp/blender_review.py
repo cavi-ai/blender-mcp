@@ -254,7 +254,8 @@ def review(p):
     columns = min(3, len(views))
     rows = math.ceil(len(views) / columns)
     tile = resolution // columns
-    width, height = tile * columns, tile * rows
+    width, height = resolution, tile * rows
+    pad = (width - tile * columns) // 2
     with render_state(scene) as (stack, visibility), output_file(p["path"], {".png"}) as path, tempfile.TemporaryDirectory(prefix="cavi-review-") as folder:
         shown, stats = prepare(meshes, mode, p, stack, radius)
         for value, _ in visibility:
@@ -284,7 +285,8 @@ def review(p):
             row, column = divmod(index, columns)
             # Blender pixel rows run bottom to top.
             top = height - (row + 1) * tile
-            sheet[top:top + tile, column * tile:(column + 1) * tile] = tile_pixels(
+            left = pad + column * tile
+            sheet[top:top + tile, left:left + tile] = tile_pixels(
                 render.filepath, tile)
         image = bpy.data.images.new("CAVI Review Sheet", width, height, alpha=True)
         stack["images"].append(image)

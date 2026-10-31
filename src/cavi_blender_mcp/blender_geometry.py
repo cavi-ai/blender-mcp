@@ -16,6 +16,11 @@ MAX_TRIANGLES = 500000
 MAX_UV_TRIANGLES = 200000
 MAX_PARTS = 64
 SEAM_WEIGHT = 10.0
+RELAXATION = (("seams", SEAM_WEIGHT), ("seams_unweighted", 1.0), ("plain", None))
+TOLERANCE = 1.1
+# CONCAVE/CONVEX packing takes seconds to minutes on few islands in Blender 5.2.
+PACK = {"margin_method": "FRACTION", "rotate": True, "rotate_method": "CARDINAL",
+        "shape_method": "AABB"}
 AXES = {"X", "Y", "Z"}
 CLEANUP_STEPS = {"merge", "delete_loose", "recalc_normals", "triangulate",
                  "clear_custom_normals"}
@@ -106,9 +111,9 @@ def seam_vertices(mesh):
         bm.free()
 
 
-def collapse(value, ratio, axis, seams):
+def collapse(value, ratio, axis, weight):
     group = None
-    if seams:
+    if weight:
         keep = seam_vertices(value.data)
         if keep:
             group = value.vertex_groups.new(name="CAVI_Preserve")
@@ -126,7 +131,7 @@ def collapse(value, ratio, axis, seams):
             # Inverted weights protect seam and boundary vertices from collapse.
             modifier.vertex_group = label
             modifier.invert_vertex_group = True
-            modifier.vertex_group_factor = SEAM_WEIGHT
+            modifier.vertex_group_factor = weight
         bake(value, modifier)
     finally:
         if label and value.vertex_groups.get(label):
@@ -134,16 +139,29 @@ def collapse(value, ratio, axis, seams):
 
 
 def reduce(value, current, target, axis, seams):
+    stages = RELAXATION if seams else RELAXATION[-1:]
     achieved = current
-    for _ in range(3):
-        if achieved <= target * 1.02:
+    for stage, weight in stages:
+        for _ in range(3):
+            if achieved <= target * 1.02:
+                break
+            collapse(value, min(1.0, max(1e-4, target / achieved)), axis, weight)
+            reached = triangle_count(value.data)
+            if reached >= achieved:
+                break
+            achieved = reached
+        if achieved <= target * TOLERANCE:
             break
-        collapse(value, min(1.0, max(1e-4, target / achieved)), axis, seams)
-        reached = triangle_count(value.data)
-        if reached >= achieved:
-            break
-        achieved = reached
-    return achieved
+    return {"target": target, "achieved": achieved, "preservation": stage,
+            "relaxed": stage != stages[0][0]}
+
+
+def missed(label, result):
+    if result["achieved"] <= result["target"] * TOLERANCE:
+        return []
+    return [(f"{label}: {result['achieved']} triangles exceed target {result['target']} "
+             f"by more than {round((TOLERANCE - 1) * 100)}% after relaxing to "
+             f"{result['preservation']}")]
 
 
 def reduction_target(p, current):
@@ -168,9 +186,11 @@ def decimate_to(p):
     value, before = source(p["name"])
     target = reduction_target(p, before)
     axis, seams = symmetry(p), boolean(p, "preserve_seams", True)
-    after = reduce(value, before, target, axis, seams) if target < before else before
+    result = (reduce(value, before, target, axis, seams) if target < before else
+              {"target": target, "achieved": before, "preservation": None, "relaxed": False})
     return {**info(value), "triangles_before": before, "triangles_target": target,
-            "triangles": after, "preserve_seams": seams, "symmetry_axis": axis}
+            "triangles": result["achieved"], **result, "preserve_seams": seams,
+            "symmetry_axis": axis, "warnings": missed(value.name, result)}
 
 
 def remesh_quad(p):
@@ -250,16 +270,17 @@ def lod_chain(p):
             lod0.name = lod0.data.name = lod0_name
             created.append(lod0)
         collection.objects.link(lod0)
-        report = [{"name": lod0.name, "level": 0, "triangles": count}]
+        report, warnings = [{"name": lod0.name, "level": 0, "triangles": count}], []
         for level, (label, goal) in enumerate(zip(names, goals), start=1):
             copy = lod0.copy()
             copy.data = lod0.data.copy()
             copy.name = copy.data.name = label
             created.append(copy)
             collection.objects.link(copy)
-            reached = reduce(copy, count, goal, axis, seams)
+            result = reduce(copy, count, goal, axis, seams)
             report.append({"name": copy.name, "level": level, "triangles_target": goal,
-                           "triangles": reached})
+                           "triangles": result["achieved"], **result})
+            warnings += missed(copy.name, result)
     except Exception:
         for item in created:
             mesh = item.data
@@ -274,7 +295,7 @@ def lod_chain(p):
         bpy.data.collections.remove(collection)
         raise
     return {"collection": collection.name, "base": base, "levels": report,
-            "source_renamed": lod0 is value and original[0] != lod0.name}
+            "source_renamed": lod0 is value and original[0] != lod0.name, "warnings": warnings}
 
 
 def uv_triangles(mesh, layer):
@@ -354,8 +375,7 @@ def lightmap_uv(p):
             lambda: bpy.ops.uv.smart_project(angle_limit=math.radians(angle), island_margin=margin,
                                              margin_method="FRACTION", rotate_method="AXIS_ALIGNED"),
             lambda: bpy.ops.uv.select_all(action="SELECT"),
-            lambda: bpy.ops.uv.pack_islands(margin=margin, margin_method="FRACTION", rotate=True,
-                                            scale=True, shape_method="CONCAVE"),
+            lambda: bpy.ops.uv.pack_islands(margin=margin, scale=True, **PACK),
         ])
     except Exception:
         layers = value.data.uv_layers
@@ -397,8 +417,7 @@ def texel_density(p):
     if pack:
         edit_uvs(value, label, [
             lambda: bpy.ops.uv.select_all(action="SELECT"),
-            lambda: bpy.ops.uv.pack_islands(margin=0.002, margin_method="FRACTION", rotate=True,
-                                            scale=False, shape_method="CONCAVE"),
+            lambda: bpy.ops.uv.pack_islands(margin=0.002, scale=False, **PACK),
         ])
         layer = value.data.uv_layers[label]
     after = density(points, uv_triangles(value.data, layer), (size, size))
@@ -453,10 +472,14 @@ def hull(points, limit):
         try:
             verts = [bm.verts.new(point) for point in points.tolist()]
             result = bmesh.ops.convex_hull(bm, input=verts)
-            extra = [v for v in result["geom_interior"] + result["geom_unused"]
-                     if isinstance(v, bmesh.types.BMVert)]
-            bmesh.ops.delete(bm, geom=extra, context="VERTS")
-            if len(bm.faces) < 4:
+            # Blender 5.2 repeats vertices across these slots.
+            extra = dict.fromkeys(
+                item for key in ("geom_interior", "geom_unused", "geom_holes")
+                for item in result[key] if isinstance(item, bmesh.types.BMVert) and item.is_valid)
+            bmesh.ops.delete(bm, geom=list(extra), context="VERTS")
+            bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
+            bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+            if len(bm.faces) < 4 or not all(e.is_manifold for e in bm.edges):
                 return None
             kept = np.array([v.co[:] for v in bm.verts])
             if len(kept) <= limit:
