@@ -41,7 +41,7 @@ scipy==1.17.1
 sympy==1.14.0
 tifffile==2026.3.3
 tokenizers==0.20.3
-torch==2.7.1
+torch==2.15.0
 tqdm==4.70.1
 transformers==4.46.3
 trimesh==4.0.5
