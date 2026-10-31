@@ -59,6 +59,9 @@ OPERATIONS = frozenset(
         "export_asset",
         "review_sheet",
         "scatter",
+        "create_terrain",
+        "place_objects",
+        "snap_to_surface",
     }
 )
 LEASE_FREE = frozenset(
@@ -102,6 +105,9 @@ SLOW_OPERATIONS = frozenset(
         "export_asset",
         "review_sheet",
         "scatter",
+        "create_terrain",
+        "place_objects",
+        "snap_to_surface",
     }
 )
 LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "retarget_rig"})
