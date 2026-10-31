@@ -43,7 +43,7 @@ wheels = [
 
 [[package]]
 name = "cavi-blender-mcp"
-version = "0.18.0"
+version = "0.19.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },

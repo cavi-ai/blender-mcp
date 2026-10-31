@@ -133,6 +133,26 @@ class RigSurfaceTests(unittest.TestCase):
                                         bake_pair=server.BakePair(high=["H"], low=["L"]),
                                         animations=True))
 
+    def test_animation_qa_maps_to_inspect_rig(self):
+        calls = self.capture()
+        asyncio.run(server.inspect_rig("Rig", ["Skin"], action="Walk",
+                                       checks=["root_motion", "loop", "deformation"],
+                                       samples=8))
+        self.assertEqual(calls, [("inspect_rig", {
+            "armature": "Rig", "meshes": ["Skin"], "max_influences": 4,
+            "action": "Walk", "checks": ["root_motion", "loop", "deformation"],
+            "samples": 8})])
+
+    def test_animation_qa_parameters_are_bounded(self):
+        for arguments in (
+            {"armature": "Rig", "meshes": ["Skin"], "checks": ["foot_slide"]},
+            {"armature": "Rig", "meshes": ["Skin"], "samples": 1},
+            {"armature": "Rig", "meshes": ["Skin"], "samples": 33},
+            {"armature": "Rig", "meshes": ["Skin"], "action": ""},
+        ):
+            with self.assertRaisesRegex(Exception, "validation error"):
+                asyncio.run(server.mcp.call_tool("inspect_rig", arguments))
+
     def test_invalid_bone_and_weight_inputs_are_bounded(self):
         for arguments in (
             {"action": "create", "name": "Rig", "bones": [{

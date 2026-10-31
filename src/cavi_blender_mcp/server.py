@@ -147,15 +147,20 @@ async def inspect_rig(
     armature: ObjectName,
     meshes: Annotated[list[ObjectName], Field(min_length=1, max_length=8)],
     max_influences: Annotated[StrictInt, Field(ge=1, le=32)] = 4,
+    action: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    checks: Annotated[list[Literal["root_motion", "loop", "deformation"]] | None,
+                      Field(max_length=3)] = None,
+    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 8,
 ) -> dict[str, Any]:
     """Inspect skin weights, rest bones and linked clips without changing action or pose.
 
     Exact meshes must each have one vertex-group armature modifier bound to the rig.
     Influence limit is a caller-selected target, not a universal engine requirement.
-    This does not validate animation deformation or exported bindings.
+    checks: root_motion, loop and deformation sample the named or active action.
     """
     return await run(call, "inspect_rig", armature=armature, meshes=meshes,
-                     max_influences=max_influences)
+                     max_influences=max_influences, action=action,
+                     checks=checks or [], samples=samples)
 
 
 @mcp.tool(annotations=MUTATING)
