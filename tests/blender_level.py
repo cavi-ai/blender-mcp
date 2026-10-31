@@ -1,6 +1,7 @@
 """Native terrain, placement and surface-snap checks."""
 
 import json
+import resource
 import sys
 import tempfile
 from pathlib import Path
@@ -29,7 +30,23 @@ def refused(operation, message, **params):
         raise AssertionError(f"{operation} accepted {params}")
 
 
+def peak_mb():
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
+
+
 try:
+    # The densest noise request must not allocate a lattice finer than the mesh.
+    baseline = peak_mb()
+    dense = bridge.dispatch("create_terrain", {
+        "name": "DenseTerrain", "resolution": 501, "octaves": 8, "frequency": 64,
+        "lease_id": lease})
+    assert dense["vertices"] == 501 * 501, dense
+    assert peak_mb() - baseline < 400, f"peak grew {peak_mb() - baseline:.0f} MB"
+    dense_mesh = bpy.data.objects["DenseTerrain"].data
+    bpy.data.objects.remove(bpy.data.objects["DenseTerrain"], do_unlink=True)
+    bpy.data.meshes.remove(dense_mesh)
+
     terrain = bridge.dispatch("create_terrain", {
         "name": "LevelTerrain", "size": [20, 10], "height": 4, "resolution": 9,
         "seed": 3, "octaves": 3, "frequency": 3, "lease_id": lease})
@@ -121,6 +138,24 @@ try:
         {"source": "LevelProp", "name": "ZeroScale", "scale": [0, 1, 1]}])
     refused("place_objects", "does not exist", placements=[
         {"source": "MissingProp", "name": "Missing"}])
+
+    # A placement that fails part-way leaves no objects and no new collection.
+    from cavi_blender_mcp import blender_level
+
+    class FailingMatrix:
+        @staticmethod
+        def LocRotScale(*args):
+            raise RuntimeError("placement failed")
+
+    original_matrix = blender_level.Matrix
+    blender_level.Matrix = FailingMatrix
+    try:
+        refused("place_objects", "placement failed", collection="RolledBackProps",
+                placements=[{"source": "LevelProp", "name": "NeverPlaced"}])
+    finally:
+        blender_level.Matrix = original_matrix
+    assert "NeverPlaced" not in bpy.data.objects
+    assert "RolledBackProps" not in bpy.data.collections
     refused("snap_to_surface", "No terrain surface", names=["LevelProp"],
             terrain="ImageTerrain")
     refused("snap_to_surface", "itself", names=["LevelTerrain"],
