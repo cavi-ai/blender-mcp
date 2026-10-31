@@ -154,6 +154,11 @@ def info(value):
             shape_key_names=([block.name for block in
                               value.data.shape_keys.key_blocks[1:]][:64]
                              if value.data.shape_keys is not None else []),
+            shape_key_action=(
+                value.data.shape_keys.animation_data.action.name
+                if value.data.shape_keys is not None
+                and value.data.shape_keys.animation_data is not None
+                and value.data.shape_keys.animation_data.action is not None else None),
         )
     return result
 
@@ -377,6 +382,31 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
                                          "names": names})
             result["shape_key_meshes"] = shape_key_meshes
             result["morph_targets"] = morph_targets
+            shape_key_animations = []
+            for item in meshes:
+                keys = item.data.shape_keys
+                if keys is None or keys.animation_data is None:
+                    continue
+                animation = keys.animation_data
+                linked = []
+                if animation.action is not None:
+                    linked.append((animation.action, "active", animation.action_slot))
+                for track in animation.nla_tracks:
+                    for strip in track.strips:
+                        if strip.action is not None:
+                            linked.append((strip.action, "nla:" + track.name,
+                                           strip.action_slot))
+                for action, binding, slot in linked:
+                    start, end = action.frame_range
+                    if not math.isfinite(start) or not math.isfinite(end) or end < start:
+                        raise RuntimeError("Imported shape-key action has an invalid frame range")
+                    shape_key_animations.append({
+                        "name": action.name, "mesh": item.name, "binding": binding,
+                        "frame_range": list(action.frame_range),
+                        "slot": slot.identifier if slot else None})
+                    if len(shape_key_animations) > 32:
+                        raise RuntimeError("Imported shape-key actions exceed the import budget")
+            result["shape_key_animations"] = shape_key_animations
         return result
     except Exception:
         for key in pools:

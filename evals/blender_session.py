@@ -62,6 +62,21 @@ result = bpy.ops.export_scene.gltf(
 assert "FINISHED" in result
 for value in bpy.context.selected_objects:
     value.select_set(False)
+morph_key = morph.data.shape_keys.key_blocks["Expand"]
+morph_key.value = 0
+morph_key.keyframe_insert("value", frame=1)
+morph_key.value = 1
+morph_key.keyframe_insert("value", frame=11)
+morph.select_set(True)
+bpy.context.view_layer.objects.active = morph
+result = bpy.ops.export_scene.gltf(
+    filepath=str(Path(os.environ["CAVI_BLENDER_WORKSPACE"]) / "morph-anim.glb"),
+    export_format="GLB", use_selection=True, export_apply=True,
+    export_animations=True, export_morph=True, export_morph_animation=True,
+    export_animation_mode="ACTIONS")
+assert "FINISHED" in result
+for value in bpy.context.selected_objects:
+    value.select_set(False)
 
 for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
                              ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),

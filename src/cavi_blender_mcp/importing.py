@@ -351,9 +351,20 @@ def inspect_glb(workspace, name):
             if type(node) is not int or not 0 <= node < len(nodes):
                 raise ValueError("Animation target references an invalid node")
             target_path = target.get("path")
-            if target_path not in {"translation", "rotation", "scale"}:
-                raise ValueError("Animation targets must be translation, rotation or scale")
-            paths.setdefault(sampler, set()).add(target_path)
+            if target_path not in {"translation", "rotation", "scale", "weights"}:
+                raise ValueError(
+                    "Animation targets must be translation, rotation, scale or weights")
+            target_count = 1
+            if target_path == "weights":
+                if "mesh" not in nodes[node]:
+                    raise ValueError("Weight animation targets need a mesh")
+                mesh_index = nodes[node]["mesh"]
+                if type(mesh_index) is not int or not 0 <= mesh_index < len(mesh_targets):
+                    raise ValueError("Weight animation target references an invalid mesh")
+                target_count = mesh_targets[mesh_index]
+                if target_count <= 0:
+                    raise ValueError("Weight animation targets need morph targets")
+            paths.setdefault(sampler, set()).add((target_path, target_count))
         clip_keys = 0
         for index, sampler in enumerate(samplers):
             if not isinstance(sampler, dict):
@@ -371,14 +382,21 @@ def inspect_glb(workspace, name):
             interpolation = sampler.get("interpolation", "LINEAR")
             if interpolation not in {"LINEAR", "STEP", "CUBICSPLINE"}:
                 raise ValueError("Unsupported animation interpolation")
-            expected = count * 3 if interpolation == "CUBICSPLINE" else count
-            if output_accessor.get("count") != expected:
-                raise ValueError("Animation output count does not match its input")
+            path_info = None
             if index in paths:
                 if len(paths[index]) != 1:
                     raise ValueError("Animation samplers cannot mix target paths")
-                target_path = next(iter(paths[index]))
-                expected_type = "VEC4" if target_path == "rotation" else "VEC3"
+                path_info = next(iter(paths[index]))
+            target_count = path_info[1] if path_info else 1
+            expected = count * target_count
+            if interpolation == "CUBICSPLINE":
+                expected *= 3
+            if output_accessor.get("count") != expected:
+                raise ValueError("Animation output count does not match its input")
+            if path_info is not None:
+                target_path = path_info[0]
+                expected_type = ("VEC4" if target_path == "rotation"
+                                 else "SCALAR" if target_path == "weights" else "VEC3")
                 if output_accessor.get("type") != expected_type:
                     raise ValueError("Animation output type does not match its target")
             clip_keys += count

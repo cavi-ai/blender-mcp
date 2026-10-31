@@ -51,6 +51,19 @@ def morphed():
     return document
 
 
+def morph_animated():
+    document = morphed()
+    document["accessors"] += [
+        {"componentType": 5126, "count": 2, "type": "SCALAR"},
+        {"componentType": 5126, "count": 2, "type": "SCALAR"},
+    ]
+    document["animations"] = [{
+        "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}],
+        "samplers": [{"input": 3, "output": 4, "interpolation": "LINEAR"}],
+    }]
+    return document
+
+
 def animated():
     document = triangle()
     document["buffers"][0]["byteLength"] = 4096
@@ -340,7 +353,58 @@ class ImportPreflightTests(unittest.TestCase):
 
             document = animated()
             document["animations"][0]["channels"][0]["target"]["path"] = "weights"
-            cases.append((document, "translation, rotation or scale"))
+            cases.append((document, "morph targets"))
+
+            for index, (document, message) in enumerate(cases):
+                with self.subTest(case=index):
+                    write_glb(root / "prop.glb", document,
+                              b"\x00" * document["buffers"][0]["byteLength"])
+                    with self.assertRaisesRegex(ValueError, message):
+                        inspect_glb(root, "prop.glb")
+
+    def test_morph_animations_are_bounded(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            write_glb(root / "prop.glb", morph_animated(), b"\x00" * 1024)
+            report = inspect_glb(root, "prop.glb")
+            self.assertEqual(report["animations"], 1)
+
+    def test_malformed_morph_animations_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cases = []
+
+            document = morph_animated()
+            document["accessors"][4]["type"] = "VEC3"
+            cases.append((document, "output type"))
+
+            document = morph_animated()
+            document["accessors"][4]["count"] = 4
+            cases.append((document, "output count"))
+
+            document = morph_animated()
+            document["nodes"].append({"name": "Empty"})
+            document["animations"][0]["channels"][0]["target"]["node"] = 1
+            cases.append((document, "need a mesh"))
+
+            document = triangle()
+            document["accessors"] += [
+                {"componentType": 5126, "count": 2, "type": "SCALAR"},
+                {"componentType": 5126, "count": 2, "type": "SCALAR"},
+            ]
+            document["animations"] = [{
+                "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}],
+                "samplers": [{"input": 2, "output": 3, "interpolation": "LINEAR"}],
+            }]
+            cases.append((document, "morph targets"))
+
+            document = morph_animated()
+            document["animations"][0]["samplers"][0]["interpolation"] = "CUBICSPLINE"
+            cases.append((document, "output count"))
 
             for index, (document, message) in enumerate(cases):
                 with self.subTest(case=index):
@@ -374,7 +438,7 @@ class ImportPreflightTests(unittest.TestCase):
 
             document = animated()
             document["animations"][0]["channels"][0]["target"]["path"] = "weights"
-            cases.append((document, "translation, rotation or scale"))
+            cases.append((document, "morph targets"))
 
             document = animated()
             document["accessors"][2]["type"] = "VEC3"
