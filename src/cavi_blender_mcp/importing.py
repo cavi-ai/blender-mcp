@@ -7,6 +7,7 @@ import struct
 from pathlib import Path
 
 MAX_BYTES = 64 * 1024 * 1024
+MAX_FBX_BYTES = 64 * 1024 * 1024
 MAX_GEOMETRY = 500_000
 MAX_SKINS = 16
 MAX_JOINTS = 512
@@ -332,3 +333,25 @@ def inspect_glb(workspace, name):
             "joints": total_joints, "skinned_meshes": len(skinned_meshes),
             "animations": len(animations), "animation_channels": total_channels,
             "animation_keys": total_keys}
+
+
+def inspect_fbx(workspace, name):
+    root = Path(workspace).expanduser().resolve(strict=True)
+    try:
+        path = (root / name).resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise ValueError("FBX does not exist inside the workspace") from exc
+    if Path(name).is_absolute() or not path.is_relative_to(root):
+        raise ValueError("Input must stay inside the workspace")
+    if path.suffix.lower() != ".fbx" or not path.is_file():
+        raise ValueError("Input must be an FBX file")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_FBX_BYTES + 1)
+    if not 27 <= len(data) <= MAX_FBX_BYTES:
+        raise ValueError("FBX must be at most 64 MiB")
+    binary = data.startswith(b"Kaydara FBX Binary")
+    ascii_file = data.lstrip().startswith(b";") and b"FBX" in data[:1024]
+    if not (binary or ascii_file):
+        raise ValueError("Expected an ASCII or binary FBX file")
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+            "format": "fbx", "binary": binary}

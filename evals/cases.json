@@ -4456,5 +4456,77 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "fbx-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.fbx",
+      "name": "ImportedFbx"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/format": "fbx",
+      "/binary": true
+    },
+    "required": [
+      "/imported_vertices",
+      "/imported_triangles",
+      "/objects/0/name"
+    ]
+  },
+  {
+    "id": "fbx-import-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "prop.fbx",
+      "name": "ImportedFbx"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
+  },
+  {
+    "id": "rigged-fbx-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "rigged.fbx",
+      "name": "RiggedFbxImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/format": "fbx",
+      "/bone_count": 1,
+      "/armatures/0": "RiggedFbxImport"
+    },
+    "required": [
+      "/skinned_meshes/0",
+      "/imported_vertices"
+    ]
+  },
+  {
+    "id": "fbx-animated-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "eval-anim.fbx",
+      "name": "AnimatedFbxImport"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "animated import workflow"
   }
 ]

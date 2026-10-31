@@ -54,6 +54,42 @@ def animated():
     return document
 
 
+class FbxPreflightTests(unittest.TestCase):
+    def test_binary_and_ascii_fbx_headers_are_hashed(self):
+        from cavi_blender_mcp.importing import inspect_fbx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name, content, binary in (
+                ("binary.fbx", b"Kaydara FBX Binary  \x00\x1a\x00" + b"\x00" * 64, True),
+                ("ascii.fbx", b"; FBX 7.4.0 project file\n" + b"\x00" * 64, False),
+            ):
+                (root / name).write_bytes(content)
+                report = inspect_fbx(root, name)
+                self.assertEqual(report["format"], "fbx")
+                self.assertEqual(report["binary"], binary)
+                self.assertEqual(len(report["sha256"]), 64)
+
+    def test_bad_extension_header_and_workspace_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_fbx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "model.obj").write_bytes(b"Kaydara FBX Binary")
+            (root / "bad.fbx").write_bytes(b"not an fbx file")
+            with self.assertRaisesRegex(ValueError, "FBX"):
+                inspect_fbx(root, "model.obj")
+            with self.assertRaisesRegex(ValueError, "FBX"):
+                inspect_fbx(root, "bad.fbx")
+            with tempfile.TemporaryDirectory() as outside:
+                target = Path(outside) / "outside.fbx"
+                target.write_bytes(b"Kaydara FBX Binary  \x00")
+                (root / "escape.fbx").symlink_to(target)
+                for name in ("../outside.fbx", "escape.fbx", str(target)):
+                    with self.subTest(name=name), self.assertRaisesRegex(ValueError, "workspace"):
+                        inspect_fbx(root, name)
+
+
 class ImportPreflightTests(unittest.TestCase):
     def test_node_cycles_are_refused_before_blender_traverses_them(self):
         from cavi_blender_mcp.importing import inspect_glb
