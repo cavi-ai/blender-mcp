@@ -29,6 +29,10 @@ jobs:
       - run: uv run --locked python -m scripts.docs.build
       - run: uv run --locked python -m scripts.docs.verify
       - run: uv build
+      - name: Resolve the local-generation requirements
+        run: |
+          uv venv --python 3.11 "$RUNNER_TEMP/neural"
+          uv pip install --dry-run --python "$RUNNER_TEMP/neural" -r requirements-neural.txt
       - uses: actions/setup-node@v7
         with:
           node-version: '22'

@@ -34,13 +34,13 @@ The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
 
 ## MCP client
 
-Register the installed entry point with absolute paths:
+Register the installed entry point and pass the variables through `env`:
 
 ```json
 {
   "mcpServers": {
     "blender": {
-      "command": "/path/to/blender-mcp/.venv/bin/cavi-blender-mcp",
+      "command": "cavi-blender-mcp",
       "env": {
         "CAVI_BLENDER_CONNECTION": "/Users/me/.cavi/blender-mcp/connection.json",
         "CAVI_BLENDER_WORKSPACE": "/Users/me/Documents/CaviBlender"

@@ -14,8 +14,8 @@ whether it executed.
 `Blender bridge is not running; start Blender with the bridge` means no private
 connection file was found.
 
-- Start Blender with `scripts/start_bridge.py`, or run
-  `cavi-blender-mcp runtime start`.
+- Run `cavi-blender-mcp runtime start`, or from a source checkout start Blender
+  with `scripts/start_bridge.py`.
 - Confirm the MCP server and Blender use the same `CAVI_BLENDER_CONNECTION`.
 - If a stale pid was found, the connection file is removed automatically.
 

@@ -18,6 +18,9 @@ All notable changes to this project are documented here. The format follows
   tooling for cavi-ai.xyz.
 - Release workflow that publishes the docs artifact and dispatches it to
   `cavi-ai/cavi-home`.
+- PyPI publishing for `cavi-blender-mcp` on release tags; install it with
+  `uv tool install cavi-blender-mcp` and start Blender with
+  `cavi-blender-mcp runtime start`.
 - License, security policy, contribution guide, code of conduct, issue forms,
   pull request template, Dependabot configuration and `CHANGELOG.md`.
 - Unit tests for docs builds, navigation coverage, README links and artifact
@@ -41,10 +44,15 @@ All notable changes to this project are documented here. The format follows
   the resolution produce different heights than before.
 - A placement that fails part-way removes every copy it made and the collection
   it created or linked.
+- `requirements-neural.txt` installs again: `opencv-python-headless`, `mpmath`
+  and `rembg` are pinned to releases compatible with `numpy` 1.26.4 and
+  `sympy`, and CI resolves the file on every change.
 - Bridge client rejects malformed responses and HTTP protocol failures with a
   stable diagnostic instead of leaking parser exceptions.
 - GLB preflight bounds nested JSON and validates embedded image buffer views.
 - Empty connection and workspace environment variables fall back to defaults.
+- The package requires `mcp` below 2.0, so an install from PyPI no longer
+  resolves an `mcp` release without the server API it uses.
 
 ## 0.20.0 — 2026-10-31
 
