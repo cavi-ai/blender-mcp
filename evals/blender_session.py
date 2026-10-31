@@ -33,6 +33,15 @@ bpy.ops.mesh.primitive_uv_sphere_add(location=(60, 0, 0))
 bpy.context.object.name = bpy.context.object.data.name = "RigMesh"
 bpy.ops.mesh.primitive_uv_sphere_add(location=(60, 5, 0))
 bpy.context.object.name = bpy.context.object.data.name = "RigMeshUnbound"
+bpy.ops.mesh.primitive_cube_add(location=(70, 0, 0))
+bpy.context.object.name = bpy.context.object.data.name = "BakeLow"
+bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=1.2,
+                                     location=(70, 0, 0))
+bpy.context.object.name = bpy.context.object.data.name = "BakeHigh"
+bpy.ops.mesh.primitive_cube_add(location=(70, 5, 0))
+bpy.context.object.name = bpy.context.object.data.name = "BakeNoUV"
+for layer in list(bpy.data.objects["BakeNoUV"].data.uv_layers):
+    bpy.data.objects["BakeNoUV"].data.uv_layers.remove(layer)
 
 for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
                              ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),
