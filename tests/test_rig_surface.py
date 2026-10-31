@@ -70,6 +70,69 @@ class RigSurfaceTests(unittest.TestCase):
                 asyncio.run(coroutine)
         self.assertEqual(calls, [])
 
+    def test_pose_and_keyframe_actions_map_to_owned_operations(self):
+        calls = self.capture()
+        pose = server.PoseSpec(bone="Spine", rotation_degrees=(0, 0, 45))
+        asyncio.run(server.rig_edit("pose", "Rig", poses=[pose], frame=5, reset=True,
+                                    lease_id="L"))
+        keyframe = server.KeyframeSpec(frame=1, poses=[pose])
+        asyncio.run(server.rig_edit("keyframe", "Rig", action_name="Walk",
+                                    keyframes=[keyframe], lease_id="L"))
+        asyncio.run(server.rig_edit("clear_pose", "Rig", frame=1, lease_id="L"))
+        operations = self.inner(calls)
+        self.assertEqual(operations[0], ("pose_rig", {
+            "lease_id": "L", "name": "Rig", "frame": 5, "reset": True,
+            "poses": [{"bone": "Spine", "rotation_degrees": (0, 0, 45),
+                       "location": None, "scale": None}]}))
+        self.assertEqual(operations[1], ("keyframe_rig", {
+            "lease_id": "L", "name": "Rig", "action_name": "Walk",
+            "keyframes": [{"frame": 1, "poses": [{
+                "bone": "Spine", "rotation_degrees": (0, 0, 45),
+                "location": None, "scale": None}]}]}))
+        self.assertEqual(operations[2], ("clear_pose", {"lease_id": "L", "name": "Rig",
+                                                        "frame": 1}))
+
+    def test_animation_parameters_are_checked_before_the_bridge(self):
+        calls = self.capture()
+        pose = server.PoseSpec(bone="Spine", rotation_degrees=(0, 0, 45))
+        keyframe = server.KeyframeSpec(frame=1, poses=[pose])
+        for coroutine, message in [
+            (server.rig_edit("pose", "Rig"), "requires: poses"),
+            (server.rig_edit("keyframe", "Rig", keyframes=[keyframe]),
+             "requires: action_name"),
+            (server.rig_edit("keyframe", "Rig", action_name="Walk"),
+             "requires: keyframes"),
+            (server.rig_edit("clear_pose", "Rig", poses=[pose]), "does not accept: poses"),
+            (server.rig_edit("pose", "Rig", poses=[pose], keyframes=[keyframe]),
+             "does not accept: keyframes"),
+        ]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                asyncio.run(coroutine)
+        self.assertEqual(calls, [])
+
+    def test_invalid_animation_inputs_are_bounded(self):
+        for arguments in (
+            {"action": "keyframe", "name": "Rig", "action_name": "Walk",
+             "keyframes": [{"frame": 0, "poses": [{"bone": "Spine",
+                                                    "rotation_degrees": [0, 0, 1]}]}]},
+            {"action": "keyframe", "name": "Rig", "action_name": "Walk",
+             "keyframes": [{"frame": 1, "poses": []}]},
+        ):
+            with self.assertRaisesRegex(Exception, "validation error"):
+                asyncio.run(server.mcp.call_tool("rig_edit", arguments))
+
+    def test_animated_export_routes_to_export_asset(self):
+        calls = self.capture()
+        asyncio.run(server.asset_io("export", "a.fbx", names=["A"], animations=True,
+                                    lease_id="L"))
+        operation, params = self.inner(calls)[0]
+        self.assertEqual(operation, "export_asset")
+        self.assertTrue(params["animations"])
+        with self.assertRaisesRegex(ValueError, "does not accept: animations"):
+            asyncio.run(server.asset_io("export", "p.fbx", lease_id="L",
+                                        bake_pair=server.BakePair(high=["H"], low=["L"]),
+                                        animations=True))
+
     def test_invalid_bone_and_weight_inputs_are_bounded(self):
         for arguments in (
             {"action": "create", "name": "Rig", "bones": [{
