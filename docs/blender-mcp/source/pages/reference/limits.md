@@ -120,7 +120,21 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | OBJ material libraries | 16 |
 | OBJ textures | 64 |
 | USD asset references | 128 |
-| FBX sidecar textures | 64 files, 64 MiB |
+| FBX and USD sidecar textures | 64 files, 64 MiB |
+
+## Levels and assembly
+
+| Limit | Value |
+| --- | --- |
+| Terrain resolution | 2–501 vertices per side |
+| Terrain triangles | 500,000 |
+| Terrain size | 0.01–10,000 per axis |
+| Terrain height | 0.01–1000 |
+| Terrain image | PNG/JPEG, 16 MiB, 4096² |
+| Placements per call | 256 |
+| Placement scale | Above 0 to 10,000 per axis |
+| Snap objects per call | 256 |
+| Snap offset | -1000 to 1000 |
 
 ## Levels and assembly
 

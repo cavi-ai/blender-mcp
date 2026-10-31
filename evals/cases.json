@@ -4307,12 +4307,19 @@
       ],
       "animations": true
     },
-    "kind": "safety",
+    "kind": "success",
     "modes": [
       "native"
     ],
-    "error": "FBX and GLB",
-    "absent": [
+    "equals": {
+      "/armatures/0": "EvalRigNew",
+      "/skinned_meshes/0": "RigMesh",
+      "/animations/0/name": "EvalWalk"
+    },
+    "required": [
+      "/animations/0/frame_range/1"
+    ],
+    "files": [
       "eval-anim.usdc"
     ]
   },
@@ -5390,23 +5397,26 @@
     ]
   },
   {
-    "id": "textures-usd-refused",
+    "id": "export-usd-textures",
     "tool": "asset_io",
     "arguments": {
       "action": "export",
-      "path": "eval-textures.usdc",
+      "path": "eval-usd-textures.usdc",
       "names": [
         "MaterialTarget"
       ],
       "textures": true
     },
-    "kind": "safety",
+    "kind": "success",
     "modes": [
       "native"
     ],
-    "error": "FBX",
-    "absent": [
-      "eval-textures.usdc"
+    "required": [
+      "/textures/0/name",
+      "/textures/0/path"
+    ],
+    "files": [
+      "eval-usd-textures.usdc"
     ]
   },
   {

@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format follows
 
 - `level_edit` for heightmap or procedural terrain, bulk object placement and
   surface snapping with bounded terrain and assembly budgets.
+- USD texture sidecars through `asset_io` `textures=true`, with copied images,
+  relative texture paths and a receipt.
+- USD export of armature and shape-key animation through `asset_io`
+  `animations=true`.
 - Versioned documentation source, build, verification and release artifact
   tooling for cavi-ai.xyz.
 - Release workflow that publishes the docs artifact and dispatches it to

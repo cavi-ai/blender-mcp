@@ -89,15 +89,18 @@ class AAASurfaceTests(unittest.TestCase):
         asyncio.run(server.asset_io("export", "a.usdc", names=["R"], lease_id="L"))
         asyncio.run(server.asset_io("export", "t.fbx", names=["R"], textures=True,
                                     lease_id="L"))
+        asyncio.run(server.asset_io("export", "t.usdc", names=["R"], textures=True,
+                                    lease_id="L"))
         asyncio.run(server.asset_io("export", "p.fbx", lease_id="L",
                                     bake_pair=server.BakePair(high=["H"], low=["R"])))
         ops = self.inner(calls)
         self.assertEqual([op for op, _ in ops],
                          ["export_mesh", "export_asset", "export_asset", "export_asset",
-                          "export_asset"])
+                          "export_asset", "export_asset"])
         self.assertNotIn("lods", ops[0][1])
         self.assertTrue(ops[3][1]["textures"])
-        self.assertEqual(ops[4][1]["bake_pair"], {"high": ["H"], "low": ["R"]})
+        self.assertTrue(ops[4][1]["textures"])
+        self.assertEqual(ops[5][1]["bake_pair"], {"high": ["H"], "low": ["R"]})
 
     def test_review_sheet_needs_no_lease_and_scatter_is_owned(self):
         calls = self.capture()

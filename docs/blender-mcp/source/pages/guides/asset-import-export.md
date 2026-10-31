@@ -58,14 +58,15 @@ Formats are `.fbx`, `.glb`, `.usd`, `.usda` and `.usdc`.
   or USD sources with matching distinct material slots.
 - `include_empties=true` adds empty ancestors and empty descendants such as
   sockets.
-- `animations=true` applies to FBX and GLB only. It includes the armatures of the
-  named skinned meshes and exports every linked action. It refuses LODs,
-  collision, instances and pair baking.
-- `textures=true` applies to FBX only. It copies used images into a new
-  `<stem>.fbm` directory beside the FBX and returns a texture receipt. An
-  existing sidecar directory is refused. GLB embeds packed textures.
-- GLB exports include shape keys/morph targets and shape-key animation. FBX and
-  USD shape-key animation remain out of scope.
+- `animations=true` applies to FBX, GLB and USD. It includes the armatures of the
+  named skinned meshes and exports every linked action. GLB and USD also export
+  shape-key actions. It refuses LODs, collision, instances and pair baking.
+- `textures=true` applies to FBX and USD. It copies used images into a new
+  `<stem>.fbm` directory beside the export and returns a texture receipt. An
+  existing sidecar directory is refused. USD writes relative texture paths. GLB
+  embeds packed textures.
+- GLB and USD exports include shape keys/morph targets and shape-key animation.
+  FBX shape-key animation remains out of scope.
 
 ### Axis presets
 

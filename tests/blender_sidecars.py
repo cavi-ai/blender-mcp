@@ -1,4 +1,4 @@
-"""Native FBX texture sidecar export and refusal checks."""
+"""Native FBX and USD texture sidecar export and refusal checks."""
 
 import json
 import sys
@@ -61,11 +61,29 @@ try:
         "names": ["SidecarCube"], "path": "plain.fbx", "lease_id": lease})
     assert plain["textures"] == [] and not (root / "plain.fbm").exists()
 
+    usd = bridge.dispatch("export_asset", {
+        "names": ["SidecarCube"], "path": "scene.usdc", "textures": True,
+        "lease_id": lease})
+    assert usd["bytes"] > 0 and usd["textures"], usd
+    usd_directory = root / "scene.fbm"
+    assert usd_directory.is_dir()
+    assert all(Path(item["path"]).is_file() for item in usd["textures"])
+    assert all(Path(item["path"]).resolve().is_relative_to(usd_directory.resolve())
+               for item in usd["textures"])
+
+    ascii_usd = bridge.dispatch("export_asset", {
+        "names": ["SidecarCube"], "path": "scene-ascii.usda", "textures": True,
+        "lease_id": lease})
+    assert ascii_usd["textures"]
+    assert b"@scene-ascii.fbm/" in (root / "scene-ascii.usda").read_bytes()
+    assert node.image.packed_file is not None
+    assert Path(node.image.filepath) == image_path
+
     (root / "existing.fbm").mkdir()
     refused("existing.fbx", "overwrite", names=["SidecarCube"], textures=True)
-    assert not (root / "existing.fbx").exists()
+    refused("existing.usdc", "overwrite", names=["SidecarCube"], textures=True)
+    assert not (root / "existing.fbx").exists() and not (root / "existing.usdc").exists()
     refused("model.glb", "FBX", names=["SidecarCube"], textures=True)
-    refused("model.usdc", "FBX", names=["SidecarCube"], textures=True)
 
     try:
         bridge.dispatch("export_asset", {
@@ -76,6 +94,7 @@ try:
 
     print(json.dumps({
         "textures": [item["name"] for item in export["textures"]],
+        "usd_textures": [item["name"] for item in usd["textures"]],
         "sidecar_dir": directory.name,
         "rollback": True,
     }))
