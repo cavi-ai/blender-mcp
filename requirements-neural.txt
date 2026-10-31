@@ -44,6 +44,6 @@ tokenizers==0.23.3
 torch==2.15.0
 tqdm==4.70.1
 transformers==5.21.0
-trimesh==4.0.5
+trimesh==5.2.0
 typing-extensions==4.16.0
 urllib3==2.8.0
