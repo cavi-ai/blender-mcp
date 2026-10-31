@@ -12,6 +12,10 @@ MAX_SKINS = 16
 MAX_JOINTS = 512
 MAX_TOTAL_JOINTS = 1024
 MAX_SKINNED_MESHES = 64
+MAX_ANIMATIONS = 32
+MAX_CHANNELS = 1024
+MAX_KEYS_PER_CLIP = 100000
+MAX_TOTAL_KEYS = 256000
 
 
 def image_size(data):
@@ -67,8 +71,6 @@ def inspect_glb(workspace, name):
     binary = chunks[1][1]
     if not isinstance(document, dict) or document.get("asset", {}).get("version") != "2.0":
         raise ValueError("Expected glTF 2.0 in the GLB")
-    if document.get("animations"):
-        raise ValueError("Animation clips need the animated import workflow")
     if document.get("cameras"):
         raise ValueError("Cameras are not supported by the import preflight")
     if len(document.get("scenes", [])) != 1 or not 0 < len(document.get("nodes", [])) <= 1000:
@@ -232,6 +234,70 @@ def inspect_glb(workspace, name):
             skinned_vertices += count
     if skinned_vertices > MAX_GEOMETRY:
         raise ValueError("Skinned geometry exceeds the import budget")
+    animations = document.get("animations", [])
+    if not isinstance(animations, list) or len(animations) > MAX_ANIMATIONS:
+        raise ValueError(f"Imports are limited to {MAX_ANIMATIONS} animations")
+    total_channels = total_samplers = total_keys = 0
+    for animation in animations:
+        if not isinstance(animation, dict):
+            raise ValueError("Invalid animation definition")  # noqa: TRY004
+        channels, samplers = animation.get("channels"), animation.get("samplers")
+        if not isinstance(channels, list) or not channels:
+            raise ValueError("Animations need at least one channel")
+        if not isinstance(samplers, list) or not samplers:
+            raise ValueError("Animations need at least one sampler")
+        total_channels += len(channels)
+        total_samplers += len(samplers)
+        if total_channels > MAX_CHANNELS or total_samplers > MAX_CHANNELS:
+            raise ValueError(f"Imports are limited to {MAX_CHANNELS} animation channels")
+        paths = {}
+        for channel in channels:
+            if not isinstance(channel, dict):
+                raise ValueError("Invalid animation channel")  # noqa: TRY004
+            sampler = channel.get("sampler")
+            if type(sampler) is not int or not 0 <= sampler < len(samplers):
+                raise ValueError("Invalid animation sampler reference")
+            target = channel.get("target")
+            if not isinstance(target, dict):
+                raise ValueError("Invalid animation target")  # noqa: TRY004
+            node = target.get("node")
+            if type(node) is not int or not 0 <= node < len(nodes):
+                raise ValueError("Animation target references an invalid node")
+            target_path = target.get("path")
+            if target_path not in {"translation", "rotation", "scale"}:
+                raise ValueError("Animation targets must be translation, rotation or scale")
+            paths.setdefault(sampler, set()).add(target_path)
+        clip_keys = 0
+        for index, sampler in enumerate(samplers):
+            if not isinstance(sampler, dict):
+                raise ValueError("Invalid animation sampler")  # noqa: TRY004
+            input_accessor = accessor_at(sampler.get("input"))
+            output_accessor = accessor_at(sampler.get("output"))
+            if (input_accessor.get("type") != "SCALAR"
+                    or input_accessor.get("componentType") != 5126):
+                raise ValueError("Animation inputs must be FLOAT SCALAR accessors")
+            if output_accessor.get("componentType") != 5126:
+                raise ValueError("Animation outputs must be FLOAT accessors")
+            count = input_accessor.get("count")
+            if type(count) is not int or not 1 <= count <= MAX_KEYS_PER_CLIP:
+                raise ValueError(f"Animation clips are limited to {MAX_KEYS_PER_CLIP} keys")
+            interpolation = sampler.get("interpolation", "LINEAR")
+            if interpolation not in {"LINEAR", "STEP", "CUBICSPLINE"}:
+                raise ValueError("Unsupported animation interpolation")
+            expected = count * 3 if interpolation == "CUBICSPLINE" else count
+            if output_accessor.get("count") != expected:
+                raise ValueError("Animation output count does not match its input")
+            if index in paths:
+                if len(paths[index]) != 1:
+                    raise ValueError("Animation samplers cannot mix target paths")
+                target_path = next(iter(paths[index]))
+                expected_type = "VEC4" if target_path == "rotation" else "VEC3"
+                if output_accessor.get("type") != expected_type:
+                    raise ValueError("Animation output type does not match its target")
+            clip_keys += count
+        total_keys += clip_keys
+        if total_keys > MAX_TOTAL_KEYS:
+            raise ValueError(f"Imports are limited to {MAX_TOTAL_KEYS} animation keys")
     vertices = triangles = 0
     for node in document["nodes"]:
         if "mesh" in node:
@@ -263,4 +329,6 @@ def inspect_glb(workspace, name):
             raise ValueError("Embedded image dimensions exceed the import budget")
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "vertices": vertices, "triangles": triangles, "skins": len(skins),
-            "joints": total_joints, "skinned_meshes": len(skinned_meshes)}
+            "joints": total_joints, "skinned_meshes": len(skinned_meshes),
+            "animations": len(animations), "animation_channels": total_channels,
+            "animation_keys": total_keys}

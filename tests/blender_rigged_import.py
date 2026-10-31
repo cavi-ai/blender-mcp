@@ -100,29 +100,12 @@ try:
     for name in pools:
         assert set(getattr(bpy.data, name)) == snapshot[name], f"Failed import leaked {name}"
 
-    edit("keyframe_rig", name="RigImport", action_name="Wave", keyframes=[
-        {"frame": 1, "poses": [{"bone": "Spine", "rotation_degrees": [0, 0, 0]}]},
-        {"frame": 11, "poses": [{"bone": "Spine", "rotation_degrees": [0, 0, 45]}]},
-    ])
-    bridge.dispatch("export_asset", {
-        "names": ["RigMesh"], "path": "animated.glb", "animations": True, "lease_id": lease})
-    before_actions = set(bpy.data.actions)
-    try:
-        bridge.dispatch("import_mesh", {
-            "path": "animated.glb", "name": "AnimatedImport", "lease_id": lease})
-    except (ValueError, RuntimeError) as exc:
-        assert "animated import workflow" in str(exc)
-    else:
-        raise AssertionError("Animated GLB import bypassed the animated workflow")
-    assert set(bpy.data.actions) == before_actions
-
     print(json.dumps({
         "armature": imported_rig.name,
         "bones": len(imported_rig.data.bones),
         "skinned_meshes": imported["skinned_meshes"],
         "vertex_groups": len(imported_mesh.vertex_groups),
         "rollback": True,
-        "animation_refused": True,
     }))
 finally:
     folder.cleanup()
