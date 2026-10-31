@@ -22,7 +22,7 @@ numba==0.68.1
 numpy==1.26.4
 omegaconf==2.3.0
 onnxruntime==1.31.1
-opencv-python-headless==4.11.0.86
+opencv-python-headless==5.0.0.93
 packaging==26.3
 pillow==13.0.0
 platformdirs==4.14.0
