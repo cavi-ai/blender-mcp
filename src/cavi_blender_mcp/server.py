@@ -65,6 +65,20 @@ class BoneSpec(BaseModel):
     roll_degrees: Number = 0
 
 
+class PoseSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    bone: Annotated[str, Field(min_length=1, max_length=63)]
+    rotation_degrees: Vector3 | None = None
+    location: Vector3 | None = None
+    scale: Vector3 | None = None
+
+
+class KeyframeSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    frame: Annotated[StrictInt, Field(ge=1, le=1_000_000)]
+    poses: Annotated[list[PoseSpec], Field(min_length=1, max_length=128)]
+
+
 def call(operation_name, **params):
     client = BridgeClient()
     if operation_name not in LEASE_FREE:
@@ -145,7 +159,7 @@ async def inspect_rig(
 
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
-    action: Literal["create", "bind", "weights"],
+    action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -153,16 +167,25 @@ async def rig_edit(
     max_influences: Annotated[StrictInt | None, Field(ge=1, le=32)] = None,
     clean_threshold: Annotated[Number | None, Field(ge=0, le=1)] = None,
     normalize: StrictBool | None = None,
+    poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128)] = None,
+    keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32)] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
+    reset: StrictBool | None = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
-    """Create an armature, bind automatic weights, or repair skin weights.
+    """Create an armature, bind or repair weights, or author an animation.
 
     create: bones, location=(0,0,0); bind: name=armature, names=meshes;
-    weights: name=mesh, max_influences=4, clean_threshold=.0001, normalize=true.
+    weights: name=mesh, max_influences=4, clean_threshold=.0001, normalize=true;
+    pose: name=armature, poses, frame, reset=false;
+    keyframe: name=armature, action_name, keyframes=[{frame, poses}];
+    clear_pose: name=armature, frame.
     """
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
-              "normalize": normalize}
+              "normalize": normalize, "poses": poses, "keyframes": keyframes,
+              "action_name": action_name, "frame": frame, "reset": reset}
     if action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
@@ -170,10 +193,23 @@ async def rig_edit(
     elif action == "bind":
         operation = "bind_skin"
         params = pick(action, values, ["names"])
-    else:
+    elif action == "weights":
         operation = "repair_weights"
         params = pick(action, values, (), {
             "max_influences": 4, "clean_threshold": 0.0001, "normalize": True})
+    elif action == "pose":
+        operation = "pose_rig"
+        params = pick(action, values, ["poses"], {"frame": None, "reset": False})
+        params["poses"] = [pose.model_dump() for pose in params["poses"]]
+    elif action == "keyframe":
+        operation = "keyframe_rig"
+        params = pick(action, values, ["action_name", "keyframes"])
+        params["keyframes"] = [
+            {"frame": item.frame, "poses": [pose.model_dump() for pose in item.poses]}
+            for item in params["keyframes"]]
+    else:
+        operation = "clear_pose"
+        params = pick(action, values, (), {"frame": None})
     return await run(call, operation, lease_id=lease_id, name=name, **params)
 
 
@@ -488,19 +524,21 @@ async def asset_io(
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192)] = None,
     lods: StrictBool | None = None,
     collision: StrictBool | None = None,
+    animations: StrictBool | None = None,
     bake_pair: BakePair | None = None,
     axis: Literal["unity", "unreal", "godot"] | None = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Move assets in or out. Params per action:
     import: static GLB path, name (new prefix); export: names, .fbx/.glb/.usd path,
-    preserve_instances, include_empties, lods, collision, axis=unity; or bake_pair alone
-    (writes <stem>_low.fbx, <stem>_high.fbx); save: .blend path;
-    generate: image, .glb path, resolution=128 (local TripoSR, no lease).
+    preserve_instances, include_empties, lods, collision, animations (FBX/GLB only),
+    axis=unity; or bake_pair alone (writes <stem>_low.fbx, <stem>_high.fbx);
+    save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
-              "lods": lods, "collision": collision, "bake_pair": bake_pair, "axis": axis}
+              "lods": lods, "collision": collision, "animations": animations,
+              "bake_pair": bake_pair, "axis": axis}
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": 128})
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
@@ -517,11 +555,12 @@ async def asset_io(
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
     params = pick(action, values, ["names"], {"preserve_instances": False,
                                               "include_empties": False, "lods": False,
-                                              "collision": False, "axis": None})
-    if (params["lods"] or params["collision"] or params["axis"]
+                                              "collision": False, "animations": False,
+                                              "axis": None})
+    if (params["lods"] or params["collision"] or params["animations"] or params["axis"]
             or path.lower().endswith((".usd", ".usda", ".usdc"))):
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    for key in ("lods", "collision", "axis"):
+    for key in ("lods", "collision", "animations", "axis"):
         params.pop(key)
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"

@@ -32,11 +32,15 @@ def collision_objects(base):
     return found
 
 
-def fbx(path, preset, empties=False):
+def fbx(path, preset, empties=False, animations=False):
+    object_types = {"MESH", "EMPTY", "ARMATURE"} if animations else (
+        {"MESH", "EMPTY"} if empties else {"MESH"})
     return bpy.ops.export_scene.fbx(
-        filepath=str(path), use_selection=True,
-        object_types={"MESH", "EMPTY"} if empties else {"MESH"},
-        mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False, bake_anim=False,
+        filepath=str(path), use_selection=True, object_types=object_types,
+        mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False,
+        bake_anim=animations, bake_anim_use_all_bones=animations,
+        bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations,
+        bake_anim_force_startend_keying=animations,
         global_scale=1, path_mode="STRIP", **AXIS_PRESETS[preset])
 
 
@@ -51,17 +55,19 @@ def usd(path, preset, instances):
         export_global_up_selection=up)
 
 
-def write(path, objects, selection, preset, instances, empties):
+def write(path, objects, selection, preset, instances, empties, animations=False):
     suffix = path.suffix.lower()
     with selected(selection):
         if suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if instances else nullcontext():
-                result = fbx(path, preset, empties)
+                result = fbx(path, preset, empties, animations)
         elif suffix == ".glb":
-            result = bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB",
-                                               use_selection=True, export_apply=True)
+            result = bpy.ops.export_scene.gltf(
+                filepath=str(path), export_format="GLB", use_selection=True,
+                export_apply=not animations, export_animations=animations,
+                export_skins=animations, export_animation_mode="ACTIONS")
         else:
             result = usd(path, preset, instances)
     if "FINISHED" not in result:
@@ -84,12 +90,48 @@ def preset_for(p, suffix):
     return preset or "unity"
 
 
+def actions_for(rig):
+    found = []
+    animation = rig.animation_data
+    if animation:
+        if animation.action is not None:
+            found.append(animation.action)
+        for track in animation.nla_tracks:
+            for strip in track.strips:
+                if strip.type == "META":
+                    raise ValueError("Nested META NLA strips are not supported")
+                if strip.action is not None and strip.action not in found:
+                    found.append(strip.action)
+    return found
+
+
+def armatures_for(objects):
+    armatures = []
+    for value in objects:
+        modifiers = [modifier for modifier in value.modifiers
+                     if modifier.type == "ARMATURE" and modifier.object is not None]
+        if len(modifiers) != 1:
+            raise ValueError("Each animated mesh needs one armature modifier")
+        rig = modifiers[0].object
+        if rig.type != "ARMATURE":
+            raise ValueError("Animated meshes must bind to an armature")
+        if rig not in armatures:
+            armatures.append(rig)
+    if not armatures:
+        raise ValueError("Animated export needs at least one armature")
+    return armatures
+
+
 def export_asset(p):
     if p.get("bake_pair") is not None:
         return bake_pair(p)
     names = p.get("names")
-    if not isinstance(names, list) or not 1 <= len(names) <= 1000:
-        raise ValueError("Provide between 1 and 1000 mesh names")
+    animations = flag(p, "animations")
+    maximum = 64 if animations else 1000
+    if not isinstance(names, list) or not 1 <= len(names) <= maximum:
+        raise ValueError(f"Provide between 1 and {maximum} mesh names")
+    if animations and len(set(names)) != len(names):
+        raise ValueError("Animated exports need unique mesh names")
     suffix = Path(p["path"]).suffix.lower()
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
@@ -98,6 +140,11 @@ def export_asset(p):
     instances, empties = flag(p, "preserve_instances"), flag(p, "include_empties")
     if instances and suffix == ".glb":
         raise ValueError("preserve_instances applies to static FBX or USD exports")
+    if animations:
+        if suffix not in {".fbx", ".glb"}:
+            raise ValueError("animations apply to FBX and GLB exports")
+        if lods or collision or instances:
+            raise ValueError("animations cannot combine with lods, collision or instances")
     objects = []
     for name in names:
         value = obj(name, mesh=True)
@@ -110,6 +157,33 @@ def export_asset(p):
         for base in dict.fromkeys(base_name(item.name) for item in meshes):
             found += [item for item in collision_objects(base) if item not in objects]
         objects += found
+    if animations:
+        armatures = armatures_for(meshes)
+        vertices = sum(len(item.data.vertices) for item in meshes)
+        triangles = sum(sum(len(face.vertices) - 2 for face in item.data.polygons)
+                        for item in meshes)
+        if vertices > 100000 or triangles > 200000:
+            raise ValueError("Animated exports are limited to 100,000 vertices and 200,000 triangles")
+        actions = []
+        for rig in armatures:
+            if len(rig.data.bones) > 128:
+                raise ValueError("Animated exports are limited to 128 bones per armature")
+            linked = actions_for(rig)
+            if len(linked) > 32:
+                raise ValueError("Animated exports are limited to 32 actions")
+            actions += [{"name": action.name, "frame_range": list(action.frame_range),
+                         "armature": rig.name} for action in linked]
+        if not actions:
+            raise ValueError("No actions on the exported armatures")
+        selected_objects = objects + armatures
+        selection = with_empties(selected_objects) if empties else selected_objects
+        with output_file(p["path"], FORMATS) as path:
+            write(path, objects, selection, preset, False, empties, animations=True)
+        return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
+                "objects": [item.name for item in selected_objects],
+                "armatures": [item.name for item in armatures],
+                "skinned_meshes": [item.name for item in meshes],
+                "animations": actions}
     selection = with_empties(objects) if empties else list(objects)
     with output_file(p["path"], FORMATS) as path:
         write(path, meshes if instances else objects, selection, preset, instances, empties)
@@ -121,7 +195,7 @@ def export_asset(p):
 
 def bake_pair(p):
     if any(p.get(k) for k in ("names", "lods", "collision", "preserve_instances",
-                              "include_empties")):
+                              "include_empties", "animations")):
         raise ValueError("bake_pair is exported alone")
     pair = p["bake_pair"]
     if not isinstance(pair, dict) or set(pair) != {"high", "low"}:
