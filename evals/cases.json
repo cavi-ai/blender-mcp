@@ -4677,5 +4677,40 @@
       "native"
     ],
     "error": "workspace"
+  },
+  {
+    "id": "usd-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "layout.usdc",
+      "name": "ImportedUsd"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/format": "usd"
+    },
+    "required": [
+      "/imported_vertices",
+      "/imported_triangles",
+      "/objects/0/name"
+    ]
+  },
+  {
+    "id": "usd-import-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "layout.usdc",
+      "name": "ImportedUsd"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   }
 ]

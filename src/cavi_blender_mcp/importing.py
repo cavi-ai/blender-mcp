@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import re
 import struct
 from pathlib import Path
 
@@ -425,3 +426,53 @@ def inspect_obj(workspace, name):
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "format": "obj", "vertices": vertices, "faces": faces, "objects": objects,
             "mtllibs": sorted(mtllibs), "textures": textures}
+
+
+def inspect_usd(workspace, name):
+    root = Path(workspace).expanduser().resolve(strict=True)
+    try:
+        path = (root / name).resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise ValueError("USD does not exist inside the workspace") from exc
+    if Path(name).is_absolute() or not path.is_relative_to(root):
+        raise ValueError("Input must stay inside the workspace")
+    suffix = path.suffix.lower()
+    if suffix not in {".usd", ".usda", ".usdc"} or not path.is_file():
+        raise ValueError("Input must be a USD file")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_BYTES + 1)
+    if not 0 < len(data) <= MAX_BYTES:
+        raise ValueError("USD must be at most 64 MiB")
+    binary = data.startswith(b"PXR-USDC")
+    text_data = None
+    if suffix == ".usdc":
+        if not binary:
+            raise ValueError("Expected a binary USD container")
+    elif suffix == ".usda":
+        try:
+            text_data = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Expected an ASCII USD file") from exc
+        if not text_data.lstrip().startswith("#usda"):
+            raise ValueError("Expected an ASCII USD file")
+    elif not binary:
+        try:
+            text_data = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Expected an ASCII or binary USD file") from exc
+        if not text_data.lstrip().startswith("#usda"):
+            raise ValueError("Expected an ASCII or binary USD file")
+    references = 0
+    if text_data is not None:
+        for match in re.findall(r"@([^@\n]+)@", text_data):
+            item = match.strip()
+            if not item or item.startswith("anon:"):
+                continue
+            target = (path.parent / item).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                raise ValueError("USD assets must stay inside the workspace")
+            references += 1
+            if references > 128:
+                raise ValueError("USD assets are limited to 128 references")
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+            "format": "usd", "binary": binary, "asset_references": references}
