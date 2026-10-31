@@ -26,7 +26,7 @@ external asset download or remote inference.
   transforms, alpha modes and material QA.
 - **Baking**: normal and ambient-occlusion maps into a new workspace PNG.
 - **Assets**: bounded GLB, FBX, OBJ and USD import; static, skinned and animated
-  FBX/GLB export; USD export; Unity, Unreal and Godot axis presets; LOD groups,
+  FBX, GLB and USD export; Unity, Unreal and Godot axis presets; LOD groups,
   collision naming and bake pairs.
 - **Rigging**: armature creation, automatic skin binding, weight repair, pose
   authoring, action creation, animation QA and retargeting.

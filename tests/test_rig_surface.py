@@ -125,9 +125,11 @@ class RigSurfaceTests(unittest.TestCase):
         calls = self.capture()
         asyncio.run(server.asset_io("export", "a.fbx", names=["A"], animations=True,
                                     lease_id="L"))
-        operation, params = self.inner(calls)[0]
-        self.assertEqual(operation, "export_asset")
-        self.assertTrue(params["animations"])
+        asyncio.run(server.asset_io("export", "a.usdc", names=["A"], animations=True,
+                                    lease_id="L"))
+        for operation, params in self.inner(calls):
+            self.assertEqual(operation, "export_asset")
+            self.assertTrue(params["animations"])
         with self.assertRaisesRegex(ValueError, "does not accept: animations"):
             asyncio.run(server.asset_io("export", "p.fbx", lease_id="L",
                                         bake_pair=server.BakePair(high=["H"], low=["L"]),
