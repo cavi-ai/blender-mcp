@@ -54,6 +54,54 @@ def animated():
     return document
 
 
+class ObjPreflightTests(unittest.TestCase):
+    def test_obj_geometry_and_material_libraries_are_bounded(self):
+        from cavi_blender_mcp.importing import inspect_obj
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "mat.mtl").write_text("newmtl Mat\n")
+            (root / "prop.obj").write_text(
+                "mtllib mat.mtl\no Prop\nv 0 0 0\nv 1 0 0\nv 0 1 0\n"
+                "f 1 2 3\n")
+            report = inspect_obj(root, "prop.obj")
+            self.assertEqual((report["format"], report["vertices"], report["faces"],
+                              report["objects"]), ("obj", 3, 1, 1))
+            self.assertEqual(report["mtllibs"], ["mat.mtl"])
+
+    def test_obj_rejects_external_or_missing_textures(self):
+        from cavi_blender_mcp.importing import inspect_obj
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "prop.obj").write_text("mtllib mat.mtl\nv 0 0 0\nf 1 1 1\n")
+            for texture in ("../outside.png", "missing.png"):
+                (root / "mat.mtl").write_text(f"newmtl Mat\nmap_Kd {texture}\n")
+                with self.subTest(texture=texture), self.assertRaisesRegex(
+                        ValueError, "workspace"):
+                    inspect_obj(root, "prop.obj")
+
+    def test_obj_rejects_missing_or_external_materials_and_empty_geometry(self):
+        from cavi_blender_mcp.importing import inspect_obj
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "missing.obj").write_text("mtllib missing.mtl\nv 0 0 0\nf 1 1 1\n")
+            with self.assertRaisesRegex(ValueError, "material libraries"):
+                inspect_obj(root, "missing.obj")
+            (root / "empty.obj").write_text("# no geometry\n")
+            with self.assertRaisesRegex(ValueError, "geometry"):
+                inspect_obj(root, "empty.obj")
+            with tempfile.TemporaryDirectory() as outside:
+                target = Path(outside) / "outside.obj"
+                target.write_text("v 0 0 0\nf 1 1 1\n")
+                (root / "escape.obj").symlink_to(target)
+                with self.assertRaisesRegex(ValueError, "workspace"):
+                    inspect_obj(root, "escape.obj")
+                with self.assertRaisesRegex(ValueError, "workspace"):
+                    inspect_obj(root, str(target))
+
+
 class FbxPreflightTests(unittest.TestCase):
     def test_binary_and_ascii_fbx_headers_are_hashed(self):
         from cavi_blender_mcp.importing import inspect_fbx

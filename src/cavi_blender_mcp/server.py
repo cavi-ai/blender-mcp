@@ -1,6 +1,7 @@
 """Typed MCP tools for the Blender bridge."""
 
 from functools import partial
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import anyio
@@ -564,7 +565,7 @@ async def asset_io(
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Move assets in or out. Params per action:
-    import: GLB or FBX path, name (new prefix); export: names, .fbx/.glb/.usd path,
+    import: GLB, FBX or OBJ path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB only),
     axis=unity; or bake_pair alone (writes <stem>_low.fbx, <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
@@ -578,7 +579,8 @@ async def asset_io(
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
         return await run(generate, workspace, params["image"], path, params["resolution"])
     if action == "import":
-        operation = "import_fbx" if path.lower().endswith(".fbx") else "import_mesh"
+        suffix = Path(path).suffix.lower()
+        operation = {".fbx": "import_fbx", ".obj": "import_obj"}.get(suffix, "import_mesh")
         return await run(call, operation, lease_id=lease_id, path=path,
                          **pick(action, values, ["name"]))
     if action == "save":

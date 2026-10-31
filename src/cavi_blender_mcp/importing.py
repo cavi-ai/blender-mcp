@@ -355,3 +355,73 @@ def inspect_fbx(workspace, name):
         raise ValueError("Expected an ASCII or binary FBX file")
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "format": "fbx", "binary": binary}
+
+
+def inspect_obj(workspace, name):
+    root = Path(workspace).expanduser().resolve(strict=True)
+    try:
+        path = (root / name).resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise ValueError("OBJ does not exist inside the workspace") from exc
+    if Path(name).is_absolute() or not path.is_relative_to(root):
+        raise ValueError("Input must stay inside the workspace")
+    if path.suffix.lower() != ".obj" or not path.is_file():
+        raise ValueError("Input must be an OBJ file")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_BYTES + 1)
+    if not 0 < len(data) <= MAX_BYTES:
+        raise ValueError("OBJ must be at most 64 MiB")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("OBJ must be UTF-8 text") from exc
+    vertices = faces = objects = 0
+    mtllibs = set()
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        key = parts[0]
+        if key == "v":
+            vertices += 1
+        elif key == "f":
+            faces += 1
+        elif key == "o":
+            objects += 1
+        elif key == "mtllib":
+            mtllibs.update(part for part in parts[1:] if part)
+    if not 0 < vertices <= MAX_GEOMETRY or not 0 < faces <= MAX_GEOMETRY:
+        raise ValueError("OBJ geometry exceeds the import budget")
+    if len(mtllibs) > 16:
+        raise ValueError("OBJ material libraries are limited to 16 files")
+    textures = 0
+    for item in mtllibs:
+        target = (path.parent / item).resolve()
+        if not target.is_relative_to(root) or not target.is_file():
+            raise ValueError("OBJ material libraries must stay inside the workspace")
+        if target.stat().st_size > 4 * 1024 * 1024:
+            raise ValueError("OBJ material libraries must be at most 4 MiB")
+        try:
+            material_text = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ValueError("OBJ material libraries must be UTF-8 text") from exc
+        for raw in material_text.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            key = parts[0].lower()
+            if not (key.startswith("map_") or key in {"bump", "disp", "decal", "refl", "norm"}):
+                continue
+            if len(parts) < 2:
+                continue
+            texture = (target.parent / parts[-1].strip('"')).resolve()
+            if not texture.is_relative_to(root) or not texture.is_file():
+                raise ValueError("OBJ textures must stay inside the workspace")
+            textures += 1
+            if textures > 64:
+                raise ValueError("OBJ textures are limited to 64 files")
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+            "format": "obj", "vertices": vertices, "faces": faces, "objects": objects,
+            "mtllibs": sorted(mtllibs), "textures": textures}

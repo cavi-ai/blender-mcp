@@ -19,7 +19,7 @@ from mathutils import Euler, Quaternion, Vector
 
 from .client import DEFAULT_TIMEOUT, MAX_REQUEST_BYTES, MAX_TIMEOUT
 from .geometry import validate_mesh
-from .importing import MAX_BYTES, MAX_FBX_BYTES, MAX_GEOMETRY, inspect_fbx, inspect_glb
+from .importing import MAX_BYTES, MAX_FBX_BYTES, MAX_GEOMETRY, inspect_fbx, inspect_glb, inspect_obj
 from .lease import Lease
 from .paths import destination
 from .presets import AXIS_PRESETS
@@ -362,7 +362,8 @@ def import_fbx(path, name):
     selection = list(bpy.context.selected_objects)
     active = bpy.context.view_layer.objects.active
     scene = bpy.context.scene
-    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".fbx", dir=_workspace)
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".fbx",
+                                     dir=Path(report["path"]).parent)
     try:
         with os.fdopen(fd, "wb") as stream:
             stream.write(payload)
@@ -383,6 +384,67 @@ def import_fbx(path, name):
                 "bone_count": bones,
                 "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
                                for action in actions],
+                "imported_vertices": vertices, "imported_triangles": triangles}
+    except Exception:
+        for key in pools:
+            pool = getattr(bpy.data, key)
+            for item in set(pool) - previous[key]:
+                pool.remove(item, do_unlink=True)
+        raise
+    finally:
+        if bpy.context.window and bpy.context.window.scene != scene:
+            bpy.context.window.scene = scene
+        for item in bpy.context.selected_objects:
+            item.select_set(False)
+        for item in selection:
+            item.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        Path(temporary).unlink(missing_ok=True)
+
+
+
+
+def _load_obj(path):
+    if "FINISHED" not in bpy.ops.wm.obj_import(
+        filepath=str(path), forward_axis="NEGATIVE_Z", up_axis="Y",
+        use_split_objects=True, use_split_groups=False,
+        import_vertex_groups=False, validate_meshes=True, global_scale=1.0):
+        raise RuntimeError("Blender did not finish importing the OBJ")
+
+
+def import_obj(path, name):
+    check_import_name(name)
+    report = inspect_obj(_workspace, path)
+    with Path(report["path"]).open("rb") as stream:
+        payload = stream.read(MAX_BYTES + 1)
+    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
+        raise RuntimeError("OBJ changed during preflight; inspect the source before retrying")
+    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
+             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+    previous = {key: set(getattr(bpy.data, key)) for key in pools}
+    selection = list(bpy.context.selected_objects)
+    active = bpy.context.view_layer.objects.active
+    scene = bpy.context.scene
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".obj",
+                                     dir=Path(report["path"]).parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+        _load_obj(temporary)
+        objects = sorted(set(bpy.data.objects) - previous["objects"],
+                         key=lambda item: (item.type != "ARMATURE", item.name))
+        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
+            objects, previous, animations_allowed=False, shape_keys_allowed=False)
+        images = workspace_images(previous)
+        collection = install_collection(name, objects, scene)
+        for image in images:
+            if not image.packed_file:
+                image.pack()
+        return {**report, "collection": collection.name,
+                "objects": [info(item) for item in objects],
+                "armatures": [item.name for item in armatures],
+                "skinned_meshes": [item.name for item in skinned],
+                "bone_count": bones, "animations": [],
                 "imported_vertices": vertices, "imported_triangles": triangles}
     except Exception:
         for key in pools:
@@ -768,6 +830,8 @@ def _dispatch(operation, p):
         return import_glb(p["path"], p["name"])
     if operation == "import_fbx":
         return import_fbx(p["path"], p["name"])
+    if operation == "import_obj":
+        return import_obj(p["path"], p["name"])
     if operation == "bake_map":
         from .blender_bake import bake
 
