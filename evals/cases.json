@@ -4936,7 +4936,6 @@
     ],
     "error": "already exists"
   },
-
   {
     "id": "morph-import-success",
     "tool": "asset_io",
@@ -5051,6 +5050,61 @@
     "absent": [
       "eval-bad-curv.png"
     ]
+  },
+  {
+    "id": "morph-animation-export",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "morph-anim-export.glb",
+      "names": [
+        "MorphSource"
+      ],
+      "animations": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/shape_key_animations/0/name"
+    ],
+    "files": [
+      "morph-anim-export.glb"
+    ]
+  },
+  {
+    "id": "morph-animation-import",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "morph-anim.glb",
+      "name": "MorphAnimImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/shape_key_meshes/0/shape_keys": 1
+    },
+    "required": [
+      "/shape_key_animations/0/name",
+      "/shape_key_animations/0/frame_range/0"
+    ]
+  },
+  {
+    "id": "morph-animation-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "morph-anim.glb",
+      "name": "MorphAnimImport"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   }
-
 ]
