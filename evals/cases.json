@@ -4628,5 +4628,54 @@
       "native"
     ],
     "error": "overwrite"
+  },
+  {
+    "id": "obj-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "input.obj",
+      "name": "ImportedObj"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/format": "obj",
+      "/imported_vertices": 3,
+      "/imported_triangles": 1
+    },
+    "required": [
+      "/objects/0/name"
+    ]
+  },
+  {
+    "id": "obj-import-duplicate",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "input.obj",
+      "name": "ImportedObj"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
+  },
+  {
+    "id": "obj-import-path-escape",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "../outside/input.obj",
+      "name": "EscapeObj"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "workspace"
   }
 ]
