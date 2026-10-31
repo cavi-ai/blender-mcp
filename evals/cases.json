@@ -3067,5 +3067,403 @@
       "/bones/0/name",
       "/project_id"
     ]
+  },
+  {
+    "id": "boolean-missing-operand",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "boolean",
+      "name": "CMP_A",
+      "operation": "union"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: operand"
+  },
+  {
+    "id": "boolean-missing-operation",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "boolean",
+      "name": "CMP_A",
+      "operand": "CMP_B"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: operation"
+  },
+  {
+    "id": "join-missing-names",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "join",
+      "name": "CMP_C"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: names"
+  },
+  {
+    "id": "array-missing-offset",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "array",
+      "name": "CMP_N",
+      "count": 2
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: offset"
+  },
+  {
+    "id": "solidify-missing-thickness",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "solidify",
+      "name": "CMP_Plane"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: thickness"
+  },
+  {
+    "id": "duplicate-missing-name",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "duplicate",
+      "name": "CMP_M"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: new_name"
+  },
+  {
+    "id": "unparent-unrelated",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "unparent",
+      "name": "CMP_Child",
+      "new_name": "CMP_Parent"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: new_name"
+  },
+  {
+    "id": "move-to-collection-missing",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "move_to_collection",
+      "name": "CMP_Child"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: new_name"
+  },
+  {
+    "id": "duplicate-count-bound",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "duplicate",
+      "name": "CMP_M",
+      "new_name": "TooMany",
+      "count": 257
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "boolean-union",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "boolean",
+      "name": "CMP_A",
+      "operand": "CMP_B",
+      "operation": "union"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/operation": "union",
+      "/operand_kept": false
+    },
+    "required": [
+      "/triangles"
+    ]
+  },
+  {
+    "id": "boolean-same-object",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "boolean",
+      "name": "CMP_A",
+      "operand": "CMP_A",
+      "operation": "union"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "another object"
+  },
+  {
+    "id": "join-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "join",
+      "name": "CMP_C",
+      "names": [
+        "CMP_D"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/triangles": 24
+    },
+    "required": [
+      "/joined/0"
+    ]
+  },
+  {
+    "id": "join-self",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "join",
+      "name": "CMP_C",
+      "names": [
+        "CMP_C"
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "must not include"
+  },
+  {
+    "id": "separate-loose",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "separate",
+      "name": "CMP_C",
+      "by": "loose_parts"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/count": 2
+    },
+    "required": [
+      "/parts/1/name"
+    ]
+  },
+  {
+    "id": "mirror-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "mirror",
+      "name": "CMP_M",
+      "symmetry_axis": "X",
+      "merge_distance": 0
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/triangles": 24,
+      "/axis": "X"
+    }
+  },
+  {
+    "id": "array-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "array",
+      "name": "CMP_N",
+      "count": 3,
+      "offset": [
+        2,
+        0,
+        0
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/triangles": 36,
+      "/count": 3
+    }
+  },
+  {
+    "id": "array-zero-offset",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "array",
+      "name": "CMP_N",
+      "count": 2,
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "not be zero"
+  },
+  {
+    "id": "solidify-success",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "solidify",
+      "name": "CMP_Plane",
+      "thickness": 0.1
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/triangles"
+    ]
+  },
+  {
+    "id": "duplicate-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "duplicate",
+      "name": "CMP_M",
+      "new_name": "CMP_Dup",
+      "count": 2,
+      "offset": [
+        2,
+        0,
+        0
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/objects/0": "CMP_Dup_01",
+      "/objects/1": "CMP_Dup_02",
+      "/count": 2
+    }
+  },
+  {
+    "id": "parent-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "parent",
+      "name": "CMP_Child",
+      "new_name": "CMP_Parent"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/parent": "CMP_Parent"
+    }
+  },
+  {
+    "id": "parent-self",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "parent",
+      "name": "CMP_Parent",
+      "new_name": "CMP_Parent"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "own parent"
+  },
+  {
+    "id": "unparent-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "unparent",
+      "name": "CMP_Child"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/parent": null
+    }
+  },
+  {
+    "id": "move-to-collection-success",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "move_to_collection",
+      "name": "CMP_Child",
+      "new_name": "CMP_Props"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/collection": "CMP_Props"
+    }
+  },
+  {
+    "id": "scene-object-collections",
+    "tool": "scene_info",
+    "arguments": {
+      "name": "CMP_Child"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/collections/0": "CMP_Props"
+    }
   }
 ]

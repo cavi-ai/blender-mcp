@@ -132,5 +132,95 @@ def add_socket(p):
     return {**info(socket), "parent": parent.name}
 
 
+def duplicate(p):
+    object_mode()
+    value = obj(p["name"])
+    base = new_name(p.get("new_name"))
+    count = p.get("count", 1)
+    if type(count) is not int or not 1 <= count <= 256:
+        raise ValueError("count must be an integer from 1 to 256")
+    offset = vector(p.get("offset") or [0, 0, 0])
+    linked = p.get("linked", False)
+    if type(linked) is not bool:
+        raise ValueError("linked must be boolean")
+    names = [base] if count == 1 else [f"{base}_{index:02d}" for index in range(1, count + 1)]
+    for label in names:
+        if label in bpy.data.objects:
+            raise ValueError(f"{label} already exists")
+    owner = (value.users_collection or [bpy.context.scene.collection])[0]
+    created = []
+    try:
+        for index, label in enumerate(names, start=1):
+            copy = value.copy()
+            if not linked and value.data is not None:
+                copy.data = value.data.copy()
+            owner.objects.link(copy)
+            copy.name = label
+            copy.matrix_world = Matrix.Translation(Vector(offset) * index) @ value.matrix_world
+            created.append(copy)
+    except Exception:
+        for item in created:
+            mesh = item.data
+            bpy.data.objects.remove(item, do_unlink=True)
+            if mesh is not None and mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
+        raise
+    return {"source": value.name, "count": count, "linked": linked,
+            "offset": list(offset), "objects": [item.name for item in created]}
+
+
+def parent(p):
+    object_mode()
+    child = obj(p["name"])
+    target = obj(p.get("new_name"))
+    if child == target:
+        raise ValueError("An object cannot be its own parent")
+    walk = target
+    while walk is not None:
+        if walk == child:
+            raise ValueError("Parenting would create a cycle")
+        walk = walk.parent
+    world = child.matrix_world.copy()
+    child.parent = target
+    child.matrix_parent_inverse = target.matrix_world.inverted_safe()
+    child.matrix_world = world
+    return {**info(child), "parent": target.name}
+
+
+def unparent(p):
+    object_mode()
+    child = obj(p["name"])
+    world = child.matrix_world.copy()
+    previous = child.parent.name if child.parent else None
+    child.parent = None
+    child.matrix_world = world
+    return {**info(child), "previous_parent": previous}
+
+
+def move_to_collection(p):
+    object_mode()
+    value = obj(p["name"])
+    label = p.get("new_name")
+    if not isinstance(label, str) or not label.strip() or len(label.encode()) > 63:
+        raise ValueError("new_name must name a collection of at most 63 UTF-8 bytes")
+    create = p.get("create", True)
+    if type(create) is not bool:
+        raise ValueError("create must be boolean")
+    collection = bpy.data.collections.get(label)
+    if collection is None:
+        if not create:
+            raise ValueError("Collection does not exist")
+        collection = bpy.data.collections.new(label)
+        bpy.context.scene.collection.children.link(collection)
+    elif not collection.users_scene:
+        bpy.context.scene.collection.children.link(collection)
+    for owner in list(value.users_collection):
+        owner.objects.unlink(value)
+    collection.objects.link(value)
+    return {**info(value), "collection": collection.name}
+
+
 HANDLERS = {"apply_transforms": apply_transforms, "set_origin": set_origin,
-            "snap_to_grid": snap_to_grid, "rename_object": rename, "add_socket": add_socket}
+            "snap_to_grid": snap_to_grid, "rename_object": rename, "add_socket": add_socket,
+            "duplicate_object": duplicate, "parent_object": parent,
+            "unparent_object": unparent, "move_to_collection": move_to_collection}

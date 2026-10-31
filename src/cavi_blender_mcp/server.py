@@ -53,12 +53,12 @@ class BakePair(BaseModel):
     low: Names
 
 
-def call(operation, **params):
+def call(operation_name, **params):
     client = BridgeClient()
-    if operation not in LEASE_FREE:
+    if operation_name not in LEASE_FREE:
         # Legacy bridges reject this envelope instead of ignoring a lease parameter.
-        return client.call("owned_edit", {"operation": operation, "params": params})
-    return client.call(operation, params)
+        return client.call("owned_edit", {"operation": operation_name, "params": params})
+    return client.call(operation_name, params)
 
 
 async def run(function, *args, **kwargs):
@@ -186,7 +186,8 @@ async def session_control(
 @mcp.tool(annotations=MUTATING)
 async def object_edit(
     action: Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
-                    "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket"],
+                    "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
+                    "duplicate", "parent", "unparent", "move_to_collection"],
     name: Annotated[str, Field(description="Object name; new and unique for create_*.")],
     kind: Literal["cube", "sphere", "cylinder", "cone", "plane"] | None = None,
     location: Vector3 | None = None,
@@ -206,6 +207,10 @@ async def object_edit(
     origin: Literal["bounds_bottom_center", "bounds_center", "world_origin", "point"] | None = None,
     grid: Annotated[Number | None, Field(ge=0.001, le=100)] = None,
     new_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    count: Annotated[StrictInt | None, Field(ge=1, le=256)] = None,
+    offset: Vector3 | None = None,
+    linked: StrictBool | None = None,
+    create: StrictBool | None = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Create or edit one object. Params per action:
@@ -213,12 +218,16 @@ async def object_edit(
     transform: location, rotation_degrees, scale; set_color: rgba, slot=0; shade: smooth=false;
     apply_transforms: components=[rotation,scale], make_single_user=false;
     set_origin: origin=bounds_bottom_center (point: world location); snap_to_grid: grid;
-    rename: new_name; add_socket: new_name, local location, rotation_degrees.
+    rename: new_name; add_socket: new_name, local location, rotation_degrees;
+    duplicate: new_name, count=1, offset=(0,0,0), linked=false;
+    parent: new_name (parent); unparent: no extra params;
+    move_to_collection: new_name (collection), create=true.
     """
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
-              "origin": origin, "grid": grid, "new_name": new_name}
+              "origin": origin, "grid": grid, "new_name": new_name, "count": count,
+              "offset": offset, "linked": linked, "create": create}
     operation, params = {
         "create_primitive": ("create_primitive",
                              lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
@@ -235,6 +244,12 @@ async def object_edit(
         "rename": ("rename_object", lambda: pick(action, values, ["new_name"])),
         "add_socket": ("add_socket", lambda: pick(action, values, ["new_name"], {
             "location": None, "rotation_degrees": None})),
+        "duplicate": ("duplicate_object", lambda: pick(action, values, ["new_name"], {
+            "count": 1, "offset": (0, 0, 0), "linked": False})),
+        "parent": ("parent_object", lambda: pick(action, values, ["new_name"])),
+        "unparent": ("unparent_object", lambda: pick(action, values)),
+        "move_to_collection": ("move_to_collection", lambda: pick(action, values, ["new_name"], {
+            "create": True})),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 
@@ -242,7 +257,8 @@ async def object_edit(
 @mcp.tool(annotations=MUTATING)
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
-                    "lightmap_uv", "texel_density", "collision", "cleanup"],
+                    "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
+                    "join", "separate", "mirror", "array", "solidify"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -270,6 +286,17 @@ async def mesh_edit(
     max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255)] = None,
     merge_distance: Annotated[Number | None, Field(ge=0, le=1)] = None,
     steps: Annotated[list[Step] | None, Field(max_length=5)] = None,
+    operand: Annotated[str | None, Field(description="Exact boolean operand mesh.")] = None,
+    operation: Literal["union", "difference", "intersect"] | None = None,
+    solver: Literal["exact", "fast"] | None = None,
+    keep_operand: StrictBool | None = None,
+    self_intersection: StrictBool | None = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
+    by: Literal["loose_parts", "materials"] | None = None,
+    count: Annotated[StrictInt | None, Field(ge=2, le=1000)] = None,
+    offset: Vector3 | None = None,
+    thickness: Annotated[Number | None, Field(gt=0, le=100)] = None,
+    clipping: StrictBool | None = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Edit mesh surface. Params per action (defaults after =):
@@ -279,7 +306,10 @@ async def mesh_edit(
     triangle_targets, rename_source=false, symmetry_axis, preserve; lightmap_uv:
     uv_layer=UVMap_Lightmap, lightmap_resolution=64, margin_px=4; texel_density:
     target_px_per_m, texture_resolution=1024, uv_layer, pack=false; collision: shape=convex,
-    max_hull_vertices=32; cleanup: merge_distance=.0001, steps=[merge,delete_loose,recalc_normals].
+    max_hull_vertices=32; cleanup: merge_distance=.0001, steps=[merge,delete_loose,recalc_normals];
+    boolean: operand, operation, solver=exact, keep_operand=false, self_intersection=false;
+    join: names; separate: by=loose_parts; mirror: symmetry_axis=X, merge_distance=.001,
+    clipping=false; array: count, offset; solidify: thickness, offset=-1.
     """
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
@@ -290,7 +320,10 @@ async def mesh_edit(
               "margin_px": margin_px, "target_px_per_m": target_px_per_m,
               "texture_resolution": texture_resolution, "pack": pack, "shape": shape,
               "max_hull_vertices": max_hull_vertices, "merge_distance": merge_distance,
-              "steps": steps}
+              "steps": steps, "operand": operand, "operation": operation, "solver": solver,
+              "keep_operand": keep_operand, "self_intersection": self_intersection,
+              "names": names, "by": by, "count": count, "offset": offset,
+              "thickness": thickness, "clipping": clipping}
     if action == "modifier":
         operation = "add_modifier"
         params = pick(action, values, ["kind", "amount"], {"apply": False})
@@ -319,6 +352,26 @@ async def mesh_edit(
         operation = action
         params = pick(action, values, ["target_px_per_m"], {
             "texture_resolution": 1024, "uv_layer": None, "pack": False})
+    elif action == "boolean":
+        operation = "boolean_mesh"
+        params = pick(action, values, ["operand", "operation"], {
+            "solver": "exact", "keep_operand": False, "self_intersection": False})
+    elif action == "join":
+        operation = "join_meshes"
+        params = pick(action, values, ["names"])
+    elif action == "separate":
+        operation = "separate_mesh"
+        params = pick(action, values, (), {"by": "loose_parts"})
+    elif action == "mirror":
+        operation = "mirror_mesh"
+        params = pick(action, values, (), {
+            "symmetry_axis": "X", "merge_distance": 0.001, "clipping": False})
+    elif action == "array":
+        operation = "array_mesh"
+        params = pick(action, values, ["count", "offset"])
+    elif action == "solidify":
+        operation = "solidify_mesh"
+        params = pick(action, values, ["thickness"], {"offset": -1})
     elif action == "collision":
         operation = action
         params = pick(action, values, (), {"shape": "convex", "max_hull_vertices": 32})

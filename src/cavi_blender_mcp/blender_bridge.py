@@ -37,8 +37,11 @@ LEASE_FREE = frozenset(
 )
 GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
                       "collision", "cleanup_mesh"})
+COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh",
+                     "array_mesh", "solidify_mesh"})
 OBJECTS = frozenset({"apply_transforms", "set_origin", "snap_to_grid", "rename_object",
-                     "add_socket"})
+                     "add_socket", "duplicate_object", "parent_object", "unparent_object",
+                     "move_to_collection"})
 MAX_MODIFIERS = 16
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"
@@ -122,6 +125,10 @@ def info(value):
         "rotation_degrees": [math.degrees(v) for v in angles],
         "rotation_mode": value.rotation_mode,
         "scale": list(value.scale),
+        "dimensions": list(value.dimensions),
+        "parent": value.parent.name if value.parent else None,
+        "children": len(value.children),
+        "collections": [item.name for item in value.users_collection],
         "modifiers": [{"name": m.name, "type": m.type} for m in value.modifiers],
     }
     if value.type == "MESH":
@@ -156,8 +163,15 @@ def selected(objects):
         for value in bpy.context.selected_objects:
             value.select_set(False)
         for value in previous:
-            value.select_set(True)
-        bpy.context.view_layer.objects.active = active
+            try:
+                value.select_set(True)
+            except ReferenceError:
+                continue
+        if active is not None:
+            try:
+                bpy.context.view_layer.objects.active = active
+            except ReferenceError:
+                pass
 
 
 @contextmanager
@@ -285,6 +299,14 @@ def scene_info(p):
     if type(offset) is not int or offset < 0:
         raise ValueError("offset must be a nonnegative integer")
     objects = bpy.context.scene.objects
+
+    def collection_tree(parent, root=True):
+        for child in parent.children:
+            yield child, None if root else parent.name
+            yield from collection_tree(child, False)
+
+    collections = sorted(collection_tree(bpy.context.scene.collection),
+                         key=lambda item: item[0].name)
     return {
         "version": bpy.app.version_string,
         "file": bpy.data.filepath,
@@ -293,6 +315,11 @@ def scene_info(p):
         "offset": offset,
         "limit": limit,
         "objects": [info(objects[i]) for i in range(offset, min(offset + limit, len(objects)))],
+        "collections": [
+            {"name": item.name, "parent": parent,
+             "objects": len(item.objects), "total_objects": len(item.all_objects)}
+            for item, parent in collections
+        ],
     }
 
 
@@ -612,6 +639,10 @@ def _dispatch(operation, p):
         from .blender_export import export_asset
 
         return export_asset(p)
+    if operation in COMPOSE:
+        from .blender_compose import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation in GEOMETRY:
         from .blender_geometry import HANDLERS
 
