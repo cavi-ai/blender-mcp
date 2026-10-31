@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cavi-blender-mcp"
-version = "0.29.0"
+version = "0.30.0"
 description = "Local-first MCP tools for Blender scene editing and game asset export"
 readme = "README.md"
 license = "MIT"
@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
-dependencies = ["anyio>=4.5,<5", "mcp>=1.12,<2", "pydantic>=2.11,<3"]
+dependencies = ["anyio>=4.5,<5", "mcp>=2.3,<3", "pydantic>=2.11,<3"]
 
 [project.urls]
 Homepage = "https://cavi-ai.xyz"

@@ -1,11 +1,13 @@
 """Typed MCP tools for the Blender bridge."""
 
-from functools import partial
+from functools import partial, wraps
+from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import anyio
-from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
@@ -13,7 +15,39 @@ from .client import BridgeClient
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 
-mcp = FastMCP(
+# The SDK hides the text of any other exception; these carry messages agents can act on.
+ANTICIPATED = (ValueError, RuntimeError, OSError)
+
+
+def _report_anticipated(fn):
+    @wraps(fn)
+    async def tool(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except ToolError:
+            raise
+        except ANTICIPATED as exc:
+            raise ToolError(str(exc)) from exc
+
+    return tool
+
+
+class Server(MCPServer):
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, version=version("cavi-blender-mcp"), **kwargs)
+
+    def tool(self, *args, **kwargs):
+        register = super().tool(*args, **kwargs)
+
+        def decorator(fn):
+            register(_report_anticipated(fn))
+            # Direct callers keep the original exception types.
+            return fn
+
+        return decorator
+
+
+mcp = Server(
     "cavi-blender-mcp",
     instructions=(
         "Inspect the scene before editing. Saves and exports refuse existing paths. "
@@ -27,10 +61,10 @@ Vector3 = tuple[Number, Number, Number]
 RGBA = tuple[Number, Number, Number, Number]
 ObjectName = Annotated[str, Field(description="Exact object name from scene_info.")]
 LeaseId = Annotated[str | None, Field(description="lease_id from session_control claim.")]
-MUTATING = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
-ADDITIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+MUTATING = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=False)
+ADDITIVE = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
 READ_ONLY = ToolAnnotations(
-    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
 Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
