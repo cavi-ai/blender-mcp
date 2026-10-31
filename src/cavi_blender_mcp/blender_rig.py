@@ -306,6 +306,20 @@ def inspect(params, find_object):
                 checks_report["loop"] = loop_report(rig, frames, poses)
             if "deformation" in requested:
                 checks_report["deformation"] = deformation_report(meshes, frames)
+    actions = []
+    for action in bpy.data.actions:
+        slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]
+        if not slots:
+            continue
+        start, end = action.frame_range
+        if not math.isfinite(start) or not math.isfinite(end):
+            continue
+        actions.append({"name": action.name, "frame_range": [start, end],
+                        "slots": [slot.identifier for slot in slots],
+                        "fake_user": action.use_fake_user})
+        if len(actions) > 64:
+            raise ValueError("Rig action inventory exceeds 64 actions")
+    actions.sort(key=lambda item: item["name"])
     not_checked = ["foot sliding", "UV mapping quality", "shader appearance",
                    "Unity import"]
     if "deformation" not in requested:
@@ -316,6 +330,7 @@ def inspect(params, find_object):
               "armature": rig.name, "pose_position": rig.data.pose_position,
               "root_bones": [b.name for b in rig.data.bones if not b.parent],
               "deform_bones": len(deform), "bones": bones, "meshes": reports,
+              "actions": actions, "action_count": len(actions),
               "clips": clips, "active_action": animation.action.name
               if animation and animation.action else None,
               "nla_enabled": animation.use_nla if animation else False,

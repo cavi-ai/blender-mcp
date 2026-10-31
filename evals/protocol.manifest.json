@@ -6,7 +6,7 @@
       "probe": "discovery-cost",
       "access": "read_only",
       "max_tools": 13,
-      "max_schema_bytes": 34000
+      "max_schema_bytes": 35000
     },
     {
       "id": "token-budget",

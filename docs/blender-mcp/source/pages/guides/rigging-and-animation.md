@@ -14,6 +14,11 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `keyframe` | Create a new action from 1–32 keyframes |
 | `clear_pose` | Reset every pose bone, optionally at a frame |
 | `retarget` | Bake a source armature action onto the target rig |
+| `set_action` | Assign an existing action, or clear the active action |
+| `rename_action` | Rename an action |
+| `delete_action` | Delete an unreferenced action |
+| `nla_push` | Move an action into an NLA track/strip |
+| `nla_remove` | Remove one strip, one track, or every track |
 
 ## Bones
 
@@ -43,6 +48,22 @@ pose edits are not keyed, and an active action re-evaluates on frame changes.
 increasing. Each action is limited to 32 frames, 128 poses per frame and 2,048
 poses total. Failure removes the new action and restores the previous action and
 pose.
+
+## Clip management
+
+`inspect_rig` lists every action with an object slot in `actions`, in addition
+to active and NLA-linked `clips`.
+
+`set_action` assigns `action_name` to the rig; omit it to clear the active
+action. `rename_action` changes the action name and refuses collisions.
+`delete_action` removes only actions with no active, NLA or other users; clear
+references first.
+
+`nla_push` places `action_name`, or the active action, into `track_name` and
+`strip_name` at `start_frame`. Strips in one track must not overlap. After a
+push the active action is cleared and the clip stays available for export.
+`nla_remove` removes a named strip, a whole track, or every track when
+`track_name` is omitted.
 
 ## Animation QA
 
@@ -78,7 +99,8 @@ mapped and unmapped bones.
 ## Verify
 
 Run `inspect_rig` after binding, repair, retargeting or animation. It reports
-hierarchy, clips, slots and weight quality without changing pose or action.
+hierarchy, all object actions, active/NLA clips, slots and weight quality without
+changing pose or action.
 
 ## Related
 

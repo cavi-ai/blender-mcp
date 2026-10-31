@@ -5222,5 +5222,128 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "rig-action-inventory",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/actions/0/name",
+      "/action_count"
+    ]
+  },
+  {
+    "id": "rig-set-action",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "set_action",
+      "name": "EvalRigNew",
+      "action_name": "EvalWalk"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/active_action": "EvalWalk"
+    }
+  },
+  {
+    "id": "rig-nla-push",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_push",
+      "name": "EvalRigNew",
+      "action_name": "EvalWalk",
+      "track_name": "Locomotion",
+      "strip_name": "Walk",
+      "start_frame": 1
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/active_action": null,
+      "/track": "Locomotion",
+      "/nla_strips": 1
+    },
+    "required": [
+      "/strip"
+    ]
+  },
+  {
+    "id": "rig-nla-remove",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_remove",
+      "name": "EvalRigNew",
+      "track_name": "Locomotion"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/removed_tracks/0": "Locomotion",
+      "/nla_strips": 0
+    }
+  },
+  {
+    "id": "rig-nla-remove-missing",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_remove",
+      "name": "EvalRigNew",
+      "track_name": "Missing"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not exist"
+  },
+  {
+    "id": "rig-rename-action",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "rename_action",
+      "name": "EvalRigNew",
+      "action_name": "EvalWalk",
+      "new_name": "EvalWalkRenamed"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "EvalWalkRenamed",
+      "/previous": "EvalWalk"
+    }
+  },
+  {
+    "id": "rig-delete-action",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "delete_action",
+      "name": "EvalRigNew",
+      "action_name": "EvalWalkRenamed"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/deleted": "EvalWalkRenamed"
+    }
   }
 ]

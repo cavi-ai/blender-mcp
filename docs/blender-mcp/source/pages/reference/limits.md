@@ -89,6 +89,8 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | Material slots per inspection | 64 |
 | Material nodes | 512 |
 | Mesh shape keys including Basis | 64 |
+| Rig actions in inventory | 64 |
+| NLA strips per rig | 32 |
 | Bake low-poly triangles | 200,000 |
 | Bake high-poly triangles | 1,000,000 |
 | Bake high-poly objects | 64 |

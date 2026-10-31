@@ -169,7 +169,8 @@ async def inspect_rig(
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
-                    "retarget"],
+                    "retarget", "set_action", "rename_action", "delete_action",
+                    "nla_push", "nla_remove"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -186,6 +187,10 @@ async def rig_edit(
     source_action: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     mapping: Annotated[dict[str, str] | None, Field(max_length=128)] = None,
     samples: Annotated[StrictInt | None, Field(ge=2, le=256)] = None,
+    new_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    track_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    strip_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Create an armature, bind or repair weights, or author an animation.
@@ -195,14 +200,19 @@ async def rig_edit(
     pose: name=armature, poses, frame, reset=false;
     keyframe: name=armature, action_name, keyframes=[{frame, poses}];
     clear_pose: name=armature, frame;
-    retarget: name=target armature, source, source_action, action_name, mapping, samples.
+    retarget: name=target armature, source, source_action, action_name, mapping, samples;
+    set_action: name=armature, action_name (omit to clear);
+    rename_action: action_name, new_name; delete_action: action_name;
+    nla_push: name=armature, action_name, track_name, strip_name, start_frame=1;
+    nla_remove: name=armature, track_name (omit to clear), strip_name.
     """
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
               "action_name": action_name, "frame": frame, "reset": reset,
               "source": source, "source_action": source_action, "mapping": mapping,
-              "samples": samples}
+              "samples": samples, "new_name": new_name, "track_name": track_name,
+              "strip_name": strip_name, "start_frame": start_frame}
     if action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
@@ -228,6 +238,23 @@ async def rig_edit(
         operation = "retarget_rig"
         params = pick(action, values, ["source", "source_action", "action_name"], {
             "mapping": None, "samples": None})
+    elif action == "set_action":
+        operation = "set_action"
+        params = pick(action, values, (), {"action_name": None})
+    elif action == "rename_action":
+        operation = "rename_action"
+        params = pick(action, values, ["action_name", "new_name"])
+    elif action == "delete_action":
+        operation = "delete_action"
+        params = pick(action, values, ["action_name"])
+    elif action == "nla_push":
+        operation = "nla_push"
+        params = pick(action, values, (), {
+            "action_name": None, "track_name": None, "strip_name": None,
+            "start_frame": 1})
+    elif action == "nla_remove":
+        operation = "nla_remove"
+        params = pick(action, values, (), {"track_name": None, "strip_name": None})
     else:
         operation = "clear_pose"
         params = pick(action, values, (), {"frame": None})

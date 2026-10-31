@@ -188,6 +188,50 @@ class RigSurfaceTests(unittest.TestCase):
                 asyncio.run(server.mcp.call_tool("rig_edit", arguments))
         self.assertEqual(calls, [])
 
+    def test_action_and_nla_actions_map_to_owned_operations(self):
+        calls = self.capture()
+        asyncio.run(server.rig_edit("set_action", "Rig", action_name="Walk", lease_id="L"))
+        asyncio.run(server.rig_edit("set_action", "Rig", lease_id="L"))
+        asyncio.run(server.rig_edit("rename_action", "Rig", action_name="Walk",
+                                    new_name="Run", lease_id="L"))
+        asyncio.run(server.rig_edit("delete_action", "Rig", action_name="Run",
+                                    lease_id="L"))
+        asyncio.run(server.rig_edit("nla_push", "Rig", action_name="Walk",
+                                    track_name="Locomotion", strip_name="Walk",
+                                    start_frame=5, lease_id="L"))
+        asyncio.run(server.rig_edit("nla_remove", "Rig", track_name="Locomotion",
+                                    lease_id="L"))
+        operations = self.inner(calls)
+        self.assertEqual(operations[0], ("set_action", {
+            "lease_id": "L", "name": "Rig", "action_name": "Walk"}))
+        self.assertEqual(operations[1], ("set_action", {
+            "lease_id": "L", "name": "Rig", "action_name": None}))
+        self.assertEqual(operations[2], ("rename_action", {
+            "lease_id": "L", "name": "Rig", "action_name": "Walk", "new_name": "Run"}))
+        self.assertEqual(operations[3], ("delete_action", {
+            "lease_id": "L", "name": "Rig", "action_name": "Run"}))
+        self.assertEqual(operations[4], ("nla_push", {
+            "lease_id": "L", "name": "Rig", "action_name": "Walk",
+            "track_name": "Locomotion", "strip_name": "Walk", "start_frame": 5}))
+        self.assertEqual(operations[5], ("nla_remove", {
+            "lease_id": "L", "name": "Rig", "track_name": "Locomotion",
+            "strip_name": None}))
+
+    def test_action_and_nla_parameters_are_checked(self):
+        calls = self.capture()
+        for coroutine, message in [
+            (server.rig_edit("rename_action", "Rig", action_name="Walk"),
+             "requires: new_name"),
+            (server.rig_edit("delete_action", "Rig"), "requires: action_name"),
+            (server.rig_edit("nla_remove", "Rig", strip_name="Walk",
+                             track_name="Track", action_name="Walk"),
+             "does not accept: action_name"),
+            (server.rig_edit("set_action", "Rig", poses=[]), "does not accept: poses"),
+        ]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                asyncio.run(coroutine)
+        self.assertEqual(calls, [])
+
     def test_invalid_bone_and_weight_inputs_are_bounded(self):
         for arguments in (
             {"action": "create", "name": "Rig", "bones": [{

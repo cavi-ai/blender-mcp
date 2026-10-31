@@ -55,7 +55,8 @@ pose and frame afterward.
 ## rig_edit
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
-`clear_pose`, `retarget`.
+`clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
+`nla_push`, `nla_remove`.
 
 | Parameter | Used by |
 | --- | --- |
@@ -71,6 +72,9 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `source`, `source_action` | `retarget`; source armature and action |
 | `mapping` | `retarget`; optional source-to-target bone map |
 | `samples` | `retarget`; optional 2–256 samples |
+| `new_name` | `rename_action`; new action name |
+| `track_name`, `strip_name` | `nla_push`, `nla_remove` |
+| `start_frame` | `nla_push`; default 1 |
 
 [Guide](../guides/rigging-and-animation.md)
 
