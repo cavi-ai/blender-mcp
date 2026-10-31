@@ -22,6 +22,7 @@
         { "title": "Generate a mesh locally", "path": "guides/local-generation.md" },
         { "title": "Rig and animate", "path": "guides/rigging-and-animation.md" },
         { "title": "Preview and review", "path": "guides/previews-and-review.md" },
+        { "title": "Build a level", "path": "guides/level-assembly.md" },
         { "title": "Scatter instances", "path": "guides/scatter.md" },
         { "title": "Share application ownership", "path": "guides/session-ownership.md" },
         { "title": "Run a dedicated session", "path": "guides/runtime-and-headless.md" },

@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `level_edit` for heightmap or procedural terrain, bulk object placement and
+  surface snapping with bounded terrain and assembly budgets.
 - Versioned documentation source, build, verification and release artifact
   tooling for cavi-ai.xyz.
 - Release workflow that publishes the docs artifact and dispatches it to

@@ -83,6 +83,16 @@ class ShapeKeyframe(BaseModel):
     value: Annotated[Number, Field(ge=0, le=1)]
 
 
+class Placement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: ObjectName
+    name: Annotated[str, Field(min_length=1, max_length=63)]
+    location: Vector3 = (0, 0, 0)
+    rotation_degrees: Vector3 = (0, 0, 0)
+    scale: Vector3 = (1, 1, 1)
+    linked: StrictBool = False
+
+
 def call(operation_name, **params):
     client = BridgeClient()
     if operation_name not in SERVER_LEASE_FREE:
@@ -695,6 +705,58 @@ async def review_sheet(
                        resolution=resolution, target_px_per_m=target_px_per_m,
                        texture_resolution=texture_resolution, uv_layer=uv_layer)
     return Image(path=result["path"])
+
+
+@mcp.tool(annotations=MUTATING)
+async def level_edit(
+    action: Literal["terrain", "place", "snap"],
+    name: Annotated[str | None, Field(min_length=1, max_length=63,
+                                      description="New terrain object name.")] = None,
+    image: Annotated[str | None, Field(max_length=1024,
+                                       description="Workspace PNG/JPEG heightmap.")] = None,
+    size: Vector2 | None = None,
+    height: Annotated[Number | None, Field(ge=0.01, le=1000)] = None,
+    resolution: Annotated[StrictInt | None, Field(ge=2, le=501)] = None,
+    location: Vector3 | None = None,
+    seed: Annotated[StrictInt | None, Field(ge=0, le=1000000)] = None,
+    octaves: Annotated[StrictInt | None, Field(ge=1, le=8)] = None,
+    frequency: Annotated[Number | None, Field(ge=1, le=64)] = None,
+    placements: Annotated[list[Placement] | None,
+                          Field(min_length=1, max_length=256)] = None,
+    collection: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    names: Annotated[list[ObjectName] | None, Field(min_length=1, max_length=256)] = None,
+    terrain: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    offset: Annotated[Number | None, Field(ge=-1000, le=1000)] = None,
+    align_to_normal: StrictBool | None = None,
+    lease_id: LeaseId = None,
+) -> dict[str, Any]:
+    """Build a terrain mesh or assemble objects in a level.
+
+    terrain: name, image or noise seed/octaves/frequency, size=(100,100),
+    height=10, resolution=128, location; place: placements=[{source, name, location,
+    rotation_degrees, scale, linked}], collection; snap: names, terrain, offset,
+    align_to_normal=false.
+    """
+    values = {"name": name, "image": image, "size": size, "height": height,
+              "resolution": resolution, "location": location, "seed": seed,
+              "octaves": octaves, "frequency": frequency, "placements": placements,
+              "collection": collection, "names": names, "terrain": terrain,
+              "offset": offset, "align_to_normal": align_to_normal}
+    if action == "terrain":
+        operation = "create_terrain"
+        params = pick(action, values, ["name"], {
+            "size": (100.0, 100.0), "height": 10.0, "resolution": 128,
+            "location": (0.0, 0.0, 0.0), "image": None, "seed": 0,
+            "octaves": 4, "frequency": 4.0})
+    elif action == "place":
+        operation = "place_objects"
+        params = pick(action, values, ["placements"], {"collection": None})
+        params["placements"] = [item.model_dump() for item in params["placements"]]
+    else:
+        operation = "snap_to_surface"
+        params = pick(action, values, ["names", "terrain"], {
+            "offset": 0.0, "align_to_normal": False})
+    return await run(call, operation, lease_id=lease_id, **params)
 
 
 @mcp.tool(annotations=MUTATING)

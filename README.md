@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Local-first MCP tools for Blender scene inspection, mesh editing, previews and
-game asset export. The server publishes 13 tools over stdio and sends every
+game asset export. The server publishes 14 tools over stdio and sends every
 operation to a bridge that runs on Blender's main thread.
 
 Everything runs on the local machine. The bridge binds only to IPv4 loopback and
@@ -108,6 +108,7 @@ cavi-blender-mcp runtime restart --lease-id <current-lease>
   authoring, action creation, clip/NLA management, animation QA and retargeting.
 - **Previews**: isolated PNG previews, lit Eevee previews and multi-view review
   sheets.
+- **Levels**: heightmap or procedural terrain, bulk placement and surface snapping.
 - **Scatter**: fixed Geometry Nodes instancing with explicit budgets.
 - **Ownership**: edit leases shared by independent MCP clients.
 

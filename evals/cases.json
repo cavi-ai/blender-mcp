@@ -5408,5 +5408,166 @@
     "absent": [
       "eval-textures.usdc"
     ]
+  },
+  {
+    "id": "level-terrain-success",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "terrain",
+      "name": "EvalTerrain",
+      "size": [
+        20,
+        20
+      ],
+      "height": 3,
+      "resolution": 33,
+      "seed": 7
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/source": "noise",
+      "/resolution": 33
+    },
+    "required": [
+      "/vertices",
+      "/triangles"
+    ]
+  },
+  {
+    "id": "level-place-success",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "place",
+      "collection": "AAA_Props",
+      "placements": [
+        {
+          "source": "AAA_Rock",
+          "name": "LevelRock",
+          "location": [
+            0,
+            0,
+            0
+          ],
+          "linked": true
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/count": 1,
+      "/collection": "AAA_Props"
+    },
+    "required": [
+      "/objects"
+    ]
+  },
+  {
+    "id": "level-snap-success",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "snap",
+      "names": [
+        "LevelRock"
+      ],
+      "terrain": "EvalTerrain",
+      "offset": 0.5
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/terrain": "EvalTerrain"
+    },
+    "required": [
+      "/objects"
+    ]
+  },
+  {
+    "id": "level-terrain-invalid",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "terrain",
+      "name": "BadTerrain",
+      "resolution": 502
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "level-place-missing",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "place"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires"
+  },
+  {
+    "id": "level-snap-missing",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "snap",
+      "names": [
+        "AAA_Rock"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires"
+  },
+  {
+    "id": "level-terrain-name",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "terrain",
+      "name": "AAA_Rock",
+      "resolution": 8
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "unique"
+  },
+  {
+    "id": "level-place-scale",
+    "tool": "level_edit",
+    "arguments": {
+      "action": "place",
+      "placements": [
+        {
+          "source": "AAA_Rock",
+          "name": "BadScale",
+          "scale": [
+            0,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "scale"
   }
 ]

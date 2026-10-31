@@ -890,6 +890,12 @@ def _dispatch(operation, p):
         from .blender_scatter import scatter
 
         return scatter(p)
+    if operation in {"create_terrain", "place_objects", "snap_to_surface"}:
+        from .blender_level import HANDLERS
+
+        if operation == "create_terrain":
+            return HANDLERS[operation](p, _workspace)
+        return HANDLERS[operation](p)
     if operation == "export_asset":
         from .blender_export import export_asset
 

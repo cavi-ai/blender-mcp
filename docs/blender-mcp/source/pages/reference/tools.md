@@ -1,6 +1,6 @@
 # Tools
 
-The server publishes 13 tools. Every mutation requires a `lease_id` unless the
+The server publishes 14 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_rig`,
@@ -164,6 +164,23 @@ a lease. Export supports FBX texture sidecars with `textures=true`.
 Lease-free. Returns one PNG contact sheet.
 
 [Guide](../guides/previews-and-review.md)
+
+## level_edit
+
+Mutating. Actions: `terrain`, `place`, `snap`.
+
+| Parameter | Used by |
+| --- | --- |
+| `name` | `terrain`; new object name |
+| `image` | `terrain`; workspace PNG/JPEG heightmap |
+| `size`, `height`, `resolution`, `location` | `terrain`; defaults `[100, 100]`, 10, 128, origin |
+| `seed`, `octaves`, `frequency` | `terrain`; procedural noise, defaults 0, 4, 4 |
+| `placements` | `place`; 1–256 `{source, name, location, rotation_degrees, scale, linked}` |
+| `collection` | `place`; optional target collection |
+| `names`, `terrain` | `snap`; 1–256 objects and the terrain mesh |
+| `offset`, `align_to_normal` | `snap`; defaults 0 and false |
+
+[Guide](../guides/level-assembly.md)
 
 ## scatter
 

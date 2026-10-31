@@ -212,7 +212,7 @@ def move_to_collection(p):
             raise ValueError("Collection does not exist")
         collection = bpy.data.collections.new(label)
         bpy.context.scene.collection.children.link(collection)
-    elif not collection.users_scene:
+    elif collection not in bpy.context.scene.collection.children_recursive:
         bpy.context.scene.collection.children.link(collection)
     for owner in list(value.users_collection):
         owner.objects.unlink(value)

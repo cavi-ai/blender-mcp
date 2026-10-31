@@ -3,7 +3,7 @@
 Blender MCP {{PRODUCT_VERSION}} gives MCP clients typed, bounded control of a
 Blender session. It has two parts:
 
-- **The MCP server**: a stdio server that publishes 13 tools and forwards
+- **The MCP server**: a stdio server that publishes 14 tools and forwards
   requests to the bridge.
 - **The Blender bridge**: a Python module loaded inside Blender that executes
   operations on Blender's main thread.
@@ -32,6 +32,7 @@ external asset download or remote inference.
   authoring, action creation, animation QA and retargeting.
 - **Previews**: isolated PNG previews, lit Eevee previews and multi-view review
   sheets.
+- **Levels**: bounded terrain meshes, bulk placement and surface snapping.
 - **Scatter**: fixed Geometry Nodes instancing with explicit budgets.
 - **Ownership**: edit leases shared by independent MCP clients.
 - **Evaluation**: deterministic protocol and native application checks through
