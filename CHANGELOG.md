@@ -4,16 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.29.0 — 2026-10-31
 
 ### Added
 
 - `level_edit` for heightmap or procedural terrain, bulk object placement and
   surface snapping with bounded terrain and assembly budgets.
-- USD texture sidecars through `asset_io` `textures=true`, with copied images,
-  relative texture paths and a receipt.
+- FBX and USD texture sidecars through `asset_io` `textures=true`, with copied
+  images, relative texture paths and a receipt.
 - USD export of armature and shape-key animation through `asset_io`
   `animations=true`.
+- Action and NLA clip management: `inspect_rig` lists actions, `rig_edit` sets,
+  renames and deletes actions, and NLA push and remove build clip libraries for
+  multi-action export.
+- Shape-key authoring: add, set and remove shape keys from sparse offsets or a
+  source mesh, and key them atomically from frame and value lists.
+- GLB morph targets: bounded shape-key import, shape-key export on static and
+  animated GLBs, shape-key animation import and export, and morph-only animated
+  GLBs; object inspection reports shape keys and the active shape-key action.
+- Curvature baking from Cycles pointiness and diffuse lightmap baking that keeps
+  the scene's lights.
 - Versioned documentation source, build, verification and release artifact
   tooling for cavi-ai.xyz.
 - Release workflow that publishes the docs artifact and dispatches it to
@@ -34,6 +44,7 @@ All notable changes to this project are documented here. The format follows
   `src/cavi_blender_mcp/operations.py`.
 - Bridge import rollback is one shared path for GLB, FBX, OBJ and USD imports.
 - Package metadata now declares the license, project URLs and classifiers.
+- `assign_material` binds materials to mesh data, so FBX exports include them.
 
 ### Fixed
 
