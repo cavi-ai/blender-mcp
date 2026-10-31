@@ -6,6 +6,7 @@ from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 
 import bpy
+import numpy as np
 
 from .blender_bridge import obj, output_file, selected, with_empties
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base
@@ -147,48 +148,62 @@ def animation_targets(objects):
     return armatures, morph
 
 
+def texture_nodes(objects):
+    materials = {slot.material for value in objects for slot in value.material_slots
+                 if slot.material is not None and slot.material.use_nodes}
+    return [node for material in sorted(materials, key=lambda item: item.name)
+            for node in material.node_tree.nodes
+            if node.type == "TEX_IMAGE" and node.image is not None]
+
+
 def used_images(objects):
-    images = set()
-    for value in objects:
-        for slot in value.material_slots:
-            material = slot.material
-            if material is None or not material.use_nodes:
-                continue
-            for node in material.node_tree.nodes:
-                if node.type == "TEX_IMAGE" and node.image is not None:
-                    images.add(node.image)
-    return sorted(images, key=lambda item: item.name)
+    return sorted({node.image for node in texture_nodes(objects)}, key=lambda item: item.name)
+
+
+def sidecar_copy(image, target):
+    width, height = image.size
+    if not width or not height:
+        raise RuntimeError("Texture image has no data")
+    channels = image.channels
+    pixels = np.empty(width * height * channels, np.float32)
+    image.pixels.foreach_get(pixels)
+    values = pixels.reshape(-1, channels)
+    if channels != 4:
+        rgba = np.ones((len(values), 4), np.float32)
+        rgba[:, :3] = values[:, :3] if channels >= 3 else values[:, :1]
+        values = rgba
+    copy = bpy.data.images.new(f"cavi-sidecar-{target.stem}", width, height,
+                               alpha=True, float_buffer=image.is_float)
+    try:
+        copy.colorspace_settings.name = image.colorspace_settings.name
+        copy.pixels.foreach_set(values.ravel())
+        copy.filepath_raw = str(target)
+        copy.file_format = "PNG"
+        copy.save()
+    except Exception:
+        bpy.data.images.remove(copy)
+        raise
+    return copy
 
 
 @contextmanager
-def prepared_images(objects, directory, unpack=False):
-    saved = []
+def prepared_images(objects, directory):
+    # Exports read PNG copies; the scene's images are never saved, re-pathed or reloaded.
+    copies, swapped = {}, []
     try:
         directory.mkdir()
         for index, image in enumerate(used_images(objects)):
-            if not image.has_data and image.packed_file is None:
-                raise RuntimeError("Texture image has no data")
             safe = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(image.name).stem) or "image"
-            target = directory / f"{index:02d}-{safe}.png"
-            saved.append((image, image.filepath, image.filepath_raw, image.file_format,
-                          image.packed_file is not None, target))
-            image.filepath_raw = str(target)
-            image.file_format = "PNG"
-            image.save()
-            image.filepath = str(target)
-            if unpack and image.packed_file is not None:
-                image.unpack(method="REMOVE")
+            copies[image] = sidecar_copy(image, directory / f"{index:02d}-{safe}.png")
+        for node in texture_nodes(objects):
+            swapped.append((node, node.image))
+            node.image = copies[node.image]
         yield
     finally:
-        for image, filepath, raw, file_format, packed, target in saved:
-            try:
-                if packed and image.packed_file is None and target.is_file():
-                    image.pack()
-                image.filepath = filepath
-                image.filepath_raw = raw
-                image.file_format = file_format
-            except (ReferenceError, RuntimeError):
-                continue
+        for node, image in swapped:
+            node.image = image
+        for copy in copies.values():
+            bpy.data.images.remove(copy)
 
 
 def sidecars(path):
@@ -230,7 +245,6 @@ def export_asset(p):
     suffix = Path(p["path"]).suffix.lower()
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
-    is_usd = suffix in {".usd", ".usda", ".usdc"}
     preset = preset_for(p, suffix)
     lods, collision = flag(p, "lods"), flag(p, "collision")
     instances, empties = flag(p, "preserve_instances"), flag(p, "include_empties")
@@ -289,7 +303,7 @@ def export_asset(p):
         with output_file(p["path"], FORMATS) as path:
             directory = sidecars(path) if textures else None
             try:
-                with prepared_images(objects, directory, unpack=is_usd) if textures else nullcontext():
+                with prepared_images(objects, directory) if textures else nullcontext():
                     write(path, objects, selection, preset, False, empties,
                           animations=True, textures=textures)
                     files = texture_receipt(directory) if directory else []
@@ -309,7 +323,7 @@ def export_asset(p):
     with output_file(p["path"], FORMATS) as path:
         directory = sidecars(path) if textures else None
         try:
-            with prepared_images(objects, directory, unpack=is_usd) if textures else nullcontext():
+            with prepared_images(objects, directory) if textures else nullcontext():
                 write(path, meshes if instances else objects, selection, preset,
                       instances, empties, textures=textures)
                 files = texture_receipt(directory) if directory else []
