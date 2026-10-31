@@ -87,6 +87,21 @@ try:
     deviation, size = variance(root / "ao.png")
     assert size == (64, 64) and deviation > 0.001, (deviation, size)
 
+    curvature = edit("bake_map", map="curvature", name="BakeAO", path="curvature.png",
+                     resolution=64, samples=1, margin=2)
+    assert curvature["map"] == "curvature"
+    deviation, size = variance(root / "curvature.png")
+    assert size == (64, 64) and deviation > 0.001, (deviation, size)
+
+    bpy.ops.object.light_add(type="POINT", location=(3, -3, 4))
+    light = bpy.context.object
+    light.data.energy = 1000
+    lightmap = edit("bake_map", map="lightmap", name="BakeLow", path="lightmap.png",
+                    resolution=64, samples=4, margin=2, isolate=True)
+    assert lightmap["map"] == "lightmap"
+    deviation, size = variance(root / "lightmap.png")
+    assert size == (64, 64) and deviation > 0.001, (deviation, size)
+
     bpy.ops.mesh.primitive_cube_add(location=(5, 0, 0))
     no_uv = bpy.context.object
     no_uv.name = "BakeNoUV"
@@ -112,6 +127,8 @@ try:
     print(json.dumps({
         "normal": [normal["resolution"], round(deviation, 4)],
         "ao_bytes": ao["bytes"],
+        "curvature_bytes": curvature["bytes"],
+        "lightmap_bytes": lightmap["bytes"],
         "normal_sha": normal["sha256"][:12],
         "state_restored": True,
     }))

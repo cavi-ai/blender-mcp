@@ -4936,6 +4936,7 @@
     ],
     "error": "already exists"
   },
+
   {
     "id": "morph-import-success",
     "tool": "asset_io",
@@ -4986,5 +4987,70 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "bake-curvature-success",
+    "tool": "bake",
+    "arguments": {
+      "map": "curvature",
+      "name": "BakeLow",
+      "path": "eval-curvature.png",
+      "resolution": 64,
+      "samples": 1,
+      "margin": 2
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/map": "curvature"
+    },
+    "files": [
+      "eval-curvature.png"
+    ]
+  },
+  {
+    "id": "bake-lightmap-success",
+    "tool": "bake",
+    "arguments": {
+      "map": "lightmap",
+      "name": "BakeLow",
+      "path": "eval-lightmap.png",
+      "resolution": 64,
+      "samples": 4,
+      "margin": 2
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/map": "lightmap"
+    },
+    "files": [
+      "eval-lightmap.png"
+    ]
+  },
+  {
+    "id": "bake-curvature-high",
+    "tool": "bake",
+    "arguments": {
+      "map": "curvature",
+      "name": "BakeLow",
+      "path": "eval-bad-curv.png",
+      "high": [
+        "BakeHigh"
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not accept: high",
+    "absent": [
+      "eval-bad-curv.png"
+    ]
   }
+
 ]

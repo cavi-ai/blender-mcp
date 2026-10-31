@@ -1,4 +1,4 @@
-"""Cycles-backed normal and ambient-occlusion baking into workspace PNGs."""
+"""Cycles-backed normal, AO, curvature and lightmap baking into workspace PNGs."""
 
 import hashlib
 from pathlib import Path
@@ -35,6 +35,9 @@ def state(scene):
             "use_cage": bake.use_cage,
             "target": bake.target,
             "normal_space": bake.normal_space,
+            "use_pass_direct": bake.use_pass_direct,
+            "use_pass_indirect": bake.use_pass_indirect,
+            "use_pass_color": bake.use_pass_color,
         },
     }
 
@@ -67,7 +70,12 @@ def bake(p):
     low_triangles = triangles(low)
     if not 0 < low_triangles <= MAX_LOW_TRIANGLES:
         raise ValueError(f"Low-poly target needs 1 to {MAX_LOW_TRIANGLES} triangles")
+    mode = p.get("map")
+    if mode not in {"normal", "ao", "curvature", "lightmap"}:
+        raise ValueError("map must be normal, ao, curvature or lightmap")
     high_names = p.get("high")
+    if high_names is not None and mode not in {"normal", "ao"}:
+        raise ValueError("high applies to normal and ao bakes")
     if high_names is not None:
         if (not isinstance(high_names, list) or not 1 <= len(high_names) <= MAX_HIGH_OBJECTS
                 or len(set(high_names)) != len(high_names)):
@@ -81,9 +89,6 @@ def bake(p):
     high_triangles = sum(triangles(value) for value in high)
     if high_triangles > MAX_HIGH_TRIANGLES:
         raise ValueError(f"High-poly sources are limited to {MAX_HIGH_TRIANGLES} triangles")
-    mode = p.get("map")
-    if mode not in {"normal", "ao"}:
-        raise ValueError("map must be normal or ao")
     resolution = p.get("resolution", 1024)
     if type(resolution) is not int or not 64 <= resolution <= MAX_RESOLUTION:
         raise ValueError(f"resolution must be an integer from 64 to {MAX_RESOLUTION}")
@@ -131,17 +136,27 @@ def bake(p):
         layers.active = target_layer
         target_layer.active_render = True
         image = bpy.data.images.new("CAVI Bake", resolution, resolution, alpha=False)
-        image.colorspace_settings.name = "Non-Color"
+        image.colorspace_settings.name = "sRGB" if mode == "lightmap" else "Non-Color"
         material = bpy.data.materials.new("CAVI Bake")
         material.use_nodes = True
-        nodes = material.node_tree.nodes
+        nodes, links = material.node_tree.nodes, material.node_tree.links
         for node in list(nodes):
             nodes.remove(node)
         output = nodes.new("ShaderNodeOutputMaterial")
-        shader = nodes.new("ShaderNodeBsdfPrincipled")
         target = nodes.new("ShaderNodeTexImage")
         target.image = image
-        material.node_tree.links.new(shader.outputs["BSDF"], output.inputs["Surface"])
+        if mode == "curvature":
+            geometry = nodes.new("ShaderNodeNewGeometry")
+            mapping = nodes.new("ShaderNodeMapRange")
+            emission = nodes.new("ShaderNodeEmission")
+            mapping.inputs["From Min"].default_value = 0.3
+            mapping.inputs["From Max"].default_value = 0.7
+            links.new(geometry.outputs["Pointiness"], mapping.inputs["Value"])
+            links.new(mapping.outputs["Result"], emission.inputs["Color"])
+            links.new(emission.outputs["Emission"], output.inputs["Surface"])
+        else:
+            shader = nodes.new("ShaderNodeBsdfPrincipled")
+            links.new(shader.outputs["BSDF"], output.inputs["Surface"])
         nodes.active = target
         bake_low.data.materials.append(material)
         bake_low.active_material_index = len(bake_low.material_slots) - 1
@@ -149,6 +164,8 @@ def bake(p):
         for value, hidden_render, hidden_viewport, _ in visibility:
             if value is bake_low or value in high:
                 value.hide_render = False
+            elif value.type in {"LIGHT", "LIGHT_PROBE", "LIGHTPROBE"}:
+                value.hide_render = hidden_render
             elif value is low or isolate:
                 value.hide_render = True
             else:
@@ -178,8 +195,20 @@ def bake(p):
         settings.target = "IMAGE_TEXTURES"
         if mode == "normal":
             settings.normal_space = normal_space.upper()
+        if mode == "lightmap":
+            settings.use_pass_direct = True
+            settings.use_pass_indirect = True
+            settings.use_pass_color = False
         with output_file(p["path"], {".png"}) as path:
-            result = bpy.ops.object.bake(type="NORMAL" if mode == "normal" else "AO")
+            if mode == "normal":
+                result = bpy.ops.object.bake(type="NORMAL")
+            elif mode == "ao":
+                result = bpy.ops.object.bake(type="AO")
+            elif mode == "curvature":
+                result = bpy.ops.object.bake(type="EMIT")
+            else:
+                result = bpy.ops.object.bake(type="DIFFUSE",
+                                             pass_filter={"DIRECT", "INDIRECT"})
             if "FINISHED" not in result:
                 raise RuntimeError("Bake did not finish")
             image.filepath_raw = str(path)
@@ -190,7 +219,8 @@ def bake(p):
                 "sha256": hashlib.sha256(data).hexdigest(), "map": mode,
                 "resolution": resolution, "samples": samples, "margin": margin,
                 "cage_extrusion": cage, "max_ray_distance": distance,
-                "normal_space": normal_space, "uv_layer": layer.name,
+                "normal_space": normal_space if mode == "normal" else None,
+                "uv_layer": layer.name,
                 "low": low.name, "high": [value.name for value in high],
                 "selected_to_active": selected, "isolate": isolate}
     finally:
