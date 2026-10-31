@@ -37,6 +37,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Texture sidecar exports write copies of the scene's images, so generated
+  images and unsaved paint keep their pixels after an export.
+- Noise terrain caps each octave's lattice at the mesh resolution, which keeps
+  the densest request near the mesh's own memory; high-frequency octaves above
+  the resolution produce different heights than before.
+- A placement that fails part-way removes every copy it made and the collection
+  it created or linked.
 - `requirements-neural.txt` installs again: `opencv-python-headless`, `mpmath`
   and `rembg` are pinned to releases compatible with `numpy` 1.26.4 and
   `sympy`, and CI resolves the file on every change.

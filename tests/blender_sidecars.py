@@ -92,6 +92,47 @@ try:
     except RuntimeError as exc:
         assert "lease_id" in str(exc)
 
+    # Session-only images keep their content: a generated image and a file image
+    # with unsaved paint must come back exactly as they were.
+    bpy.ops.mesh.primitive_cube_add()
+    painted = bpy.context.object
+    painted.name = painted.data.name = "PaintedCube"
+    paint_material = bpy.data.materials.new("PaintedMaterial")
+    paint_material.use_nodes = True
+    generated = bpy.data.images.new("GeneratedTexture", 4, 4)
+    generated.generated_color = (1, 0, 0, 1)
+    disk_path = root / "painted.png"
+    blank = bpy.data.images.new("PaintedBlank", 4, 4)
+    blank.filepath_raw = str(disk_path)
+    blank.file_format = "PNG"
+    blank.save()
+    bpy.data.images.remove(blank)
+    edited = bpy.data.images.load(str(disk_path))
+    pixels = list(edited.pixels)
+    pixels[0:4] = [0, 0, 1, 1]
+    edited.pixels = pixels
+    for source in (generated, edited):
+        paint_material.node_tree.nodes.new("ShaderNodeTexImage").image = source
+    painted.data.materials.append(paint_material)
+
+    def state(image):
+        return (image.source, image.filepath, image.is_dirty,
+                [round(value, 3) for value in image.pixels[0:4]])
+
+    before = [state(generated), state(edited)]
+    for path in ("painted.fbx", "painted-usd.usdc"):
+        result = bridge.dispatch("export_asset", {
+            "names": ["PaintedCube"], "path": path, "textures": True, "lease_id": lease})
+        assert [state(generated), state(edited)] == before, (path, before)
+        written = {item["name"]: item["path"] for item in result["textures"]}
+        copy = bpy.data.images.load(written["01-painted.png"])
+        assert [round(value, 3) for value in copy.pixels[0:4]] == [0, 0, 1, 1]
+        bpy.data.images.remove(copy)
+        copy = bpy.data.images.load(written["00-GeneratedTexture.png"])
+        assert [round(value, 3) for value in copy.pixels[0:4]] == [1, 0, 0, 1]
+        bpy.data.images.remove(copy)
+    assert not any(image.name.startswith("cavi-sidecar") for image in bpy.data.images)
+
     print(json.dumps({
         "textures": [item["name"] for item in export["textures"]],
         "usd_textures": [item["name"] for item in usd["textures"]],

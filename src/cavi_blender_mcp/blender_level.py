@@ -55,7 +55,8 @@ def noise(resolution, seed, octaves, frequency):
     total = np.zeros((resolution, resolution), np.float64)
     amplitude, weight = 1.0, 0.0
     for octave in range(octaves):
-        cells = max(2, round(frequency * 2 ** octave))
+        # A lattice finer than the output grid only adds memory, not detail.
+        cells = min(max(2, round(frequency * 2 ** octave)), max(2, resolution - 1))
         lattice = rng.random((cells + 1, cells + 1))
         total += amplitude * sample(lattice, resolution)
         weight += amplitude
@@ -212,9 +213,10 @@ def target_collection(name):
     created = collection is None
     if collection is None:
         collection = bpy.data.collections.new(name)
-    if collection not in bpy.context.scene.collection.children_recursive:
+    linked = collection not in bpy.context.scene.collection.children_recursive
+    if linked:
         bpy.context.scene.collection.children.link(collection)
-    return collection, created
+    return collection, created, linked
 
 
 def place(p):
@@ -222,12 +224,13 @@ def place(p):
         raise ValueError("Switch Blender to Object Mode before this operation")
     specs = placement_specs(p.get("placements"))
     target = target_collection(p.get("collection"))
-    collection, created_collection = target if target else (None, False)
+    collection, created_collection, linked_collection = target if target else (None, False, False)
     created = []
     try:
         for spec in specs:
             source = spec["source"]
             copy = source.copy()
+            created.append(copy)
             if not spec["linked"] and copy.data is not None:
                 copy.data = copy.data.copy()
             owner = collection or (source.users_collection or [bpy.context.scene.collection])[0]
@@ -238,15 +241,16 @@ def place(p):
                 Euler([math.radians(v) for v in spec["rotation"]], "XYZ"),
                 Vector(spec["scale"]),
             )
-            created.append(copy)
     except Exception:
         for item in created:
             data = item.data
             bpy.data.objects.remove(item, do_unlink=True)
             if data is not None and data.users == 0:
                 bpy.data.meshes.remove(data)
-        if created_collection and collection is not None and collection.users == 0:
+        if created_collection:
             bpy.data.collections.remove(collection)
+        elif linked_collection:
+            bpy.context.scene.collection.children.unlink(collection)
         raise
     return {
         "collection": collection.name if collection is not None else None,
