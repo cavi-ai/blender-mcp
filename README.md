@@ -62,11 +62,11 @@ After installing new tools, restart that client's MCP connection to discover the
 ## Tools
 
 - `session_control`: `action` = inspect | claim | renew | release application edit ownership.
-- `scene_info`: version, file, workspace and a page of objects (`limit` 1–1000, default 200; `offset`; returns `total`). With `name`, returns that object's details.
+- `scene_info`: version, file, workspace, collections, and a page of objects (`limit` 1–1000, default 200; `offset`; returns `total`). Objects report parent, children, collections and dimensions. With `name`, returns that object's details.
 - `inspect_mesh_quality`: read-only physical texel density, directional UV stretch, degenerate mappings, per-slot material bindings, and image metadata on exact static mesh names. Optional `checks`: `naming` (lint against `naming` = `mesh_prefix`, `lod_suffix` `_LOD{n}`, `collision_prefixes`), `topology` (non-manifold and boundary edges, loose vertices, zero-area faces, n-gons), `lightmap` (presence and rasterized `overlap_ratio` of `lightmap_uv` at `lightmap_resolution`), `transforms` (applied scale/rotation), `origin` (position relative to local bounds). Texture-UV overlaps, seams, and visual acceptance remain separate checks; unbaked modifiers and rigs are refused.
 - `inspect_rig`: read-only bone hierarchy, linked actions/slots and vertex-group skin weights for an exact `armature` and 1–8 `meshes`. Reports unweighted, unnormalized, invalid and over-limit vertices with bounded examples. `max_influences` (1–32, default 4) selects the target profile. Each skin must have one vertex-group Armature modifier bound to that rig. Limits: 512 bones, 100,000 total vertices/triangles, one million assignments. Does not change pose, normalize weights, validate animation deformation or establish Unity import quality.
 - `render_preview`: render a PNG and return an MCP image; no lease needed. `names` isolates meshes (other renderable objects are hidden), `direction` picks the view, `orthographic` switches the camera. Workbench checks shape; `renderer="eevee"` checks materials under temporary studio lighting at up to 1024 pixels. Scene state is restored afterward.
-- `object_edit`: `action` = `create_primitive` (`kind`, `location`), `create_mesh` (`vertices`, `faces`), `transform` (`location`, `rotation_degrees` XYZ Euler, honoring the object's rotation mode, `scale`), `set_color` (`rgba`, `slot`=0; reuses one color material per object slot), `shade` (`smooth`), `apply_transforms` (`components`=[rotation, scale]; shared mesh data needs `make_single_user`=true; children keep their world transforms), `set_origin` (`origin` = bounds_bottom_center | bounds_center | world_origin | point with world `location`; geometry stays in place), `snap_to_grid` (`grid`), `rename` (`new_name`; also renames single-user mesh data), `add_socket` (empty `SOCKET_<new_name>` parented at local `location`, `rotation_degrees`).
+- `object_edit`: `action` = `create_primitive` (`kind`, `location`), `create_mesh` (`vertices`, `faces`), `transform` (`location`, `rotation_degrees` XYZ Euler, honoring the object's rotation mode, `scale`), `set_color` (`rgba`, `slot`=0; reuses one color material per object slot), `shade` (`smooth`), `apply_transforms` (`components`=[rotation, scale]; shared mesh data needs `make_single_user`=true; children keep their world transforms), `set_origin` (`origin` = bounds_bottom_center | bounds_center | world_origin | point with world `location`; geometry stays in place), `snap_to_grid` (`grid`), `rename` (`new_name`; also renames single-user mesh data), `add_socket` (empty `SOCKET_<new_name>` parented at local `location`, `rotation_degrees`), `duplicate` (`new_name`; `count`, world `offset`, `linked`), `parent` (`new_name`; preserves world transform and refuses cycles), `unparent` (preserves world transform), `move_to_collection` (`new_name`, `create`).
 - `mesh_edit`: `action` =
   - `modifier` (`kind` bevel | decimate | subdivision | voxel_remesh, `amount`, `apply`)
   - `unwrap` (Smart UV Project then pack; `angle_limit_degrees`=66, `island_margin`=0.02, optional `uv_layer`, created if missing)
@@ -77,6 +77,12 @@ After installing new tools, restart that client's MCP connection to discover the
   - `texel_density` (uniformly scales the layer around its UV bounds center to `target_px_per_m` at `texture_resolution`, measured as in `inspect_mesh_quality`; `pack` rearranges islands without rescaling)
   - `collision` (`shape` convex | box | sphere → `UCX_`/`UBX_`/`USP_<base>_NN` per loose part, unparented, world transform of the source; convex hulls are capped at `max_hull_vertices` (≤255) by farthest-point sampling; `<base>` drops a `_LODn` suffix)
   - `cleanup` (`merge_distance`, `steps` from merge, delete_loose, recalc_normals, triangulate, clear_custom_normals; returns count deltas)
+  - `boolean` (`operand`, `operation` union | difference | intersect; `solver` exact | fast, `keep_operand`, `self_intersection`; transfers materials; removes the operand unless `keep_operand`=true)
+  - `join` (`names`; consumes the sources into `name`, remapping transforms, UVs, vertex groups and material slots)
+  - `separate` (`by` loose_parts | materials; keeps the source as part 0 and creates `<name>_part_NN`)
+  - `mirror` (`symmetry_axis`; `merge_distance`, `clipping`; mirrors across the object origin)
+  - `array` (`count`, constant object-space `offset`)
+  - `solidify` (`thickness`, `offset`)
 - `assign_material`: bind a new material to exact mesh slots, pack a bounded workspace PNG as sRGB base color, and set raw roughness and metallic values. Other slots are preserved; UVs and single-user mesh data are required for textured assignment.
 - `asset_io`: `action` = `import` (static GLB `path`, new `name`), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease).
 - `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) exactly `resolution` px wide (≤ 2048; tiles centered); `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
@@ -110,6 +116,8 @@ Custom meshes accept 3–10,000 vertices, 1–20,000 faces and at most 100,000 f
 Bevel is bounded by the evaluated geometry; unapplied modifier stacks are limited to 16.
 
 Geometry actions need Object Mode, single-user mesh data without modifiers or shape keys, and at most 500,000 triangles (`remesh_quad`, `collision`, `lightmap_uv`, `texel_density`: 200,000; `remesh_quad` targets 16–100,000 faces; `lod_chain` 1–6 levels; collision 1–64 loose parts). Reductions bake through the evaluated mesh rather than context operators; QuadriFlow and UV packing run through Blender operators, including in `runtime start --background`.
+
+Composition also requires Object Mode, single-user meshes without modifiers or shape keys. Booleans bound the two inputs and result to 500,000 triangles; `fast` selects Blender's float solver, `exact` its exact solver. `join` takes 1–64 sources, `separate` creates 1–64 parts, `array` allows 2–1000 copies within the 500,000-triangle result budget, and `duplicate` creates 1–256 objects. Failed booleans, joins, splits, duplicates and modifier bakes restore the original scene.
 
 `decimate_to` and each `lod_chain` level report `target`, `achieved`, `preservation` (`seams`, `seams_unweighted`, `plain`) and `relaxed`. Seam preservation is relaxed in that order when it blocks a target; results still more than 10% over target are listed in `warnings`.
 
@@ -183,6 +191,8 @@ The additional `tests/blender_organic.py` native check exercises custom topology
 `tests/blender_harden.py` checks rotation modes, color material reuse, named UV layers, modifier budgets, lease-free previews, FBX settings, and the bridge's request cap and error statuses.
 
 `tests/blender_aaa.py` checks decimation, LOD chains, QuadriFlow, lightmap overlap, texel density, collision naming, cleanup deltas, transform/origin edits, sockets, inspection checks, LOD/collision/USD/bake-pair exports with FBX re-import, every review sheet mode and scatter budgets.
+
+`tests/blender_compose.py` checks booleans and rollback, joins with transforms/materials, loose and material splits, mirror/array/solidify bounds, linked and copied duplicates, parent/unparent world transforms, collection moves, hierarchy reporting and ownership.
 
 `tests/blender_golden.py` checks convex hulls of meshes with interior points, lightmap packing time, LOD/decimation relaxation and warnings, and exact review sheet width.
 
