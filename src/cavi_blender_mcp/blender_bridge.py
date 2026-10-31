@@ -369,8 +369,8 @@ def import_fbx(path, name):
         _load_fbx(temporary)
         objects = sorted(set(bpy.data.objects) - previous["objects"],
                          key=lambda item: (item.type != "ARMATURE", item.name))
-        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
-            objects, previous, animations_allowed=False, shape_keys_allowed=False)
+        armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
+            objects, previous, animations_allowed=True, shape_keys_allowed=False)
         images = workspace_images(previous)
         collection = install_collection(name, objects, scene)
         for image in images:
@@ -380,7 +380,9 @@ def import_fbx(path, name):
                 "objects": [info(item) for item in objects],
                 "armatures": [item.name for item in armatures],
                 "skinned_meshes": [item.name for item in skinned],
-                "bone_count": bones, "animations": [],
+                "bone_count": bones,
+                "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
+                               for action in actions],
                 "imported_vertices": vertices, "imported_triangles": triangles}
     except Exception:
         for key in pools:

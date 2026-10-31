@@ -85,7 +85,7 @@ After installing new tools, restart that client's MCP connection to discover the
   - `array` (`count`, constant object-space `offset`)
   - `solidify` (`thickness`, `offset`)
 - `assign_material`: bind a PBR material to exact mesh slots and pack bounded workspace PNG/JPEG maps: `base_color_texture`, `normal_texture`/`normal_strength`, `roughness_texture`, `metallic_texture`, `emission_texture`/`emission_strength`, and `alpha_texture`/`alpha_mode` (opaque | clip | blend). `uv_scale`, `uv_offset` and `uv_rotation_degrees` drive one Mapping node; base color and emission use sRGB, the remaining maps use Non-Color. `base_color`, `roughness` and `metallic` set scalar values when maps are absent. `update_existing` edits a material created by this tool that is bound to the slot, preserving unspecified settings and replacing supplied maps; untagged materials are refused and maps cannot be removed. Other slots are preserved; UVs and single-user mesh data are required for textured assignment. Each image is at most 16 MiB and 4096², with a combined 32-million-pixel budget.
-- `asset_io`: `action` = `import` (GLB `path`, new `name`; static, skinned or animated; or FBX `path`, new `name`; static or skinned), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `animations`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease). `animations=true` applies to FBX and GLB only, includes the armatures of the named meshes, exports every linked action, and refuses LODs, collision, instances and pair baking.
+- `asset_io`: `action` = `import` (GLB or FBX `path`, new `name`; static, skinned or animated), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `animations`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease). `animations=true` applies to FBX and GLB only, includes the armatures of the named meshes, exports every linked action, and refuses LODs, collision, instances and pair baking.
 - `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) exactly `resolution` px wide (≤ 2048; tiles centered); `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
 - `scatter`: adds a fixed Geometry Nodes modifier that instances `collection` over the mesh surface: `density` per m², `seed`, `min_distance` (Poisson), `scale_range`, `rotation_jitter_degrees` about Z, `realize`. Bounded to 100,000 estimated instances and 2,000,000 realized triangles; no caller-authored node graphs.
 
@@ -148,11 +148,12 @@ rotation or scale targets with LINEAR, STEP or CUBICSPLINE interpolation.
 
 FBX import accepts ASCII and binary files of at most 64 MiB. It uses a size-capped import
 with post-import validation and rollback rather than a binary preflight. Static meshes,
-materials, armatures and skinned meshes are supported; animation clips, shape keys, cameras
-and lights are refused by the static FBX workflow. Imported images must be packed or resolve
-inside the workspace; external texture references reject the import. Imported armatures,
-skinned meshes and GLB actions work with `inspect_rig`, `rig_edit` weight repair and animated
-exports. Import names accept at most 58 UTF-8 bytes to leave room for object suffixes.
+materials, armatures, skinned meshes and animation clips are supported; up to 32 actions with
+finite frame ranges are imported and can be re-exported. Shape keys, cameras and lights are
+refused. Imported images must be packed or resolve inside the workspace; external texture
+references reject the import. Imported armatures, skinned meshes and actions work with
+`inspect_rig`, `rig_edit` weight repair and animated exports. Import names accept at most
+58 UTF-8 bytes to leave room for object suffixes.
 
 Prepare a separate runtime with `uv venv --python 3.11 /path/to/neural-env` and `uv pip install --python /path/to/neural-env/bin/python -r requirements-neural.txt`. Check out upstream TripoSR at commit `107cefdc244c39106fa830359024f6a2f1c78871`. Download `config.yaml` and `model.ckpt` from the public `stabilityai/TripoSR` model at revision `5b521936b01fbe1890f6f9baed0254ab6351c04a`, plus `facebook/dino-vitb16/config.json` saved as `dino-config.json` in the same weights directory.
 
@@ -232,9 +233,9 @@ after a partial import.
 `tests/blender_animated_import.py` checks animated GLB import, imported action frame ranges,
 `inspect_rig` clips, re-export to FBX/GLB, duplicate-name rejection and rollback.
 
-`tests/blender_fbx_import.py` checks static and rigged FBX import, workspace texture packing,
-external texture/camera/light/shape-key refusal, animated-FBX refusal, duplicate names and
-partial-import rollback.
+`tests/blender_fbx_import.py` checks static, rigged and animated FBX import, workspace
+texture packing, animated action inspection and re-export, external texture/camera/light/
+shape-key refusal, duplicate names and partial-import rollback.
 
 ## MCP evaluation
 
@@ -247,7 +248,7 @@ npm run eval:protocol
 npm run eval:core -- --blender /path/to/blender
 ```
 
-The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 12 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB imports, packed color materials, lit previews, geometry actions, rig creation/binding, rig inspection, review sheets, scatter, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
+The evaluator is pinned to `@cavi-ai/mcp-eval` 0.8.0. The protocol manifest checks discovery size, catalog token budgets, pagination, surface listing, and protocol negotiation. The core manifest adds schema, structured output, repeated reads, and contention checks. The corpus covers all 12 tools through real stdio MCP sessions, including PNG image data, nonempty exports, GLB/FBX imports, packed color materials, lit previews, geometry actions, rig creation/binding, rig inspection, review sheets, scatter, and edit ownership. The optional model case requires a configured runtime and `--model-image`; ordinary protocol/native runs report model evaluation as not run. No-argument read tools have no tool-specific invalid inputs.
 
 To exercise actual image-to-3D inference, append `--model-image /path/to/original.png` to the native evaluator command. The resulting GLB and report are retained in that run's artifact directory.
 

@@ -4516,7 +4516,30 @@
     ]
   },
   {
-    "id": "fbx-animated-refused",
+    "id": "fbx-animated-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "eval-anim.fbx",
+      "name": "AnimatedFbxImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/format": "fbx",
+      "/armatures/0": "AnimatedFbxImport",
+      "/animations/0/frame_range/0": 1,
+      "/animations/0/frame_range/1": 11
+    },
+    "required": [
+      "/animations/0/name",
+      "/skinned_meshes/0"
+    ]
+  },
+  {
+    "id": "fbx-animated-import-duplicate",
     "tool": "asset_io",
     "arguments": {
       "action": "import",
@@ -4527,6 +4550,6 @@
     "modes": [
       "native"
     ],
-    "error": "animated import workflow"
+    "error": "already exists"
   }
 ]
