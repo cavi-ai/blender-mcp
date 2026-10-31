@@ -40,6 +40,20 @@ def skinned():
     return document
 
 
+def animated():
+    document = triangle()
+    document["buffers"][0]["byteLength"] = 4096
+    document["accessors"] += [
+        {"componentType": 5126, "count": 2, "type": "SCALAR"},
+        {"componentType": 5126, "count": 2, "type": "VEC3"},
+    ]
+    document["animations"] = [{
+        "channels": [{"sampler": 0, "target": {"node": 0, "path": "translation"}}],
+        "samplers": [{"input": 2, "output": 3, "interpolation": "LINEAR"}],
+    }]
+    return document
+
+
 class ImportPreflightTests(unittest.TestCase):
     def test_node_cycles_are_refused_before_blender_traverses_them(self):
         from cavi_blender_mcp.importing import inspect_glb
@@ -110,22 +124,117 @@ class ImportPreflightTests(unittest.TestCase):
             self.assertEqual((report["skins"], report["joints"], report["skinned_meshes"]),
                              (1, 1, 1))
 
-    def test_animations_cameras_and_lights_are_refused(self):
+    def test_animated_glb_is_bounded_and_reported(self):
         from cavi_blender_mcp.importing import inspect_glb
 
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            for key, message in [("animations", "animated"), ("cameras", "Cameras")]:
-                document = triangle()
-                document[key] = [{}]
-                write_glb(root / "prop.glb", document)
-                with self.subTest(key=key), self.assertRaisesRegex(ValueError, message):
-                    inspect_glb(root, "prop.glb")
+            write_glb(root / "prop.glb", animated(), b"\x00" * 4096)
+            report = inspect_glb(root, "prop.glb")
+            self.assertEqual((report["animations"], report["animation_channels"],
+                              report["animation_keys"]), (1, 1, 2))
+            document = animated()
+            document["animations"][0]["samplers"][0]["interpolation"] = "CUBICSPLINE"
+            document["accessors"][3]["count"] = 6
+            write_glb(root / "prop.glb", document, b"\x00" * 4096)
+            report = inspect_glb(root, "prop.glb")
+            self.assertEqual(report["animation_keys"], 2)
+
+    def test_cameras_and_lights_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            document = triangle()
+            document["cameras"] = [{}]
+            write_glb(root / "prop.glb", document)
+            with self.assertRaisesRegex(ValueError, "Cameras"):
+                inspect_glb(root, "prop.glb")
             document = triangle()
             document["extensionsUsed"] = ["KHR_lights_punctual"]
             write_glb(root / "prop.glb", document)
             with self.assertRaisesRegex(ValueError, "Light"):
                 inspect_glb(root, "prop.glb")
+
+    def test_malformed_animations_are_refused(self):
+        from cavi_blender_mcp.importing import inspect_glb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cases = []
+
+            document = animated()
+            document["animations"][0]["channels"] = []
+            cases.append((document, "at least one channel"))
+
+            document = animated()
+            document["animations"][0]["samplers"] = []
+            cases.append((document, "at least one sampler"))
+
+            document = animated()
+            document["animations"][0]["channels"][0]["sampler"] = 9
+            cases.append((document, "sampler reference"))
+
+            document = animated()
+            document["animations"][0]["channels"][0]["target"]["node"] = 9
+            cases.append((document, "invalid node"))
+
+            document = animated()
+            document["animations"][0]["channels"][0]["target"]["path"] = "weights"
+            cases.append((document, "translation, rotation or scale"))
+
+            document = animated()
+            document["accessors"][2]["type"] = "VEC3"
+            cases.append((document, "FLOAT SCALAR"))
+
+            document = animated()
+            document["accessors"][3]["componentType"] = 5123
+            cases.append((document, "FLOAT accessors"))
+
+            document = animated()
+            document["accessors"][2]["count"] = 100001
+            document["accessors"][3]["count"] = 100001
+            cases.append((document, "100000 keys"))
+
+            document = animated()
+            document["animations"][0]["samplers"][0]["interpolation"] = "BEZIER"
+            cases.append((document, "interpolation"))
+
+            document = animated()
+            document["accessors"][3]["count"] = 3
+            cases.append((document, "output count"))
+
+            document = animated()
+            document["animations"][0]["channels"][0]["target"]["path"] = "rotation"
+            cases.append((document, "output type"))
+
+            document = animated()
+            document["animations"][0]["channels"].append(
+                {"sampler": 0, "target": {"node": 0, "path": "scale"}})
+            cases.append((document, "mix target paths"))
+
+            document = animated()
+            document["animations"] = [
+                json.loads(json.dumps(document["animations"][0])) for _ in range(33)]
+            cases.append((document, "32 animations"))
+
+            document = triangle()
+            document["buffers"][0]["byteLength"] = 4096
+            document["accessors"] += [
+                {"componentType": 5126, "count": 100000, "type": "SCALAR"},
+                {"componentType": 5126, "count": 100000, "type": "VEC3"},
+            ]
+            sample = {"channels": [{"sampler": 0,
+                                    "target": {"node": 0, "path": "translation"}}],
+                      "samplers": [{"input": 2, "output": 3, "interpolation": "LINEAR"}]}
+            document["animations"] = [json.loads(json.dumps(sample)) for _ in range(3)]
+            cases.append((document, "256000 animation keys"))
+
+            for index, (document, message) in enumerate(cases):
+                with self.subTest(case=index):
+                    write_glb(root / "prop.glb", document, b"\x00" * 4096)
+                    with self.assertRaisesRegex(ValueError, message):
+                        inspect_glb(root, "prop.glb")
 
     def test_malformed_skin_bindings_are_refused(self):
         from cavi_blender_mcp.importing import inspect_glb

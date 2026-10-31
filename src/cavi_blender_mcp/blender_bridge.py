@@ -229,8 +229,6 @@ def import_glb(path, name):
             raise RuntimeError("GLB produced an unsupported object type")
         if set(bpy.data.scenes) != previous["scenes"]:
             raise RuntimeError("GLB import unexpectedly changed the scene set")
-        if set(bpy.data.actions) != previous["actions"]:
-            raise RuntimeError("Animation clips need the animated import workflow")
         armatures = [item for item in objects if item.type == "ARMATURE"]
         if len(armatures) > 16:
             raise RuntimeError("Imported armatures exceed the import budget")
@@ -258,6 +256,14 @@ def import_glb(path, name):
         if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
                 or not 0 < triangles <= MAX_GEOMETRY):
             raise RuntimeError("Imported geometry exceeds the import budget")
+        actions = sorted(set(bpy.data.actions) - previous["actions"],
+                         key=lambda item: item.name)
+        if len(actions) > 32:
+            raise RuntimeError("Imported actions exceed the import budget")
+        for action in actions:
+            start, end = action.frame_range
+            if not math.isfinite(start) or not math.isfinite(end) or end < start:
+                raise RuntimeError("Imported action has an invalid frame range")
         collection = bpy.data.collections.new(name)
         scene.collection.children.link(collection)
         for index, item in enumerate(objects):
@@ -273,6 +279,8 @@ def import_glb(path, name):
                 "armatures": [item.name for item in armatures],
                 "skinned_meshes": [item.name for item in skinned],
                 "bone_count": bones,
+                "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
+                               for action in actions],
                 "imported_vertices": vertices, "imported_triangles": triangles}
     except Exception:
         for key in pools:

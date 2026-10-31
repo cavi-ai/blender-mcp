@@ -4420,7 +4420,31 @@
     ]
   },
   {
-    "id": "animated-import-refused",
+    "id": "animated-import-success",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "eval-anim.glb",
+      "name": "AnimatedImport"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/armatures/0": "AnimatedImport",
+      "/joints": 2,
+      "/bone_count": 2,
+      "/animations/0/frame_range/0": 1,
+      "/animations/0/frame_range/1": 11
+    },
+    "required": [
+      "/animations/0/name",
+      "/skinned_meshes/0"
+    ]
+  },
+  {
+    "id": "animated-import-duplicate",
     "tool": "asset_io",
     "arguments": {
       "action": "import",
@@ -4431,6 +4455,6 @@
     "modes": [
       "native"
     ],
-    "error": "animated import workflow"
+    "error": "already exists"
   }
 ]

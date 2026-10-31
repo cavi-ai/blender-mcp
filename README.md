@@ -85,7 +85,7 @@ After installing new tools, restart that client's MCP connection to discover the
   - `array` (`count`, constant object-space `offset`)
   - `solidify` (`thickness`, `offset`)
 - `assign_material`: bind a PBR material to exact mesh slots and pack bounded workspace PNG/JPEG maps: `base_color_texture`, `normal_texture`/`normal_strength`, `roughness_texture`, `metallic_texture`, `emission_texture`/`emission_strength`, and `alpha_texture`/`alpha_mode` (opaque | clip | blend). `uv_scale`, `uv_offset` and `uv_rotation_degrees` drive one Mapping node; base color and emission use sRGB, the remaining maps use Non-Color. `base_color`, `roughness` and `metallic` set scalar values when maps are absent. `update_existing` edits a material created by this tool that is bound to the slot, preserving unspecified settings and replacing supplied maps; untagged materials are refused and maps cannot be removed. Other slots are preserved; UVs and single-user mesh data are required for textured assignment. Each image is at most 16 MiB and 4096², with a combined 32-million-pixel budget.
-- `asset_io`: `action` = `import` (GLB `path`, new `name`; static or skinned), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `animations`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease). `animations=true` applies to FBX and GLB only, includes the armatures of the named meshes, exports every linked action, and refuses LODs, collision, instances and pair baking.
+- `asset_io`: `action` = `import` (GLB `path`, new `name`; static, skinned or animated), `export` (`names`, `.fbx`/`.glb`/`.usd`/`.usda`/`.usdc` `path`, `preserve_instances`, `include_empties`, `lods`, `collision`, `animations`, `axis`, or `bake_pair`), `save` (new `.blend` `path`), `generate` (`image`, `.glb` `path`, `resolution`; local TripoSR, no lease). `animations=true` applies to FBX and GLB only, includes the armatures of the named meshes, exports every linked action, and refuses LODs, collision, instances and pair baking.
 - `review_sheet`: one PNG contact sheet of up to six `views` (front, back, left, right, top, persp) exactly `resolution` px wide (≤ 2048; tiles centered); `mode` = shaded | wireframe | uv_checker | texel_heatmap (blue below, green on, red above `target_px_per_m` at `texture_resolution`) | matcap. Read-only stand-ins; no lease.
 - `scatter`: adds a fixed Geometry Nodes modifier that instances `collection` over the mesh surface: `density` per m², `seed`, `min_distance` (Poisson), `scale_range`, `rotation_jitter_degrees` about Z, `realize`. Bounded to 100,000 estimated instances and 2,000,000 realized triangles; no caller-authored node graphs.
 
@@ -139,12 +139,14 @@ file is hashed, validated, and copied to a private snapshot before Blender reads
 
 Import is limited to one-scene triangle GLBs of at most 64 MiB, 1,000 nodes,
 500,000 vertices and triangles, and a combined 4096×4096 embedded-image pixels. PNG and JPEG
-images may be embedded; external dependencies, animation clips, cameras, lights, morph
-targets, compressed geometry, and cyclic or excessively deep node hierarchies are refused.
-Skins are supported with up to 16 skins, 512 joints each, 1,024 joints total, 64 skinned
-meshes and four influences per vertex. Imported armatures and skinned meshes work with
-`inspect_rig` and `rig_edit` weight repair; animation clips need the animated import
-workflow. Import names accept at most 58 UTF-8 bytes to leave room for object suffixes.
+images may be embedded; external dependencies, cameras, lights, morph targets, compressed
+geometry, and cyclic or excessively deep node hierarchies are refused. Skins are supported
+with up to 16 skins, 512 joints each, 1,024 joints total, 64 skinned meshes and four
+influences per vertex. Animation clips are supported with up to 32 clips, 1,024 total
+channels and samplers, 100,000 keys per clip and 256,000 keys total, using translation,
+rotation or scale targets with LINEAR, STEP or CUBICSPLINE interpolation. Imported armatures,
+skinned meshes and actions work with `inspect_rig`, `rig_edit` weight repair and animated
+exports. Import names accept at most 58 UTF-8 bytes to leave room for object suffixes.
 
 Prepare a separate runtime with `uv venv --python 3.11 /path/to/neural-env` and `uv pip install --python /path/to/neural-env/bin/python -r requirements-neural.txt`. Check out upstream TripoSR at commit `107cefdc244c39106fa830359024f6a2f1c78871`. Download `config.yaml` and `model.ckpt` from the public `stabilityai/TripoSR` model at revision `5b521936b01fbe1890f6f9baed0254ab6351c04a`, plus `facebook/dino-vitb16/config.json` saved as `dino-config.json` in the same weights directory.
 
@@ -218,8 +220,11 @@ and rollback after a partial native import. It uses a disposable factory scene a
 temporary workspace; no game project is opened.
 
 `tests/blender_rigged_import.py` checks skinned GLB import, armature and vertex-group
-preservation, `inspect_rig` on the imported result, duplicate-name rejection, rollback
-after a partial import, and refusal of animated GLBs before the animated workflow.
+preservation, `inspect_rig` on the imported result, duplicate-name rejection, and rollback
+after a partial import.
+
+`tests/blender_animated_import.py` checks animated GLB import, imported action frame ranges,
+`inspect_rig` clips, re-export to FBX/GLB, duplicate-name rejection and rollback.
 
 ## MCP evaluation
 
