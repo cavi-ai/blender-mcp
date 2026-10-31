@@ -54,6 +54,48 @@ def animated():
     return document
 
 
+class UsdPreflightTests(unittest.TestCase):
+    def test_ascii_usd_assets_are_bounded_and_resolved(self):
+        from cavi_blender_mcp.importing import inspect_usd
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "inside.usda").write_text("#usda 1.0\n")
+            (root / "prop.usda").write_text(
+                '#usda 1.0\n(def Xform "X" (prepend references = @inside.usda@))\n')
+            report = inspect_usd(root, "prop.usda")
+            self.assertEqual((report["format"], report["binary"],
+                              report["asset_references"]), ("usd", False, 1))
+            for reference in ("../outside.usda", "missing.usda"):
+                (root / "prop.usda").write_text(
+                    f'#usda 1.0\n(def Xform "X" (references = @{reference}@))\n')
+                with self.subTest(reference=reference), self.assertRaisesRegex(
+                        ValueError, "workspace"):
+                    inspect_usd(root, "prop.usda")
+
+    def test_binary_usd_and_workspace_boundary_are_checked(self):
+        from cavi_blender_mcp.importing import inspect_usd
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "prop.usdc").write_bytes(b"PXR-USDC" + b"\x00" * 64)
+            report = inspect_usd(root, "prop.usdc")
+            self.assertTrue(report["binary"])
+            (root / "bad.usdc").write_bytes(b"not a usd")
+            with self.assertRaisesRegex(ValueError, "USD"):
+                inspect_usd(root, "bad.usdc")
+            (root / "bad.usda").write_text("not usd")
+            with self.assertRaisesRegex(ValueError, "USD"):
+                inspect_usd(root, "bad.usda")
+            with tempfile.TemporaryDirectory() as outside:
+                target = Path(outside) / "outside.usda"
+                target.write_text("#usda 1.0\n")
+                (root / "escape.usda").symlink_to(target)
+                for name in ("escape.usda", "../outside.usda", str(target)):
+                    with self.subTest(name=name), self.assertRaisesRegex(ValueError, "workspace"):
+                        inspect_usd(root, name)
+
+
 class ObjPreflightTests(unittest.TestCase):
     def test_obj_geometry_and_material_libraries_are_bounded(self):
         from cavi_blender_mcp.importing import inspect_obj

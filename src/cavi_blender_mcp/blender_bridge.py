@@ -19,7 +19,15 @@ from mathutils import Euler, Quaternion, Vector
 
 from .client import DEFAULT_TIMEOUT, MAX_REQUEST_BYTES, MAX_TIMEOUT
 from .geometry import validate_mesh
-from .importing import MAX_BYTES, MAX_FBX_BYTES, MAX_GEOMETRY, inspect_fbx, inspect_glb, inspect_obj
+from .importing import (
+    MAX_BYTES,
+    MAX_FBX_BYTES,
+    MAX_GEOMETRY,
+    inspect_fbx,
+    inspect_glb,
+    inspect_obj,
+    inspect_usd,
+)
 from .lease import Lease
 from .paths import destination
 from .presets import AXIS_PRESETS
@@ -259,11 +267,21 @@ def validate_imported(objects, previous, animations_allowed=True, shape_keys_all
     return armatures, meshes, skinned, actions, bones, vertices, triangles
 
 
-def workspace_images(previous):
+def workspace_images(previous, objects, require_workspace=False):
     root = Path(_workspace).resolve()
     images = set(bpy.data.images) - previous["images"]
+    materials = set(bpy.data.materials) - previous["materials"]
+    for value in objects:
+        for slot in value.material_slots:
+            if slot.material is not None:
+                materials.add(slot.material)
+    for material in materials:
+        if material.use_nodes:
+            for node in material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image is not None:
+                    images.add(node.image)
     for image in images:
-        if image.packed_file is not None:
+        if image.packed_file is not None and not require_workspace:
             continue
         if not image.filepath:
             raise RuntimeError("Imported images need packed data or a workspace path")
@@ -312,8 +330,9 @@ def import_glb(path, name):
                          key=lambda item: (item.type != "ARMATURE", item.name))
         armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
             objects, previous, animations_allowed=True)
+        images = workspace_images(previous, objects)
         collection = install_collection(name, objects, scene)
-        for image in set(bpy.data.images) - previous["images"]:
+        for image in images:
             if not image.packed_file:
                 image.pack()
         return {**report, "collection": collection.name,
@@ -372,7 +391,7 @@ def import_fbx(path, name):
                          key=lambda item: (item.type != "ARMATURE", item.name))
         armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
             objects, previous, animations_allowed=True, shape_keys_allowed=False)
-        images = workspace_images(previous)
+        images = workspace_images(previous, objects)
         collection = install_collection(name, objects, scene)
         for image in images:
             if not image.packed_file:
@@ -435,11 +454,82 @@ def import_obj(path, name):
                          key=lambda item: (item.type != "ARMATURE", item.name))
         armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
             objects, previous, animations_allowed=False, shape_keys_allowed=False)
-        images = workspace_images(previous)
+        images = workspace_images(previous, objects)
         collection = install_collection(name, objects, scene)
         for image in images:
             if not image.packed_file:
                 image.pack()
+        return {**report, "collection": collection.name,
+                "objects": [info(item) for item in objects],
+                "armatures": [item.name for item in armatures],
+                "skinned_meshes": [item.name for item in skinned],
+                "bone_count": bones, "animations": [],
+                "imported_vertices": vertices, "imported_triangles": triangles}
+    except Exception:
+        for key in pools:
+            pool = getattr(bpy.data, key)
+            for item in set(pool) - previous[key]:
+                pool.remove(item, do_unlink=True)
+        raise
+    finally:
+        if bpy.context.window and bpy.context.window.scene != scene:
+            bpy.context.window.scene = scene
+        for item in bpy.context.selected_objects:
+            item.select_set(False)
+        for item in selection:
+            item.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        Path(temporary).unlink(missing_ok=True)
+
+
+
+
+def _load_usd(path):
+    if "FINISHED" not in bpy.ops.wm.usd_import(
+        filepath=str(path), scale=1.0, set_frame_range=False,
+        import_cameras=False, import_curves=False, import_lights=False,
+        import_materials=True, import_meshes=True, import_volumes=False,
+        import_shapes=False, import_skeletons=True, import_blendshapes=False,
+        import_points=False, import_subdivision=False,
+        support_scene_instancing=False, import_visible_only=False,
+        create_collection=False, read_mesh_uvs=True, read_mesh_colors=True,
+        read_mesh_attributes=True, import_textures_mode="IMPORT_PACK",
+        validate_meshes=True):
+        raise RuntimeError("Blender did not finish importing the USD")
+
+
+def import_usd(path, name):
+    check_import_name(name)
+    report = inspect_usd(_workspace, path)
+    with Path(report["path"]).open("rb") as stream:
+        payload = stream.read(MAX_BYTES + 1)
+    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
+        raise RuntimeError("USD changed during preflight; inspect the source before retrying")
+    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
+             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+    previous = {key: set(getattr(bpy.data, key)) for key in pools}
+    selection = list(bpy.context.selected_objects)
+    active = bpy.context.view_layer.objects.active
+    scene = bpy.context.scene
+    source = Path(report["path"])
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=source.suffix,
+                                     dir=source.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+        _load_usd(temporary)
+        objects = sorted(set(bpy.data.objects) - previous["objects"],
+                         key=lambda item: (item.type != "ARMATURE", item.name))
+        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
+            objects, previous, animations_allowed=False, shape_keys_allowed=False)
+        images = workspace_images(previous, objects, require_workspace=True)
+        collection = install_collection(name, objects, scene)
+        for image in images:
+            if not image.packed_file:
+                image.pack()
+        for item in set(bpy.data.collections) - previous["collections"]:
+            if item is not collection and not item.objects and not item.children:
+                bpy.data.collections.remove(item)
         return {**report, "collection": collection.name,
                 "objects": [info(item) for item in objects],
                 "armatures": [item.name for item in armatures],
@@ -832,6 +922,8 @@ def _dispatch(operation, p):
         return import_fbx(p["path"], p["name"])
     if operation == "import_obj":
         return import_obj(p["path"], p["name"])
+    if operation == "import_usd":
+        return import_usd(p["path"], p["name"])
     if operation == "bake_map":
         from .blender_bake import bake
 
