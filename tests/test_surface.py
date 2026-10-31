@@ -32,8 +32,9 @@ class SurfaceTests(unittest.TestCase):
         self.assertIn("inspect_rig", OPERATIONS)
         calls = self.capture()
         asyncio.run(server.inspect_rig("Rig", ["Skin"], max_influences=4))
-        self.assertEqual(calls, [("inspect_rig", {"armature": "Rig", "meshes": ["Skin"],
-                                                 "max_influences": 4})])
+        self.assertEqual(calls, [("inspect_rig", {
+            "armature": "Rig", "meshes": ["Skin"], "max_influences": 4,
+            "action": None, "checks": [], "samples": 8})])
 
         async def invalid():
             return await server.mcp.call_tool("inspect_rig", {

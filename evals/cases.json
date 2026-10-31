@@ -4712,5 +4712,109 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "rig-animation-root-motion",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ],
+      "action": "EvalWalk",
+      "checks": [
+        "root_motion",
+        "loop"
+      ],
+      "samples": 4
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/analyzed_action": "EvalWalk"
+    },
+    "required": [
+      "/animation_checks/root_motion/root_bones/0/name",
+      "/animation_checks/loop/loop_closes"
+    ]
+  },
+  {
+    "id": "rig-animation-deformation",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ],
+      "action": "EvalWalk",
+      "checks": [
+        "deformation"
+      ],
+      "samples": 4
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/animation_checks/deformation/0/max_dimension_ratio"
+    ]
+  },
+  {
+    "id": "rig-animation-missing-action",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ],
+      "action": "Missing",
+      "checks": [
+        "loop"
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "does not exist"
+  },
+  {
+    "id": "rig-animation-invalid-check",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ],
+      "checks": [
+        "foot_slide"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "rig-animation-samples-bound",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "EvalRigNew",
+      "meshes": [
+        "RigMesh"
+      ],
+      "samples": 33
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]
