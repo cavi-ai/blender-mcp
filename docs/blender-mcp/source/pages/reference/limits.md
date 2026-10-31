@@ -88,6 +88,7 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | Combined material pixels | 32,000,000 |
 | Material slots per inspection | 64 |
 | Material nodes | 512 |
+| Mesh shape keys including Basis | 64 |
 | Bake low-poly triangles | 200,000 |
 | Bake high-poly triangles | 1,000,000 |
 | Bake high-poly objects | 64 |

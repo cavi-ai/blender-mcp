@@ -92,7 +92,7 @@ cavi-blender-mcp runtime restart --lease-id <current-lease>
 - **Inspection**: scene and object metadata, mesh budgets, texel density, UV
   stretch, material bindings, bone hierarchies and skin weights.
 - **Object editing**: primitives, custom meshes, transforms, origins, names,
-  sockets, duplicates, parents and collections.
+  sockets, duplicates, parents, collections and shape keys.
 - **Mesh preparation**: modifiers, UV unwrapping, decimation, LOD chains,
   QuadriFlow, lightmap packing, texel density, collision hulls, cleanup,
   booleans, joins, splits, mirrors, arrays and shells.

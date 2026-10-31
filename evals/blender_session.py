@@ -44,6 +44,8 @@ bpy.ops.mesh.primitive_cube_add(location=(70, 5, 0))
 bpy.context.object.name = bpy.context.object.data.name = "BakeNoUV"
 for layer in list(bpy.data.objects["BakeNoUV"].data.uv_layers):
     bpy.data.objects["BakeNoUV"].data.uv_layers.remove(layer)
+bpy.ops.mesh.primitive_cube_add(location=(85, 0, 0))
+bpy.context.object.name = bpy.context.object.data.name = "ShapeTarget"
 bpy.ops.mesh.primitive_cube_add(location=(80, 0, 0))
 morph = bpy.context.object
 morph.name = morph.data.name = "MorphSource"

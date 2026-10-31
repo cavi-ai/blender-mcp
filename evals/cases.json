@@ -5106,5 +5106,121 @@
       "native"
     ],
     "error": "already exists"
+  },
+  {
+    "id": "shape-key-add",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_add",
+      "name": "ShapeTarget",
+      "new_name": "Smile",
+      "value": 0.5,
+      "offsets": [
+        [
+          0,
+          0,
+          0,
+          0.1
+        ]
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/shape_keys": 1,
+      "/shape_key_names/0": "Smile"
+    }
+  },
+  {
+    "id": "shape-key-value",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_value",
+      "name": "ShapeTarget",
+      "new_name": "Smile",
+      "value": 0.25
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/shape_key_names/0": "Smile"
+    }
+  },
+  {
+    "id": "shape-key-keyframe",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_keyframe",
+      "name": "ShapeTarget",
+      "new_name": "Smile",
+      "action_name": "EvalSmile",
+      "keyframes": [
+        {
+          "frame": 1,
+          "value": 0
+        },
+        {
+          "frame": 11,
+          "value": 1
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "EvalSmile",
+      "/frame_range/0": 1
+    },
+    "required": [
+      "/action_slot"
+    ]
+  },
+  {
+    "id": "shape-key-missing-name",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_add",
+      "name": "ShapeTarget"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: new_name"
+  },
+  {
+    "id": "shape-key-remove-basis",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_remove",
+      "name": "ShapeTarget",
+      "new_name": "Basis"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "Basis"
+  },
+  {
+    "id": "shape-key-duplicate",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "shape_key_add",
+      "name": "ShapeTarget",
+      "new_name": "Smile"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists"
   }
 ]

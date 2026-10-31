@@ -864,6 +864,11 @@ def _dispatch(operation, p):
         return import_obj(p["path"], p["name"])
     if operation == "import_usd":
         return import_usd(p["path"], p["name"])
+    if operation in {"shape_key_add", "shape_key_value", "shape_key_remove",
+                     "shape_key_keyframe"}:
+        from .blender_shape_keys import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation == "bake_map":
         from .blender_bake import bake
 

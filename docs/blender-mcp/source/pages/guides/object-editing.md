@@ -21,6 +21,10 @@ Unrelated action parameters are refused before contacting Blender.
 | `parent` | `new_name` is the parent; preserves world transform |
 | `unparent` | no extra parameters; preserves world transform |
 | `move_to_collection` | `new_name`, `create` |
+| `shape_key_add` | `new_name`, `value`, sparse `offsets`, or `source` mesh |
+| `shape_key_value` | `new_name`, `value` |
+| `shape_key_keyframe` | `new_name`, `action_name`, `keyframes` = 1–32 `{frame, value}` |
+| `shape_key_remove` | `new_name`; Basis cannot be removed |
 
 ## Transforms and origins
 
@@ -49,6 +53,17 @@ offset in world space by its index.
 
 `move_to_collection` moves the object to a named collection. `create=true`
 creates the collection when missing.
+
+## Shape keys
+
+Shape-key actions require single-user mesh data. `shape_key_add` creates Basis
+when needed, then adds the named key. `offsets` are sparse
+`[vertex_index, x, y, z]` local displacements; `source` copies local vertex
+positions from another mesh with the same vertex count.
+
+`shape_key_keyframe` creates a new action atomically with 1–32 strictly
+increasing frames and values from 0 to 1. Values are applied and keyed in order;
+the previous action, value and scene frame are restored on failure.
 
 ## Related
 
