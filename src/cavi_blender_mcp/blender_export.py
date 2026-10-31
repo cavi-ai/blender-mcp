@@ -46,10 +46,10 @@ def fbx(path, preset, empties=False, animations=False, textures=False):
         **AXIS_PRESETS[preset])
 
 
-def usd(path, preset, instances):
+def usd(path, preset, instances, animations=False):
     forward, up = USD_AXES[preset]
     return bpy.ops.wm.usd_export(
-        filepath=str(path), selected_objects_only=True, export_animation=False,
+        filepath=str(path), selected_objects_only=True, export_animation=animations,
         export_hair=False, export_lights=False, export_cameras=False, export_materials=True,
         export_uvmaps=True, export_normals=True, use_instancing=instances,
         evaluation_mode="RENDER", export_textures_mode="KEEP",
@@ -73,7 +73,7 @@ def write(path, objects, selection, preset, instances, empties, animations=False
                 export_skins=animations, export_animation_mode="ACTIONS",
                 export_morph=True, export_morph_animation=animations)
         else:
-            result = usd(path, preset, instances)
+            result = usd(path, preset, instances, animations)
     if "FINISHED" not in result:
         raise RuntimeError("Export did not finish")
 
@@ -240,8 +240,8 @@ def export_asset(p):
     if instances and suffix == ".glb":
         raise ValueError("preserve_instances applies to static FBX or USD exports")
     if animations:
-        if suffix not in {".fbx", ".glb"}:
-            raise ValueError("animations apply to FBX and GLB exports")
+        if suffix not in {".fbx", ".glb", ".usd", ".usda", ".usdc"}:
+            raise ValueError("animations apply to FBX, GLB and USD exports")
         if lods or collision or instances:
             raise ValueError("animations cannot combine with lods, collision or instances")
     objects = []

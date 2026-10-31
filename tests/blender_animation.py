@@ -121,8 +121,14 @@ try:
     document = glb_document(root / "anim.glb")
     assert document.get("animations") and document.get("skins"), document.keys()
 
-    refused("export_asset", "FBX and GLB", names=["AnimMesh"], path="anim.usd",
-            animations=True)
+    usd = bridge.dispatch("export_asset", {
+        "names": ["AnimMesh"], "path": "anim.usda", "animations": True, "lease_id": lease})
+    assert usd["bytes"] > 0 and usd["animations"], usd
+    assert usd["armatures"] == ["AnimRig"]
+    assert "timeSamples" in (root / "anim.usda").read_text()
+    usdc = bridge.dispatch("export_asset", {
+        "names": ["AnimMesh"], "path": "anim.usdc", "animations": True, "lease_id": lease})
+    assert usdc["bytes"] > 0 and usdc["animations"]
     bpy.ops.mesh.primitive_cube_add(location=(5, 0, 0))
     bpy.context.object.name = "Unskinned"
     refused("export_asset", "armature", names=["Unskinned"], path="bad.fbx",

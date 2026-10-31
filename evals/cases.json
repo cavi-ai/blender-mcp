@@ -4307,12 +4307,19 @@
       ],
       "animations": true
     },
-    "kind": "safety",
+    "kind": "success",
     "modes": [
       "native"
     ],
-    "error": "FBX and GLB",
-    "absent": [
+    "equals": {
+      "/armatures/0": "EvalRigNew",
+      "/skinned_meshes/0": "RigMesh",
+      "/animations/0/name": "EvalWalk"
+    },
+    "required": [
+      "/animations/0/frame_range/1"
+    ],
+    "files": [
       "eval-anim.usdc"
     ]
   },

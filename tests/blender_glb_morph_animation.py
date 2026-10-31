@@ -59,11 +59,18 @@ try:
         "path": "morph-again.glb", "name": "MorphAnimAgain", "lease_id": lease})
     assert reimported["shape_key_animations"], reimported
 
+    usd = bridge.dispatch("export_asset", {
+        "names": ["MorphAnimSource"], "path": "morph-anim.usda",
+        "animations": True, "lease_id": lease})
+    assert usd["bytes"] > 0 and usd["shape_key_animations"], usd
+    assert "timeSamples" in (root / "morph-anim.usda").read_text()
+
     print(json.dumps({
         "action": clip["name"],
         "frames": clip["frame_range"],
         "shape_keys": len(mesh.data.shape_keys.key_blocks) - 1,
         "reimported": len(reimported["shape_key_animations"]),
+        "usd_shape_key_clips": len(usd["shape_key_animations"]),
     }))
 finally:
     folder.cleanup()
