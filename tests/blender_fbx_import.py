@@ -99,17 +99,31 @@ try:
     ])
     export_selected(root / "animated.fbx", [rig, skin], {"MESH", "ARMATURE"},
                     bake_anim=True)
-    snapshot = {key: set(getattr(bpy.data, key))
-                for key in ("objects", "actions", "armatures", "collections")}
+    animated = bridge.dispatch("import_fbx", {
+        "path": "animated.fbx", "name": "AnimatedFbx", "lease_id": lease})
+    assert animated["animations"], animated
+    animation = animated["animations"][0]
+    assert animation["frame_range"] == [1, 11], animation
+    animated_rig = bpy.data.objects[animated["armatures"][0]]
+    animated_skin = bpy.data.objects[animated["skinned_meshes"][0]]
+    imported_action = bpy.data.actions[animation["name"]]
+    assert list(imported_action.frame_range) == [1, 11]
+    inspected = bridge.dispatch("inspect_rig", {
+        "armature": animated_rig.name, "meshes": [animated_skin.name]})
+    assert any(clip["name"] == imported_action.name for clip in inspected["clips"]), inspected
+    for suffix in ("fbx", "glb"):
+        exported = bridge.dispatch("export_asset", {
+            "names": [animated_skin.name], "path": f"fbx-reexport.{suffix}",
+            "animations": True, "lease_id": lease})
+        assert exported["bytes"] > 0
+        assert any(item["name"] == imported_action.name for item in exported["animations"])
     try:
         bridge.dispatch("import_fbx", {
             "path": "animated.fbx", "name": "AnimatedFbx", "lease_id": lease})
-    except RuntimeError as exc:
-        assert "animated import workflow" in str(exc), exc
+    except ValueError as exc:
+        assert "already exists" in str(exc)
     else:
-        raise AssertionError("Animated FBX import bypassed the animated workflow")
-    for key, value in snapshot.items():
-        assert set(getattr(bpy.data, key)) == value, f"Animated import leaked {key}"
+        raise AssertionError("Duplicate animated FBX import was accepted")
 
     inside_path = root / "inside.png"
     image = bpy.data.images.new("InsideTexture", 2, 2)
@@ -230,6 +244,8 @@ try:
         "armature": imported_rig.name,
         "bones": len(imported_rig.data.bones),
         "skinned_meshes": rigged["skinned_meshes"],
+        "animated_action": imported_action.name,
+        "animated_frames": animation["frame_range"],
         "rollback": True,
     }))
 finally:
