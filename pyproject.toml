@@ -5,9 +5,36 @@ build-backend = "hatchling.build"
 [project]
 name = "cavi-blender-mcp"
 version = "0.20.0"
-description = "MCP tools for Blender scene editing and game asset export"
+description = "Local-first MCP tools for Blender scene editing and game asset export"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+authors = [{ name = "CAVI AI" }]
+keywords = ["blender", "mcp", "model-context-protocol", "game-assets", "3d"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Graphics :: 3D Modeling",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
 dependencies = ["anyio>=4.5,<5", "mcp>=1.12,<2", "pydantic>=2.11,<3"]
+
+[project.urls]
+Homepage = "https://cavi-ai.xyz"
+Repository = "https://github.com/cavi-ai/blender-mcp"
+Issues = "https://github.com/cavi-ai/blender-mcp/issues"
+Documentation = "https://cavi-ai.xyz/docs/blender-mcp"
+Changelog = "https://github.com/cavi-ai/blender-mcp/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cavi-blender-mcp = "cavi_blender_mcp.server:main"
@@ -18,6 +45,10 @@ dev = ["numpy>=2,<3", "ruff>=0.14,<1"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/cavi_blender_mcp"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["/docs/blender-mcp/v*", "/.tmp", "/.worktrees", "/dist"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [".tmp", ".worktrees", "docs/blender-mcp/v*"]

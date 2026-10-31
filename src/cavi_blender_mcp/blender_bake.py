@@ -146,7 +146,7 @@ def bake(p):
         bake_low.data.materials.append(material)
         bake_low.active_material_index = len(bake_low.material_slots) - 1
 
-        for value, hidden_render, hidden_viewport, hidden_get in visibility:
+        for value, hidden_render, hidden_viewport, _ in visibility:
             if value is bake_low or value in high:
                 value.hide_render = False
             elif value is low or isolate:

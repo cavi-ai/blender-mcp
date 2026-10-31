@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from .client import BridgeClient
 from .generation import generate
+from .operations import SERVER_LEASE_FREE
 
 mcp = FastMCP(
     "cavi-blender-mcp",
@@ -30,10 +31,6 @@ MUTATING = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHi
 ADDITIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
-)
-LEASE_FREE = frozenset(
-    {"scene_info", "object_info", "runtime_status", "session_control", "inspect_mesh_quality",
-     "render_preview", "review_sheet", "inspect_rig"}
 )
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
 Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
@@ -82,7 +79,7 @@ class KeyframeSpec(BaseModel):
 
 def call(operation_name, **params):
     client = BridgeClient()
-    if operation_name not in LEASE_FREE:
+    if operation_name not in SERVER_LEASE_FREE:
         # Legacy bridges reject this envelope instead of ignoring a lease parameter.
         return client.call("owned_edit", {"operation": operation_name, "params": params})
     return client.call(operation_name, params)

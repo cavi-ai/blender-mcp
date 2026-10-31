@@ -8,12 +8,13 @@ import tempfile
 from pathlib import Path
 
 from .client import BridgeClient
+from .paths import environment_path
 
 
 def start_runtime(project=None, background=False):
-    workspace = Path(os.environ.get(
+    workspace = environment_path(
         "CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender"
-    )).expanduser().resolve()
+    ).resolve()
     source = None
     if project is not None:
         source = (workspace / project).resolve()

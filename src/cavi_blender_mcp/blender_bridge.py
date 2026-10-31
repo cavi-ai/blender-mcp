@@ -17,7 +17,6 @@ from pathlib import Path
 import bpy
 from mathutils import Euler, Quaternion, Vector
 
-from .client import DEFAULT_TIMEOUT, MAX_REQUEST_BYTES, MAX_TIMEOUT
 from .geometry import validate_mesh
 from .importing import (
     MAX_BYTES,
@@ -29,7 +28,13 @@ from .importing import (
     inspect_usd,
 )
 from .lease import Lease
-from .paths import destination
+from .operations import (
+    DEFAULT_TIMEOUT,
+    LEASE_FREE,
+    MAX_REQUEST_BYTES,
+    MAX_TIMEOUT,
+)
+from .paths import destination, environment_path
 from .presets import AXIS_PRESETS
 
 _server = None
@@ -39,10 +44,6 @@ _connection = None
 _workspace = None
 _lease = Lease()
 _project_epoch = secrets.token_hex(16)
-LEASE_FREE = frozenset(
-    {"scene_info", "object_info", "runtime_status", "inspect_mesh_quality", "inspect_rig", "render_preview",
-     "review_sheet"}
-)
 GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
                       "collision", "cleanup_mesh"})
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh",
@@ -199,11 +200,6 @@ def output_file(path, extensions):
         raise
 
 
-def _load_glb(path):
-    if "FINISHED" not in bpy.ops.import_scene.gltf(filepath=path):
-        raise RuntimeError("Blender did not finish importing the GLB")
-
-
 def check_import_name(name):
     if not isinstance(name, str) or not name.strip() or len(name.encode("utf-8")) > 58:
         raise ValueError("Import name must be nonempty and at most 58 UTF-8 bytes")
@@ -308,41 +304,51 @@ def install_collection(name, objects, scene):
     return collection
 
 
-def import_glb(path, name):
+def _import_asset(loader, inspector, path, name, suffix, maximum, *,
+                  animations_allowed, shape_keys_allowed, require_workspace=False,
+                  temp_root=None, cleanup=None):
     check_import_name(name)
-    report = inspect_glb(_workspace, path)
+    report = inspector(_workspace, path)
     with Path(report["path"]).open("rb") as stream:
-        payload = stream.read(MAX_BYTES + 1)
+        payload = stream.read(maximum + 1)
     if hashlib.sha256(payload).hexdigest() != report["sha256"]:
-        raise RuntimeError("GLB changed during preflight; inspect the source before retrying")
+        raise RuntimeError(f"{suffix.upper()} changed during preflight; inspect the source before retrying")
     pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
              "curves", "cameras", "lights", "armatures", "actions", "scenes"]
     previous = {key: set(getattr(bpy.data, key)) for key in pools}
     selection = list(bpy.context.selected_objects)
     active = bpy.context.view_layer.objects.active
     scene = bpy.context.scene
-    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".glb", dir=_workspace)
+    root = Path(temp_root or Path(report["path"]).parent).resolve()
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=suffix, dir=root)
     try:
         with os.fdopen(fd, "wb") as stream:
             stream.write(payload)
-        _load_glb(temporary)
+        loader(temporary)
         objects = sorted(set(bpy.data.objects) - previous["objects"],
                          key=lambda item: (item.type != "ARMATURE", item.name))
         armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
-            objects, previous, animations_allowed=True)
-        images = workspace_images(previous, objects)
+            objects, previous, animations_allowed=animations_allowed,
+            shape_keys_allowed=shape_keys_allowed)
+        images = workspace_images(previous, objects, require_workspace=require_workspace)
         collection = install_collection(name, objects, scene)
         for image in images:
             if not image.packed_file:
                 image.pack()
-        return {**report, "collection": collection.name,
-                "objects": [info(item) for item in objects],
-                "armatures": [item.name for item in armatures],
-                "skinned_meshes": [item.name for item in skinned],
-                "bone_count": bones,
-                "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
-                               for action in actions],
-                "imported_vertices": vertices, "imported_triangles": triangles}
+        if cleanup is not None:
+            cleanup(previous, collection)
+        return {
+            **report,
+            "collection": collection.name,
+            "objects": [info(item) for item in objects],
+            "armatures": [item.name for item in armatures],
+            "skinned_meshes": [item.name for item in skinned],
+            "bone_count": bones,
+            "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
+                           for action in actions],
+            "imported_vertices": vertices,
+            "imported_triangles": triangles,
+        }
     except Exception:
         for key in pools:
             pool = getattr(bpy.data, key)
@@ -358,6 +364,17 @@ def import_glb(path, name):
             item.select_set(True)
         bpy.context.view_layer.objects.active = active
         Path(temporary).unlink(missing_ok=True)
+
+
+def _load_glb(path):
+    if "FINISHED" not in bpy.ops.import_scene.gltf(filepath=path):
+        raise RuntimeError("Blender did not finish importing the GLB")
+
+
+def import_glb(path, name):
+    return _import_asset(
+        _load_glb, inspect_glb, path, name, ".glb", MAX_BYTES,
+        animations_allowed=True, shape_keys_allowed=True, temp_root=_workspace)
 
 
 def _load_fbx(path):
@@ -369,58 +386,9 @@ def _load_fbx(path):
 
 
 def import_fbx(path, name):
-    check_import_name(name)
-    report = inspect_fbx(_workspace, path)
-    with Path(report["path"]).open("rb") as stream:
-        payload = stream.read(MAX_FBX_BYTES + 1)
-    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
-        raise RuntimeError("FBX changed during preflight; inspect the source before retrying")
-    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
-             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
-    previous = {key: set(getattr(bpy.data, key)) for key in pools}
-    selection = list(bpy.context.selected_objects)
-    active = bpy.context.view_layer.objects.active
-    scene = bpy.context.scene
-    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".fbx",
-                                     dir=Path(report["path"]).parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-        _load_fbx(temporary)
-        objects = sorted(set(bpy.data.objects) - previous["objects"],
-                         key=lambda item: (item.type != "ARMATURE", item.name))
-        armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
-            objects, previous, animations_allowed=True, shape_keys_allowed=False)
-        images = workspace_images(previous, objects)
-        collection = install_collection(name, objects, scene)
-        for image in images:
-            if not image.packed_file:
-                image.pack()
-        return {**report, "collection": collection.name,
-                "objects": [info(item) for item in objects],
-                "armatures": [item.name for item in armatures],
-                "skinned_meshes": [item.name for item in skinned],
-                "bone_count": bones,
-                "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
-                               for action in actions],
-                "imported_vertices": vertices, "imported_triangles": triangles}
-    except Exception:
-        for key in pools:
-            pool = getattr(bpy.data, key)
-            for item in set(pool) - previous[key]:
-                pool.remove(item, do_unlink=True)
-        raise
-    finally:
-        if bpy.context.window and bpy.context.window.scene != scene:
-            bpy.context.window.scene = scene
-        for item in bpy.context.selected_objects:
-            item.select_set(False)
-        for item in selection:
-            item.select_set(True)
-        bpy.context.view_layer.objects.active = active
-        Path(temporary).unlink(missing_ok=True)
-
-
+    return _import_asset(
+        _load_fbx, inspect_fbx, path, name, ".fbx", MAX_FBX_BYTES,
+        animations_allowed=True, shape_keys_allowed=False)
 
 
 def _load_obj(path):
@@ -432,56 +400,9 @@ def _load_obj(path):
 
 
 def import_obj(path, name):
-    check_import_name(name)
-    report = inspect_obj(_workspace, path)
-    with Path(report["path"]).open("rb") as stream:
-        payload = stream.read(MAX_BYTES + 1)
-    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
-        raise RuntimeError("OBJ changed during preflight; inspect the source before retrying")
-    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
-             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
-    previous = {key: set(getattr(bpy.data, key)) for key in pools}
-    selection = list(bpy.context.selected_objects)
-    active = bpy.context.view_layer.objects.active
-    scene = bpy.context.scene
-    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".obj",
-                                     dir=Path(report["path"]).parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-        _load_obj(temporary)
-        objects = sorted(set(bpy.data.objects) - previous["objects"],
-                         key=lambda item: (item.type != "ARMATURE", item.name))
-        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
-            objects, previous, animations_allowed=False, shape_keys_allowed=False)
-        images = workspace_images(previous, objects)
-        collection = install_collection(name, objects, scene)
-        for image in images:
-            if not image.packed_file:
-                image.pack()
-        return {**report, "collection": collection.name,
-                "objects": [info(item) for item in objects],
-                "armatures": [item.name for item in armatures],
-                "skinned_meshes": [item.name for item in skinned],
-                "bone_count": bones, "animations": [],
-                "imported_vertices": vertices, "imported_triangles": triangles}
-    except Exception:
-        for key in pools:
-            pool = getattr(bpy.data, key)
-            for item in set(pool) - previous[key]:
-                pool.remove(item, do_unlink=True)
-        raise
-    finally:
-        if bpy.context.window and bpy.context.window.scene != scene:
-            bpy.context.window.scene = scene
-        for item in bpy.context.selected_objects:
-            item.select_set(False)
-        for item in selection:
-            item.select_set(True)
-        bpy.context.view_layer.objects.active = active
-        Path(temporary).unlink(missing_ok=True)
-
-
+    return _import_asset(
+        _load_obj, inspect_obj, path, name, ".obj", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False)
 
 
 def _load_usd(path):
@@ -498,67 +419,27 @@ def _load_usd(path):
         raise RuntimeError("Blender did not finish importing the USD")
 
 
+def _usd_cleanup(previous, collection):
+    for item in set(bpy.data.collections) - previous["collections"]:
+        if item is not collection and not item.objects and not item.children:
+            bpy.data.collections.remove(item)
+
+
 def import_usd(path, name):
-    check_import_name(name)
-    report = inspect_usd(_workspace, path)
-    with Path(report["path"]).open("rb") as stream:
-        payload = stream.read(MAX_BYTES + 1)
-    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
-        raise RuntimeError("USD changed during preflight; inspect the source before retrying")
-    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
-             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
-    previous = {key: set(getattr(bpy.data, key)) for key in pools}
-    selection = list(bpy.context.selected_objects)
-    active = bpy.context.view_layer.objects.active
-    scene = bpy.context.scene
-    source = Path(report["path"])
-    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=source.suffix,
-                                     dir=source.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-        _load_usd(temporary)
-        objects = sorted(set(bpy.data.objects) - previous["objects"],
-                         key=lambda item: (item.type != "ARMATURE", item.name))
-        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
-            objects, previous, animations_allowed=False, shape_keys_allowed=False)
-        images = workspace_images(previous, objects, require_workspace=True)
-        collection = install_collection(name, objects, scene)
-        for image in images:
-            if not image.packed_file:
-                image.pack()
-        for item in set(bpy.data.collections) - previous["collections"]:
-            if item is not collection and not item.objects and not item.children:
-                bpy.data.collections.remove(item)
-        return {**report, "collection": collection.name,
-                "objects": [info(item) for item in objects],
-                "armatures": [item.name for item in armatures],
-                "skinned_meshes": [item.name for item in skinned],
-                "bone_count": bones, "animations": [],
-                "imported_vertices": vertices, "imported_triangles": triangles}
-    except Exception:
-        for key in pools:
-            pool = getattr(bpy.data, key)
-            for item in set(pool) - previous[key]:
-                pool.remove(item, do_unlink=True)
-        raise
-    finally:
-        if bpy.context.window and bpy.context.window.scene != scene:
-            bpy.context.window.scene = scene
-        for item in bpy.context.selected_objects:
-            item.select_set(False)
-        for item in selection:
-            item.select_set(True)
-        bpy.context.view_layer.objects.active = active
-        Path(temporary).unlink(missing_ok=True)
+    return _import_asset(
+        _load_usd, inspect_usd, path, name, Path(path).suffix.lower(), MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False,
+        require_workspace=True, cleanup=_usd_cleanup)
 
 
 def dispatch(operation, p):
     if operation == "owned_edit":
-        operation, p = p["operation"], p["params"]
-        if operation in {"owned_edit", "session_control", "scene_info", "object_info",
-                         "runtime_status", "inspect_mesh_quality", "inspect_rig", "review_sheet"}:
+        inner, params = p.get("operation"), p.get("params")
+        if not isinstance(inner, str) or not isinstance(params, dict):
+            raise ValueError("Owned edit envelope needs an operation and object params")
+        if inner in LEASE_FREE | {"owned_edit", "session_control", "runtime_restart"}:
             raise ValueError("Owned edit envelope requires a scene mutation")
+        operation, p = inner, params
     if operation == "session_control":
         return _lease.control(p, project_identity)
     if operation in LEASE_FREE:
@@ -1267,9 +1148,9 @@ def register():
             raise RuntimeError(
                 "Another Blender bridge owns this connection; choose CAVI_BLENDER_CONNECTION explicitly"
             )
-    _workspace = Path(
-        os.environ.get("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender")
-    ).expanduser()
+    _workspace = environment_path(
+        "CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender"
+    )
     _workspace.mkdir(parents=True, exist_ok=True)
     _workspace = _workspace.resolve()
     replace_server()
