@@ -141,7 +141,7 @@ Mutating. Binds a PBR material to exact mesh slots.
 
 ## bake
 
-Mutating. Bakes a normal or AO map into a new PNG.
+Mutating. Bakes a normal, AO, curvature or lightmap map into a new PNG.
 
 [Guide](../guides/baking.md)
 

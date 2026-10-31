@@ -44,6 +44,35 @@ class BakeSurfaceTests(unittest.TestCase):
             "resolution": 128, "samples": 2, "margin": 2, "cage_extrusion": .01,
             "max_ray_distance": .1, "uv_layer": None, "isolate": False})
 
+    def test_curvature_and_lightmap_defaults(self):
+        calls = self.capture()
+        asyncio.run(server.bake("curvature", "Low", "curvature.png", lease_id="L"))
+        asyncio.run(server.bake("lightmap", "Low", "lightmap.png", samples=4,
+                                lease_id="L"))
+        operations = self.inner(calls)
+        self.assertEqual(operations[0], ("bake_map", {
+            "lease_id": "L", "map": "curvature", "name": "Low",
+            "path": "curvature.png", "resolution": 1024, "samples": 16,
+            "margin": 4, "uv_layer": None, "isolate": True}))
+        self.assertEqual(operations[1], ("bake_map", {
+            "lease_id": "L", "map": "lightmap", "name": "Low",
+            "path": "lightmap.png", "resolution": 1024, "samples": 4,
+            "margin": 4, "uv_layer": None, "isolate": True}))
+
+    def test_high_and_cage_apply_only_to_normal_and_ao(self):
+        calls = self.capture()
+        for arguments, message in [
+            ({"map": "curvature", "name": "Low", "path": "c.png", "high": ["High"]},
+             "does not accept: high"),
+            ({"map": "lightmap", "name": "Low", "path": "l.png",
+             "cage_extrusion": 0.1}, "does not accept: cage_extrusion"),
+            ({"map": "curvature", "name": "Low", "path": "c.png",
+             "normal_space": "object"}, "does not accept: normal_space"),
+        ]:
+            with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
+                asyncio.run(server.mcp.call_tool("bake", arguments))
+        self.assertEqual(calls, [])
+
     def test_bake_parameters_are_bounded(self):
         calls = self.capture()
         for arguments, message in [

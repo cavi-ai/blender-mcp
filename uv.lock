@@ -43,7 +43,7 @@ wheels = [
 
 [[package]]
 name = "cavi-blender-mcp"
-version = "0.21.0"
+version = "0.22.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -61,7 +61,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.5,<5" },
-    { name = "mcp", specifier = ">=1.12,<2" },
+    { name = "mcp", specifier = ">=1.12,<3" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
 

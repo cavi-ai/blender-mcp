@@ -38,6 +38,8 @@ bpy.context.object.name = bpy.context.object.data.name = "BakeLow"
 bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=1.2,
                                      location=(70, 0, 0))
 bpy.context.object.name = bpy.context.object.data.name = "BakeHigh"
+bpy.ops.object.light_add(type="POINT", location=(73, -3, 4))
+bpy.context.object.data.energy = 1000
 bpy.ops.mesh.primitive_cube_add(location=(70, 5, 0))
 bpy.context.object.name = bpy.context.object.data.name = "BakeNoUV"
 for layer in list(bpy.data.objects["BakeNoUV"].data.uv_layers):

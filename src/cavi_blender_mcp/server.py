@@ -529,31 +529,33 @@ async def assign_material(
 
 @mcp.tool(annotations=MUTATING)
 async def bake(
-    map: Literal["normal", "ao"],
+    map: Literal["normal", "ao", "curvature", "lightmap"],
     name: ObjectName,
     path: Annotated[str, Field(description="New workspace .png path.")],
     high: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
     resolution: Annotated[StrictInt, Field(ge=64, le=4096)] = 1024,
     samples: Annotated[StrictInt, Field(ge=1, le=256)] = 16,
     margin: Annotated[StrictInt, Field(ge=0, le=64)] = 4,
-    cage_extrusion: Annotated[Number, Field(ge=0, le=1)] = 0.01,
-    max_ray_distance: Annotated[Number, Field(ge=0, le=10)] = 0.1,
+    cage_extrusion: Annotated[Number | None, Field(ge=0, le=1)] = None,
+    max_ray_distance: Annotated[Number | None, Field(ge=0, le=10)] = None,
     normal_space: Literal["tangent", "object"] | None = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     isolate: StrictBool = True,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
-    """Bake a normal or AO map into a new PNG; high-poly sources are optional.
+    """Bake a normal, AO, curvature or lightmap into a new PNG.
 
-    normal: tangent or object space; ao: ambient occlusion. high enables selected-to-active.
-    The low-poly mesh is copied for baking, so the scene materials and selection are restored.
+    normal: tangent or object space; ao: ambient occlusion; curvature: pointiness;
+    lightmap: direct and indirect diffuse lighting. high enables selected-to-active for
+    normal and ao. The low-poly mesh is copied, so scene state is restored.
     """
     values = {"high": high, "resolution": resolution, "samples": samples, "margin": margin,
               "cage_extrusion": cage_extrusion, "max_ray_distance": max_ray_distance,
               "normal_space": normal_space, "uv_layer": uv_layer, "isolate": isolate}
-    defaults = {"high": None, "resolution": 1024, "samples": 16, "margin": 4,
-                "cage_extrusion": 0.01, "max_ray_distance": 0.1, "uv_layer": None,
-                "isolate": True}
+    defaults = {"resolution": 1024, "samples": 16, "margin": 4,
+                "uv_layer": None, "isolate": True}
+    if map in {"normal", "ao"}:
+        defaults.update({"high": None, "cage_extrusion": 0.01, "max_ray_distance": 0.1})
     if map == "normal":
         defaults["normal_space"] = "tangent"
     params = pick(map, values, (), defaults)
