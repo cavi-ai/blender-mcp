@@ -6,9 +6,10 @@ The project uses Semantic Versioning. Before 1.0, the tool surface, action
 parameters and result fields can still change. Every change is recorded in the
 repository [CHANGELOG.md](https://github.com/cavi-ai/blender-mcp/blob/main/CHANGELOG.md).
 
-Upgrade the server and the bridge together. Reopen the dedicated Blender session
-with the released `start_bridge.py` after upgrading. Running an older bridge
-against a newer server can produce protocol refusals.
+Upgrade the server and the bridge together: run
+`uv tool upgrade cavi-blender-mcp`, then close the dedicated Blender session and
+run `cavi-blender-mcp runtime start` again. Running an older bridge against a
+newer server can produce protocol refusals.
 
 ## Documentation versions
 

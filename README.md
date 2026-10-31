@@ -13,25 +13,26 @@ external asset download or remote inference.
 ## Install
 
 Requirements: Python 3.11 or newer, [`uv`](https://docs.astral.sh/uv/), and
-Blender. Native checks target Blender 5.2.3 LTS. Dependencies are pinned in
-`uv.lock`.
+Blender. Native checks target Blender 5.2.3 LTS.
 
 ```bash
-git clone https://github.com/cavi-ai/blender-mcp.git
-cd blender-mcp
-uv sync --locked
+uv tool install cavi-blender-mcp
 ```
 
-Start a dedicated Blender session with the bridge. Use the absolute path to this
-checkout:
+Start a dedicated Blender session with the bridge:
 
 ```bash
-blender --factory-startup --python /path/to/blender-mcp/scripts/start_bridge.py
+cavi-blender-mcp runtime start
 ```
 
-`--factory-startup` opens a separate default scene without loading or saving user
-preferences. The stdio MCP server never launches or authenticates Blender by
-itself; use the runtime CLI when you want it to start a dedicated session.
+It runs `blender` from `PATH`, `CAVI_BLENDER_BIN`, or on macOS
+`/Applications/Blender.app`, with `--factory-startup` so the session opens a
+separate default scene without loading or saving user preferences. The stdio MCP
+server never launches or authenticates Blender by itself.
+
+To work from a source checkout instead, clone the repository, run
+`uv sync --locked`, and start Blender with
+`blender --factory-startup --python scripts/start_bridge.py`.
 
 ## Quickstart
 
@@ -41,11 +42,14 @@ Register the installed entry point with your MCP client:
 {
   "mcpServers": {
     "blender": {
-      "command": "/path/to/blender-mcp/.venv/bin/cavi-blender-mcp"
+      "command": "cavi-blender-mcp"
     }
   }
 }
 ```
+
+If your client does not inherit your shell's `PATH`, use the absolute path that
+`which cavi-blender-mcp` prints.
 
 Call `scene_info` first. Then inspect the session with `session_control`:
 
