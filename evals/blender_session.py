@@ -19,6 +19,15 @@ uv_target = bpy.data.objects.new("UVTarget", source.data.copy())
 bpy.context.scene.collection.objects.link(uv_target)
 for layer in list(uv_target.data.uv_layers):
     uv_target.data.uv_layers.remove(layer)
+pbr_target = bpy.data.objects.new("PBRTarget", source.data.copy())
+bpy.context.scene.collection.objects.link(pbr_target)
+pbr_no_uv = bpy.data.objects.new("PBRNoUV", source.data.copy())
+bpy.context.scene.collection.objects.link(pbr_no_uv)
+for layer in list(pbr_no_uv.data.uv_layers):
+    pbr_no_uv.data.uv_layers.remove(layer)
+pbr_custom = bpy.data.objects.new("PBRCustomTarget", source.data.copy())
+bpy.context.scene.collection.objects.link(pbr_custom)
+pbr_custom.data.materials.append(bpy.data.materials.new("PBRCustom"))
 
 for name, kind, location in (("AAA_Rock", "sphere", (0, 6, 0)), ("AAA_Blob", "sphere", (3, 6, 0)),
                              ("AAA_Crate", "cube", (6, 6, 0)), ("AAA_Box", "cube", (9, 6, 0)),

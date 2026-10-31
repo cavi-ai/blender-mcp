@@ -16,6 +16,11 @@ class TextureInputTests(unittest.TestCase):
         value = b"\x89PNG\r\n\x1a\n" + struct.pack(">I4sIIBBBBB", 13, b"IHDR", width, height, 8, 2, 0, 0, 0)
         (self.root / "color.png").write_bytes(value)
 
+    def jpeg(self, width=16, height=8):
+        value = (b"\xff\xd8\xff\xc0" + struct.pack(">H", 17) + bytes([8])
+                 + struct.pack(">HH", height, width) + bytes([3]) + bytes(9))
+        (self.root / "color.jpg").write_bytes(value)
+
     def test_color_receipt_identifies_exact_input_bytes_and_dimensions(self):
         self.png()
         value = textures.png_input(self.root, "color.png")
@@ -31,6 +36,13 @@ class TextureInputTests(unittest.TestCase):
             for path in (str(target), "escape.png"):
                 with self.assertRaisesRegex(ValueError, "workspace"):
                     textures.png_input(self.root, path)
+
+    def test_accepts_bounded_jpeg_inputs_and_reports_format(self):
+        self.jpeg(width=32, height=16)
+        value = textures.image_input(self.root, "color.jpg")
+        self.assertEqual((value["format"], value["width"], value["height"]), ("jpg", 32, 16))
+        with self.assertRaisesRegex(ValueError, "png"):
+            textures.png_input(self.root, "color.jpg")
 
     def test_refuses_oversized_and_non_png_inputs_before_decoding(self):
         self.png(width=100000)
