@@ -77,6 +77,12 @@ class KeyframeSpec(BaseModel):
     poses: Annotated[list[PoseSpec], Field(min_length=1, max_length=128)]
 
 
+class ShapeKeyframe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    frame: Annotated[StrictInt, Field(ge=1, le=1_000_000)]
+    value: Annotated[Number, Field(ge=0, le=1)]
+
+
 def call(operation_name, **params):
     client = BridgeClient()
     if operation_name not in SERVER_LEASE_FREE:
@@ -285,7 +291,8 @@ async def session_control(
 async def object_edit(
     action: Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
-                    "duplicate", "parent", "unparent", "move_to_collection"],
+                    "duplicate", "parent", "unparent", "move_to_collection", "shape_key_add",
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove"],
     name: Annotated[str, Field(description="Object name; new and unique for create_*.")],
     kind: Literal["cube", "sphere", "cylinder", "cone", "plane"] | None = None,
     location: Vector3 | None = None,
@@ -309,6 +316,12 @@ async def object_edit(
     offset: Vector3 | None = None,
     linked: StrictBool | None = None,
     create: StrictBool | None = None,
+    value: Annotated[Number | None, Field(ge=0, le=1)] = None,
+    keyframes: Annotated[list[ShapeKeyframe] | None, Field(min_length=1, max_length=32)] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    source: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
+                       Field(max_length=10000)] = None,
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Create or edit one object. Params per action:
@@ -319,13 +332,18 @@ async def object_edit(
     rename: new_name; add_socket: new_name, local location, rotation_degrees;
     duplicate: new_name, count=1, offset=(0,0,0), linked=false;
     parent: new_name (parent); unparent: no extra params;
-    move_to_collection: new_name (collection), create=true.
+    move_to_collection: new_name (collection), create=true;
+    shape_key_add: new_name, value=0, offsets, source; shape_key_value: new_name, value;
+    shape_key_keyframe: new_name, action_name, keyframes=[{frame, value}];
+    shape_key_remove: new_name.
     """
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
               "origin": origin, "grid": grid, "new_name": new_name, "count": count,
-              "offset": offset, "linked": linked, "create": create}
+              "offset": offset, "linked": linked, "create": create, "value": value,
+              "keyframes": keyframes, "action_name": action_name, "source": source,
+              "offsets": offsets}
     operation, params = {
         "create_primitive": ("create_primitive",
                              lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
@@ -348,6 +366,14 @@ async def object_edit(
         "unparent": ("unparent_object", lambda: pick(action, values)),
         "move_to_collection": ("move_to_collection", lambda: pick(action, values, ["new_name"], {
             "create": True})),
+        "shape_key_add": ("shape_key_add", lambda: pick(action, values, ["new_name"], {
+            "value": 0, "offsets": None, "source": None})),
+        "shape_key_value": ("shape_key_value", lambda: pick(action, values, ["new_name", "value"])),
+        "shape_key_keyframe": ("shape_key_keyframe", lambda: {
+            **pick(action, values, ["new_name", "action_name", "keyframes"]),
+            "keyframes": [item.model_dump() for item in keyframes],
+        }),
+        "shape_key_remove": ("shape_key_remove", lambda: pick(action, values, ["new_name"])),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 

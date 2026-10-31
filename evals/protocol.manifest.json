@@ -12,7 +12,7 @@
       "id": "token-budget",
       "probe": "token-cost",
       "access": "read_only",
-      "max_total_tokens": 8000,
+      "max_total_tokens": 8600,
       "max_tool_tokens": 1600
     },
     {

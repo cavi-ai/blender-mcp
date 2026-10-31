@@ -108,7 +108,8 @@ Lease-free. Inspects, claims, renews or releases edit ownership.
 
 Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
-`add_socket`, `duplicate`, `parent`, `unparent`, `move_to_collection`.
+`add_socket`, `duplicate`, `parent`, `unparent`, `move_to_collection`,
+`shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`.
 
 [Guide](../guides/object-editing.md)
 
