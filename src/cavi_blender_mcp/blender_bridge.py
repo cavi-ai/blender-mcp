@@ -39,6 +39,7 @@ GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", 
                       "collision", "cleanup_mesh"})
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh",
                      "array_mesh", "solidify_mesh"})
+RIG = frozenset({"create_armature", "bind_skin", "repair_weights"})
 OBJECTS = frozenset({"apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
                      "move_to_collection"})
@@ -639,6 +640,10 @@ def _dispatch(operation, p):
         from .blender_export import export_asset
 
         return export_asset(p)
+    if operation in RIG:
+        from .blender_rigging import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation in COMPOSE:
         from .blender_compose import HANDLERS
 

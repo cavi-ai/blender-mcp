@@ -54,6 +54,17 @@ class BakePair(BaseModel):
     low: Names
 
 
+class BoneSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: Annotated[str, Field(min_length=1, max_length=63)]
+    head: Vector3
+    tail: Vector3
+    parent: Annotated[str | None, Field(min_length=1, max_length=63)] = None
+    connect: StrictBool = False
+    deform: StrictBool = True
+    roll_degrees: Number = 0
+
+
 def call(operation_name, **params):
     client = BridgeClient()
     if operation_name not in LEASE_FREE:
@@ -130,6 +141,40 @@ async def inspect_rig(
     """
     return await run(call, "inspect_rig", armature=armature, meshes=meshes,
                      max_influences=max_influences)
+
+
+@mcp.tool(annotations=MUTATING)
+async def rig_edit(
+    action: Literal["create", "bind", "weights"],
+    name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
+    location: Vector3 | None = None,
+    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=16)] = None,
+    max_influences: Annotated[StrictInt | None, Field(ge=1, le=32)] = None,
+    clean_threshold: Annotated[Number | None, Field(ge=0, le=1)] = None,
+    normalize: StrictBool | None = None,
+    lease_id: LeaseId = None,
+) -> dict[str, Any]:
+    """Create an armature, bind automatic weights, or repair skin weights.
+
+    create: bones, location=(0,0,0); bind: name=armature, names=meshes;
+    weights: name=mesh, max_influences=4, clean_threshold=.0001, normalize=true.
+    """
+    values = {"location": location, "bones": bones, "names": names,
+              "max_influences": max_influences, "clean_threshold": clean_threshold,
+              "normalize": normalize}
+    if action == "create":
+        operation = "create_armature"
+        params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
+        params["bones"] = [bone.model_dump() for bone in params["bones"]]
+    elif action == "bind":
+        operation = "bind_skin"
+        params = pick(action, values, ["names"])
+    else:
+        operation = "repair_weights"
+        params = pick(action, values, (), {
+            "max_influences": 4, "clean_threshold": 0.0001, "normalize": True})
+    return await run(call, operation, lease_id=lease_id, name=name, **params)
 
 
 @mcp.tool(annotations=ADDITIVE)

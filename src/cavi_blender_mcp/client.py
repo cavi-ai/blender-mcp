@@ -47,6 +47,9 @@ OPERATIONS = frozenset(
         "parent_object",
         "unparent_object",
         "move_to_collection",
+        "create_armature",
+        "bind_skin",
+        "repair_weights",
         "apply_transforms",
         "set_origin",
         "snap_to_grid",
@@ -61,7 +64,8 @@ SLOW_OPERATIONS = frozenset(
     {"import_mesh", "export_mesh", "export_instances", "add_modifier", "render_preview",
      "save_project", "decimate_to", "lightmap_uv", "texel_density", "collision", "cleanup_mesh",
      "boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh", "array_mesh",
-     "solidify_mesh", "export_asset", "review_sheet", "scatter"}
+     "solidify_mesh", "bind_skin", "repair_weights", "export_asset", "review_sheet",
+     "scatter"}
 )
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
