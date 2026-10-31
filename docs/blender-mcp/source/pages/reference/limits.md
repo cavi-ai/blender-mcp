@@ -120,6 +120,7 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | OBJ material libraries | 16 |
 | OBJ textures | 64 |
 | USD asset references | 128 |
+| FBX sidecar textures | 64 files, 64 MiB |
 
 ## Previews and scatter
 

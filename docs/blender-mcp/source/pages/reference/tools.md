@@ -154,7 +154,7 @@ Mutating. Bakes a normal, AO, curvature or lightmap map into a new PNG.
 ## asset_io
 
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
-a lease.
+a lease. Export supports FBX texture sidecars with `textures=true`.
 
 [Guide](../guides/asset-import-export.md) and
 [local generation](../guides/local-generation.md).

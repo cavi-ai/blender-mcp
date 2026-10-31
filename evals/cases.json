@@ -5345,5 +5345,68 @@
     "equals": {
       "/deleted": "EvalWalkRenamed"
     }
+  },
+  {
+    "id": "export-fbx-textures",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "eval-textures.fbx",
+      "names": [
+        "MaterialTarget"
+      ],
+      "textures": true
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/textures/0/name",
+      "/textures/0/path"
+    ],
+    "files": [
+      "eval-textures.fbx"
+    ]
+  },
+  {
+    "id": "textures-glb-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "eval-textures.glb",
+      "names": [
+        "MaterialTarget"
+      ],
+      "textures": true
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "FBX",
+    "absent": [
+      "eval-textures.glb"
+    ]
+  },
+  {
+    "id": "textures-usd-refused",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "eval-textures.usdc",
+      "names": [
+        "MaterialTarget"
+      ],
+      "textures": true
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "FBX",
+    "absent": [
+      "eval-textures.usdc"
+    ]
   }
 ]
