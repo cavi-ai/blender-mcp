@@ -37,6 +37,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `requirements-neural.txt` installs again: `opencv-python-headless`, `mpmath`
+  and `rembg` are pinned to releases compatible with `numpy` 1.26.4 and
+  `sympy`, and CI resolves the file on every change.
 - Bridge client rejects malformed responses and HTTP protocol failures with a
   stable diagnostic instead of leaking parser exceptions.
 - GLB preflight bounds nested JSON and validates embedded image buffer views.
