@@ -1,22 +1,27 @@
-import importlib.util
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from cavi_blender_mcp.client import OPERATIONS, BridgeClient, default_connection
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class ContractTests(unittest.TestCase):
     def test_transport_has_no_code_execution_operation(self):
-        module = ROOT / "src/cavi_blender_mcp/client.py"
-        self.assertTrue(module.exists(), "authenticated Blender client is not implemented")
-        spec = importlib.util.spec_from_file_location("blender_client", module)
-        client = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(client)
+        self.assertNotIn("execute_code", OPERATIONS)
         with self.assertRaisesRegex(ValueError, "Unknown operation"):
-            client.BridgeClient().call("execute_code", {"code": "print(1)"})
+            BridgeClient().call("execute_code", {"code": "print(1)"})
+
+    def test_empty_connection_environment_uses_the_default_path(self):
+        with patch.dict(os.environ, {"CAVI_BLENDER_CONNECTION": ""}):
+            self.assertEqual(
+                default_connection(),
+                Path.home() / ".cavi/blender-mcp/connection.json",
+            )
 
     def test_remote_host_is_rejected_before_connection(self):
         from cavi_blender_mcp.client import BridgeClient

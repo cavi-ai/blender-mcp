@@ -7,80 +7,17 @@ import stat
 import uuid
 from pathlib import Path
 
-OPERATIONS = frozenset(
-    {
-        "scene_info",
-        "object_info",
-        "inspect_mesh_quality",
-        "inspect_rig",
-        "create_primitive",
-        "create_mesh",
-        "import_mesh",
-        "import_fbx",
-        "import_obj",
-        "import_usd",
-        "bake_map",
-        "transform_object",
-        "set_color",
-        "add_modifier",
-        "shade_mesh",
-        "unwrap_mesh",
-        "export_mesh",
-        "export_instances",
-        "save_project",
-        "render_preview",
-        "runtime_status",
-        "runtime_restart",
-        "session_control",
-        "owned_edit",
-        "assign_material",
-        "decimate_to",
-        "remesh_quad",
-        "lod_chain",
-        "lightmap_uv",
-        "texel_density",
-        "collision",
-        "cleanup_mesh",
-        "boolean_mesh",
-        "join_meshes",
-        "separate_mesh",
-        "mirror_mesh",
-        "array_mesh",
-        "solidify_mesh",
-        "duplicate_object",
-        "parent_object",
-        "unparent_object",
-        "move_to_collection",
-        "create_armature",
-        "bind_skin",
-        "repair_weights",
-        "pose_rig",
-        "keyframe_rig",
-        "clear_pose",
-        "retarget_rig",
-        "apply_transforms",
-        "set_origin",
-        "snap_to_grid",
-        "rename_object",
-        "add_socket",
-        "export_asset",
-        "review_sheet",
-        "scatter",
-    }
+from .operations import (
+    DEFAULT_TIMEOUT,
+    LONG_OPERATIONS,
+    MAX_REQUEST_BYTES,
+    MAX_RESPONSE_BYTES,
+    MAX_TIMEOUT,
+    OPERATIONS,
+    SLOW_OPERATIONS,
+    SLOW_TIMEOUT,
 )
-SLOW_OPERATIONS = frozenset(
-    {"import_mesh", "import_fbx", "import_obj", "import_usd", "inspect_rig", "export_mesh", "export_instances", "add_modifier", "render_preview",
-     "save_project", "decimate_to", "lightmap_uv", "texel_density", "collision", "cleanup_mesh",
-     "boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh", "array_mesh",
-     "solidify_mesh", "bind_skin", "repair_weights", "keyframe_rig", "export_asset",
-     "review_sheet", "scatter"}
-)
-DEFAULT_TIMEOUT = 60
-SLOW_TIMEOUT = 300
-MAX_TIMEOUT = 600
-LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "retarget_rig"})
-MAX_REQUEST_BYTES = 8 * 1024 * 1024
-MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+from .paths import environment_path
 
 
 class BridgeError(ConnectionError):
@@ -92,10 +29,8 @@ class BridgeOperationError(RuntimeError):
 
 
 def default_connection() -> Path:
-    return Path(
-        os.environ.get(
-            "CAVI_BLENDER_CONNECTION", Path.home() / ".cavi/blender-mcp/connection.json"
-        )
+    return environment_path(
+        "CAVI_BLENDER_CONNECTION", Path.home() / ".cavi/blender-mcp/connection.json"
     )
 
 
@@ -135,9 +70,12 @@ class BridgeClient:
                 os.name != "nt" and (info.st_mode & 0o077 or info.st_uid != os.getuid())
             ):
                 raise PermissionError("Connection file must be private and owned by this user")
-            config = json.load(stream)
+            try:
+                config = json.load(stream)
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise ValueError("Invalid bridge connection file") from exc
         if not isinstance(config, dict):
-            config = {}
+            raise ValueError("Invalid bridge connection file")  # noqa: TRY004
         pid = config.get("pid")
         if pid is not None and (type(pid) is not int or pid <= 0):
             raise ValueError("Invalid bridge connection file")
@@ -180,32 +118,41 @@ class BridgeClient:
             raise ValueError(f"Request exceeds {MAX_REQUEST_BYTES} bytes")
         connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout + 5)
         try:
-            connection.request(
-                "POST",
-                "/rpc",
-                payload,
-                {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            )
-            response = connection.getresponse()
-            body = response.read(MAX_RESPONSE_BYTES + 1)
+            try:
+                connection.request(
+                    "POST",
+                    "/rpc",
+                    payload,
+                    {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                )
+                response = connection.getresponse()
+                body = response.read(MAX_RESPONSE_BYTES + 1)
+            except (http.client.HTTPException, TimeoutError, OSError) as exc:
+                raise ConnectionError(
+                    "Bridge connection failed; outcome may be unknown. Do not retry a mutation without inspecting the scene."
+                ) from exc
             if len(body) > MAX_RESPONSE_BYTES:
                 raise BridgeError("Bridge response exceeds size limit")
             if response.status != 200:
                 raise BridgeError(
                     f"Bridge HTTP {response.status}: {error_message(body)}; request was not retried"
                 )
-            result = json.loads(body)
+            try:
+                result = json.loads(body)
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise BridgeError("Bridge response is not valid JSON") from exc
+            if not isinstance(result, dict):
+                raise BridgeError("Bridge response must be a JSON object")
             if result.get("id") != request_id:
                 raise BridgeError("Bridge response ID mismatch")
             if "error" in result:
-                raise BridgeOperationError(result["error"])
+                message = result["error"]
+                raise BridgeOperationError(
+                    message if isinstance(message, str) and message else "no diagnostic"
+                )
+            if "result" not in result:
+                raise BridgeError("Bridge response has no result")
             return result["result"]
-        except BridgeError:
-            raise
-        except (TimeoutError, OSError) as exc:
-            raise ConnectionError(
-                "Bridge connection failed; outcome may be unknown. Do not retry a mutation without inspecting the scene."
-            ) from exc
         finally:
             connection.close()
 

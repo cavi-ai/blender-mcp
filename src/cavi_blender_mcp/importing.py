@@ -69,32 +69,53 @@ def inspect_glb(workspace, name):
         offset += length
     if offset != len(data) or len(chunks) != 2 or [c[0] for c in chunks] != [0x4E4F534A, 0x004E4942]:
         raise ValueError("GLB must contain JSON followed by one embedded binary buffer")
-    document = json.loads(bytes(chunks[0][1]))
+    try:
+        document = json.loads(bytes(chunks[0][1]))
+    except (ValueError, UnicodeDecodeError, RecursionError) as exc:
+        raise ValueError("GLB JSON chunk is invalid") from exc
     binary = chunks[1][1]
-    if not isinstance(document, dict) or document.get("asset", {}).get("version") != "2.0":
+    if not isinstance(document, dict):
+        raise ValueError("Expected glTF 2.0 in the GLB")  # noqa: TRY004
+    asset = document.get("asset")
+    if not isinstance(asset, dict) or asset.get("version") != "2.0":
         raise ValueError("Expected glTF 2.0 in the GLB")
+    for key in (
+        "accessors", "animations", "bufferViews", "images", "meshes",
+        "materials", "nodes", "scenes", "skins",
+    ):
+        if not isinstance(document.get(key, []), list):
+            raise ValueError(f"GLB {key} must be a list")  # noqa: TRY004
     if document.get("cameras"):
         raise ValueError("Cameras are not supported by the import preflight")
     if len(document.get("scenes", [])) != 1 or not 0 < len(document.get("nodes", [])) <= 1000:
         raise ValueError("GLB imports require one scene and at most 1000 nodes")
     compressed = {"KHR_draco_mesh_compression", "EXT_meshopt_compression"}
     extensions = document.get("extensionsUsed", [])
+    if not isinstance(extensions, list) or not all(
+            isinstance(extension, str) for extension in extensions):
+        raise ValueError("GLB extensionsUsed must be a string list")
     if compressed.intersection(extensions):
         raise ValueError("Compressed geometry is not supported by the import preflight")
     if "KHR_lights_punctual" in extensions:
         raise ValueError("Light extensions are not supported by the import preflight")
 
-    def check_references(value):
+    def check_references(value, depth=0):
+        if depth > 64:
+            raise ValueError("GLB JSON nesting exceeds the import budget")
         if isinstance(value, dict):
             for key, child in value.items():
-                if key == "extensions" and compressed.intersection(child):
-                    raise ValueError("Compressed geometry is not supported by the import preflight")
+                if key == "extensions":
+                    if not isinstance(child, dict):
+                        raise ValueError("GLB extensions must be an object")
+                    if compressed.intersection(child):
+                        raise ValueError(
+                            "Compressed geometry is not supported by the import preflight")
                 if key == "uri" and (not isinstance(child, str) or not child.startswith("data:")):
                     raise ValueError("GLB external dependencies are refused")
-                check_references(child)
+                check_references(child, depth + 1)
         elif isinstance(value, list):
             for child in value:
-                check_references(child)
+                check_references(child, depth + 1)
 
     check_references(document)
     nodes = document["nodes"]
@@ -313,16 +334,36 @@ def inspect_glb(workspace, name):
     if sum(v for v, _ in mesh_sizes) > MAX_GEOMETRY:
         raise ValueError("Declared geometry exceeds the import budget")
     pixels = 0
-    for image in document.get("images", []):
+    images = document.get("images", [])
+    buffer_views = document.get("bufferViews", [])
+    if not isinstance(images, list) or not isinstance(buffer_views, list):
+        raise ValueError("GLB images and bufferViews must be lists")  # noqa: TRY004
+    for image in images:
+        if not isinstance(image, dict):
+            raise ValueError("Invalid GLB image definition")  # noqa: TRY004
         if "uri" in image:
-            header, encoded = image["uri"].split(",", 1)
+            uri = image["uri"]
+            if not isinstance(uri, str) or "," not in uri:
+                raise ValueError("Embedded image must be PNG or JPEG")
+            header, encoded = uri.split(",", 1)
             if header not in {"data:image/png;base64", "data:image/jpeg;base64"}:
                 raise ValueError("Embedded image must be PNG or JPEG")
-            image_data = base64.b64decode(encoded, validate=True)
+            try:
+                image_data = base64.b64decode(encoded, validate=True)
+            except ValueError as exc:
+                raise ValueError("Embedded image is not valid base64") from exc
         else:
-            view = document["bufferViews"][image["bufferView"]]
-            start, length = view.get("byteOffset", 0), view["byteLength"]
-            if view.get("buffer") != 0 or start < 0 or length <= 0 or start + length > len(binary):
+            index = image.get("bufferView")
+            if type(index) is not int or not 0 <= index < len(buffer_views):
+                raise ValueError("Invalid embedded image buffer view")
+            view = buffer_views[index]
+            if not isinstance(view, dict):
+                raise ValueError("Invalid embedded image buffer view")
+            start = view.get("byteOffset", 0)
+            length = view.get("byteLength")
+            if (view.get("buffer") != 0
+                    or type(start) is not int or type(length) is not int
+                    or start < 0 or length <= 0 or start + length > len(binary)):
                 raise ValueError("Invalid embedded image range")
             image_data = binary[start:start + length]
         width, height = image_size(image_data)

@@ -1,0 +1,112 @@
+"""Shared operation names, lease policy and transport budgets."""
+
+OPERATIONS = frozenset(
+    {
+        "scene_info",
+        "object_info",
+        "inspect_mesh_quality",
+        "inspect_rig",
+        "create_primitive",
+        "create_mesh",
+        "import_mesh",
+        "import_fbx",
+        "import_obj",
+        "import_usd",
+        "bake_map",
+        "transform_object",
+        "set_color",
+        "add_modifier",
+        "shade_mesh",
+        "unwrap_mesh",
+        "export_mesh",
+        "export_instances",
+        "save_project",
+        "render_preview",
+        "runtime_status",
+        "runtime_restart",
+        "session_control",
+        "owned_edit",
+        "assign_material",
+        "decimate_to",
+        "remesh_quad",
+        "lod_chain",
+        "lightmap_uv",
+        "texel_density",
+        "collision",
+        "cleanup_mesh",
+        "boolean_mesh",
+        "join_meshes",
+        "separate_mesh",
+        "mirror_mesh",
+        "array_mesh",
+        "solidify_mesh",
+        "duplicate_object",
+        "parent_object",
+        "unparent_object",
+        "move_to_collection",
+        "create_armature",
+        "bind_skin",
+        "repair_weights",
+        "pose_rig",
+        "keyframe_rig",
+        "clear_pose",
+        "retarget_rig",
+        "apply_transforms",
+        "set_origin",
+        "snap_to_grid",
+        "rename_object",
+        "add_socket",
+        "export_asset",
+        "review_sheet",
+        "scatter",
+    }
+)
+LEASE_FREE = frozenset(
+    {
+        "scene_info",
+        "object_info",
+        "runtime_status",
+        "inspect_mesh_quality",
+        "inspect_rig",
+        "render_preview",
+        "review_sheet",
+    }
+)
+SERVER_LEASE_FREE = LEASE_FREE | {"session_control"}
+SLOW_OPERATIONS = frozenset(
+    {
+        "import_mesh",
+        "import_fbx",
+        "import_obj",
+        "import_usd",
+        "inspect_rig",
+        "export_mesh",
+        "export_instances",
+        "add_modifier",
+        "render_preview",
+        "save_project",
+        "decimate_to",
+        "lightmap_uv",
+        "texel_density",
+        "collision",
+        "cleanup_mesh",
+        "boolean_mesh",
+        "join_meshes",
+        "separate_mesh",
+        "mirror_mesh",
+        "array_mesh",
+        "solidify_mesh",
+        "bind_skin",
+        "repair_weights",
+        "keyframe_rig",
+        "export_asset",
+        "review_sheet",
+        "scatter",
+    }
+)
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "retarget_rig"})
+DEFAULT_TIMEOUT = 60
+SLOW_TIMEOUT = 300
+MAX_TIMEOUT = 600
+MAX_REQUEST_BYTES = 8 * 1024 * 1024
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024

@@ -28,7 +28,7 @@ def max_create_mesh_request():
 
 
 class Server:
-    def __init__(self, test, status=200, body=None):
+    def __init__(self, test, status=200, body=None, raw=None):
         self.received = []
         received = self.received
 
@@ -39,8 +39,11 @@ class Server:
             def do_POST(self):
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 received.append(request)
-                payload = body if body is not None else {"id": request["id"], "result": {}}
-                data = json.dumps(payload).encode()
+                if callable(body):
+                    payload = body(request)
+                else:
+                    payload = body if body is not None else {"id": request["id"], "result": {}}
+                data = raw if raw is not None else json.dumps(payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
@@ -143,6 +146,26 @@ class BridgeErrorTests(unittest.TestCase):
         server = Server(self)
         config = connection(self.folder, port=server.http.server_port, pid=os.getpid())
         self.assertEqual(BridgeClient(config).call("scene_info"), {})
+
+    def test_malformed_response_bodies_are_stable_errors(self):
+        cases = [
+            ({"raw": b"not json"}, "not valid JSON"),
+            ({"raw": b"[]"}, "JSON object"),
+            ({"raw": b'{"id":"wrong"}'}, "ID mismatch"),
+            ({"body": lambda request: {"id": request["id"]}}, "no result"),
+        ]
+        for spec, message in cases:
+            server = Server(self, **spec)
+            config = connection(self.folder, port=server.http.server_port)
+            with self.subTest(message=message), self.assertRaisesRegex(ConnectionError, message):
+                BridgeClient(config).call("scene_info")
+
+    def test_non_string_operation_error_is_surfaced(self):
+        server = Server(self, body=lambda request: {
+            "id": request["id"], "error": {"code": "bad"}})
+        config = connection(self.folder, port=server.http.server_port)
+        with self.assertRaisesRegex(RuntimeError, "no diagnostic"):
+            BridgeClient(config).call("scene_info")
 
 
 if __name__ == "__main__":

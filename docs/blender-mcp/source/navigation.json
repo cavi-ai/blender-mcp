@@ -1,0 +1,53 @@
+{
+  "title": "Blender MCP",
+  "version": "{{PRODUCT_VERSION}}",
+  "sections": [
+    {
+      "title": "Introduction",
+      "pages": [
+        { "title": "Overview", "path": "introduction/overview.md" },
+        { "title": "Installation", "path": "introduction/installation.md" },
+        { "title": "Quickstart", "path": "introduction/quickstart.md" }
+      ]
+    },
+    {
+      "title": "Guides",
+      "pages": [
+        { "title": "Inspect a scene", "path": "guides/scene-inspection.md" },
+        { "title": "Edit objects", "path": "guides/object-editing.md" },
+        { "title": "Prepare meshes", "path": "guides/mesh-preparation.md" },
+        { "title": "Materials and UVs", "path": "guides/materials-and-uvs.md" },
+        { "title": "Bake maps", "path": "guides/baking.md" },
+        { "title": "Import and export assets", "path": "guides/asset-import-export.md" },
+        { "title": "Generate a mesh locally", "path": "guides/local-generation.md" },
+        { "title": "Rig and animate", "path": "guides/rigging-and-animation.md" },
+        { "title": "Preview and review", "path": "guides/previews-and-review.md" },
+        { "title": "Scatter instances", "path": "guides/scatter.md" },
+        { "title": "Share application ownership", "path": "guides/session-ownership.md" },
+        { "title": "Run a dedicated session", "path": "guides/runtime-and-headless.md" },
+        { "title": "Troubleshooting", "path": "guides/troubleshooting.md" }
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        { "title": "Tools", "path": "reference/tools.md" },
+        { "title": "CLI", "path": "reference/cli.md" },
+        { "title": "Configuration", "path": "reference/configuration.md" },
+        { "title": "Limits and boundaries", "path": "reference/limits.md" }
+      ]
+    },
+    {
+      "title": "Security",
+      "pages": [
+        { "title": "Security model", "path": "security/model.md" }
+      ]
+    },
+    {
+      "title": "Release",
+      "pages": [
+        { "title": "Version and support", "path": "release/version-and-support.md" }
+      ]
+    }
+  ]
+}

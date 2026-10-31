@@ -1,6 +1,12 @@
 """File boundaries shared by the MCP client and Blender bridge."""
 
+import os
 from pathlib import Path
+
+
+def environment_path(name: str, default: Path | str) -> Path:
+    value = os.environ.get(name)
+    return Path(value if value is not None and value.strip() else default).expanduser()
 
 
 def destination(workspace: Path, name: str, extensions: set[str]) -> Path:
