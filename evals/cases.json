@@ -5390,23 +5390,26 @@
     ]
   },
   {
-    "id": "textures-usd-refused",
+    "id": "export-usd-textures",
     "tool": "asset_io",
     "arguments": {
       "action": "export",
-      "path": "eval-textures.usdc",
+      "path": "eval-usd-textures.usdc",
       "names": [
         "MaterialTarget"
       ],
       "textures": true
     },
-    "kind": "safety",
+    "kind": "success",
     "modes": [
       "native"
     ],
-    "error": "FBX",
-    "absent": [
-      "eval-textures.usdc"
+    "required": [
+      "/textures/0/name",
+      "/textures/0/path"
+    ],
+    "files": [
+      "eval-usd-textures.usdc"
     ]
   },
   {

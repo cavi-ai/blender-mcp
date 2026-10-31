@@ -161,28 +161,33 @@ def used_images(objects):
 
 
 @contextmanager
-def prepared_images(objects, directory):
+def prepared_images(objects, directory, unpack=False):
     saved = []
     try:
         directory.mkdir()
         for index, image in enumerate(used_images(objects)):
-            saved.append((image, image.filepath, image.filepath_raw, image.file_format))
             if not image.has_data and image.packed_file is None:
                 raise RuntimeError("Texture image has no data")
             safe = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(image.name).stem) or "image"
             target = directory / f"{index:02d}-{safe}.png"
+            saved.append((image, image.filepath, image.filepath_raw, image.file_format,
+                          image.packed_file is not None, target))
             image.filepath_raw = str(target)
             image.file_format = "PNG"
             image.save()
             image.filepath = str(target)
+            if unpack and image.packed_file is not None:
+                image.unpack(method="REMOVE")
         yield
     finally:
-        for image, filepath, raw, file_format in saved:
+        for image, filepath, raw, file_format, packed, target in saved:
             try:
+                if packed and image.packed_file is None and target.is_file():
+                    image.pack()
                 image.filepath = filepath
                 image.filepath_raw = raw
                 image.file_format = file_format
-            except ReferenceError:
+            except (ReferenceError, RuntimeError):
                 continue
 
 
@@ -225,12 +230,13 @@ def export_asset(p):
     suffix = Path(p["path"]).suffix.lower()
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
+    is_usd = suffix in {".usd", ".usda", ".usdc"}
     preset = preset_for(p, suffix)
     lods, collision = flag(p, "lods"), flag(p, "collision")
     instances, empties = flag(p, "preserve_instances"), flag(p, "include_empties")
     textures = flag(p, "textures")
-    if textures and suffix != ".fbx":
-        raise ValueError("textures applies to FBX exports")
+    if textures and suffix not in {".fbx", ".usd", ".usda", ".usdc"}:
+        raise ValueError("textures applies to FBX and USD exports; GLB embeds textures")
     if instances and suffix == ".glb":
         raise ValueError("preserve_instances applies to static FBX or USD exports")
     if animations:
@@ -283,7 +289,7 @@ def export_asset(p):
         with output_file(p["path"], FORMATS) as path:
             directory = sidecars(path) if textures else None
             try:
-                with prepared_images(objects, directory) if textures else nullcontext():
+                with prepared_images(objects, directory, unpack=is_usd) if textures else nullcontext():
                     write(path, objects, selection, preset, False, empties,
                           animations=True, textures=textures)
                     files = texture_receipt(directory) if directory else []
@@ -303,7 +309,7 @@ def export_asset(p):
     with output_file(p["path"], FORMATS) as path:
         directory = sidecars(path) if textures else None
         try:
-            with prepared_images(objects, directory) if textures else nullcontext():
+            with prepared_images(objects, directory, unpack=is_usd) if textures else nullcontext():
                 write(path, meshes if instances else objects, selection, preset,
                       instances, empties, textures=textures)
                 files = texture_receipt(directory) if directory else []

@@ -647,7 +647,7 @@ async def asset_io(
     """Move assets in or out. Params per action:
     import: GLB, FBX, OBJ or USD path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB only),
-    textures (FBX sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
+    textures (FBX/USD sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
     <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
     """
