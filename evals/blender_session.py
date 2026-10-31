@@ -9,6 +9,7 @@ import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from cavi_blender_mcp import blender_bridge as bridge
+from cavi_blender_mcp.presets import AXIS_PRESETS
 
 source = bpy.data.objects["Cube"]
 material_target = bpy.data.objects.new("MaterialTarget", source.data.copy())
@@ -76,6 +77,11 @@ workspace = Path(os.environ["CAVI_BLENDER_WORKSPACE"])
 result = bpy.ops.export_scene.gltf(
     filepath=str(workspace / "rigged.glb"), export_format="GLB", use_selection=True,
     export_skins=True, export_animations=False, export_apply=False)
+assert "FINISHED" in result
+result = bpy.ops.export_scene.fbx(
+    filepath=str(workspace / "rigged.fbx"), use_selection=True,
+    object_types={"MESH", "ARMATURE"}, add_leaf_bones=False, bake_anim=False,
+    global_scale=1, **AXIS_PRESETS["unity"])
 assert "FINISHED" in result
 for value in bpy.context.selected_objects:
     value.select_set(False)

@@ -19,7 +19,7 @@ from mathutils import Euler, Quaternion, Vector
 
 from .client import DEFAULT_TIMEOUT, MAX_REQUEST_BYTES, MAX_TIMEOUT
 from .geometry import validate_mesh
-from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
+from .importing import MAX_BYTES, MAX_FBX_BYTES, MAX_GEOMETRY, inspect_fbx, inspect_glb
 from .lease import Lease
 from .paths import destination
 from .presets import AXIS_PRESETS
@@ -196,7 +196,7 @@ def _load_glb(path):
         raise RuntimeError("Blender did not finish importing the GLB")
 
 
-def import_glb(path, name):
+def check_import_name(name):
     if not isinstance(name, str) or not name.strip() or len(name.encode("utf-8")) > 58:
         raise ValueError("Import name must be nonempty and at most 58 UTF-8 bytes")
     if name in bpy.data.collections or any(
@@ -205,6 +205,93 @@ def import_glb(path, name):
         raise ValueError("Import name already exists; choose a new asset name")
     if bpy.context.mode != "OBJECT":
         raise ValueError("Switch Blender to Object Mode before importing")
+
+
+def validate_imported(objects, previous, animations_allowed=True, shape_keys_allowed=True):
+    if not objects or any(
+        item.type not in {"MESH", "EMPTY", "ARMATURE"} for item in objects
+    ):
+        raise RuntimeError("Import produced an unsupported object type")
+    if set(bpy.data.scenes) != previous["scenes"]:
+        raise RuntimeError("Import unexpectedly changed the scene set")
+    armatures = [item for item in objects if item.type == "ARMATURE"]
+    if len(armatures) > 16:
+        raise RuntimeError("Imported armatures exceed the import budget")
+    bones = sum(len(item.data.bones) for item in armatures)
+    if any(not item.data.bones for item in armatures):
+        raise RuntimeError("Imported armatures need at least one bone")
+    if bones > 1024 or any(len(item.data.bones) > 512 for item in armatures):
+        raise RuntimeError("Imported bones exceed the import budget")
+    meshes = [item for item in objects if item.type == "MESH"]
+    if not shape_keys_allowed and any(item.data.shape_keys is not None for item in meshes):
+        raise RuntimeError("Shape keys need a separate import workflow")
+    skinned = []
+    for item in meshes:
+        modifiers = [modifier for modifier in item.modifiers
+                     if modifier.type == "ARMATURE" and modifier.object is not None]
+        if not modifiers:
+            continue
+        if len(modifiers) != 1 or modifiers[0].object not in armatures:
+            raise RuntimeError("Imported skins need one armature modifier on an imported rig")
+        if not item.vertex_groups or len(item.vertex_groups) > 512:
+            raise RuntimeError("Imported skins exceed the vertex-group budget")
+        skinned.append(item)
+    if len(skinned) > 64:
+        raise RuntimeError("Imported skinned meshes exceed the import budget")
+    vertices = sum(len(item.data.vertices) for item in meshes)
+    triangles = sum(len(poly.vertices) - 2 for item in meshes for poly in item.data.polygons)
+    if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
+            or not 0 < triangles <= MAX_GEOMETRY):
+        raise RuntimeError("Imported geometry exceeds the import budget")
+    if len(set(bpy.data.materials) - previous["materials"]) > 64:
+        raise RuntimeError("Imported materials exceed the import budget")
+    if len(set(bpy.data.images) - previous["images"]) > 64:
+        raise RuntimeError("Imported images exceed the import budget")
+    actions = sorted(set(bpy.data.actions) - previous["actions"], key=lambda item: item.name)
+    if not animations_allowed and actions:
+        raise RuntimeError("Animation clips need the animated import workflow")
+    if len(actions) > 32:
+        raise RuntimeError("Imported actions exceed the import budget")
+    for action in actions:
+        start, end = action.frame_range
+        if not math.isfinite(start) or not math.isfinite(end) or end < start:
+            raise RuntimeError("Imported action has an invalid frame range")
+    return armatures, meshes, skinned, actions, bones, vertices, triangles
+
+
+def workspace_images(previous):
+    root = Path(_workspace).resolve()
+    images = set(bpy.data.images) - previous["images"]
+    for image in images:
+        if image.packed_file is not None:
+            continue
+        if not image.filepath:
+            raise RuntimeError("Imported images need packed data or a workspace path")
+        candidates = [Path(image.filepath)]
+        if not Path(image.filepath).is_absolute():
+            candidates += [Path(bpy.path.abspath(image.filepath)), root / image.filepath]
+        valid = [candidate for candidate in candidates
+                 if candidate.resolve().is_relative_to(root) and candidate.is_file()]
+        if not valid:
+            raise RuntimeError("Imported images must stay inside the workspace")
+        if valid[0].stat().st_size > 16 * 1024 * 1024:
+            raise RuntimeError("Imported textures must be at most 16 MiB")
+    return images
+
+
+def install_collection(name, objects, scene):
+    collection = bpy.data.collections.new(name)
+    scene.collection.children.link(collection)
+    for index, item in enumerate(objects):
+        item.name = name if index == 0 else f"{name}.{index:03}"
+        for owner in list(item.users_collection):
+            owner.objects.unlink(item)
+        collection.objects.link(item)
+    return collection
+
+
+def import_glb(path, name):
+    check_import_name(name)
     report = inspect_glb(_workspace, path)
     with Path(report["path"]).open("rb") as stream:
         payload = stream.read(MAX_BYTES + 1)
@@ -223,54 +310,9 @@ def import_glb(path, name):
         _load_glb(temporary)
         objects = sorted(set(bpy.data.objects) - previous["objects"],
                          key=lambda item: (item.type != "ARMATURE", item.name))
-        if not objects or any(
-            item.type not in {"MESH", "EMPTY", "ARMATURE"} for item in objects
-        ):
-            raise RuntimeError("GLB produced an unsupported object type")
-        if set(bpy.data.scenes) != previous["scenes"]:
-            raise RuntimeError("GLB import unexpectedly changed the scene set")
-        armatures = [item for item in objects if item.type == "ARMATURE"]
-        if len(armatures) > 16:
-            raise RuntimeError("Imported armatures exceed the import budget")
-        bones = sum(len(item.data.bones) for item in armatures)
-        if any(not item.data.bones for item in armatures):
-            raise RuntimeError("Imported armatures need at least one bone")
-        if bones > 1024 or any(len(item.data.bones) > 512 for item in armatures):
-            raise RuntimeError("Imported bones exceed the import budget")
-        meshes = [item for item in objects if item.type == "MESH"]
-        skinned = []
-        for item in meshes:
-            modifiers = [modifier for modifier in item.modifiers
-                         if modifier.type == "ARMATURE" and modifier.object is not None]
-            if not modifiers:
-                continue
-            if len(modifiers) != 1 or modifiers[0].object not in armatures:
-                raise RuntimeError("Imported skins need one armature modifier on an imported rig")
-            if not item.vertex_groups or len(item.vertex_groups) > 512:
-                raise RuntimeError("Imported skins exceed the vertex-group budget")
-            skinned.append(item)
-        if len(skinned) > 64:
-            raise RuntimeError("Imported skinned meshes exceed the import budget")
-        vertices = sum(len(item.data.vertices) for item in meshes)
-        triangles = sum(len(poly.vertices) - 2 for item in meshes for poly in item.data.polygons)
-        if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
-                or not 0 < triangles <= MAX_GEOMETRY):
-            raise RuntimeError("Imported geometry exceeds the import budget")
-        actions = sorted(set(bpy.data.actions) - previous["actions"],
-                         key=lambda item: item.name)
-        if len(actions) > 32:
-            raise RuntimeError("Imported actions exceed the import budget")
-        for action in actions:
-            start, end = action.frame_range
-            if not math.isfinite(start) or not math.isfinite(end) or end < start:
-                raise RuntimeError("Imported action has an invalid frame range")
-        collection = bpy.data.collections.new(name)
-        scene.collection.children.link(collection)
-        for index, item in enumerate(objects):
-            item.name = name if index == 0 else f"{name}.{index:03}"
-            for owner in list(item.users_collection):
-                owner.objects.unlink(item)
-            collection.objects.link(item)
+        armatures, _meshes, skinned, actions, bones, vertices, triangles = validate_imported(
+            objects, previous, animations_allowed=True)
+        collection = install_collection(name, objects, scene)
         for image in set(bpy.data.images) - previous["images"]:
             if not image.packed_file:
                 image.pack()
@@ -281,6 +323,64 @@ def import_glb(path, name):
                 "bone_count": bones,
                 "animations": [{"name": action.name, "frame_range": list(action.frame_range)}
                                for action in actions],
+                "imported_vertices": vertices, "imported_triangles": triangles}
+    except Exception:
+        for key in pools:
+            pool = getattr(bpy.data, key)
+            for item in set(pool) - previous[key]:
+                pool.remove(item, do_unlink=True)
+        raise
+    finally:
+        if bpy.context.window and bpy.context.window.scene != scene:
+            bpy.context.window.scene = scene
+        for item in bpy.context.selected_objects:
+            item.select_set(False)
+        for item in selection:
+            item.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _load_fbx(path):
+    if "FINISHED" not in bpy.ops.import_scene.fbx(
+        filepath=str(path), use_image_search=False, use_anim=True,
+        ignore_leaf_bones=False, automatic_bone_orientation=False,
+        use_manual_orientation=False, use_prepost_rot=True):
+        raise RuntimeError("Blender did not finish importing the FBX")
+
+
+def import_fbx(path, name):
+    check_import_name(name)
+    report = inspect_fbx(_workspace, path)
+    with Path(report["path"]).open("rb") as stream:
+        payload = stream.read(MAX_FBX_BYTES + 1)
+    if hashlib.sha256(payload).hexdigest() != report["sha256"]:
+        raise RuntimeError("FBX changed during preflight; inspect the source before retrying")
+    pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
+             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+    previous = {key: set(getattr(bpy.data, key)) for key in pools}
+    selection = list(bpy.context.selected_objects)
+    active = bpy.context.view_layer.objects.active
+    scene = bpy.context.scene
+    fd, temporary = tempfile.mkstemp(prefix=".cavi-import-", suffix=".fbx", dir=_workspace)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+        _load_fbx(temporary)
+        objects = sorted(set(bpy.data.objects) - previous["objects"],
+                         key=lambda item: (item.type != "ARMATURE", item.name))
+        armatures, _meshes, skinned, _actions, bones, vertices, triangles = validate_imported(
+            objects, previous, animations_allowed=False, shape_keys_allowed=False)
+        images = workspace_images(previous)
+        collection = install_collection(name, objects, scene)
+        for image in images:
+            if not image.packed_file:
+                image.pack()
+        return {**report, "collection": collection.name,
+                "objects": [info(item) for item in objects],
+                "armatures": [item.name for item in armatures],
+                "skinned_meshes": [item.name for item in skinned],
+                "bone_count": bones, "animations": [],
                 "imported_vertices": vertices, "imported_triangles": triangles}
     except Exception:
         for key in pools:
@@ -664,6 +764,8 @@ def _dispatch(operation, p):
         return assign(p, _workspace, obj)
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])
+    if operation == "import_fbx":
+        return import_fbx(p["path"], p["name"])
     if operation == "review_sheet":
         from .blender_review import review
 

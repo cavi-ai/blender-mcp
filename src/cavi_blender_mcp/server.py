@@ -530,7 +530,7 @@ async def asset_io(
     lease_id: LeaseId = None,
 ) -> dict[str, Any]:
     """Move assets in or out. Params per action:
-    import: static GLB path, name (new prefix); export: names, .fbx/.glb/.usd path,
+    import: GLB or FBX path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB only),
     axis=unity; or bake_pair alone (writes <stem>_low.fbx, <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
@@ -544,7 +544,8 @@ async def asset_io(
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
         return await run(generate, workspace, params["image"], path, params["resolution"])
     if action == "import":
-        return await run(call, "import_mesh", lease_id=lease_id, path=path,
+        operation = "import_fbx" if path.lower().endswith(".fbx") else "import_mesh"
+        return await run(call, operation, lease_id=lease_id, path=path,
                          **pick(action, values, ["name"]))
     if action == "save":
         pick(action, values)

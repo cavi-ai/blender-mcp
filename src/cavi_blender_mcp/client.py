@@ -16,6 +16,7 @@ OPERATIONS = frozenset(
         "create_primitive",
         "create_mesh",
         "import_mesh",
+        "import_fbx",
         "transform_object",
         "set_color",
         "add_modifier",
@@ -64,7 +65,7 @@ OPERATIONS = frozenset(
     }
 )
 SLOW_OPERATIONS = frozenset(
-    {"import_mesh", "export_mesh", "export_instances", "add_modifier", "render_preview",
+    {"import_mesh", "import_fbx", "export_mesh", "export_instances", "add_modifier", "render_preview",
      "save_project", "decimate_to", "lightmap_uv", "texel_density", "collision", "cleanup_mesh",
      "boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh", "array_mesh",
      "solidify_mesh", "bind_skin", "repair_weights", "keyframe_rig", "export_asset",
