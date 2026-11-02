@@ -7,11 +7,12 @@ from typing import Annotated, Any, Literal
 
 import anyio
 from mcp.server.mcpserver import Image, MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from .client import BridgeClient
+from .contracts import AssetResult, MeshQuality, Ownership, SceneInfo, compact_schema, failure
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 
@@ -35,6 +36,21 @@ def _report_anticipated(fn):
 class Server(MCPServer):
     def __init__(self, name: str, **kwargs):
         super().__init__(name, version=version("cavi-blender-mcp"), **kwargs)
+
+    async def list_tools(self):
+        return [tool.model_copy(update={"input_schema": compact_schema(tool.input_schema),
+                                       "output_schema": compact_schema(tool.output_schema)})
+                for tool in await super().list_tools()]
+
+    async def call_tool(self, name, arguments, context=None):
+        try:
+            return await super().call_tool(name, arguments, context)
+        except UnexpectedToolError:
+            raise
+        except ToolError as exc:
+            if context is None:
+                raise
+            return failure(name, exc)
 
     def tool(self, *args, **kwargs):
         register = super().tool(*args, **kwargs)
@@ -159,7 +175,7 @@ async def scene_info(
     name: Annotated[str | None, Field(description="Return only this object's details.")] = None,
     limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 200,
     offset: Annotated[StrictInt, Field(ge=0)] = 0,
-) -> dict[str, Any]:
+) -> SceneInfo:
     """Inspect Blender version, file, workspace and a page of scene objects, or one object."""
     if name is not None:
         return await run(call, "object_info", name=name)
@@ -176,7 +192,7 @@ async def inspect_mesh_quality(
     naming: NamingRules | None = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63)] = "UVMap_Lightmap",
     lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096)] = 64,
-) -> dict[str, Any]:
+) -> MeshQuality:
     """Measure static mesh budgets, texel density, UV stretch and material bindings.
 
     Uses the render-active UV layer unless named. Refuses modifiers, rigs and shape keys.
@@ -341,7 +357,7 @@ async def session_control(
     ] = None,
     lease_id: Annotated[str | None, Field(max_length=128)] = None,
     ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600)] = 600,
-) -> dict[str, Any]:
+) -> Ownership:
     """Inspect ownership or claim, renew or release an edit lease.
 
     Claim returns a private lease_id; pass it on every edit. Expiry and release never
@@ -677,7 +693,7 @@ async def asset_io(
     bake_pair: BakePair | None = None,
     axis: Literal["unity", "unreal", "godot"] | None = None,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> AssetResult:
     """Move assets in or out. Params per action:
     import: GLB, FBX, OBJ or USD path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB/USD),
