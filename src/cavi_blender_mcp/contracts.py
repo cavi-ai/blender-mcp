@@ -185,7 +185,7 @@ class RigInspection(Result):
     not_checked: list[str]
     project_id: str
     analyzed_action: str | None = None
-    animation_checks: dict[str, Record] | None = None
+    animation_checks: dict[str, Record | list[Record]] | None = None
 
 
 class ObjectEditResult(ObjectFields):
@@ -248,7 +248,7 @@ class MeshEditResult(ObjectFields):
     levels: list[Record] | None = None
     source_renamed: bool | None = None
     uv_layer: str | None = None
-    texture_resolution: list[int] | None = None
+    texture_resolution: int | None = None
     source: str | None = None
     shape: str | None = None
     count: int | None = None

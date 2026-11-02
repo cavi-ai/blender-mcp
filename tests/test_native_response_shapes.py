@@ -38,7 +38,7 @@ def cases():
             object_info(faces_target=10, faces=10, quad_ratio=1.),
             object_info(before={"vertices": 8}, after={"vertices": 7}, delta={"vertices": -1},
                         merged_vertices=1, loose_removed=0, flipped_faces=0, steps=["merge"]),
-            object_info(texture_resolution=[1024, 1024], density_before={}, density_after={},
+            object_info(texture_resolution=1024, density_before={}, density_after={},
                         uv_bounds={"min": [0., 0.], "max": [1., 1.]}, packed=True),
             {"collection": "LOD", "base": "Prop", "levels": [], "source_renamed": False, "warnings": []},
             {"source": "Prop", "shape": "box", "count": 1, "objects": [], "uniform_scale": True}],
@@ -85,3 +85,17 @@ class NativeResponseShapes(unittest.TestCase):
             self.assertFalse(Draft202012Validator(contracts.ObjectEditResult.model_json_schema()).is_valid(record))
         with self.assertRaises(ValidationError):
             contracts.ScatterResult.model_validate({**cases()["ScatterResult"][0], "estimated_instances": True})
+
+
+class NativeScalarAndListCompatibility(unittest.TestCase):
+    def test_deformation_list_and_texel_resolution_match_native_returns(self):
+        inspection = {**cases()["RigInspection"][0],
+                      "analyzed_action": "Walk", "animation_checks": {
+                          "deformation": [{"name": "Body", "frames": []}],
+                          "root_motion": {"bone": "Root"}}}
+        edit = object_info(texture_resolution=1024)
+        for model, record in [(contracts.RigInspection, inspection),
+                              (contracts.MeshEditResult, edit)]:
+            self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
+            Draft202012Validator(contracts.compact_schema(
+                model.model_json_schema(), output=True)).validate(record)
