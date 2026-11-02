@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.31.0 — 2026-11-02
+
+### Added
+
+- Declared response fields for scene inspection, mesh quality, edit ownership and asset transfer.
+- Structured error codes, outcome and recovery hints alongside readable MCP errors.
+
+### Changed
+
+- Omit redundant schema titles from discovery while retaining validation constraints.
+
 ## 0.30.0 — 2026-10-31
 
 ### Changed
