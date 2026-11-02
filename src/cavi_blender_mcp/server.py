@@ -1,9 +1,10 @@
 """Typed MCP tools for the Blender bridge."""
 
+import logging
 from functools import partial, wraps
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import anyio
 from mcp.server.mcpserver import Image, MCPServer
@@ -12,7 +13,22 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from .client import BridgeClient
-from .contracts import AssetResult, MeshQuality, Ownership, SceneInfo, compact_schema, failure
+from .contracts import (
+    AssetResult,
+    LevelEditResult,
+    MapBakeResult,
+    MaterialAssignment,
+    MeshEditResult,
+    MeshQuality,
+    ObjectEditResult,
+    Ownership,
+    RigEditResult,
+    RigInspection,
+    ScatterResult,
+    SceneInfo,
+    compact_schema,
+    failure,
+)
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 
@@ -38,15 +54,19 @@ class Server(MCPServer):
         super().__init__(name, version=version("cavi-blender-mcp"), **kwargs)
 
     async def list_tools(self):
-        return [tool.model_copy(update={"input_schema": compact_schema(tool.input_schema),
-                                       "output_schema": compact_schema(tool.output_schema)})
-                for tool in await super().list_tools()]
+        return [tool.model_copy(update={
+            "input_schema": compact_schema(tool.input_schema),
+            "output_schema": compact_schema(tool.output_schema, output=True)})
+            for tool in await super().list_tools()]
 
     async def call_tool(self, name, arguments, context=None):
         try:
             return await super().call_tool(name, arguments, context)
-        except UnexpectedToolError:
-            raise
+        except UnexpectedToolError as exc:
+            if context is None:
+                raise
+            logging.getLogger(__name__).exception("Tool execution or output conversion failed")
+            return failure(name, exc)
         except ToolError as exc:
             if context is None:
                 raise
@@ -214,7 +234,7 @@ async def inspect_rig(
     checks: Annotated[list[Literal["root_motion", "loop", "deformation"]] | None,
                       Field(max_length=3)] = None,
     samples: Annotated[StrictInt, Field(ge=2, le=32)] = 8,
-) -> dict[str, Any]:
+) -> RigInspection:
     """Inspect skin weights, rest bones and linked clips without changing action or pose.
 
     Exact meshes must each have one vertex-group armature modifier bound to the rig.
@@ -252,7 +272,7 @@ async def rig_edit(
     strip_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
 
     create: bones, location=(0,0,0); bind: name=armature, names=meshes;
@@ -410,7 +430,7 @@ async def object_edit(
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
                        Field(max_length=10000)] = None,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> ObjectEditResult:
     """Create or edit one object. Params per action:
     create_primitive: kind, location; create_mesh: vertices, faces;
     transform: location, rotation_degrees, scale; set_color: rgba, slot=0; shade: smooth=false;
@@ -509,7 +529,7 @@ async def mesh_edit(
     thickness: Annotated[Number | None, Field(gt=0, le=100)] = None,
     clipping: StrictBool | None = None,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> MeshEditResult:
     """Edit mesh surface. Params per action (defaults after =):
     modifier: kind, amount, apply=false; unwrap: angle_limit_degrees=66, island_margin=.02,
     uv_layer; decimate_to: target_triangles|amount, symmetry_axis, preserve=[seams];
@@ -621,7 +641,7 @@ async def assign_material(
     update_existing: StrictBool | None = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> MaterialAssignment:
     """Assign or update a PBR material. Maps are workspace PNG/JPEG files.
 
     Normal, roughness, metallic and alpha maps are Non-Color; base color and emission
@@ -655,7 +675,7 @@ async def bake(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     isolate: StrictBool = True,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> MapBakeResult:
     """Bake a normal, AO, curvature or lightmap into a new PNG.
 
     normal: tangent or object space; ao: ambient occlusion; curvature: pointiness;
@@ -779,7 +799,7 @@ async def level_edit(
     offset: Annotated[Number | None, Field(ge=-1000, le=1000)] = None,
     align_to_normal: StrictBool | None = None,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> LevelEditResult:
     """Build a terrain mesh or assemble objects in a level.
 
     terrain: name, image or noise seed/octaves/frequency, size=(100,100),
@@ -820,7 +840,7 @@ async def scatter(
     rotation_jitter_degrees: Annotated[Number, Field(ge=0, le=360)] = 360,
     realize: StrictBool = False,
     lease_id: LeaseId = None,
-) -> dict[str, Any]:
+) -> ScatterResult:
     """Add a fixed Geometry Nodes modifier instancing a collection over the mesh surface."""
     return await run(call, "scatter", lease_id=lease_id, name=name, collection=collection,
                      density=density, seed=seed, min_distance=min_distance,

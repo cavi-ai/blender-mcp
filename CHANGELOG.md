@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.32.0 — 2026-11-02
+
+### Added
+
+- Declared response fields for rig inspection, native edits, materials, bakes, levels and scatter.
+- Action-specific response validation that preserves existing wire shapes and extra details.
+- Report output conversion failures as uncertain outcomes without suggesting a retry.
+
 ## 0.31.0 — 2026-11-02
 
 ### Added
