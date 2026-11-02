@@ -6,6 +6,20 @@ from mcp.client.stdio import stdio_client
 
 
 class ResultContractTests(unittest.IsolatedAsyncioTestCase):
+    def test_nested_decode_failure_keeps_transport_outcome_unknown(self):
+        from mcp.server.mcpserver.exceptions import ToolError
+
+        from cavi_blender_mcp.client import BridgeError
+        from cavi_blender_mcp.contracts import failure
+        transport = BridgeError("Invalid response; outcome unknown")
+        transport.__cause__ = ValueError("Malformed response JSON")
+        wrapper = ToolError("Inspect outputs")
+        wrapper.__cause__ = transport
+        result = failure("export", wrapper)
+        self.assertEqual(result.structured_content["error"]["outcome"], "unknown")
+        self.assertEqual(result.structured_content["error"]["next_action"],
+                         "inspect_application_and_outputs")
+
     def test_schema_compaction_preserves_property_names_and_literal_values(self):
         from cavi_blender_mcp.contracts import compact_schema
 

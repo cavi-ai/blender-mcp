@@ -188,3 +188,15 @@ Mutating. Actions: `terrain`, `place`, `snap`.
 Mutating. Adds a fixed Geometry Nodes scatter modifier.
 
 [Guide](../guides/scatter.md)
+
+## Response fields and failures
+
+scene_info, inspect_mesh_quality, session_control and asset_io publish declared
+response fields. Quality reports identify pixels_per_meter density units and
+scene_unit_meters scale. Existing additional fields remain available.
+
+Anticipated failures keep readable text and add an error object with version, code,
+operation, outcome, retry_safe and next_action. INVALID_ARGUMENT and INPUT_NOT_FOUND
+identify local validation/input failures. Transport or protocol uncertainty uses
+OUTCOME_UNKNOWN and requires application/output inspection. retry_safe=false never
+authorizes an automatic mutation retry. Unexpected defects remain opaque.

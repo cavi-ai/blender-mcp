@@ -1797,12 +1797,16 @@
     ],
     "equals": {
       "/density_unit": "pixels_per_meter",
-      "/objects/0/name": "MaterialTarget"
+      "/objects/0/name": "MaterialTarget",
+      "/scope": "static_source_current_frame"
     },
     "required": [
       "/objects/0/mapping/density_area_weighted",
       "/unique_materials",
-      "/images"
+      "/images",
+      "/scene_unit_meters",
+      "/texture_resolution",
+      "/not_checked"
     ]
   },
   {
