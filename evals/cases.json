@@ -1,5 +1,74 @@
 [
   {
+    "id": "uv-layout-source-success",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Cube"
+      ],
+      "texture_resolution": [
+        1024,
+        512
+      ],
+      "padding_pixels": 0
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/complete": true,
+      "/scope": "source_uv_one_texture_set",
+      "/objects/0/uv_layer_index": 0
+    },
+    "required": [
+      "/overlap/triangle_pairs",
+      "/padding/requested_pixels",
+      "/unique_tile_ready"
+    ]
+  },
+  {
+    "id": "uv-layout-padding-bound",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Cube"
+      ],
+      "texture_resolution": [
+        1024,
+        512
+      ],
+      "padding_pixels": -1
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "uv-layout-budget-bound",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Cube"
+      ],
+      "texture_resolution": [
+        1024,
+        512
+      ],
+      "padding_pixels": 4,
+      "comparison_budget": 1000001
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "scene-success",
     "tool": "scene_info",
     "arguments": {},

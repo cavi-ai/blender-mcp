@@ -44,7 +44,7 @@ class ResultContractTests(unittest.IsolatedAsyncioTestCase):
         async with stdio_client(params) as (r, w), ClientSession(r, w) as client:
             await client.initialize()
             tools = {t.name: t for t in (await client.list_tools()).tools}
-            for name in ("scene_info", "inspect_mesh_quality", "session_control", "asset_io",
+            for name in ("scene_info", "inspect_mesh_quality", "inspect_uv_layout", "session_control", "asset_io",
                          "inspect_rig", "rig_edit", "object_edit", "mesh_edit", "assign_material",
                          "bake", "level_edit", "scatter"):
                 self.assertTrue(tools[name].output_schema.get("properties"), name)

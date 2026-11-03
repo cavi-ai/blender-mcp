@@ -6,7 +6,7 @@ from unittest.mock import patch
 from cavi_blender_mcp import server
 from cavi_blender_mcp.client import OPERATIONS
 
-TOOLS = {"scene_info", "inspect_mesh_quality", "inspect_rig", "rig_edit", "render_preview",
+TOOLS = {"scene_info", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "rig_edit", "render_preview",
          "session_control", "object_edit", "mesh_edit", "assign_material", "bake",
          "asset_io", "review_sheet", "level_edit", "scatter"}
 
@@ -42,6 +42,21 @@ class SurfaceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "32"):
             asyncio.run(invalid())
+
+    def test_uv_layout_is_read_only_and_requires_measurement_inputs(self):
+        from cavi_blender_mcp.operations import LEASE_FREE
+
+        calls = self.capture()
+        asyncio.run(server.inspect_uv_layout(["Prop"], (2048, 1024), 8.))
+        self.assertEqual(calls, [("inspect_uv_layout", {
+            "names": ["Prop"], "texture_resolution": (2048, 1024), "padding_pixels": 8.,
+            "uv_layer": None, "comparison_budget": 100000})])
+        self.assertIn("inspect_uv_layout", LEASE_FREE)
+        tool = next(t for t in asyncio.run(server.mcp.list_tools())
+                    if t.name == "inspect_uv_layout")
+        self.assertTrue(tool.annotations.read_only_hint)
+        self.assertEqual(set(tool.input_schema['required']),
+                         {'names', 'texture_resolution', 'padding_pixels'})
 
     def test_scene_info_pages_or_targets_one_object(self):
         calls = self.capture()
