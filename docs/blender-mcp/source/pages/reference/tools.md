@@ -1,9 +1,9 @@
 # Tools
 
-The server publishes 14 tools. Every mutation requires a `lease_id` unless the
+The server publishes 15 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
-Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_rig`,
+Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
 
@@ -34,6 +34,45 @@ Read-only. Measures exact static mesh names.
 | `lightmap_resolution` | 16–4096, default 64 |
 
 Refuses modifiers, shape keys and rigs.
+
+## inspect_uv_layout
+
+Read-only source UV preflight. Treats the exact selected meshes as **one texture
+set**, including overlaps between objects. Call separately for independent sets;
+material slots do not automatically partition the report.
+
+| Parameter | Values |
+| --- | --- |
+| `names` | 1–32 unique Object Mode mesh names |
+| `texture_resolution` | Required width and height, each 1–16384 |
+| `padding_pixels` | Required minimum chart separation and tile-border clearance, 0–256 pixels |
+| `uv_layer` | Optional exact name; default is layer **index 0** |
+| `comparison_budget` | 1–1000000 candidate comparisons; default 100000 |
+
+Up to 20000 source triangles and 200000 source vertices per call, with at most
+60000 loops per mesh. Modifiers and shape keys are not evaluated; this works on
+raw static or skinned source UVs. Object ranges and selected UV layer indices
+identify every reported triangle. Selection, geometry, UVs and edit ownership
+are unchanged.
+
+Triangle intersections use polygon clipping, including subpixel overlaps;
+shared edges have zero overlap area. `overlap.pairwise_area_pixels2` sums areas
+across pairs, so triple overlaps are counted repeatedly. It is not atlas occupancy.
+Charts connect across shared source edges with exactly matching loop UVs.
+Disconnected but touching charts have zero clearance. Padding uses pixel-space
+triangle distances, accounting for nonsquare textures. Examples are capped at 32;
+counts include all measured pairs.
+
+`complete=false` means the comparison budget was exhausted: counts are lower
+bounds, never evidence of absence. `unique_tile_ready` is false for incomplete
+analysis, nonfinite/degenerate/out-of-tile UVs, positive-area overlaps or insufficient
+requested padding. It applies only to a unique 0..1 tile. Intentional tiled,
+mirrored and stacked mappings need their own policy. Area tolerance is 1e-8 pixel²;
+padding tolerance is 1e-6 pixel. No raster occupancy approximation is used here.
+
+Choose padding from bake dilation, filtering and mip requirements. The tool does
+not validate the cage, projection, final baked maps, material transforms or
+exported UVs. Verify those separately before accepting the asset.
 
 ## inspect_rig
 

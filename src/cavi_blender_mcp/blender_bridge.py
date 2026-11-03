@@ -848,6 +848,10 @@ def _dispatch(operation, p):
         return {**inspect(p, obj), "project_id": project_identity()}
     if operation == "export_instances":
         operation, p = "export_mesh", {**p, "preserve_instances": True}
+    if operation == "inspect_uv_layout":
+        from .blender_uv_layout import inspect
+
+        return {**inspect(p, obj), "project_id": project_identity()}
     if operation == "inspect_mesh_quality":
         from .blender_quality import inspect
 

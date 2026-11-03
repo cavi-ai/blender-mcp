@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Read-only UV layout preflight with analytic overlap, chart and tile-border padding measurements.
+- Explicit incomplete results when the bounded UV comparison budget is exhausted.
+
 ### Fixed
 
 - Preserve floating-point bake samples through 16-bit PNG output by default, with explicit precision metadata.

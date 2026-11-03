@@ -26,6 +26,7 @@ from .contracts import (
     RigInspection,
     ScatterResult,
     SceneInfo,
+    UVLayout,
     compact_schema,
     failure,
 )
@@ -223,6 +224,28 @@ async def inspect_mesh_quality(
                      checks=checks or [],
                      naming=naming.model_dump() if naming else None,
                      lightmap_uv=lightmap_uv, lightmap_resolution=lightmap_resolution)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def inspect_uv_layout(
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
+    texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
+                              Annotated[StrictInt, Field(ge=1, le=16384)]],
+    padding_pixels: Annotated[Number, Field(ge=0, le=256)],
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
+) -> UVLayout:
+    """Read source UVs as ONE declared texture set, at most 20,000 triangles.
+
+    Uses UV layer index 0 unless named. Analytic intersections detect subpixel
+    overlaps; gutters and tile borders use the requested texture size in pixels.
+    unique_tile_ready applies only to unique 0..1 baking, not intentional tiled or
+    mirrored UVs. Budget exhaustion returns complete=false and never ready.
+    Does not evaluate modifiers, unwrap, pack, change selection or require a lease.
+    """
+    return await run(call, "inspect_uv_layout", names=names,
+                     texture_resolution=texture_resolution, padding_pixels=padding_pixels,
+                     uv_layer=uv_layer, comparison_budget=comparison_budget)
 
 
 @mcp.tool(annotations=READ_ONLY)
