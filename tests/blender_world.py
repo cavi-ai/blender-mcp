@@ -13,7 +13,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from cavi_blender_mcp.blender_scene import world
 
 with tempfile.TemporaryDirectory() as folder:
-    root=Path(folder);source=root/'environment.exr'
+    root=Path(folder).resolve();source=root/'environment.exr'
     image=bpy.data.images.new('Environment source',width=8,height=4,float_buffer=True)
     image.pixels.foreach_set([v for i in range(32) for v in (i/31,.123456,.234567,1)])
     scene=bpy.context.scene
