@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.33.0 - 2026-11-03
+
+### Added
+
+- Typed IK, pole and rotation-limit authoring, exact vertex weights and independent evaluated FK animation bakes.
+- Persistent cameras, lights, packed HDRI worlds and production Cycles/Eevee rendering with 16-bit defaults.
+
+### Fixed
+
+- Export baked rig and mesh transforms as one glTF animation, excluding unrelated actions.
+- Preserve high precision texture sidecars and apply color encoding once; reject implicit HDR clipping.
+- Snapshot exact HDRI bytes independently of stale cached image buffers.
+
+
 ### Added
 
 - Read-only UV layout preflight with analytic overlap, chart and tile-border padding measurements.

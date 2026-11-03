@@ -274,3 +274,9 @@ Cycles defaults to CPU. `device="GPU"` uses the app's configured enabled Cycles
 devices and refuses an unavailable GPU instead of silently falling back. Eevee uses
 its native GPU renderer. Existing `render_preview` remains a separate temporary
 preview operation with its original budgets.
+
+
+Texture sidecars preserve loaded high precision images at PNG16. Color samples
+are encoded once through sRGB; data-map samples use Raw. PNG sidecars require
+finite normalized samples; remap signed/HDR values explicitly. Source images and
+scene render profiles remain unchanged.
