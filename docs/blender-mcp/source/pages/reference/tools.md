@@ -95,7 +95,7 @@ pose and frame afterward.
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_remove`.
+`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `bake`.
 
 | Parameter | Used by |
 | --- | --- |

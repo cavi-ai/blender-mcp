@@ -846,6 +846,14 @@ def _dispatch(operation, p):
         from .blender_rig import inspect
 
         return {**inspect(p, obj), "project_id": project_identity()}
+    if operation in {'add_constraint', 'remove_constraint', 'assign_weights'}:
+        from .blender_rig_controls import HANDLERS
+
+        return HANDLERS[operation](p)
+    if operation == 'bake_rig':
+        from .blender_rig_bake import bake
+
+        return bake(p)
     if operation == "export_instances":
         operation, p = "export_mesh", {**p, "preserve_instances": True}
     if operation == "inspect_uv_layout":

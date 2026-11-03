@@ -6,6 +6,26 @@ from contextlib import contextmanager
 import bpy
 import numpy as np
 
+
+def constraint_info(value):
+    result = {'name': value.name, 'type': value.type, 'influence': value.influence,
+              'mute': value.mute, 'valid': value.is_valid, 'owner_space': value.owner_space}
+    for field in ('target', 'pole_target'):
+        if hasattr(value, field):
+            target = getattr(value, field)
+            result[field] = target.name if target else None
+    for field in ('subtarget', 'pole_subtarget', 'chain_count', 'iterations',
+                  'use_tail', 'use_stretch'):
+        if hasattr(value, field):
+            result[field] = getattr(value, field)
+    if value.type == 'IK':
+        result['pole_angle_degrees'] = math.degrees(value.pole_angle)
+    if value.type == 'LIMIT_ROTATION':
+        result['minimum_degrees'] = [math.degrees(getattr(value, 'min_' + a)) for a in 'xyz']
+        result['maximum_degrees'] = [math.degrees(getattr(value, 'max_' + a)) for a in 'xyz']
+        result['axes'] = [getattr(value, 'use_limit_' + a) for a in 'xyz']
+    return result
+
 CHECKS = {"root_motion", "loop", "deformation"}
 MAX_SAMPLES = 32
 MAX_DEFORMATION_WORK = 2000000
@@ -262,6 +282,7 @@ def inspect(params, find_object):
              for a, binding, slot in linked]
     deform = {bone.name for bone in rig.data.bones if bone.use_deform}
     bones = [{"name": b.name, "parent": b.parent.name if b.parent else None,
+              "constraints": [constraint_info(c) for c in rig.pose.bones[b.name].constraints],
               "deform": b.use_deform, "length": b.length,
               "finite_rest_matrix": all(math.isfinite(v) for row in b.matrix_local for v in row),
               "finite_pose_matrix": all(math.isfinite(v) for row in rig.pose.bones[b.name].matrix

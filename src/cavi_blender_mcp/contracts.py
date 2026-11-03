@@ -102,7 +102,7 @@ class AssetResult(Result):
     objects: list[str | dict[str, Any]] | None = None
     axis: str | None = None
     pairs: int | None = None
-    textures: list[dict[str, Any]] | None = None
+    textures: int | list[dict[str, Any]] | None = None
 
 
 class VariantResult(Result):

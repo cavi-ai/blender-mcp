@@ -4197,6 +4197,192 @@
     ]
   },
   {
+    "id": "rig-limits-success",
+    "arguments": {
+      "action": "constraint",
+      "name": "EvalRigNew",
+      "constraint": {
+        "type": "LIMIT_ROTATION",
+        "name": "Joint limits",
+        "bone": "Spine",
+        "minimum_degrees": [
+          -90,
+          -90,
+          -90
+        ],
+        "maximum_degrees": [
+          90,
+          90,
+          90
+        ]
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/constraint": "Joint limits",
+      "/constraint_type": "LIMIT_ROTATION"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-limits-duplicate",
+    "arguments": {
+      "action": "constraint",
+      "name": "EvalRigNew",
+      "constraint": {
+        "type": "LIMIT_ROTATION",
+        "name": "Joint limits",
+        "bone": "Spine",
+        "minimum_degrees": [
+          -90,
+          -90,
+          -90
+        ],
+        "maximum_degrees": [
+          90,
+          90,
+          90
+        ]
+      }
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weights",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 0,
+          "weights": {
+            "Root": 0.123456,
+            "Spine": 0.876544
+          }
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/assigned_vertices": 1
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weights-missing-vertex",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 1000000,
+          "weights": {
+            "Root": 1
+          }
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "indices",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-fk-bake",
+    "arguments": {
+      "action": "bake",
+      "name": "EvalRigNew",
+      "new_name": "EvalBakedRig",
+      "action_name": "EvalBakedWalk",
+      "start_frame": 1,
+      "end_frame": 11,
+      "names": [
+        "RigMesh"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "EvalBakedWalk",
+      "/constraints_removed_from_copy": true,
+      "/skins/0/name": "EvalBakedRig_Skin1"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-limits-remove",
+    "arguments": {
+      "action": "remove_constraint",
+      "name": "EvalRigNew",
+      "bone": "Spine",
+      "constraint_name": "Joint limits"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/removed_constraint": "Joint limits"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-ik-missing-target",
+    "arguments": {
+      "action": "constraint",
+      "name": "Rig",
+      "constraint": {
+        "type": "IK",
+        "name": "Foot IK",
+        "bone": "Shin"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weight-invalid-value",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 0,
+          "weights": {
+            "Root": 1.1
+          }
+        }
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation",
+    "tool": "rig_edit"
+  },
+  {
     "id": "rig-pose-success",
     "tool": "rig_edit",
     "arguments": {
