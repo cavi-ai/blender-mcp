@@ -76,6 +76,17 @@ class MeshQuality(Result):
     not_checked: list[str]
 
 
+class UVLayout(Result):
+    scope: Literal["source_uv_one_texture_set"]
+    complete: bool
+    unique_tile_ready: bool
+    texture_resolution: list[int]
+    objects: list[dict[str, Any]]
+    overlap: dict[str, Any]
+    padding: dict[str, Any]
+    not_checked: list[str]
+
+
 class Ownership(Result):
     active: bool
     owner: str | None
