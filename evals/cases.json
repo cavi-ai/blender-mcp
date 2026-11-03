@@ -4197,6 +4197,192 @@
     ]
   },
   {
+    "id": "rig-limits-success",
+    "arguments": {
+      "action": "constraint",
+      "name": "EvalRigNew",
+      "constraint": {
+        "type": "LIMIT_ROTATION",
+        "name": "Joint limits",
+        "bone": "Spine",
+        "minimum_degrees": [
+          -90,
+          -90,
+          -90
+        ],
+        "maximum_degrees": [
+          90,
+          90,
+          90
+        ]
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/constraint": "Joint limits",
+      "/constraint_type": "LIMIT_ROTATION"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-limits-duplicate",
+    "arguments": {
+      "action": "constraint",
+      "name": "EvalRigNew",
+      "constraint": {
+        "type": "LIMIT_ROTATION",
+        "name": "Joint limits",
+        "bone": "Spine",
+        "minimum_degrees": [
+          -90,
+          -90,
+          -90
+        ],
+        "maximum_degrees": [
+          90,
+          90,
+          90
+        ]
+      }
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "already exists",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weights",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 0,
+          "weights": {
+            "Root": 0.123456,
+            "Spine": 0.876544
+          }
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/assigned_vertices": 1
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weights-missing-vertex",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 1000000,
+          "weights": {
+            "Root": 1
+          }
+        }
+      ]
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "indices",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-fk-bake",
+    "arguments": {
+      "action": "bake",
+      "name": "EvalRigNew",
+      "new_name": "EvalBakedRig",
+      "action_name": "EvalBakedWalk",
+      "start_frame": 1,
+      "end_frame": 11,
+      "names": [
+        "RigMesh"
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "EvalBakedWalk",
+      "/constraints_removed_from_copy": true,
+      "/skins/0/name": "EvalBakedRig_Skin1"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-limits-remove",
+    "arguments": {
+      "action": "remove_constraint",
+      "name": "EvalRigNew",
+      "bone": "Spine",
+      "constraint_name": "Joint limits"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/removed_constraint": "Joint limits"
+    },
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-ik-missing-target",
+    "arguments": {
+      "action": "constraint",
+      "name": "Rig",
+      "constraint": {
+        "type": "IK",
+        "name": "Foot IK",
+        "bone": "Shin"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation",
+    "tool": "rig_edit"
+  },
+  {
+    "id": "rig-exact-weight-invalid-value",
+    "arguments": {
+      "action": "assign_weights",
+      "name": "RigMesh",
+      "vertex_weights": [
+        {
+          "vertex": 0,
+          "weights": {
+            "Root": 1.1
+          }
+        }
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation",
+    "tool": "rig_edit"
+  },
+  {
     "id": "rig-pose-success",
     "tool": "rig_edit",
     "arguments": {
@@ -5671,5 +5857,285 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "scene-camera-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "camera",
+      "camera": {
+        "name": "RenderCamera",
+        "location": [
+          4,
+          -6,
+          4
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "focal_length_mm": 50
+      }
+    },
+    "equals": {
+      "/name": "RenderCamera",
+      "/type": "CAMERA",
+      "/camera/focal_length_mm": 50
+    }
+  },
+  {
+    "id": "scene-light-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "StudioKey",
+        "type": "AREA",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 1200
+      }
+    },
+    "equals": {
+      "/type": "LIGHT",
+      "/light/type": "AREA"
+    }
+  },
+  {
+    "id": "scene-world-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "world",
+      "world": {
+        "name": "StudioWorld",
+        "color": [
+          0.1,
+          0.15,
+          0.2
+        ],
+        "strength": 0.5
+      }
+    },
+    "equals": {
+      "/world": "StudioWorld",
+      "/strength": 0.5
+    }
+  },
+  {
+    "id": "scene-production-render-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "scene-production.png",
+        "camera": "RenderCamera",
+        "width": 256,
+        "height": 128,
+        "samples": 2
+      }
+    },
+    "equals": {
+      "/width": 256,
+      "/height": 128,
+      "/bit_depth": 16,
+      "/engine": "CYCLES"
+    },
+    "required": [
+      "/path"
+    ],
+    "files": [
+      "scene-production.png"
+    ],
+    "png_bit_depth": 16
+  },
+  {
+    "id": "scene-over-pixel-budget",
+    "tool": "scene_edit",
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "rejected-render.png",
+        "camera": "RenderCamera",
+        "width": 6000,
+        "height": 3000
+      }
+    },
+    "error": "max_pixels"
+  },
+  {
+    "id": "scene-camera-zero-direction",
+    "tool": "scene_edit",
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "camera",
+      "camera": {
+        "name": "BadCamera",
+        "location": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "error": "differ"
+  },
+  {
+    "id": "scene-authoring-unowned",
+    "tool": "scene_edit",
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "arguments": {
+      "action": "world",
+      "world": {
+        "name": "UnownedWorld"
+      }
+    },
+    "error": "lease_id"
+  },
+  {
+    "id": "scene-wrong-png-depth",
+    "tool": "scene_edit",
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "bad.png",
+        "camera": "RenderCamera",
+        "bit_depth": "32"
+      }
+    },
+    "error": "depth"
+  },
+  {
+    "id": "scene-light-point",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbePOINT",
+        "type": "POINT",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "POINT"
+    }
+  },
+  {
+    "id": "scene-light-sun",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbeSUN",
+        "type": "SUN",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "SUN"
+    }
+  },
+  {
+    "id": "scene-light-spot",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbeSPOT",
+        "type": "SPOT",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "SPOT"
+    }
   }
 ]

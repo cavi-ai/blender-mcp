@@ -135,3 +135,10 @@ class NativeScalarAndListCompatibility(unittest.TestCase):
             self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
             Draft202012Validator(contracts.compact_schema(
                 model.model_json_schema(), output=True)).validate(record)
+
+
+class ImportTextureCountTests(unittest.TestCase):
+    def test_import_texture_counts_and_export_receipts_both_validate(self):
+        for textures in (0, 2, [{'path':'BaseColor.png','sha256':'f'*64}]):
+            value={'path':'model.obj','textures':textures}
+            self.assertEqual(contracts.AssetResult.model_validate(value).model_dump(),value)

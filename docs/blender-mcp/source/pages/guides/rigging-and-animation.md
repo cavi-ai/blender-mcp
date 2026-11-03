@@ -10,6 +10,10 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `create` | New armature from 1–128 `bones` and an optional `location` |
 | `bind` | Automatic weights from `name` armature to 1–16 `names` meshes |
 | `weights` | Clean, limit and normalize weights on one skinned mesh |
+| `assign_weights` | Set exact deform-bone weights on declared vertices |
+| `constraint` | Add IK with pole targets, or local/pose/world rotation limits |
+| `remove_constraint` | Remove one named bone constraint |
+| `bake` | Create a separate rig and optional skin copies with evaluated transform keys |
 | `pose` | Apply bounded pose transforms, optionally resetting first |
 | `keyframe` | Create a new action from 1–32 keyframes |
 | `clear_pose` | Reset every pose bone, optionally at a frame |
@@ -107,3 +111,47 @@ changing pose or action.
 - [Inspect a scene](scene-inspection.md)
 - [Import and export assets](asset-import-export.md)
 - [Limits and boundaries](../reference/limits.md)
+
+
+## IK and joint limits
+
+`constraint` takes a typed `constraint` object. IK targets may be objects or
+bones, including a pole bone on the same rig. A target that depends on the
+constrained chain is refused. Names are unique per bone.
+
+```json
+{"action":"constraint","name":"CharacterRig","constraint":{"type":"IK","name":"Foot IK","bone":"Shin.L","target":"CharacterRig","subtarget":"FootControl.L","pole_target":"CharacterRig","pole_subtarget":"KneeControl.L","pole_angle_degrees":90,"chain_count":2,"use_stretch":false},"lease_id":"<lease>"}
+```
+
+`LIMIT_ROTATION` takes `minimum_degrees`, `maximum_degrees`, `axes` and
+`owner_space`. `remove_constraint` takes `bone` and `constraint_name`.
+`inspect_rig` reports each bone's constraints, target/pole bindings and limits.
+
+## Exact skin weights
+
+`assign_weights` takes `vertex_weights=[{"vertex":42,"weights":{"Thigh.L":0.75,"Shin.L":0.25}}]`.
+Indices must exist and must not repeat. Bone names must belong to the skin's
+bound armature and deform the mesh. By default, `replace=true` replaces deform
+weights on just those vertices and preserves other vertex groups and vertices.
+`replace=false` merges assignments; explicit zero removes a contribution.
+`normalize=false` preserves requested values; explicit true normalizes the result.
+Invalid assignments are rejected before edits, and native failures restore the
+previous affected weights. Inspect the result's normalization and influence counts.
+
+## Bake an independent export rig
+
+`bake` takes `new_name`, `action_name`, `start_frame`, `end_frame`, optional
+`frame_step` (default 1), and optional `names` of bound skins to copy. It samples
+current evaluated motion, including IK and NLA, into quaternion transform keys
+on a separate rig without constraints. The source rig, action and constraints
+remain editable. Each skin copy receives its own mesh data and binds to the new
+rig. Source and copy names are returned in `skins`.
+
+It checks evaluated bone matrices at every declared sample and restores the
+original frame. Dense keys use linear interpolation; larger steps require their
+own between-sample motion review. The budget is 4096 samples and one million
+bone poses per call. Object shear that transform keys cannot preserve is refused.
+This bakes bone/object transforms; blend-shape drivers, simulation and engine
+import behavior need their respective validation. Save the source `.blend`, then
+export the returned skin names with `asset_io animations=true`; the exporter includes
+their bound armature.

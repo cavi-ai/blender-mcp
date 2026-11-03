@@ -1,6 +1,6 @@
 # Tools
 
-The server publishes 15 tools. Every mutation requires a `lease_id` unless the
+The server publishes 16 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
@@ -95,7 +95,7 @@ pose and frame afterward.
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_remove`.
+`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `bake`.
 
 | Parameter | Used by |
 | --- | --- |
@@ -242,3 +242,41 @@ operation, outcome, retry_safe and next_action. INVALID_ARGUMENT and INPUT_NOT_F
 identify local validation/input failures. Transport or protocol uncertainty uses
 OUTCOME_UNKNOWN and requires application/output inspection. retry_safe=false never
 authorizes an automatic mutation retry. Unexpected defects remain opaque.
+
+
+## scene_edit
+
+Authors persistent scene definitions under an edit lease. Supply exactly the
+model matching `action`: `camera`, `light`, `world` or `render`.
+
+- `camera`: named camera, location/target, perspective or orthographic projection,
+  focal length, sensor width, clip range, lens shift, depth of field, focus distance
+  and f-stop. Existing camera names update in place; shared camera data is copied.
+- `light`: named area, point, sun or spot light, location/target, energy, RGB color,
+  area shape/size, radius, sun angle or spot cone/blend. Existing lights update in place.
+- `world`: new managed color/HDRI node graph, strength and rotation. Workspace EXR,
+  HDR, PNG, TIFF or JPEG inputs are hashed and packed into the editable project.
+  Subsequent calls update that managed graph; an unrelated authored graph is preserved.
+- `render`: renders the actual scene through the exact named camera, using Cycles
+  or Eevee. The definition includes independent width/height, sample count, film
+  transparency, color management, precision, thread count and pixel budget. Settings
+  persist with the project. `scene_info(name=...)` reads camera/light definitions.
+
+Production PNG/TIFF default to 16-bit; EXR supports half or full float through
+`bit_depth="16"` or `"32"`. Explicit 8-bit PNG/TIFF remain available. Output paths
+must be new workspace files. `max_pixels` defaults to 16777216 and may be raised
+explicitly for larger images. `cycles_time_limit` limits Cycles sampling; it is
+not a wall-clock deadline for scene preparation or Eevee. The result reports elapsed
+seconds and whether Cycles may have reached its sampling limit. Requested sample
+count is not a claim about samples achieved when a time limit intervenes.
+
+Cycles defaults to CPU. `device="GPU"` uses the app's configured enabled Cycles
+devices and refuses an unavailable GPU instead of silently falling back. Eevee uses
+its native GPU renderer. Existing `render_preview` remains a separate temporary
+preview operation with its original budgets.
+
+
+Texture sidecars preserve loaded high precision images at PNG16. Color samples
+are encoded once through sRGB; data-map samples use Raw. PNG sidecars require
+finite normalized samples; remap signed/HDR values explicitly. Source images and
+scene render profiles remain unchanged.

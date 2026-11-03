@@ -72,6 +72,7 @@ def write(path, objects, selection, preset, instances, empties, animations=False
                 filepath=str(path), export_format="GLB", use_selection=True,
                 export_apply=not animations, export_animations=animations,
                 export_skins=animations, export_animation_mode="ACTIONS",
+                export_anim_single_armature=False,
                 export_morph=True, export_morph_animation=animations)
         else:
             result = usd(path, preset, instances, animations)
@@ -172,17 +173,33 @@ def sidecar_copy(image, target):
         rgba = np.ones((len(values), 4), np.float32)
         rgba[:, :3] = values[:, :3] if channels >= 3 else values[:, :1]
         values = rgba
-    copy = bpy.data.images.new(f"cavi-sidecar-{target.stem}", width, height,
-                               alpha=True, float_buffer=image.is_float)
+    if not np.isfinite(values).all() or np.any(values < 0) or np.any(values > 1):
+        raise ValueError("PNG texture export requires normalized finite samples; "
+                         "remap HDR/signed source values explicitly")
+    # A float staging image avoids reducing loaded PNG16 sources to byte pixels.
+    # save_render applies the required scene-linear -> sRGB transfer for color;
+    # Raw retains data-map samples. Source images and render profiles are untouched.
+    high_precision = image.is_float or image.depth > channels * 8
+    staging = bpy.data.images.new(f"cavi-sidecar-{target.stem}", width, height,
+                                  alpha=True, float_buffer=True)
+    scene = bpy.data.scenes.new("Cavi texture export")
+    data_map = image.colorspace_settings.is_data
     try:
-        copy.colorspace_settings.name = image.colorspace_settings.name
-        copy.pixels.foreach_set(values.ravel())
-        copy.filepath_raw = str(target)
-        copy.file_format = "PNG"
-        copy.save()
-    except Exception:
-        bpy.data.images.remove(copy)
-        raise
+        staging.pixels.foreach_set(values.ravel())
+        scene.render.image_settings.file_format = "PNG"
+        scene.render.image_settings.color_mode = "RGBA"
+        scene.render.image_settings.color_depth = "16" if high_precision else "8"
+        scene.render.dither_intensity = 0
+        scene.view_settings.view_transform = "Raw" if data_map else "Standard"
+        scene.view_settings.look = "None"
+        scene.view_settings.exposure = 0
+        scene.view_settings.gamma = 1
+        staging.save_render(str(target), scene=scene)
+    finally:
+        bpy.data.images.remove(staging)
+        bpy.data.scenes.remove(scene)
+    copy = bpy.data.images.load(str(target), check_existing=False)
+    copy.colorspace_settings.name = "Non-Color" if data_map else "sRGB"
     return copy
 
 

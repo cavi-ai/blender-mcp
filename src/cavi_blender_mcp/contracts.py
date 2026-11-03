@@ -102,7 +102,7 @@ class AssetResult(Result):
     objects: list[str | dict[str, Any]] | None = None
     axis: str | None = None
     pairs: int | None = None
-    textures: list[dict[str, Any]] | None = None
+    textures: int | list[dict[str, Any]] | None = None
 
 
 class VariantResult(Result):
@@ -142,6 +142,21 @@ class VariantResult(Result):
         if cls.shapes:
             schema["anyOf"] = [{"required": list(shape)} for shape in cls.shapes]
         return schema
+
+
+class SceneEditResult(VariantResult):
+    nullable_shape_fields = frozenset({'world'})
+    shapes = (('name', 'type'), ('world', 'strength'),
+              ('path', 'engine', 'width', 'height', 'bit_depth'))
+    name: str | None = None
+    type: str | None = None
+    world: str | None = None
+    strength: float | None = None
+    path: str | None = None
+    engine: str | None = None
+    width: int | None = None
+    height: int | None = None
+    bit_depth: int | None = None
 
 
 Number = int | float

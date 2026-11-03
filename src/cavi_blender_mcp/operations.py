@@ -3,6 +3,7 @@
 OPERATIONS = frozenset(
     {
         "scene_info",
+        "scene_authoring",
         "object_info",
         "inspect_mesh_quality",
         "inspect_uv_layout",
@@ -49,6 +50,10 @@ OPERATIONS = frozenset(
         "create_armature",
         "bind_skin",
         "repair_weights",
+        "add_constraint",
+        "remove_constraint",
+        "assign_weights",
+        "bake_rig",
         "pose_rig",
         "keyframe_rig",
         "clear_pose",
@@ -105,6 +110,7 @@ SLOW_OPERATIONS = frozenset(
         "solidify_mesh",
         "bind_skin",
         "repair_weights",
+        "assign_weights",
         "keyframe_rig",
         "export_asset",
         "review_sheet",
@@ -114,7 +120,8 @@ SLOW_OPERATIONS = frozenset(
         "snap_to_surface",
     }
 )
-LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "bake_png", "retarget_rig"})
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "bake_png", "retarget_rig",
+                             "bake_rig", "scene_authoring"})
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600

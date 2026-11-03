@@ -25,6 +25,7 @@ from .contracts import (
     RigEditResult,
     RigInspection,
     ScatterResult,
+    SceneEditResult,
     SceneInfo,
     UVLayout,
     compact_schema,
@@ -32,6 +33,8 @@ from .contracts import (
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
+from .rig_models import Constraint, VertexWeights
+from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
 # The SDK hides the text of any other exception; these carry messages agents can act on.
 ANTICIPATED = (ValueError, RuntimeError, OSError)
@@ -271,7 +274,8 @@ async def inspect_rig(
 async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
-                    "nla_push", "nla_remove"],
+                    "nla_push", "nla_remove", "constraint", "remove_constraint",
+                    "assign_weights", "bake"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -292,6 +296,14 @@ async def rig_edit(
     track_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     strip_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
+    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
+    frame_step: Annotated[StrictInt | None, Field(ge=1, le=10000)] = None,
+    constraint: Constraint | None = None,
+    bone: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    constraint_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    vertex_weights: Annotated[list[VertexWeights] | None,
+                              Field(min_length=1, max_length=100000)] = None,
+    replace: StrictBool | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
@@ -306,6 +318,10 @@ async def rig_edit(
     rename_action: action_name, new_name; delete_action: action_name;
     nla_push: name=armature, action_name, track_name, strip_name, start_frame=1;
     nla_remove: name=armature, track_name (omit to clear), strip_name.
+    constraint: typed IK (target/pole) or rotation limits; remove_constraint: bone+constraint_name.
+    assign_weights: name=skin, vertex_weights, replace=true, normalize=false.
+    bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
+    Creates a separate constraint-free rig and skin copies; source rig stays editable.
     """
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
@@ -313,8 +329,26 @@ async def rig_edit(
               "action_name": action_name, "frame": frame, "reset": reset,
               "source": source, "source_action": source_action, "mapping": mapping,
               "samples": samples, "new_name": new_name, "track_name": track_name,
-              "strip_name": strip_name, "start_frame": start_frame}
-    if action == "create":
+              "strip_name": strip_name, "start_frame": start_frame,
+              "end_frame": end_frame, "frame_step": frame_step, 'constraint': constraint,
+              'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
+              'replace': replace}
+    if action == 'constraint':
+        operation = 'add_constraint'
+        params = pick(action, values, ['constraint'])
+        params['constraint'] = params['constraint'].model_dump()
+    elif action == 'remove_constraint':
+        operation = 'remove_constraint'
+        params = pick(action, values, ['bone', 'constraint_name'])
+    elif action == 'assign_weights':
+        operation = 'assign_weights'
+        params = pick(action, values, ['vertex_weights'], {'replace': True, 'normalize': False})
+        params['vertex_weights'] = [item.model_dump() for item in params['vertex_weights']]
+    elif action == 'bake':
+        operation = 'bake_rig'
+        params = pick(action, values, ['new_name', 'action_name', 'start_frame', 'end_frame'],
+                      {'frame_step': 1, 'names': []})
+    elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
         params["bones"] = [bone.model_dump() for bone in params["bones"]]
@@ -360,6 +394,28 @@ async def rig_edit(
         operation = "clear_pose"
         params = pick(action, values, (), {"frame": None})
     return await run(call, operation, lease_id=lease_id, name=name, **params)
+
+
+@mcp.tool(annotations=MUTATING)
+async def scene_edit(
+    action: Literal['camera', 'light', 'world', 'render'],
+    camera: CameraSpec | None = None,
+    light: LightSpec | None = None,
+    world: WorldSpec | None = None,
+    render: RenderSpec | None = None,
+    lease_id: LeaseId = None,
+) -> SceneEditResult:
+    """Author persistent camera/light definitions, a managed color/HDRI world, or
+    render the actual scene through its named camera. Existing camera/light names
+    update in place; worlds update only graphs this tool authored. Render settings
+    persist for saved-project reproducibility. PNG/TIFF default to 16-bit, EXR
+    supports 16/32-bit. max_pixels is caller-configurable; samples bound work and
+    cycles_time_limit caps Cycles sampling. GPU uses configured enabled Cycles devices.
+    Existing render_preview remains a separate quick-preview path."""
+    definitions = {'camera': camera, 'light': light, 'world': world, 'render': render}
+    params = pick(action, definitions, [action])
+    return await run(call, 'scene_authoring', lease_id=lease_id, action=action,
+                     definition=params[action].model_dump())
 
 
 @mcp.tool(annotations=ADDITIVE)
