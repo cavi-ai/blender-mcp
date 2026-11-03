@@ -40,7 +40,7 @@ Changelog = "https://github.com/cavi-ai/blender-mcp/blob/main/CHANGELOG.md"
 cavi-blender-mcp = "cavi_blender_mcp.server:main"
 
 [dependency-groups]
-dev = ["numpy>=2,<3", "ruff>=0.14,<1"]
+dev = ["numpy>=2,<3", "pillow>=13,<14", "ruff>=0.14,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cavi_blender_mcp"]

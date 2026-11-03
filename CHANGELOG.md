@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Preserve supplied transparency in reconstruction references, including white foreground details.
+- Convert reconstructed vertex colors from sRGB to linear RGB for glTF export, preserving alpha.
+
 ## 0.32.0 — 2026-11-02
 
 ### Added

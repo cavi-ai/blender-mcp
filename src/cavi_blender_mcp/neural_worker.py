@@ -21,12 +21,46 @@ def clean_mesh(mesh):
     return mesh
 
 
+def prepare_image(source):
+    from PIL import Image, ImageChops
+
+    with Image.open(source) as original:
+        if original.width > 4096 or original.height > 4096:
+            raise ValueError("Input image must be at most 4096 pixels per side")
+        rgba = original.convert("RGBA")
+        # An existing cutout is authoritative. Removing white pixels from it
+        # also erases white clothes, eyes and ceramic parts of the subject.
+        if rgba.getchannel("A").getextrema()[0] == 255:
+            red, green, blue, _ = rgba.split()
+            darkest = ImageChops.darker(ImageChops.darker(red, green), blue)
+            rgba.putalpha(darkest.point(lambda value: min(255, (255 - value) * 255 // 12)))
+        cutout = rgba
+        bounds = cutout.getbbox()
+        if bounds is None:
+            raise ValueError("Input image has no visible foreground")
+        cutout = cutout.crop(bounds)
+        cutout.thumbnail((435, 435), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (512, 512), (128, 128, 128, 255))
+        canvas.alpha_composite(cutout, ((512 - cutout.width) // 2, (512 - cutout.height) // 2))
+        return canvas.convert("RGB")
+
+
+def linearize_vertex_colors(colors):
+    """Convert TripoSR's display RGB to glTF's linear COLOR_0; preserve alpha."""
+    import numpy as np
+
+    result = colors.copy()
+    rgb = colors[:, :3].astype(np.float32) / 255.0
+    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    result[:, :3] = np.rint(linear * 255).astype(np.uint8)
+    return result
+
+
 def main():
     # Heavy libraries stay in a separate configured environment, outside Blender and MCP.
     import numpy as np
     import torch
     from omegaconf import OmegaConf
-    from PIL import Image
     from skimage.measure import marching_cubes
 
     torch.set_num_threads(4)
@@ -63,29 +97,14 @@ def main():
         model.load_state_dict(state)
         del state
         model.renderer.set_chunk_size(16384)
-        with Image.open(source) as original:
-            if original.width > 4096 or original.height > 4096:
-                raise ValueError("Input image must be at most 4096 pixels per side")
-            rgba = np.array(original.convert("RGBA"))
-            # Match upstream's gray-background conditioning and 85% foreground framing.
-            alpha = rgba[:, :, 3].astype(np.float32) / 255
-            alpha *= np.clip((255 - rgba[:, :, :3].min(axis=2).astype(np.float32)) / 12, 0, 1)
-            rgba[:, :, 3] = (alpha * 255).astype(np.uint8)
-            cutout = Image.fromarray(rgba)
-            bounds = cutout.getbbox()
-            if bounds is None:
-                raise ValueError("Input image has no visible foreground")
-            cutout = cutout.crop(bounds)
-            cutout.thumbnail((435, 435), Image.Resampling.LANCZOS)
-            canvas = Image.new("RGBA", (512, 512), (128, 128, 128, 255))
-            canvas.alpha_composite(cutout, ((512 - cutout.width) // 2, (512 - cutout.height) // 2))
-            prepared = canvas.convert("RGB")
+        prepared = prepare_image(source)
         with torch.inference_mode():
             codes = model([prepared], device="cpu")
             mesh = model.extract_mesh(codes, has_vertex_color=True, resolution=resolution)[0]
         if not 0 < len(mesh.faces) <= 500000:
             raise ValueError("Reconstructed mesh exceeded 500000 faces or was empty")
         mesh = clean_mesh(mesh)
+        mesh.visual.vertex_colors = linearize_vertex_colors(mesh.visual.vertex_colors)
         # TripoSR uses Z-up with its conditioning view along +X. glTF uses Y-up.
         mesh.vertices = mesh.vertices[:, [1, 2, 0]]
         mesh.export(str(output))
