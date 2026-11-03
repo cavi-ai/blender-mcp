@@ -878,7 +878,7 @@ def _dispatch(operation, p):
         from .blender_nla import HANDLERS
 
         return HANDLERS[operation](p)
-    if operation == "bake_map":
+    if operation in {"bake_map", "bake_png"}:
         from .blender_bake import bake
 
         return bake(p)

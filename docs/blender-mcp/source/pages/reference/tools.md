@@ -187,6 +187,9 @@ Mutating. Binds a PBR material to exact mesh slots.
 ## bake
 
 Mutating. Bakes a normal, AO, curvature or lightmap map into a new PNG.
+`bit_depth` accepts 8 or 16 and defaults to 16. Returns actual precision,
+color-space role and canonical normal channels; requires an updated bridge.
+Data maps bypass artistic view transforms; lightmaps use the sRGB transfer.
 
 [Guide](../guides/baking.md)
 

@@ -235,13 +235,11 @@ async def inspect_uv_layout(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
 ) -> UVLayout:
-    """Read source UVs as ONE declared texture set, at most 20,000 triangles.
+    """Inspect one texture set's source UVs (max 20,000 triangles); default layer index 0.
 
-    Uses UV layer index 0 unless named. Analytic intersections detect subpixel
-    overlaps; gutters and tile borders use the requested texture size in pixels.
-    unique_tile_ready applies only to unique 0..1 baking, not intentional tiled or
-    mirrored UVs. Budget exhaustion returns complete=false and never ready.
-    Does not evaluate modifiers, unwrap, pack, change selection or require a lease.
+    Analytic overlaps, chart gutters and tile borders use the supplied dimensions.
+    unique_tile_ready concerns unique 0..1 baking; incomplete analysis is never ready.
+    Modifiers are not evaluated. No mesh or selection edits.
     """
     return await run(call, "inspect_uv_layout", names=names,
                      texture_resolution=texture_resolution, padding_pixels=padding_pixels,
@@ -692,6 +690,7 @@ async def bake(
     resolution: Annotated[StrictInt, Field(ge=64, le=4096)] = 1024,
     samples: Annotated[StrictInt, Field(ge=1, le=256)] = 16,
     margin: Annotated[StrictInt, Field(ge=0, le=64)] = 4,
+    bit_depth: Literal[8, 16] = 16,
     cage_extrusion: Annotated[Number | None, Field(ge=0, le=1)] = None,
     max_ray_distance: Annotated[Number | None, Field(ge=0, le=10)] = None,
     normal_space: Literal["tangent", "object"] | None = None,
@@ -699,23 +698,23 @@ async def bake(
     isolate: StrictBool = True,
     lease_id: LeaseId = None,
 ) -> MapBakeResult:
-    """Bake a normal, AO, curvature or lightmap into a new PNG.
+    """Bake normal/AO, pointiness curvature or diffuse lightmap to a new PNG (default 16-bit).
 
-    normal: tangent or object space; ao: ambient occlusion; curvature: pointiness;
-    lightmap: direct and indirect diffuse lighting. high enables selected-to-active for
-    normal and ao. The low-poly mesh is copied, so scene state is restored.
+    high: selected-to-active normal/AO; normal_space: tangent/object, RGB +X,+Y,+Z.
+    Requires an updated Blender bridge.
     """
     values = {"high": high, "resolution": resolution, "samples": samples, "margin": margin,
+              "bit_depth": bit_depth,
               "cage_extrusion": cage_extrusion, "max_ray_distance": max_ray_distance,
               "normal_space": normal_space, "uv_layer": uv_layer, "isolate": isolate}
-    defaults = {"resolution": 1024, "samples": 16, "margin": 4,
+    defaults = {"resolution": 1024, "samples": 16, "margin": 4, "bit_depth": 16,
                 "uv_layer": None, "isolate": True}
     if map in {"normal", "ao"}:
         defaults.update({"high": None, "cage_extrusion": 0.01, "max_ray_distance": 0.1})
     if map == "normal":
         defaults["normal_space"] = "tangent"
     params = pick(map, values, (), defaults)
-    return await run(call, "bake_map", lease_id=lease_id, map=map, name=name, path=path,
+    return await run(call, "bake_png", lease_id=lease_id, map=map, name=name, path=path,
                      **params)
 
 
