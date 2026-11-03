@@ -126,7 +126,7 @@ class DocumentationTests(unittest.TestCase):
 
     def test_readme_links_and_tool_count(self):
         readme = (Path(REPO_ROOT) / "README.md").read_text()
-        self.assertRegex(readme, r"publishes 15 tools")
+        self.assertRegex(readme, r"publishes 16 tools")
         broken = []
         for target in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", readme):
             if re.match(r"^[a-z]+:", target):
