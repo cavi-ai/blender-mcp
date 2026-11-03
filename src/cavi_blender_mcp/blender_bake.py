@@ -35,6 +35,7 @@ def state(scene):
             "use_cage": bake.use_cage,
             "target": bake.target,
             "normal_space": bake.normal_space,
+            "normal_r": bake.normal_r, "normal_g": bake.normal_g, "normal_b": bake.normal_b,
             "use_pass_direct": bake.use_pass_direct,
             "use_pass_indirect": bake.use_pass_indirect,
             "use_pass_color": bake.use_pass_color,
@@ -59,6 +60,28 @@ def bake_layer(mesh, requested):
     if layer is None:
         raise ValueError("Bake target needs an existing UV layer")
     return layer
+
+
+def write_png(image, path, bit_depth, mode):
+    """Encode through dedicated output settings without the user's view transform."""
+    output_scene = bpy.data.scenes.new("CAVI Bake Output")
+    try:
+        settings = output_scene.render.image_settings
+        settings.file_format = "PNG"
+        settings.color_mode = "RGB"
+        settings.color_depth = str(bit_depth)
+        output_scene.render.dither_intensity = 0
+        output_scene.view_settings.view_transform = "Standard" if mode == "lightmap" else "Raw"
+        output_scene.view_settings.look = "None"
+        output_scene.view_settings.exposure = 0
+        output_scene.view_settings.gamma = 1
+        image.save_render(str(path), scene=output_scene)
+        with Path(path).open("rb") as stream:
+            header = stream.read(26)
+        if header[:8] != b"\x89PNG\r\n\x1a\n" or header[24:26] != bytes([bit_depth, 2]):
+            raise RuntimeError("PNG encoder did not preserve the requested RGB precision")
+    finally:
+        bpy.data.scenes.remove(output_scene)
 
 
 def bake(p):
@@ -95,6 +118,9 @@ def bake(p):
     samples = p.get("samples", 16)
     if type(samples) is not int or not 1 <= samples <= MAX_SAMPLES:
         raise ValueError(f"samples must be an integer from 1 to {MAX_SAMPLES}")
+    bit_depth = p.get("bit_depth", 16)
+    if type(bit_depth) is not int or bit_depth not in {8, 16}:
+        raise ValueError("bit_depth must be 8 or 16")
     margin = p.get("margin", 4)
     if type(margin) is not int or not 0 <= margin <= 64:
         raise ValueError("margin must be an integer from 0 to 64")
@@ -135,8 +161,8 @@ def bake(p):
             raise RuntimeError("Could not copy the bake UV layer")
         layers.active = target_layer
         target_layer.active_render = True
-        image = bpy.data.images.new("CAVI Bake", resolution, resolution, alpha=False)
-        image.colorspace_settings.name = "sRGB" if mode == "lightmap" else "Non-Color"
+        image = bpy.data.images.new("CAVI Bake", resolution, resolution, alpha=False,
+                                    float_buffer=True, is_data=mode != "lightmap")
         material = bpy.data.materials.new("CAVI Bake")
         material.use_nodes = True
         nodes, links = material.node_tree.nodes, material.node_tree.links
@@ -195,6 +221,7 @@ def bake(p):
         settings.target = "IMAGE_TEXTURES"
         if mode == "normal":
             settings.normal_space = normal_space.upper()
+            settings.normal_r, settings.normal_g, settings.normal_b = "POS_X", "POS_Y", "POS_Z"
         if mode == "lightmap":
             settings.use_pass_direct = True
             settings.use_pass_indirect = True
@@ -211,13 +238,14 @@ def bake(p):
                                              pass_filter={"DIRECT", "INDIRECT"})
             if "FINISHED" not in result:
                 raise RuntimeError("Bake did not finish")
-            image.filepath_raw = str(path)
-            image.file_format = "PNG"
-            image.save()
+            write_png(image, path, bit_depth, mode)
         data = Path(path).read_bytes()
         return {"path": str(path), "bytes": len(data),
                 "sha256": hashlib.sha256(data).hexdigest(), "map": mode,
                 "resolution": resolution, "samples": samples, "margin": margin,
+                "bit_depth": bit_depth,
+                "color_space": "sRGB" if mode == "lightmap" else "Non-Color",
+                "normal_channels": ["+X", "+Y", "+Z"] if mode == "normal" else None,
                 "cage_extrusion": cage, "max_ray_distance": distance,
                 "normal_space": normal_space if mode == "normal" else None,
                 "uv_layer": layer.name,

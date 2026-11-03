@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Preserve floating-point bake samples through 16-bit PNG output by default, with explicit precision metadata.
+- Encode raw data maps and sRGB lightmaps independently of scene view settings.
+- Use canonical normal channels and restore the scene's original swizzles after baking.
+- Refuse incompatible bake bridges before writing output.
+
 - Accept mesh separation results and named-object collection lists in MCP responses.
 - Preserve supplied transparency in reconstruction references, including white foreground details.
 - Convert reconstructed vertex colors from sRGB to linear RGB for glTF export, preserving alpha.

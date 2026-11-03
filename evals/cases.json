@@ -4584,7 +4584,10 @@
     "equals": {
       "/map": "normal",
       "/selected_to_active": true,
-      "/resolution": 64
+      "/resolution": 64,
+      "/bit_depth": 16,
+      "/color_space": "Non-Color",
+      "/normal_channels/1": "+Y"
     },
     "required": [
       "/sha256"
@@ -5583,5 +5586,21 @@
       "native"
     ],
     "error": "scale"
+  },
+  {
+    "id": "bake-invalid-bit-depth",
+    "tool": "bake",
+    "arguments": {
+      "map": "normal",
+      "name": "BakeLow",
+      "path": "bad-precision.png",
+      "bit_depth": 32
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

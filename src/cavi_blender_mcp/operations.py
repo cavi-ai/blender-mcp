@@ -13,6 +13,7 @@ OPERATIONS = frozenset(
         "import_obj",
         "import_usd",
         "bake_map",
+        "bake_png",
         "transform_object",
         "set_color",
         "add_modifier",
@@ -110,7 +111,7 @@ SLOW_OPERATIONS = frozenset(
         "snap_to_surface",
     }
 )
-LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "retarget_rig"})
+LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "bake_png", "retarget_rig"})
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600

@@ -276,6 +276,9 @@ class MaterialAssignment(Result):
 
 
 class MapBakeResult(Result):
+    bit_depth: Literal[8, 16]
+    color_space: Literal["sRGB", "Non-Color"]
+    normal_channels: list[str] | None = None
     path: str
     bytes: int
     sha256: str
