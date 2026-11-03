@@ -184,8 +184,14 @@ def bake(p):
             shader = nodes.new("ShaderNodeBsdfPrincipled")
             links.new(shader.outputs["BSDF"], output.inputs["Surface"])
         nodes.active = target
+        # A mesh copy retains source materials and their active image targets.
+        # Route every copied face through one private target, including object overrides.
+        bake_low.data.materials.clear()
         bake_low.data.materials.append(material)
-        bake_low.active_material_index = len(bake_low.material_slots) - 1
+        bake_low.material_slots[0].link = "DATA"
+        bake_low.active_material_index = 0
+        for polygon in bake_low.data.polygons:
+            polygon.material_index = 0
 
         for value, hidden_render, hidden_viewport, _ in visibility:
             if value is bake_low or value in high:
