@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Local-first MCP tools for Blender scene inspection, mesh editing, previews and
-game asset export. The server publishes 15 tools over stdio and sends every
+game asset export. The server publishes 16 tools over stdio and sends every
 operation to a bridge that runs on Blender's main thread.
 
 Everything runs on the local machine. The bridge binds only to IPv4 loopback and
