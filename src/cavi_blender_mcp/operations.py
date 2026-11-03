@@ -3,6 +3,7 @@
 OPERATIONS = frozenset(
     {
         "scene_info",
+        "scene_authoring",
         "object_info",
         "inspect_mesh_quality",
         "inspect_uv_layout",
@@ -120,7 +121,7 @@ SLOW_OPERATIONS = frozenset(
     }
 )
 LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "bake_png", "retarget_rig",
-                             "bake_rig"})
+                             "bake_rig", "scene_authoring"})
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600

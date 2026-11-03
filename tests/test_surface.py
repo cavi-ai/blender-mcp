@@ -6,7 +6,7 @@ from unittest.mock import patch
 from cavi_blender_mcp import server
 from cavi_blender_mcp.client import OPERATIONS
 
-TOOLS = {"scene_info", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "rig_edit", "render_preview",
+TOOLS = {"scene_info", "scene_edit", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "rig_edit", "render_preview",
          "session_control", "object_edit", "mesh_edit", "assign_material", "bake",
          "asset_io", "review_sheet", "level_edit", "scatter"}
 

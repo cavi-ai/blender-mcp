@@ -140,7 +140,7 @@ class DocumentationTests(unittest.TestCase):
         text = (PAGES / "reference/tools.md").read_text()
         documented = set(re.findall(r"^## ([a-z_]+)$", text, re.MULTILINE))
         self.assertEqual(documented, {tool.name for tool in tools})
-        self.assertEqual(len(tools), 15)
+        self.assertEqual(len(tools), 16)
 
     def test_release_artifact_is_deterministic(self):
         with tempfile.TemporaryDirectory() as temp:

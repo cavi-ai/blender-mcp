@@ -25,6 +25,7 @@ from .contracts import (
     RigEditResult,
     RigInspection,
     ScatterResult,
+    SceneEditResult,
     SceneInfo,
     UVLayout,
     compact_schema,
@@ -33,6 +34,7 @@ from .contracts import (
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .rig_models import Constraint, VertexWeights
+from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
 # The SDK hides the text of any other exception; these carry messages agents can act on.
 ANTICIPATED = (ValueError, RuntimeError, OSError)
@@ -392,6 +394,28 @@ async def rig_edit(
         operation = "clear_pose"
         params = pick(action, values, (), {"frame": None})
     return await run(call, operation, lease_id=lease_id, name=name, **params)
+
+
+@mcp.tool(annotations=MUTATING)
+async def scene_edit(
+    action: Literal['camera', 'light', 'world', 'render'],
+    camera: CameraSpec | None = None,
+    light: LightSpec | None = None,
+    world: WorldSpec | None = None,
+    render: RenderSpec | None = None,
+    lease_id: LeaseId = None,
+) -> SceneEditResult:
+    """Author persistent camera/light definitions, a managed color/HDRI world, or
+    render the actual scene through its named camera. Existing camera/light names
+    update in place; worlds update only graphs this tool authored. Render settings
+    persist for saved-project reproducibility. PNG/TIFF default to 16-bit, EXR
+    supports 16/32-bit. max_pixels is caller-configurable; samples bound work and
+    cycles_time_limit caps Cycles sampling. GPU uses configured enabled Cycles devices.
+    Existing render_preview remains a separate quick-preview path."""
+    definitions = {'camera': camera, 'light': light, 'world': world, 'render': render}
+    params = pick(action, definitions, [action])
+    return await run(call, 'scene_authoring', lease_id=lease_id, action=action,
+                     definition=params[action].model_dump())
 
 
 @mcp.tool(annotations=ADDITIVE)

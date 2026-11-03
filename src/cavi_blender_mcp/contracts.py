@@ -144,6 +144,21 @@ class VariantResult(Result):
         return schema
 
 
+class SceneEditResult(VariantResult):
+    nullable_shape_fields = frozenset({'world'})
+    shapes = (('name', 'type'), ('world', 'strength'),
+              ('path', 'engine', 'width', 'height', 'bit_depth'))
+    name: str | None = None
+    type: str | None = None
+    world: str | None = None
+    strength: float | None = None
+    path: str | None = None
+    engine: str | None = None
+    width: int | None = None
+    height: int | None = None
+    bit_depth: int | None = None
+
+
 Number = int | float
 Record = dict[str, Any]
 OBJECT_FIELDS = (

@@ -5857,5 +5857,285 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "scene-camera-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "camera",
+      "camera": {
+        "name": "RenderCamera",
+        "location": [
+          4,
+          -6,
+          4
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "focal_length_mm": 50
+      }
+    },
+    "equals": {
+      "/name": "RenderCamera",
+      "/type": "CAMERA",
+      "/camera/focal_length_mm": 50
+    }
+  },
+  {
+    "id": "scene-light-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "StudioKey",
+        "type": "AREA",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 1200
+      }
+    },
+    "equals": {
+      "/type": "LIGHT",
+      "/light/type": "AREA"
+    }
+  },
+  {
+    "id": "scene-world-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "world",
+      "world": {
+        "name": "StudioWorld",
+        "color": [
+          0.1,
+          0.15,
+          0.2
+        ],
+        "strength": 0.5
+      }
+    },
+    "equals": {
+      "/world": "StudioWorld",
+      "/strength": 0.5
+    }
+  },
+  {
+    "id": "scene-production-render-success",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "scene-production.png",
+        "camera": "RenderCamera",
+        "width": 256,
+        "height": 128,
+        "samples": 2
+      }
+    },
+    "equals": {
+      "/width": 256,
+      "/height": 128,
+      "/bit_depth": 16,
+      "/engine": "CYCLES"
+    },
+    "required": [
+      "/path"
+    ],
+    "files": [
+      "scene-production.png"
+    ],
+    "png_bit_depth": 16
+  },
+  {
+    "id": "scene-over-pixel-budget",
+    "tool": "scene_edit",
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "rejected-render.png",
+        "camera": "RenderCamera",
+        "width": 6000,
+        "height": 3000
+      }
+    },
+    "error": "max_pixels"
+  },
+  {
+    "id": "scene-camera-zero-direction",
+    "tool": "scene_edit",
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "camera",
+      "camera": {
+        "name": "BadCamera",
+        "location": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "error": "differ"
+  },
+  {
+    "id": "scene-authoring-unowned",
+    "tool": "scene_edit",
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "arguments": {
+      "action": "world",
+      "world": {
+        "name": "UnownedWorld"
+      }
+    },
+    "error": "lease_id"
+  },
+  {
+    "id": "scene-wrong-png-depth",
+    "tool": "scene_edit",
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "arguments": {
+      "action": "render",
+      "render": {
+        "path": "bad.png",
+        "camera": "RenderCamera",
+        "bit_depth": "32"
+      }
+    },
+    "error": "depth"
+  },
+  {
+    "id": "scene-light-point",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbePOINT",
+        "type": "POINT",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "POINT"
+    }
+  },
+  {
+    "id": "scene-light-sun",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbeSUN",
+        "type": "SUN",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "SUN"
+    }
+  },
+  {
+    "id": "scene-light-spot",
+    "tool": "scene_edit",
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "arguments": {
+      "action": "light",
+      "light": {
+        "name": "ProbeSPOT",
+        "type": "SPOT",
+        "location": [
+          3,
+          -4,
+          6
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "energy": 3
+      }
+    },
+    "equals": {
+      "/light/type": "SPOT"
+    }
   }
 ]

@@ -142,6 +142,16 @@ def info(value):
         "collections": [item.name for item in value.users_collection],
         "modifiers": [{"name": m.name, "type": m.type} for m in value.modifiers],
     }
+    if value.type == 'CAMERA':
+        data = value.data
+        result['camera'] = {'projection': data.type, 'focal_length_mm': data.lens,
+            'sensor_width_mm': data.sensor_width, 'ortho_scale': data.ortho_scale,
+            'clip': [data.clip_start, data.clip_end], 'shift': [data.shift_x, data.shift_y],
+            'depth_of_field': data.dof.use_dof, 'focus_distance': data.dof.focus_distance,
+            'fstop': data.dof.aperture_fstop}
+    elif value.type == 'LIGHT':
+        data = value.data
+        result['light'] = {'type': data.type, 'energy': data.energy, 'color': list(data.color)}
     if value.type == "MESH":
         result.update(
             vertices=len(value.data.vertices),
@@ -842,6 +852,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'scene_authoring':
+        from .blender_scene import author
+
+        return author(p, _workspace)
     if operation == "inspect_rig":
         from .blender_rig import inspect
 

@@ -132,6 +132,13 @@ async def exercise(mode, env, workspace, adapter=None, include_model=False):
                     for path in case.get("files", []):
                         target = workspace / path
                         assert target.is_file() and target.stat().st_size > 0, path
+                    if case.get('png_bit_depth'):
+                        target = Path(data['path']).resolve()
+                        assert target.is_relative_to(workspace.resolve()), target
+                        with target.open('rb') as stream:
+                            header = stream.read(26)
+                        assert header[:8] == b'\x89PNG\r\n\x1a\n'
+                        assert header[24] == case['png_bit_depth'], header[24]
                 for path in case.get("absent", []):
                     assert not (workspace / path).exists(), path
                 results.append(

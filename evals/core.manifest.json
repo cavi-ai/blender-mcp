@@ -5,14 +5,14 @@
       "id": "discovery-budget",
       "probe": "discovery-cost",
       "access": "read_only",
-      "max_tools": 15,
-      "max_schema_bytes": 52000
+      "max_tools": 16,
+      "max_schema_bytes": 60000
     },
     {
       "id": "token-budget",
       "probe": "token-cost",
       "access": "read_only",
-      "max_total_tokens": 14000,
+      "max_total_tokens": 16500,
       "max_tool_tokens": 3000
     },
     {
