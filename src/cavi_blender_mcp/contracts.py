@@ -61,7 +61,7 @@ class SceneInfo(Result):
     offset: int | None = None
     limit: int | None = None
     objects: list[dict[str, Any]] | None = None
-    collections: list[dict[str, Any]] | None = None
+    collections: list[str] | list[dict[str, Any]] | None = None
 
 
 class MeshQuality(Result):
@@ -240,6 +240,7 @@ class MeshEditResult(ObjectFields):
         OBJECT_FIELDS,
         ("collection", "base", "levels", "source_renamed", "warnings"),
         ("source", "shape", "count", "objects", "uniform_scale"),
+        ("source", "by", "count", "parts", "triangles_before"),
     )
     triangles: int | None = None
     warnings: list[str] | None = None
@@ -254,6 +255,9 @@ class MeshEditResult(ObjectFields):
     count: int | None = None
     objects: list[Record] | None = None
     uniform_scale: bool | None = None
+    by: Literal["loose_parts", "materials"] | None = None
+    parts: list[Record] | None = None
+    triangles_before: int | None = None
 
 
 class MaterialAssignment(Result):

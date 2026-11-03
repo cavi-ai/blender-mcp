@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Accept mesh separation results and named-object collection lists in MCP responses.
 - Preserve supplied transparency in reconstruction references, including white foreground details.
 - Convert reconstructed vertex colors from sRGB to linear RGB for glTF export, preserving alpha.
 

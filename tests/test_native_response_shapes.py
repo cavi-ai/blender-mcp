@@ -41,7 +41,12 @@ def cases():
             object_info(texture_resolution=1024, density_before={}, density_after={},
                         uv_bounds={"min": [0., 0.], "max": [1., 1.]}, packed=True),
             {"collection": "LOD", "base": "Prop", "levels": [], "source_renamed": False, "warnings": []},
-            {"source": "Prop", "shape": "box", "count": 1, "objects": [], "uniform_scale": True}],
+            {"source": "Prop", "shape": "box", "count": 1, "objects": [], "uniform_scale": True},
+            *[{"source": "Prop", "by": by, "count": 2, "triangles_before": 24,
+               "parts": [object_info(part=0, material_index=0 if by == "materials" else None),
+                         object_info(name="Prop_part_01", part=1,
+                                     material_index=1 if by == "materials" else None)]}
+              for by in ("materials", "loose_parts")]],
         "MaterialAssignment": [{"material": "Clay", "objects": ["Prop"], "slot": 0,
             "updated": False, "material_users": 1, "base_color_srgb": [1., 1., 1., 1.],
             "roughness": .5, "metallic": 0., "base_color_texture": None,
@@ -88,6 +93,36 @@ class NativeResponseShapes(unittest.TestCase):
 
 
 class NativeScalarAndListCompatibility(unittest.TestCase):
+    def test_separation_requires_its_metadata_and_preserves_part_records(self):
+        model = contracts.MeshEditResult
+        record = next(r for r in cases()["MeshEditResult"] if r.get("by") == "materials")
+        self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
+        schemas = [model.model_json_schema(),
+                   contracts.compact_schema(model.model_json_schema(), output=True)]
+        malformed = [{k: v for k, v in record.items() if k != missing}
+                     for missing in ("source", "by", "count", "parts", "triangles_before")]
+        malformed += [{**record, **change} for change in (
+            {"by": "faces"}, {"parts": ["Prop"]}, {"count": True}, {"triangles_before": "24"})]
+        for value in malformed:
+            with self.subTest(value=value):
+                with self.assertRaises(ValidationError):
+                    model.model_validate(value)
+                for schema in schemas:
+                    self.assertFalse(Draft202012Validator(schema).is_valid(value))
+
+    def test_scene_collections_keep_homogeneous_name_or_detail_lists(self):
+        model = contracts.SceneInfo
+        for record in [object_info(collections=["Collection"]),
+                       {"version": "5.2.3", "objects": [object_info()],
+                        "collections": [{"name": "Collection", "objects": 1}]}]:
+            self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
+            for schema in [model.model_json_schema(),
+                           contracts.compact_schema(model.model_json_schema(), output=True)]:
+                Draft202012Validator(schema).validate(record)
+        for collections in ([1], ["Collection", {"name": "Other"}]):
+            with self.subTest(collections=collections), self.assertRaises(ValidationError):
+                contracts.SceneInfo.model_validate(object_info(collections=collections))
+
     def test_deformation_list_and_texel_resolution_match_native_returns(self):
         inspection = {**cases()["RigInspection"][0],
                       "analyzed_action": "Walk", "animation_checks": {
