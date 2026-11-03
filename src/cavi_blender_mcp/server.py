@@ -235,13 +235,11 @@ async def inspect_uv_layout(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
 ) -> UVLayout:
-    """Read source UVs as ONE declared texture set, at most 20,000 triangles.
+    """Inspect one texture set's source UVs (max 20,000 triangles); default layer index 0.
 
-    Uses UV layer index 0 unless named. Analytic intersections detect subpixel
-    overlaps; gutters and tile borders use the requested texture size in pixels.
-    unique_tile_ready applies only to unique 0..1 baking, not intentional tiled or
-    mirrored UVs. Budget exhaustion returns complete=false and never ready.
-    Does not evaluate modifiers, unwrap, pack, change selection or require a lease.
+    Analytic overlaps, chart gutters and tile borders use the supplied dimensions.
+    unique_tile_ready concerns unique 0..1 baking; incomplete analysis is never ready.
+    Modifiers are not evaluated. No mesh or selection edits.
     """
     return await run(call, "inspect_uv_layout", names=names,
                      texture_resolution=texture_resolution, padding_pixels=padding_pixels,
@@ -700,12 +698,10 @@ async def bake(
     isolate: StrictBool = True,
     lease_id: LeaseId = None,
 ) -> MapBakeResult:
-    """Bake a normal, AO, curvature or lightmap into a new PNG (16-bit by default).
+    """Bake normal/AO, pointiness curvature or diffuse lightmap to a new PNG (default 16-bit).
 
-    normal: tangent or object space; ao: ambient occlusion; curvature: pointiness;
-    lightmap: direct and indirect diffuse lighting. high enables selected-to-active for
-    normal and ao. Normal RGB channels are +X,+Y,+Z. The low-poly mesh is copied,
-    and scene state is restored. Requires an updated precision-capable bridge.
+    high: selected-to-active normal/AO; normal_space: tangent/object, RGB +X,+Y,+Z.
+    Requires an updated Blender bridge.
     """
     values = {"high": high, "resolution": resolution, "samples": samples, "margin": margin,
               "bit_depth": bit_depth,
