@@ -27,6 +27,9 @@ workspace `.png`. It requires a `lease_id`.
 - The low mesh needs an existing UV layer and at most 200,000 triangles.
 - High-poly sources are limited to one million total triangles and 64 objects.
 - Baking copies the low mesh and uses Cycles on CPU with a floating-point image buffer.
+- All copied faces use one private material/image target. Source texture buffers,
+  material slots, object overrides and linked mesh data remain unchanged. Empty
+  or untextured source slots do not need active image nodes.
 - Output uses the requested PNG depth without an intermediate 8-bit image.
 - Normal, AO and curvature values remain raw linear data. Lightmaps use the sRGB
   transfer, without the current scene's artistic view transform, exposure or gamma.

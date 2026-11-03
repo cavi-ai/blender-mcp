@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Isolate copied bake materials and route every face to the private output image, preserving original texture buffers and material overrides.
+
 - Preserve floating-point bake samples through 16-bit PNG output by default, with explicit precision metadata.
 - Encode raw data maps and sRGB lightmaps independently of scene view settings.
 - Use canonical normal channels and restore the scene's original swizzles after baking.
