@@ -7217,5 +7217,81 @@
       "protocol"
     ],
     "error": "does not accept"
+  },
+  {
+    "id": "shader-image-needs-node",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "set_image",
+      "image": {
+        "path": "x.exr",
+        "color_space": "Non-Color"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "requires: node"
+  },
+  {
+    "id": "shader-image-needs-color-space",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "set_image",
+      "node": "Pattern",
+      "image": {
+        "path": "x.exr"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "shader-image-rejects-socket-values",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "set_image",
+      "node": "Pattern",
+      "image": {
+        "path": "x.exr",
+        "color_space": "Non-Color"
+      },
+      "inputs": {
+        "A": 0.1
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not accept"
+  },
+  {
+    "id": "shader-inspect-rejects-outputs",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "inspect",
+      "outputs": {
+        "Color": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not accept"
   }
 ]

@@ -1,48 +1,21 @@
 """Persistent cameras, lights, managed world nodes and production scene rendering."""
 
-import hashlib
 import json
 import math
-import os
-import tempfile
 import time
-from pathlib import Path
 
 import bpy
 from mathutils import Vector
 
 from .blender_bridge import info, obj, output_file, vector
+from .blender_images import packed_snapshot
 from .blender_rigging import label
 
 WORLD_TAG = 'cavi_managed_world'
 
 
 def environment_image(path, workspace, existing=None):
-    """Pack a hashed snapshot, avoiding stale/dirty images cached at the source path."""
-    digest = hashlib.sha256()
-    fd, name = tempfile.mkstemp(prefix='.cavi-world-', suffix=path.suffix, dir=workspace)
-    snapshot = Path(name)
-    try:
-        with os.fdopen(fd, 'wb') as output, path.open('rb') as source:
-            for chunk in iter(lambda: source.read(1024*1024), b''):
-                output.write(chunk)
-                digest.update(chunk)
-        fingerprint = digest.hexdigest()
-        if (existing is not None and not existing.is_dirty and existing.packed_file
-                and existing.get('cavi_world_source_sha256') == fingerprint):
-            return existing, fingerprint
-        image = bpy.data.images.load(str(snapshot), check_existing=False)
-        try:
-            image.pack()
-            image.filepath_raw = str(path)
-            image.name = path.stem
-            image['cavi_world_source_sha256'] = fingerprint
-        except Exception:
-            bpy.data.images.remove(image)
-            raise
-        return image, fingerprint
-    finally:
-        snapshot.unlink(missing_ok=True)
+    return packed_snapshot(path, workspace, existing, tag='cavi_world_source_sha256')
 
 
 def scalar(value, minimum=0, maximum=math.inf):

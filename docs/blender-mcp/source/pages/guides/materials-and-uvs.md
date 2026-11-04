@@ -113,3 +113,38 @@ nodes from stale settings. Other custom properties remain intact. Save to a new
 blend, reopen it and compare values, links and the rendered finish. Blender's
 native graph is source artwork; Unity delivery still needs a supported shader and
 verified texture handoff.
+
+### Value/RGB nodes and image replacement
+
+Inspection includes native `outputs` as well as `inputs`. For Value or RGB control
+nodes, call `set_inputs` with `node` and an `outputs` map keyed by the discovered
+socket identifier. Inputs and outputs can be supplied together; the whole batch
+is validated before writing. `changed_outputs` reports effective output-default
+changes. Outputs computed by other nodes still follow their node evaluation;
+a stored socket default does not replace that computation.
+
+For an existing image-backed node, use `action="set_image"`:
+
+```json
+{"action":"set_image","material_name":"GlazedCeramic","group_path":["Finish Controls"],"node":"Pattern","image":{"path":"textures/glaze.exr","color_space":"Non-Color","alpha_mode":"CHANNEL_PACKED"},"lease_id":"<claim-token>"}
+```
+
+`image.path` selects an existing workspace file decoded by Blender. PNG, TIFF and
+EXR retain their original encoded bytes and native precision; packing does not
+re-encode them. Choose `color_space` explicitly from the active OCIO configuration.
+`alpha_mode` is `STRAIGHT` (default), `PREMUL`, `CHANNEL_PACKED` or `NONE`.
+Use Non-Color for data maps. Color maps require their actual source color space;
+a linear EXR is not automatically sRGB.
+
+A fresh image datablock keeps other nodes' images, color spaces, alpha modes and
+unsaved pixels intact. The edited node keeps its links, interpolation, projection,
+extension and other settings. The image is a packed single-file binding; it does
+not define a UDIM set or image-sequence delivery. `image_source` reports the exact
+snapshot SHA-256 and byte count. `changed_image` distinguishes replacements from
+unchanged packed snapshots, which are reused. A changed file at the same path is
+loaded from a fresh snapshot, bypassing stale image-cache contents.
+
+A failed edit restores the old image binding and managed tags and removes the
+new image. Effective replacements use the same managed-configuration handoff as
+socket edits. Save/reopen, inspect the binding, and review the authored material
+before adapting it for the destination game shader.

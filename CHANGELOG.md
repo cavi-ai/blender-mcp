@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.55.0 - 2026-11-04
+
+- Replace authored shader image bindings with exact packed native image snapshots.
+- Set explicit image color space and alpha interpretation without changing shared source images.
+- Inspect and edit native output defaults, including Value and RGB controls.
+- Share image snapshot loading with world environments and compact fixed-vector schemas.
+
 ## 0.54.0 - 2026-11-04
 
 - Inspect authored material nodes and native socket defaults inside nested shader groups.
