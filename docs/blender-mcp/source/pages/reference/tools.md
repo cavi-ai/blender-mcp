@@ -359,4 +359,8 @@ and `contact_frame_scale`/`contact_frame_offset` align candidate clip time. See
 `compare_rig_motion` accepts `candidate_frame_scale` with its existing offset.
 See [clip timing](../guides/rigging-and-animation.md#trim-rebase-and-retime-a-clip).
 
+Baked FBX exports report their integer `animation_frame_range`. FBX imports clear
+inferred connected-bone flags while preserving hierarchy and rest positions, so
+joint translation keys remain effective.
+
 `rig_edit contact_lock` takes `source_action`, `new_name`, `action_name`, optional `names`/`frame_step`, and typed `foot_locks`. See [editable contact correction](../guides/rigging-and-animation.md#correct-declared-foot-contacts).

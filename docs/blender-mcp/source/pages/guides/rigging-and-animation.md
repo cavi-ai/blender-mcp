@@ -310,6 +310,12 @@ clip again; use its actual start to calculate the offset. Contact inspection use
 the same mapping through `contact_frame_scale` and `contact_frame_offset`, with
 the original declared windows and source rig/action as `contact_reference`.
 
+Baked FBX exports use an integer scene envelope and report it as
+`animation_frame_range`. Fractional clip bounds can leave leading or trailing
+padding. Preserve the intended clip bounds when configuring engine clips, and
+account for the imported envelope's time shift when comparing the motion. GLB
+retains the baked action's fractional bounds.
+
 ## Check contacts after bake and reimport
 
 Use the same contact windows on the final bake and each reimport. If an importer

@@ -29,7 +29,9 @@ with tempfile.TemporaryDirectory() as folder:
     edit('bind_skin', name='Source', names=['Skin'])
     for group in skin.vertex_groups:
         group.remove(list(range(len(skin.data.vertices))))
-    skin.vertex_groups['Root'].add(list(range(len(skin.data.vertices))), 1, 'REPLACE')
+    for vertex in skin.data.vertices:
+        bone = 'Root' if vertex.co.z > 0 else 'Foot'
+        skin.vertex_groups[bone].add([vertex.index], 1, 'REPLACE')
     skin.shape_key_add(name='Basis')
     shape = skin.shape_key_add(name='Blink')
     for vertex in shape.data:
@@ -76,6 +78,19 @@ with tempfile.TemporaryDirectory() as folder:
     assert contact['passed'], contact
     assert contact['sample_frames'][0] == 2.5 and contact['sample_frames'][-1] == 10.5
     assert contact['reference_sample_frames'][0] == 12 and contact['reference_sample_frames'][-1] == 28
+    exported = edit('export_asset', path='fractional.fbx', names=['Clip_Skin1'],
+        animations=True, baked_animation=True, animation_sample_step=.05)
+    assert exported['animation_frame_range'] == [2, 11], exported
+    imported = edit('import_fbx', path='fractional.fbx', name='Imported')
+    mapping = {item['exported_name']: item['name'] for item in imported['source_objects']
+               if item['name'] in imported['armatures']+imported['skinned_meshes']}
+    imported_rig = bpy.data.objects[mapping['Clip']]
+    first, last = imported_rig.animation_data.action.frame_range
+    assert abs(last-first-9) < 1e-4, (first, last)
+    delivered = bridge.dispatch('compare_rig_motion', {**params, 'candidate': mapping['Clip'],
+        'meshes': [{'source': 'Skin', 'candidate': mapping['Clip_Skin1']}],
+        'vertex_match': 'point_set', 'candidate_frame_offset': -3.5+first-2})
+    assert delivered['passed'], delivered
     assert (scene.frame_current, scene.frame_subframe, source.animation_data.action) == before[:3]
     assert shape.driver_add('value').driver.expression == before[4]
     for rate in (0, 1e300):
@@ -90,4 +105,5 @@ with tempfile.TemporaryDirectory() as folder:
         assert 'Invalid' not in bpy.data.objects and 'InvalidTake' not in bpy.data.actions
     print(json.dumps({'max_error_m': compared['max_error_m'],
         'wrong_time_error_m': wrong_time['max_error_m'], 'contact': contact['passed'],
-        'output_range': baked['frame_range'], 'source_preserved': True}))
+        'output_range': baked['frame_range'], 'source_preserved': True,
+        'fbx_error_m': delivered['max_error_m']}))

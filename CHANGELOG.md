@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 - Rebase and retime independent rig bakes, including object and shape-key motion.
 - Compare surfaces and contact markers on explicitly mapped source/candidate times.
 - Reject output samples that collapse at native keyframe precision before creating copies.
+- Record baked FBX sampling envelopes and preserve imported joint translation channels.
 
 ## 0.44.0 - 2026-11-04
 
