@@ -20,6 +20,8 @@ rigs and procedural graphs. Name collisions receive native suffixes. `roots`
 and `items` map source names to actual imported names through native import
 events; never infer names from suffixes. `items` is capped at 1000 with an explicit
 truncation flag. `created_counts` covers all newly created IDs.
+For collection placements, `instance_collections=true` returns instance object
+names in `instances`; see [collection assemblies](../guides/collection-assembly.md).
 
 The current project, selection and active collection are preserved. Failures
 remove newly appended IDs; inspect after any uncertain result. Packed image

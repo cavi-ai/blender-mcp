@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.50.0 - 2026-11-04
+
+- Append collections as native instances for editable modular kit placement.
+- Export nested evaluated mesh assemblies to FBX and GLB without flattening sources.
+- Preserve generated materials, shared geometry and sheared placements in static exports.
+- Allow mirrored object transforms while rejecting zero scale before mutation.
+
 ## 0.49.0 - 2026-11-04
 
 - Inspect native Blender libraries by data type with exact source hashes.

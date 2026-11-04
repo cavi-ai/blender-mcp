@@ -75,6 +75,7 @@ class AssetLibraryResult(Result):
     items: list[dict[str, Any]] | None = None
     items_truncated: bool | None = None
     images: list[dict[str, Any]] | None = None
+    instances: list[dict[str, Any]] | None = None
 
 
 class SceneEditResult(VariantResult):

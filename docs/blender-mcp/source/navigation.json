@@ -23,6 +23,7 @@
         { "title": "Rig and animate", "path": "guides/rigging-and-animation.md" },
         { "title": "Procedural assets", "path": "guides/procedural-assets.md" },
         { "title": "Native asset libraries", "path": "guides/native-libraries.md" },
+        { "title": "Collection assemblies", "path": "guides/collection-assembly.md" },
         { "title": "Preview and review", "path": "guides/previews-and-review.md" },
         { "title": "Build a level", "path": "guides/level-assembly.md" },
         { "title": "Scatter instances", "path": "guides/scatter.md" },

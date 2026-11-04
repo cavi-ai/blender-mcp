@@ -840,6 +840,7 @@ async def asset_io(
     collision: StrictBool | None = None,
     animations: StrictBool | None = None,
     baked_animation: StrictBool | None = None,
+    assembly: StrictBool | None = None,
     animation_sample_step: Annotated[Number | None, Field(gt=0)] = None,
     textures: StrictBool | None = None,
     bake_pair: BakePair | None = None,
@@ -849,7 +850,9 @@ async def asset_io(
     """Move assets in or out. Params per action:
     import: GLB, FBX, OBJ or USD path, name (new prefix); export: names, .fbx/.glb/.usd path,
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB/USD),
-    textures (FBX/USD sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
+    textures (FBX/USD sidecars), axis=unity; assembly=true instead exports evaluated
+    static collection-instance names to FBX/GLB with axis and textures only;
+    or bake_pair alone (writes <stem>_low.fbx,
     <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 for the TripoSR provider
     (local, no lease; CAVI_GENERATION_PROVIDER=triposg or triposg-mlx selects TripoSG, without
@@ -859,7 +862,14 @@ async def asset_io(
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
-              "baked_animation": baked_animation, "animation_sample_step": animation_sample_step}
+              "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
+              'assembly': assembly}
+    if action == 'export' and assembly is True:
+        values.pop('assembly')
+        params = pick(action, values, ['names'], {'axis': None, 'textures': False})
+        return await run(call, 'export_assembly', path=path, lease_id=lease_id, **params)
+    if action == 'export' and assembly is False:
+        values.pop('assembly')
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None})
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
@@ -902,15 +912,25 @@ async def asset_library(
     expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
     offset: Annotated[StrictInt | None, Field(ge=0)] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
+    instance_collections: StrictBool | None = None,
     lease_id: LeaseId = None,
 ) -> AssetLibraryResult:
-    """Inspect .blend library names or append independent native assets with their dependencies."""
-    values = {'names': names, 'expected_sha256': expected_sha256, 'offset': offset, 'limit': limit}
+    """Inspect .blend names or append editable native assets. Append instance_collections=true
+    creates placement empties sharing imported collection definitions (kind=collections only).
+    """
+    values = {'names': names, 'expected_sha256': expected_sha256, 'offset': offset, 'limit': limit,
+              'instance_collections': instance_collections}
     if action == 'inspect':
         params = pick(action, values, (), {'offset': 0, 'limit': 100})
         return await run(call, 'inspect_asset_library', path=path, kind=kind, **params)
-    params = pick(action, values, ['names', 'expected_sha256'])
-    return await run(call, 'append_asset_library', path=path, kind=kind, lease_id=lease_id, **params)
+    params = pick(action, values, ['names', 'expected_sha256'], {'instance_collections': None})
+    if params.pop('instance_collections'):
+        if kind != 'collections':
+            raise ValueError('instance_collections requires kind=collections')
+        operation = 'append_asset_library_instances'
+    else:
+        operation = 'append_asset_library'
+    return await run(call, operation, path=path, kind=kind, lease_id=lease_id, **params)
 
 
 @mcp.tool(annotations=MUTATING)

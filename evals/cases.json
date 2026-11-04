@@ -7011,5 +7011,60 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "library-instance-kind",
+    "tool": "asset_library",
+    "arguments": {
+      "action": "append",
+      "path": "kit.blend",
+      "kind": "objects",
+      "names": [
+        "Kit"
+      ],
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "instance_collections": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires kind=collections"
+  },
+  {
+    "id": "assembly-animation-options",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "kit.glb",
+      "names": [
+        "Kit"
+      ],
+      "assembly": true,
+      "animations": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "animations"
+  },
+  {
+    "id": "assembly-import-options",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "kit.glb",
+      "name": "Kit",
+      "assembly": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "assembly"
   }
 ]
