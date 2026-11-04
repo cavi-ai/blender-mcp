@@ -50,6 +50,8 @@ class Ownership(Result):
     project_id: str
     claimed_project_id: str | None
     expires_in: float
+    idle_seconds: float | None = None
+    previous_owner: str | None = None
     lease_id: str | None = None
 
 

@@ -12,8 +12,11 @@ arbitrary scripts.
 3. Pass the returned `lease_id` on every mutation.
 4. `action="renew"` extends the lease.
 5. `action="release"` ends it.
+6. `action="break"` takes the inspected `expected_project` and ends a lease
+   whose owner has not used it for 300 seconds. It returns `previous_owner`.
 
-Claims last 30–3600 seconds and default to 600.
+Claims last 30–3600 seconds and default to 600. Inspection reports
+`idle_seconds` since the owner last used the lease.
 
 ## Guarantees
 
@@ -22,7 +25,8 @@ Claims last 30–3600 seconds and default to 600.
   refused.
 - An owned operation holds its exclusive section until it finishes.
 - A successful owned save or project transition updates the claim's binding.
-- Release and expiry never save, close or discard a project.
+- Release, break and expiry never save, close or discard a project.
+- A lease in use, or used within the last 300 seconds, cannot be broken.
 
 The lease token is private. Keep it out of asset receipts and handoff documents.
 A new agent inspects and claims its own session.

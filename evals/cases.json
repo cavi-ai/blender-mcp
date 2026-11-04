@@ -1854,6 +1854,32 @@
     "error": "eval-A"
   },
   {
+    "id": "session-non-ascii-lease",
+    "tool": "session_control",
+    "arguments": {
+      "action": "renew",
+      "lease_id": "\u00e9"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "valid lease_id"
+  },
+  {
+    "id": "session-break-active-owner",
+    "tool": "session_control",
+    "arguments": {
+      "action": "break",
+      "expected_project": "$project"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "error": "break requires"
+  },
+  {
     "id": "session-renew",
     "tool": "session_control",
     "arguments": {

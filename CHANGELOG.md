@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows
 - Inspect Geometry Nodes socket identifiers, types, ranges and attribute modes.
 - Edit modifier-local procedural inputs without changing shared node groups.
 - Snapshot evaluated meshes with material usage and preserve editable sources.
+- Break an edit lease whose owner has not used it for 300 seconds; inspection reports idle time.
+- Refuse a non-ASCII `lease_id` as an invalid lease instead of raising `TypeError`.
 
 ## 0.47.0 - 2026-11-04
 
