@@ -35,6 +35,7 @@ from .contracts import (
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .rig_models import Constraint, MotionSkinPair, VertexWeights
+from .rig_models import Name as RigName
 from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
 # The SDK hides the text of any other exception; these carry messages agents can act on.
@@ -334,6 +335,7 @@ async def rig_edit(
     replace: StrictBool | None = None,
     max_distance_m: Annotated[Number | None, Field(gt=0)] = None,
     max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1)] = None,
+    shape_names: Annotated[list[RigName] | None, Field(max_length=64)] = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
@@ -352,6 +354,7 @@ async def rig_edit(
     assign_weights: name=skin, vertex_weights, replace=true, normalize=false.
     transfer_weights: name=target, source=skin, new_name, max_distance_m, max_discarded_weight;
     copies the target and interpolates rest-surface weights within explicit distance/loss budgets.
+    Optional shape_names transfer selected relative morph deltas and follow donor weights/mute.
     bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
     Creates a separate constraint-free rig and skin copies; source rig stays editable.
     """
@@ -365,11 +368,11 @@ async def rig_edit(
               "end_frame": end_frame, "frame_step": frame_step, 'constraint': constraint,
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
               'replace': replace, 'max_distance_m': max_distance_m,
-              'max_discarded_weight': max_discarded_weight}
+              'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names}
     if action == 'transfer_weights':
         operation = 'transfer_skin_weights'
         params = pick(action, values, ['source', 'new_name', 'max_distance_m', 'max_discarded_weight'],
-                      {'max_influences': 4})
+                      {'max_influences': 4, 'shape_names': []})
     elif action == 'constraint':
         operation = 'add_constraint'
         params = pick(action, values, ['constraint'])

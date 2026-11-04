@@ -10,7 +10,7 @@ from mathutils.geometry import barycentric_transform
 
 from .blender_bridge import info, new_name, obj
 from .blender_rig import weights
-from .blender_rigging import MAX_ASSIGNMENTS
+from .blender_rigging import MAX_ASSIGNMENTS, label
 
 
 def world_vertices(value, origin):
@@ -33,6 +33,14 @@ def transfer(p):
         raise ValueError('Transfer weights in Object Mode')
     source, target = obj(p['source'], mesh=True), obj(p['name'], mesh=True)
     name = new_name(p['new_name'])
+    shape_names = p.get('shape_names', [])
+    if not isinstance(shape_names, list) or len(shape_names) > 64:
+        raise ValueError('shape_names must list up to 64 unique source shapes')
+    for shape_name in shape_names:
+        label(shape_name, 'shape name')
+    if len(set(shape_names)) != len(shape_names):
+        raise ValueError('shape_names must be unique')
+    projection = []
     distance, loss, limit = p['max_distance_m'], p['max_discarded_weight'], p.get('max_influences', 4)
     if (isinstance(distance, bool) or not isinstance(distance, (int, float))
             or not math.isfinite(distance) or distance <= 0
@@ -92,6 +100,8 @@ def transfer(p):
             raise ValueError('Source surface produced invalid barycentric coordinates')
         factors = [min(1., max(0., value)) for value in factors]
         total_factor = sum(factors)
+        if shape_names:
+            projection.append((triangle, [value/total_factor for value in factors]))
         contributions = {}
         for vertex, factor in zip(triangle, factors, strict=True):
             for bone, weight in donors[vertex].items():
@@ -112,6 +122,9 @@ def transfer(p):
         raise ValueError(f'Skin transfer rejected before edits: distance_vertices={len(outside)}, '
                          f'max_distance_m={maximum_distance:.9g}; loss_vertices={len(excessive)}, '
                          f'max_discarded_weight={maximum_loss:.9g}')
+    from .blender_morph_transfer import prepare
+
+    morphs = prepare(source, target, shape_names, projection)
     copy, mesh = None, None
     try:
         copy = target.copy()
@@ -132,6 +145,9 @@ def transfer(p):
         for index, assignments in enumerate(projected):
             for bone, weight in assignments:
                 created[bone].add([index], weight, 'REPLACE')
+        from .blender_morph_transfer import apply
+
+        transferred_shapes = apply(copy, source, morphs, meters)
         world = target.matrix_world.copy()
         copy.parent = source
         copy.parent_type = 'OBJECT'
@@ -154,7 +170,7 @@ def transfer(p):
                 'degenerate_triangles_ignored': len(source.data.loop_triangles)-len(triangles),
                 'max_distance_m': maximum_distance, 'distance_limit_m': distance,
                 'max_discarded_weight': maximum_loss, 'discarded_weight_limit': loss,
-                'weights': quality, 'frame': bpy.context.scene.frame_current,
+                'morphs': transferred_shapes, 'weights': quality, 'frame': bpy.context.scene.frame_current,
                 'not_checked': ['anatomical correspondence', 'cloth collision', 'animation deformation',
                                 'normal/tangent deformation', 'Unity import']}
     except Exception:
