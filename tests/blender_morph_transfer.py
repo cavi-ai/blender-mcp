@@ -74,7 +74,7 @@ for index, factors in enumerate(expected):
     assert (actual-expected_delta).length < 1e-7, (actual, expected_delta)
     actual = keys.key_blocks['Corrective'].data[index].co - keys.key_blocks[0].data[index].co
     assert (actual - inverse.to_3x3() @ Vector((0, .006, 0))).length < 1e-7
-for frame, expected_value in ((1, 0), (25, 1)):
+for frame, expected_value in ((1, 0), (13, .5), (25, 1)):
     scene.frame_set(frame)
     bpy.context.view_layer.update()
     evaluated = keys.evaluated_get(bpy.context.evaluated_depsgraph_get())
