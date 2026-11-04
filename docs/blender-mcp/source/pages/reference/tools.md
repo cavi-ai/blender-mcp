@@ -12,6 +12,10 @@ its source objects. `geometry_nodes` inspect/set_inputs accepts `instance` to
 resolve an internal member through that scene instance. Edits affect the shared
 definition; the ordinary scene-object route remains unchanged.
 
+`object_edit` `make_unique` takes a scene collection instance's `name`, a unique
+collection `new_name` and lease. It branches the current editable definition and
+retargets that placement, returning actual source/copy ID mappings.
+
 ## asset_library
 
 `inspect` is lease-free; `append` requires a lease. Paths are workspace `.blend`

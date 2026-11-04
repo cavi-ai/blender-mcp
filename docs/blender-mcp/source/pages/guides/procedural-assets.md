@@ -51,8 +51,8 @@ validated socket-value/attribute path as ordinary procedural edits. Responses
 identify both the chosen `instance` and its root `definition`.
 
 These are shared source edits: every placement referencing that internal object
-sees the override. Reappend an independent library definition before making a
-variant that must differ. Node-group topology and defaults remain unchanged.
+sees the override. Use `object_edit` `make_unique` on the placement to branch its current edited
+definition, or reappend an independent library definition from saved source. Node-group topology and defaults remain unchanged.
 Unrelated objects cannot be reached by supplying an arbitrary name alongside an
 instance. Inspection preserves scene context and does not dirty a saved file.
 
