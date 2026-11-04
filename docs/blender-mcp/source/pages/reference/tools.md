@@ -1,11 +1,30 @@
 # Tools
 
-The server publishes 19 tools. Every mutation requires a `lease_id` unless the
+The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
+
+## asset_library
+
+`inspect` is lease-free; `append` requires a lease. Paths are workspace `.blend`
+files. Select `kind`: `objects`, `collections` (default), `materials` or `node_groups`.
+Inspection accepts `offset` and `limit` (1–1000, default 100); it returns exact
+names, source SHA-256 and byte size without loading IDs into the scene.
+
+`append` requires 1–256 unique `names` and the inspected `expected_sha256`.
+Blender appends independent local IDs recursively, preserving asset metadata,
+rigs and procedural graphs. Name collisions receive native suffixes. `roots`
+and `items` map source names to actual imported names through native import
+events; never infer names from suffixes. `items` is capped at 1000 with an explicit
+truncation flag. `created_counts` covers all newly created IDs.
+
+The current project, selection and active collection are preserved. Failures
+remove newly appended IDs; inspect after any uncertain result. Packed image
+receipts hash every packed file; external image files must exist inside the
+workspace and are hashed without conversion. See [native libraries](../guides/native-libraries.md).
 
 ## geometry_nodes
 

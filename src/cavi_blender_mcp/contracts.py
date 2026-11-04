@@ -64,6 +64,19 @@ class AssetResult(Result):
     textures: int | list[dict[str, Any]] | None = None
 
 
+class AssetLibraryResult(Result):
+    path: str
+    sha256: str
+    bytes: int | None = None
+    kind: str | None = None
+    names: list[str] | None = None
+    roots: list[dict[str, Any]] | None = None
+    created_counts: dict[str, int] | None = None
+    items: list[dict[str, Any]] | None = None
+    items_truncated: bool | None = None
+    images: list[dict[str, Any]] | None = None
+
+
 class SceneEditResult(VariantResult):
     nullable_shape_fields = frozenset({'world'})
     shapes = (('name', 'type'), ('world', 'strength'),

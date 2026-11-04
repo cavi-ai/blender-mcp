@@ -8,7 +8,7 @@ from cavi_blender_mcp.client import OPERATIONS
 
 TOOLS = {"scene_info", "scene_edit", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "compare_rig_motion", "inspect_skin_clearance", "rig_edit", "render_preview",
          "session_control", "object_edit", "mesh_edit", "assign_material", "bake",
-         "asset_io", "review_sheet", "level_edit", "scatter", "geometry_nodes"}
+         "asset_io", "review_sheet", "level_edit", "scatter", "geometry_nodes", "asset_library"}
 
 
 class SurfaceTests(unittest.TestCase):

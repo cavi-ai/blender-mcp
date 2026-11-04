@@ -877,6 +877,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation in {'inspect_asset_library', 'append_asset_library'}:
+        from .blender_asset_library import append, inspect
+
+        return (inspect if operation == 'inspect_asset_library' else append)(p, _workspace)
     if operation in {'inspect_geometry_nodes', 'set_geometry_inputs', 'snapshot_geometry'}:
         from .blender_node_inputs import inspect, set_inputs, snapshot
 

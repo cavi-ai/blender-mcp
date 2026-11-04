@@ -46,7 +46,7 @@ class ResultContractTests(unittest.IsolatedAsyncioTestCase):
             tools = {t.name: t for t in (await client.list_tools()).tools}
             for name in ("scene_info", "inspect_mesh_quality", "inspect_uv_layout", "session_control", "asset_io",
                          "inspect_rig", "compare_rig_motion", "inspect_skin_clearance", "rig_edit", "object_edit", "mesh_edit", "assign_material",
-                         "bake", "level_edit", "scatter", "geometry_nodes"):
+                         "bake", "level_edit", "scatter", "geometry_nodes", "asset_library"):
                 self.assertTrue(tools[name].output_schema.get("properties"), name)
             rejected = await client.call_tool("scene_info", {"limit": 0})
             self.assertTrue(rejected.is_error)
