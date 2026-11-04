@@ -84,6 +84,7 @@ class MeshQuality(Result):
 
 
 class UVLayout(Result):
+    material: str | None = None
     scope: Literal["source_uv_one_texture_set"]
     complete: bool
     unique_tile_ready: bool

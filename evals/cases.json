@@ -1,5 +1,26 @@
 [
   {
+    "id": "uv-layout-empty-material",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Cube"
+      ],
+      "texture_resolution": [
+        1024,
+        1024
+      ],
+      "padding_pixels": 0,
+      "material": ""
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "uv-layout-source-success",
     "tool": "inspect_uv_layout",
     "arguments": {

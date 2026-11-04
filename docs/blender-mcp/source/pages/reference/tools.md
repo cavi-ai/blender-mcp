@@ -48,8 +48,9 @@ Refuses modifiers, shape keys and rigs.
 ## inspect_uv_layout
 
 Read-only source UV preflight. Treats the exact selected meshes as **one texture
-set**, including overlaps between objects. Call separately for independent sets;
-material slots do not automatically partition the report.
+set**, including overlaps between objects. Pass `material` to select faces using
+one exact material across objects and slots, including multi-material meshes.
+Without a filter, all faces are measured together.
 
 | Parameter | Values |
 | --- | --- |
@@ -58,12 +59,15 @@ material slots do not automatically partition the report.
 | `padding_pixels` | Required minimum chart separation and tile-border clearance, 0–256 pixels |
 | `uv_layer` | Optional exact name; default is layer **index 0** |
 | `comparison_budget` | 1–1000000 candidate comparisons; default 100000 |
+| `material` | Optional exact material name; at least one source face must use it |
 
-Up to 20000 source triangles and 200000 source vertices per call, with at most
+Up to 20000 selected triangles and 200000 source vertices per call, with at most
 60000 loops per mesh. Modifiers and shape keys are not evaluated; this works on
 raw static or skinned source UVs. Object ranges and selected UV layer indices
 identify every reported triangle. Selection, geometry, UVs and edit ownership
-are unchanged.
+are unchanged. Each object also reports its full source triangle count and used
+material slots with per-slot counts, allowing callers to check texture-set
+coverage. UV readiness applies only to the selected faces.
 
 Triangle intersections use polygon clipping, including subpixel overlaps;
 shared edges have zero overlap area. `overlap.pairwise_area_pixels2` sums areas

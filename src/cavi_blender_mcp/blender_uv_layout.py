@@ -12,6 +12,9 @@ def inspect(params, find_object):
     requested = params.get('uv_layer')
     if requested is not None and (not isinstance(requested, str) or not 1 <= len(requested) <= 63):
         raise ValueError('UV layer name must contain 1..63 characters')
+    material = params.get('material')
+    if material is not None and (not isinstance(material, str) or not 1 <= len(material) <= 63):
+        raise ValueError('Material must be an exact 1..63 character name')
     triangles, vertices, objects = [], [], []
     vertex_offset = 0
     for name in names:
@@ -26,21 +29,33 @@ def inspect(params, find_object):
         if layer is None:
             raise ValueError(f'{name}: requested UV layer is missing')
         mesh.calc_loop_triangles()
-        count = len(mesh.loop_triangles)
-        if not count or len(triangles) + count > MAX_TRIANGLES:
+        slots, selected = {}, []
+        for triangle in mesh.loop_triangles:
+            index = triangle.material_index
+            bound = value.material_slots[index].material if index < len(value.material_slots) else None
+            name_at_slot = bound.name if bound else None
+            slots.setdefault(index, {'slot': index, 'material': name_at_slot, 'triangles': 0})['triangles'] += 1
+            if material is None or name_at_slot == material:
+                selected.append(triangle)
+        count = len(selected)
+        if not mesh.loop_triangles or len(triangles) + count > MAX_TRIANGLES:
             raise ValueError(f'Inspect 1..{MAX_TRIANGLES} triangles total')
         first = len(triangles)
-        for triangle in mesh.loop_triangles:
+        for triangle in selected:
             triangles.append([tuple(layer.data[loop].uv) for loop in triangle.loops])
             vertices.append([vertex + vertex_offset for vertex in triangle.vertices])
         vertex_offset += len(mesh.vertices)
         objects.append({'name': name, 'mesh': mesh.name, 'uv_layer': layer.name,
                         'uv_layer_index': list(mesh.uv_layers).index(layer),
                         'first_triangle': first, 'triangles': count,
+                        'source_triangles': len(mesh.loop_triangles),
+                        'material_slots': list(slots.values()),
                         'unevaluated_modifiers': [m.type for m in value.modifiers]})
+    if not triangles:
+        raise ValueError('No source triangles use the requested material')
     result = analyze(triangles, vertices, params['texture_resolution'], params['padding_pixels'],
                      params.get('comparison_budget', 100000))
-    return {**result, 'scope': 'source_uv_one_texture_set', 'objects': objects,
+    return {**result, 'scope': 'source_uv_one_texture_set', 'material': material, 'objects': objects,
             'file': bpy.data.filepath, 'dirty': bpy.data.is_dirty,
             'not_checked': ['evaluated or exported UVs', 'material UV transforms',
                             'bake projection and cage', 'dilation and mip filtering']}
