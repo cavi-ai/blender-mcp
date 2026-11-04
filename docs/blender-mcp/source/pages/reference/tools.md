@@ -7,6 +7,11 @@ Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `in
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
 
+For a nested kit definition, `scene_info(name=..., definition=true)` pages through
+its source objects. `geometry_nodes` inspect/set_inputs accepts `instance` to
+resolve an internal member through that scene instance. Edits affect the shared
+definition; the ordinary scene-object route remains unchanged.
+
 ## asset_library
 
 `inspect` is lease-free; `append` requires a lease. Paths are workspace `.blend`

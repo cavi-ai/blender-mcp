@@ -53,8 +53,13 @@ class InputStore:
         del self.item[key]
 
 
-def host(name):
-    value = obj(name)
+def host(name, instance=None):
+    if instance is None:
+        value = obj(name)
+    else:
+        from .blender_collection_instances import object_in_instance
+
+        value = object_in_instance(name, instance)
     if not hasattr(value, 'modifiers'):
         raise ValueError('Object has no modifier stack')
     return value
@@ -95,7 +100,7 @@ def editable(socket):
 
 
 def inspect(params):
-    value = host(params['name'])
+    value = host(params['name'], params.get('instance'))
     items = [modifier(value, params['modifier'])] if params.get('modifier') else [
         m for m in value.modifiers if m.type == 'NODES' and m.node_group]
     reports = []
@@ -114,7 +119,12 @@ def inspect(params):
         reports.append({'name': item.name, 'node_group': item.node_group.name,
             'nodes': len(item.node_group.nodes), 'links': len(item.node_group.links),
             'show_viewport': item.show_viewport, 'show_render': item.show_render, 'inputs': inputs})
-    return {'name': value.name, 'modifiers': reports}
+    result = {'name': value.name, 'modifiers': reports}
+    if params.get('instance') is not None:
+        from .blender_collection_instances import root
+
+        result.update(instance=params['instance'], definition=root(params['instance']).instance_collection.name)
+    return result
 
 
 def numeric(value, socket):
@@ -170,7 +180,7 @@ def update(value):
 
 
 def set_inputs(params):
-    value = host(params['name'])
+    value = host(params['name'], params.get('instance'))
     if value.library and value.override_library is None:
         raise ValueError('Linked object needs an editable local copy or library override')
     item = modifier(value, params.get('modifier'))
@@ -213,7 +223,7 @@ def set_inputs(params):
                 del store[key]
         update(value)
         raise
-    return inspect({'name': value.name, 'modifier': item.name})
+    return inspect({'name': value.name, 'modifier': item.name, 'instance': params.get('instance')})
 
 
 def snapshot(params):

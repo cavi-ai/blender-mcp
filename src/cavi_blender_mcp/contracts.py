@@ -18,6 +18,9 @@ class SceneInfo(Result):
     limit: int | None = None
     objects: list[dict[str, Any]] | None = None
     collections: list[str] | list[dict[str, Any]] | None = None
+    instance_collection: str | None = None
+    instance_offset: list[float] | None = None
+    scene_instances: list[str] | None = None
 
 
 class MeshQuality(Result):
@@ -221,6 +224,8 @@ class ProceduralAssetResult(Result):
     name: str
     modifiers: list[Record]
     source: str | None = None
+    instance: str | None = None
+    definition: str | None = None
     scope: str | None = None
     frame: Number | None = None
     triangles: int | None = None
