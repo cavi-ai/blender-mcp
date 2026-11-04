@@ -64,9 +64,19 @@ def weights(value, deform, limit):
 
 
 def action_slot(rig, action):
-    slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]
+    target = rig.id_type
+    slots = [slot for slot in action.slots if slot.target_id_type == target]
     if not slots:
-        raise ValueError("Action has no object slot")
+        raise ValueError(f"Action has no {target} slot")
+    if target == 'KEY':
+        animation = rig.animation_data
+        if animation and animation.action == action and animation.action_slot in slots:
+            return animation.action_slot
+        exact = [slot for slot in slots if slot.name_display == rig.name]
+        if len(exact) == 1:
+            return exact[0]
+        if len(slots) != 1:
+            raise ValueError('Shape-key action slot is ambiguous for this owner')
     return next((slot for slot in slots if slot.name_display == rig.name), slots[0])
 
 
@@ -299,6 +309,7 @@ def inspect(params, find_object):
                                         for v in row)} for b in rig.data.bones]
     reports = []
     triangles = 0
+    from .blender_nla import shape_animation
     for value in meshes:
         value.data.calc_loop_triangles()
         triangles += len(value.data.loop_triangles)
@@ -309,6 +320,7 @@ def inspect(params, find_object):
                         "triangles": len(value.data.loop_triangles),
                         "uv_layers": [layer.name for layer in value.data.uv_layers],
                         "shape_keys": value.data.shape_keys is not None,
+                        "shape_key_animation": shape_animation(value.data.shape_keys),
                         "materials": [s.material.name if s.material else None
                                       for s in value.material_slots],
                         "modifier_enabled": value.modifiers[0].show_viewport,
@@ -365,7 +377,7 @@ def inspect(params, find_object):
                 checks_report['contacts'] = contact_report(rig, action, contacts, reference, frame_offset, frame_scale)
     actions = []
     for action in bpy.data.actions:
-        slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]
+        slots = [slot for slot in action.slots if slot.target_id_type in {'OBJECT', 'KEY'}]
         if not slots:
             continue
         start, end = action.frame_range
@@ -373,6 +385,7 @@ def inspect(params, find_object):
             continue
         actions.append({"name": action.name, "frame_range": [start, end],
                         "slots": [slot.identifier for slot in slots],
+                        "target_types": sorted({slot.target_id_type for slot in slots}),
                         "fake_user": action.use_fake_user})
         if len(actions) > 64:
             raise ValueError("Rig action inventory exceeds 64 actions")

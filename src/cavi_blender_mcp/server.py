@@ -298,7 +298,7 @@ async def rig_edit(
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
                     "assign_weights", "transfer_weights", "bake", "contact_lock"],
-    name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
+    name: str,
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
     names: Annotated[list[str] | None, Field(min_length=1, max_length=16)] = None,
@@ -334,9 +334,10 @@ async def rig_edit(
     foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16)] = None,
     timing: ClipTiming | None = None,
     strip_settings: NlaStripSettings | None = None,
+    animation_target: Literal['OBJECT', 'SHAPE_KEYS'] | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
-    """Author rigs, skinning, clips and NLA layers under a lease; bake/contact_lock create independent copies."""
+    """Edit rigs."""
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
@@ -349,7 +350,11 @@ async def rig_edit(
               'replace': replace, 'max_distance_m': max_distance_m,
               'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
               'calibration': calibration, 'skinning_mode': skinning_mode, 'foot_locks': foot_locks,
-              'timing': timing, 'strip_settings': strip_settings}
+              'timing': timing, 'strip_settings': strip_settings,
+              'animation_target': animation_target}
+    clip_action = action in {'set_action', 'nla_push', 'nla_edit', 'nla_remove'}
+    if clip_action:
+        values.pop('animation_target')
     if action == 'contact_lock':
         operation = 'lock_rig_contacts'
         params = pick(action, values, ['source_action', 'action_name', 'new_name', 'foot_locks'],
@@ -435,6 +440,8 @@ async def rig_edit(
     else:
         operation = "clear_pose"
         params = pick(action, values, (), {"frame": None})
+    if clip_action and animation_target is not None:
+        params['animation_target'] = animation_target
     return await run(call, operation, lease_id=lease_id, name=name, **params)
 
 

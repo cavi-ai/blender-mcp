@@ -12,6 +12,32 @@ from cavi_blender_mcp.rig_models import NlaStripSettings
 
 
 class NlaSurfaceTests(unittest.TestCase):
+    def test_shape_owner_reaches_each_owned_clip_operation(self):
+        calls = []
+        def call(operation, params):
+            calls.append((operation, params))
+            return {'name': 'Face'}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            for action, kwargs in (
+                ('set_action', {'action_name': 'Blink'}),
+                ('nla_push', {'action_name': 'Blink'}),
+                ('nla_edit', {'track_name': 'Face', 'strip_name': 'Blink',
+                              'strip_settings': NlaStripSettings(repeat=2)}),
+                ('nla_remove', {'track_name': 'Face'}),
+            ):
+                asyncio.run(server.rig_edit(action, 'Face', animation_target='SHAPE_KEYS',
+                                           lease_id='L', **kwargs))
+        self.assertEqual(len(calls), 4)
+        for operation, params in calls:
+            self.assertEqual(operation, 'owned_edit')
+            self.assertEqual(params['params']['animation_target'], 'SHAPE_KEYS')
+            self.assertEqual(params['params']['name'], 'Face')
+            self.assertEqual(params['params']['lease_id'], 'L')
+
+    def test_shape_owner_is_rejected_for_non_clip_actions(self):
+        with self.assertRaisesRegex(ValueError, 'animation_target'):
+            asyncio.run(server.rig_edit('clear_pose', 'Face', animation_target='SHAPE_KEYS', lease_id='L'))
+
     def test_sparse_settings_reach_the_owned_strip_edit(self):
         calls = []
         def call(operation, params):
