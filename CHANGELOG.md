@@ -41,6 +41,10 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The server type, failure contract and schema compaction come from `cavi-mcp-core`; unknown tool names return a `TOOL_NOT_FOUND` failure.
+
 ### Added
 
 - TripoSG image-to-3D provider on Apple Silicon, CUDA or CPU, selected with `CAVI_GENERATION_PROVIDER`.

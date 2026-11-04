@@ -82,8 +82,9 @@ class BridgeErrorTests(unittest.TestCase):
             self.assertEqual(len(server.received), 1)
 
     def test_explicit_preflight_rejection_keeps_the_native_outcome(self):
+        from cavi_mcp_core.contracts import failure
+
         from cavi_blender_mcp.blender_errors import PreflightRejected
-        from cavi_blender_mcp.contracts import failure
         server = Server(self, body=lambda request: {
             'id': request['id'], 'error': 'Distance exceeds the transfer budget',
             'error_outcome': 'rejected'})
@@ -97,8 +98,9 @@ class BridgeErrorTests(unittest.TestCase):
         self.assertEqual(len(server.received), 1)
 
     def test_unproven_or_malformed_outcomes_remain_unknown(self):
+        from cavi_mcp_core.contracts import failure
+
         from cavi_blender_mcp.client import BridgeOperationError
-        from cavi_blender_mcp.contracts import failure
         for fields in ({}, {'error_outcome': 'unknown'}, {'error_outcome': True},
                        {'error_outcome': 'rejected', 'result': {}},
                        {'error_outcome': 'rejected', 'error': {'code': 'bad'}}):

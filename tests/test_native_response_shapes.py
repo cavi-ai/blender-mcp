@@ -2,6 +2,7 @@
 import copy
 import unittest
 
+from cavi_mcp_core.schema import compact_schema
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
@@ -72,7 +73,7 @@ class NativeResponseShapes(unittest.TestCase):
             model = getattr(contracts, name)
             schema = Draft202012Validator(model.model_json_schema())
             compact = Draft202012Validator(
-                contracts.compact_schema(model.model_json_schema(), output=True))
+                compact_schema(model.model_json_schema(), output=True))
             for original in records:
                 with self.subTest(model=name, keys=sorted(original)):
                     record = {**copy.deepcopy(original), "extension": {"preserved": [1, None]}}
@@ -99,7 +100,7 @@ class NativeScalarAndListCompatibility(unittest.TestCase):
         record = next(r for r in cases()["MeshEditResult"] if r.get("by") == "materials")
         self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
         schemas = [model.model_json_schema(),
-                   contracts.compact_schema(model.model_json_schema(), output=True)]
+                   compact_schema(model.model_json_schema(), output=True)]
         malformed = [{k: v for k, v in record.items() if k != missing}
                      for missing in ("source", "by", "count", "parts", "triangles_before")]
         malformed += [{**record, **change} for change in (
@@ -118,7 +119,7 @@ class NativeScalarAndListCompatibility(unittest.TestCase):
                         "collections": [{"name": "Collection", "objects": 1}]}]:
             self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
             for schema in [model.model_json_schema(),
-                           contracts.compact_schema(model.model_json_schema(), output=True)]:
+                           compact_schema(model.model_json_schema(), output=True)]:
                 Draft202012Validator(schema).validate(record)
         for collections in ([1], ["Collection", {"name": "Other"}]):
             with self.subTest(collections=collections), self.assertRaises(ValidationError):
@@ -133,7 +134,7 @@ class NativeScalarAndListCompatibility(unittest.TestCase):
         for model, record in [(contracts.RigInspection, inspection),
                               (contracts.MeshEditResult, edit)]:
             self.assertEqual(model.model_validate(record).model_dump(mode="json"), record)
-            Draft202012Validator(contracts.compact_schema(
+            Draft202012Validator(compact_schema(
                 model.model_json_schema(), output=True)).validate(record)
 
 

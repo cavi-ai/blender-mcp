@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
-dependencies = ["anyio>=4.5,<5", "mcp>=2.3,<3", "pydantic>=2.11,<3"]
+dependencies = ["anyio>=4.5,<5", "cavi-mcp-core>=0.1,<0.2", "mcp>=2.3,<3", "pydantic>=2.11,<3"]
 
 [project.urls]
 Homepage = "https://cavi-ai.xyz"
@@ -38,6 +38,10 @@ Changelog = "https://github.com/cavi-ai/blender-mcp/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cavi-blender-mcp = "cavi_blender_mcp.server:main"
+
+# Until cavi-mcp-core is on PyPI, uv resolves it from its public repository.
+[tool.uv.sources]
+cavi-mcp-core = { git = "https://github.com/cavi-ai/mcp-core.git", rev = "76f427f6c6f2ca0dc12faaebd53063930ff67b51" }
 
 [dependency-groups]
 dev = ["numpy>=2,<3", "pillow>=13,<14", "ruff>=0.14,<1"]

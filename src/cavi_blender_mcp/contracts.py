@@ -1,59 +1,8 @@
-"""Declared response fields and conservative transport failure details."""
+"""Declared response fields for the Blender tools."""
 
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
-from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
-from mcp.types import CallToolResult, TextContent
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    ValidationError,
-    model_serializer,
-    model_validator,
-)
-
-from ._vendor import schema as _schema
-
-compact_schema = _schema.compact_schema
-compact_union = _schema.compact_union
-
-
-class Result(BaseModel):
-    model_config = ConfigDict(extra="allow", strict=True)
-
-    @model_serializer(mode="wrap")
-    def preserve_shape(self, handler):
-        """Keep omitted optional fields omitted, preserving the existing wire shape."""
-        return {key: value for key, value in handler(self).items() if key in self.model_fields_set}
-
-
-def failure(name, error):
-    cause = error
-    while (isinstance(cause, ToolError) and not isinstance(cause, UnexpectedToolError)
-           and cause.__cause__ is not None):
-        cause = cause.__cause__
-    rejected = isinstance(cause, (ValueError, ValidationError, FileNotFoundError))
-    code = (
-        "INVALID_ARGUMENT"
-        if isinstance(cause, (ValueError, ValidationError))
-        else "INPUT_NOT_FOUND"
-        if isinstance(cause, FileNotFoundError)
-        else "OUTCOME_UNKNOWN"
-    )
-    return CallToolResult(
-        isError=True,
-        content=[TextContent(type="text", text=str(error))],
-        structuredContent={
-            "error": {
-                "version": 1,
-                "code": code,
-                "operation": name,
-                "outcome": "rejected" if rejected else "unknown",
-                "retry_safe": False,
-                "next_action": "inspect_inputs" if rejected else "inspect_application_and_outputs",
-            }
-        },
-    )
+from cavi_mcp_core.contracts import Result, VariantResult
 
 
 class SceneInfo(Result):
@@ -111,23 +60,6 @@ class AssetResult(Result):
     axis: str | None = None
     pairs: int | None = None
     textures: int | list[dict[str, Any]] | None = None
-
-
-class VariantResult(Result):
-    """Declare existing action branches without adding a discriminator to the wire."""
-
-    shapes: ClassVar[tuple[tuple[str, ...], ...]] = ()
-    nullable_shape_fields: ClassVar[frozenset[str]] = frozenset()
-
-    @model_validator(mode="before")
-    @classmethod
-    def require_shape(cls, value):
-        fields = {field.alias or name for name, field in cls.model_fields.items()}
-        return _schema.validate_variant(value, fields, cls.shapes, cls.nullable_shape_fields)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, core_schema, handler):
-        return _schema.variant_schema(core_schema, handler, cls.shapes, cls.nullable_shape_fields)
 
 
 class SceneEditResult(VariantResult):
