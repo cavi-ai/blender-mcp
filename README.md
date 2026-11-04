@@ -18,6 +18,17 @@ Everything runs on the local machine. The bridge binds only to IPv4 loopback and
 requires a random session token. There is no arbitrary Python tool, telemetry,
 external asset download or remote inference.
 
+## Try one material handoff
+
+Inspect a utility case's material assignments, export its nine mesh objects,
+and check the two texture sets that Painter actually receives. The example
+includes the original mesh, exported maps and reproduction steps.
+
+[![One utility case, nine mesh objects and two assigned material names](examples/material-texture-sets/utility-case-material-handoff-poster.png)](examples/material-texture-sets/utility-case-material-handoff.mp4)
+
+[Watch the 30-second edited handoff](examples/material-texture-sets/utility-case-material-handoff.mp4)
+or [count the assigned materials](examples/material-texture-sets/README.md).
+
 ## Install
 
 Requirements: Python 3.11 or newer, [`uv`](https://docs.astral.sh/uv/), and

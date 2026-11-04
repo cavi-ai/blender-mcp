@@ -1,0 +1,37 @@
+{
+  "kind": "example-results",
+  "versions": {
+    "blender_mcp": "0.44.0",
+    "blender": "5.2.3 LTS",
+    "substance_mcp": "0.12.0",
+    "painter": "12.2.0",
+    "platform": "macOS"
+  },
+  "source_materials": [
+    "Hardware",
+    "PaintedMetal"
+  ],
+  "FBX_materials_and_receiving_texture_sets": [
+    "CaviHardware_A",
+    "CaviStudioPainted_A"
+  ],
+  "exported_objects": 9,
+  "FBX_bytes": 69644,
+  "retained_FBX_sha256": "21e9eb0d080aa7c1119897f92aca2a50a8b2a299696fb3f2088a0aefd478f66d",
+  "files_sha256": {
+    "LICENSE": "da3cac1bafb733641e0ba083681015f208fb2788c6b08f6f7b9fc626ff0dcb13",
+    "create_utility_case.py": "d72e6531c5934905b9a4f0ae799d5352b44ec08044e8f01100d2357f22f5d7ed",
+    "maps-A/Hardware_Base_color.png": "3de5835c2a7ae3ff4b76de1db5ab2a685b433c24cf4a1cde0f9caacc72aabc28",
+    "maps-A/Hardware_Base_metalness.png": "f40abe87e4ab025f7738f05f7d9f83b758c4ae897aaca0a9a92c3c9f4946b8e6",
+    "maps-A/Hardware_Specular_roughness.png": "d7b1812c3339dd85c37940a75d45a953f0bc1fcea9ed94a4bda7197f86ba56b0",
+    "maps-A/PaintedMetal_Base_color.png": "c37c512ee6233a004f31ef8660768a809f8e1e01a7c1aaab61544eaefa351aef",
+    "maps-A/PaintedMetal_Base_metalness.png": "2b547e87865a43a12ad982a0be71bf5b3755a8d278dff0e669ee8df2fbf37b4d",
+    "maps-A/PaintedMetal_Specular_roughness.png": "cd5b02accfab03a80debfe475e5df36405c1cbd35f1a236aa786ab49db151d6d",
+    "material-settings.json": "ce2420c93b1a1232afd4f045ba097559d1e167fc26aa4cd729230b6e7e7eb4c9",
+    "utility-case-material-handoff-poster.png": "7ebca564222f849c0cbac12ac7112b1f73e3cb56ba2c9e53ceeb9df87ab5f6c5",
+    "utility-case-material-handoff.mp4": "0ecf08712a64f06e0ee8e92ca007a7f9742beea9013f900979ec9507b4394b53",
+    "utility_case.mtl": "7aacac9c1cd0b1e86e0bf9bfd08e9c9082bf5fa673cf914fb9c7307477444cf0",
+    "utility_case.obj": "d508137cb3d305e65b0575bdffd56ac846d98386c8a3638dd39a0ffa113d7ee0"
+  },
+  "scope": "Static FBX export and Painter texture-set inspection"
+}
