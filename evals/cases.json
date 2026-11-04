@@ -1,5 +1,27 @@
 [
   {
+    "id": "clip-timing-zero-rate",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "bake",
+      "name": "Rig",
+      "new_name": "Clip",
+      "action_name": "Run",
+      "start_frame": 12,
+      "end_frame": 28,
+      "timing": {
+        "start_frame": 1,
+        "playback_rate": 0
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "contact-reference-invalid-field",
     "tool": "inspect_rig",
     "arguments": {

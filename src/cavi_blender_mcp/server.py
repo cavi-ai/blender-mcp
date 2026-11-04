@@ -31,6 +31,7 @@ from .contracts import (
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .rig_models import (
+    ClipTiming,
     Constraint,
     ContactReference,
     ContactWindow,
@@ -216,6 +217,7 @@ async def inspect_rig(
     contacts: Annotated[list[ContactWindow] | None, Field(min_length=1, max_length=16)] = None,
     contact_reference: ContactReference | None = None,
     contact_frame_offset: Number = 0,
+    contact_frame_scale: Annotated[Number, Field(gt=0)] = 1,
 ) -> RigInspection:
     """Inspect skin weights, rest bones and linked clips without changing action or pose.
 
@@ -225,7 +227,7 @@ async def inspect_rig(
     contacts: declared bone-local markers and frame windows measure horizontal drift
     and absolute height error against a world-Z ground plane in metres.
     contact_reference: source rig/action maps marker offsets across fixed rest-axis
-    changes. contact_frame_offset shifts candidate sampling relative to source windows.
+    changes. Candidate time = source time * contact_frame_scale + contact_frame_offset.
     """
     arguments = {'armature': armature, 'meshes': meshes, 'max_influences': max_influences,
                  'action': action, 'checks': checks or [], 'samples': samples}
@@ -235,6 +237,8 @@ async def inspect_rig(
         arguments['contact_reference'] = contact_reference.model_dump()
     if contact_frame_offset != 0:
         arguments['contact_frame_offset'] = contact_frame_offset
+    if contact_frame_scale != 1:
+        arguments['contact_frame_scale'] = contact_frame_scale
     return await run(call, "inspect_rig", **arguments)
 
 
@@ -271,17 +275,20 @@ async def compare_rig_motion(
     space: Literal["world", "start_root"] = "world",
     vertex_match: Literal["index", "point_set"] = "index",
     candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000)] = 0,
+    candidate_frame_scale: Annotated[Number, Field(gt=0)] = 1,
 ) -> RigMotionComparison:
     """Compare evaluated skin positions and matching bone heads on the current timeline.
 
     Index matching is for unchanged vertex order. Bidirectional point sets allow export seam
     splits; they do not establish vertex correspondence. start_root removes only initial rig
-    placement. Offset aligns a known imported clip start. Restores frame and subframe; no edits.
+    placement. Candidate time = source time * candidate_frame_scale + candidate_frame_offset.
+    Restores frame and subframe; no edits.
     """
+    options = {'candidate_frame_scale': candidate_frame_scale} if candidate_frame_scale != 1 else {}
     return await run(call, "compare_rig_motion", source=source, candidate=candidate,
         meshes=[pair.model_dump() for pair in meshes], start_frame=start_frame, end_frame=end_frame,
         max_error_m=max_error_m, samples=samples, space=space, vertex_match=vertex_match,
-        candidate_frame_offset=candidate_frame_offset)
+        candidate_frame_offset=candidate_frame_offset, **options)
 
 
 @mcp.tool(annotations=MUTATING)
@@ -324,6 +331,7 @@ async def rig_edit(
     calibration: RetargetCalibration | None = None,
     skinning_mode: Literal['preserve', 'linear'] | None = None,
     foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16)] = None,
+    timing: ClipTiming | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Edit rigs under a lease; bake and contact_lock create independent rig/skin copies.
@@ -338,7 +346,8 @@ async def rig_edit(
     constraint: typed constraint; remove_constraint: bone/constraint_name;
     assign_weights: vertex_weights; transfer_weights: source/new_name/distance/loss budgets,
     optional shape_names. Existing targets remain editable.
-    bake: new_name/action_name/start_frame/end_frame, optional names/frame_step/skinning_mode.
+    bake: new_name/action_name/start_frame/end_frame; optional names/frame_step/skinning_mode/timing.
+    timing: output start_frame and playback_rate; source sampling stays at frame_step.
     contact_lock: source_action/new_name/action_name/foot_locks, optional names/frame_step.
     Contact anchors require separate contact/deformation inspection before export.
     """
@@ -353,7 +362,8 @@ async def rig_edit(
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
               'replace': replace, 'max_distance_m': max_distance_m,
               'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
-              'calibration': calibration, 'skinning_mode': skinning_mode, 'foot_locks': foot_locks}
+              'calibration': calibration, 'skinning_mode': skinning_mode, 'foot_locks': foot_locks,
+              'timing': timing}
     if action == 'contact_lock':
         operation = 'lock_rig_contacts'
         params = pick(action, values, ['source_action', 'action_name', 'new_name', 'foot_locks'],
@@ -377,7 +387,11 @@ async def rig_edit(
     elif action == 'bake':
         operation = 'bake_rig'
         params = pick(action, values, ['new_name', 'action_name', 'start_frame', 'end_frame'],
-                      {'frame_step': 1, 'names': [], 'skinning_mode': 'preserve'})
+                      {'frame_step': 1, 'names': [], 'skinning_mode': 'preserve', 'timing': None})
+        if params['timing'] is None:
+            del params['timing']
+        else:
+            params['timing'] = params['timing'].model_dump()
     elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})

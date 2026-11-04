@@ -91,7 +91,8 @@ def fbx(path, preset, empties=False, animations=False, textures=False, animation
                 if float(step) > exact:
                     step = np.nextafter(step, np.float32(-math.inf))
                 step = float(step)
-        return bpy.ops.export_scene.fbx(
+        sampled = {'animation_frame_range': [bpy.context.scene.frame_start, bpy.context.scene.frame_end]} if baked_animation else {}
+        result = bpy.ops.export_scene.fbx(
             filepath=str(path), use_selection=True, object_types=object_types,
             mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False,
             bake_anim=animations, bake_anim_use_all_bones=animations,
@@ -101,6 +102,7 @@ def fbx(path, preset, empties=False, animations=False, textures=False, animation
             bake_anim_simplify_factor=1 if animation_step is None else 0,
             global_scale=1, path_mode="RELATIVE" if textures else "STRIP",
             **AXIS_PRESETS[preset])
+        return result, sampled
 
 
 def usd(path, preset, instances, animations=False):
@@ -117,12 +119,13 @@ def usd(path, preset, instances, animations=False):
 def write(path, objects, selection, preset, instances, empties, animations=False,
           textures=False, baked_animation=False, animation_step=None):
     suffix = path.suffix.lower()
+    sampled = {}
     with selected(selection), (export_identities(selection) if animations else nullcontext()):
         if suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if instances else nullcontext():
-                result = fbx(path, preset, empties, animations, textures, animation_step, baked_animation)
+                result, sampled = fbx(path, preset, empties, animations, textures, animation_step, baked_animation)
         elif suffix == ".glb":
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
@@ -135,6 +138,7 @@ def write(path, objects, selection, preset, instances, empties, animations=False
             result = usd(path, preset, instances, animations)
     if "FINISHED" not in result:
         raise RuntimeError("Export did not finish")
+    return sampled
 
 
 def flag(p, key):
@@ -398,14 +402,14 @@ def export_asset(p):
             directory = sidecars(path) if textures else None
             try:
                 with prepared_images(objects, directory) if textures else nullcontext():
-                    write(path, objects, selection, preset, False, empties,
+                    sampled = write(path, objects, selection, preset, False, empties,
                           animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step)
                     files = texture_receipt(directory) if directory else []
             except Exception:
                 if directory is not None:
                     shutil.rmtree(directory, ignore_errors=True)
                 raise
-        return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
+        return {**sampled, "path": str(path), "bytes": path.stat().st_size, "axis": preset,
                 "objects": [item.name for item in selected_objects],
                 "armatures": [item.name for item in armatures],
                 "skinned_meshes": [item.name for item in skinned],

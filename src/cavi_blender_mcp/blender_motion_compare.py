@@ -6,6 +6,8 @@ import bpy
 import numpy as np
 from mathutils.kdtree import KDTree
 
+from .blender_frame_map import mapped_frames
+
 
 def set_frame(frame):
     integer = math.floor(frame)
@@ -71,6 +73,8 @@ def compare(p, find_object):
         raise ValueError('Comparison requires 1..512 bones per rig')
     shared = sorted(source_bones & candidate_bones)
     frames = np.linspace(start, end, samples).tolist()
+    scale = p.get('candidate_frame_scale', 1)
+    candidate_frames = mapped_frames(frames, scale, offset)
     scene = bpy.context.scene
     prior_frame, prior_subframe = scene.frame_current, scene.frame_subframe
     meters = scene.unit_settings.scale_length
@@ -84,9 +88,9 @@ def compare(p, find_object):
     bone_error = 0.
     work = 0
     try:
-        for frame in frames:
+        for frame, candidate_frame in zip(frames, candidate_frames, strict=True):
             poses, bones = [], []
-            for side, (rig, time) in enumerate(((source, frame), (candidate, frame + offset))):
+            for side, (rig, time) in enumerate(((source, frame), (candidate, candidate_frame))):
                 set_frame(time)
                 depsgraph = bpy.context.evaluated_depsgraph_get()
                 evaluated = rig.evaluated_get(depsgraph)
@@ -136,7 +140,8 @@ def compare(p, find_object):
     missing = sorted(source_bones - candidate_bones)
     extra = sorted(candidate_bones - source_bones)
     maximum = max([bone_error, *(report['max_error_m'] for report in reports)])
-    return {'scope': 'sampled_evaluated_rig_motion', 'source': source.name, 'candidate': candidate.name,
+    timing = {'candidate_frame_scale': scale, 'candidate_frames': candidate_frames} if scale != 1 else {}
+    return {**timing, 'scope': 'sampled_evaluated_rig_motion', 'source': source.name, 'candidate': candidate.name,
             'frames': frames, 'candidate_frame_offset': offset, 'space': space, 'vertex_match': matching,
             'max_error_m': maximum, 'tolerance_m': tolerance, 'passed': not missing and not extra and maximum <= tolerance,
             'bone_head_error_m': bone_error, 'missing_bones': missing, 'extra_bones': extra,

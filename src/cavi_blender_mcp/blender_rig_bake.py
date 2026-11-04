@@ -1,6 +1,8 @@
 """Bake evaluated bone motion onto an independent rig and optional skin copies."""
 
 import math
+import struct
+from itertools import pairwise
 
 import bpy
 from mathutils import Matrix
@@ -66,6 +68,21 @@ def bake(p):
             frames[-1] = float(end)
         if len(frames) > 4096 or len(frames) * len(source.pose.bones) > 1000000:
             raise ValueError('Bake exceeds 4096 samples or one million bone poses')
+        timing = p.get('timing')
+        output_frames = frames
+        if timing is not None:
+            if not isinstance(timing, dict) or set(timing) != {'start_frame', 'playback_rate'}:
+                raise ValueError('Timing requires start_frame and playback_rate')
+            output_start, rate = timing['start_frame'], timing['playback_rate']
+            if (any(type(v) not in (int, float) or not math.isfinite(v) for v in (output_start, rate))
+                    or not 1 <= output_start <= 1000000 or rate <= 0):
+                raise ValueError('Timing needs a finite positive playback rate and valid start frame')
+            output_frames = [output_start+(frame-start)/rate for frame in frames]
+            if any(not math.isfinite(frame) or not 1 <= frame <= 1000000 for frame in output_frames):
+                raise ValueError('Retimed frames exceed the supported bake range')
+            key_times = [struct.unpack('f', struct.pack('f', frame))[0] for frame in output_frames]
+            if any(left >= right for left, right in pairwise(key_times)):
+                raise ValueError('Retimed sample times are indistinguishable at native key precision')
         names = p.get('names') or []
         if not isinstance(names, list) or len(names) > 16 or len(set(names)) != len(names):
             raise ValueError('names must contain up to 16 unique skins')
@@ -105,7 +122,7 @@ def bake(p):
         action.use_fake_user = True
         action[ACTION_TAG] = rig.name
         action.use_frame_range = True
-        action.frame_start, action.frame_end = start, end
+        action.frame_start, action.frame_end = output_frames[0], output_frames[-1]
         rig.animation_data.action = action
         rig.animation_data.action_slot = action.slots.new('OBJECT', rig.name)
         copies = []
@@ -139,7 +156,7 @@ def bake(p):
             scene.collection.objects.link(copy)
             copies.append(copy)
         ordered = sorted(rig.pose.bones, key=lambda b: len(b.parent_recursive))
-        for frame in frames:
+        for frame, output_frame in zip(frames, output_frames, strict=True):
             scene.frame_set(math.floor(frame), subframe=frame % 1)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             evaluated = source.evaluated_get(depsgraph)
@@ -153,19 +170,21 @@ def bake(p):
                 shape_states.append(None if evaluated_keys is None else {
                     'relative': evaluated_keys.use_relative, 'time': evaluated_keys.eval_time,
                     'values': {key.name: key.value for key in evaluated_keys.key_blocks[1:]}})
+            if output_frame != frame:
+                scene.frame_set(math.floor(output_frame), subframe=output_frame % 1)
             transform(rig, world, previous, ('object', rig.name))
-            key_transform(rig, frame)
+            key_transform(rig, output_frame)
             for bone in ordered:
                 bone.matrix = matrices[bone.name]
                 key = ('bone', bone.name)
                 if key in previous and previous[key].dot(bone.rotation_quaternion) < 0:
                     bone.rotation_quaternion.negate()
                 previous[key] = bone.rotation_quaternion.copy()
-                key_transform(bone, frame)
+                key_transform(bone, output_frame)
                 bpy.context.view_layer.update()
             for copy, matrix, shapes in zip(copies, skin_worlds, shape_states, strict=True):
                 transform(copy, world.inverted() @ matrix, previous, ('object', copy.name))
-                key_transform(copy, frame)
+                key_transform(copy, output_frame)
                 if shapes is not None:
                     keys = copy.data.shape_keys
                     if shapes['relative']:
@@ -174,12 +193,12 @@ def bake(p):
                                 raise ValueError('Evaluated shape weights must be finite')
                             key = keys.key_blocks[key_name]
                             key.value = value
-                            key.keyframe_insert('value', frame=frame)
+                            key.keyframe_insert('value', frame=output_frame)
                     else:
                         if not math.isfinite(shapes['time']):
                             raise ValueError('Evaluated shape time must be finite')
                         keys.eval_time = shapes['time']
-                        keys.keyframe_insert('eval_time', frame=frame)
+                        keys.keyframe_insert('eval_time', frame=output_frame)
                 mesh_action = copy.animation_data.action
                 if mesh_action not in actions:
                     actions.append(mesh_action)
@@ -206,8 +225,9 @@ def bake(p):
         raise
     finally:
         scene.frame_set(old_frame, subframe=old_subframe)
-    return {**info(rig), 'source': source.name, 'action': action.name,
-            'frame_range': [start, end], 'frames': frames,
+    remap = {'source_frame_range': [start, end], 'source_frames': frames, 'timing': timing} if timing else {}
+    return {**info(rig), **remap, 'source': source.name, 'action': action.name,
+            'frame_range': [output_frames[0], output_frames[-1]], 'frames': output_frames,
             'maximum_matrix_component_error': maximum,
             'skins': [{'source': mesh.name, 'name': copy.name}
                       for mesh, copy in zip(skins, copies, strict=True)],

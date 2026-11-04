@@ -460,11 +460,20 @@ def import_glb(path, name):
 
 
 def _load_fbx(path):
+    previous = set(bpy.data.objects)
     if "FINISHED" not in bpy.ops.import_scene.fbx(
         filepath=str(path), use_image_search=False, use_anim=True,
         ignore_leaf_bones=False, automatic_bone_orientation=False,
         use_manual_orientation=False, use_prepost_rot=True):
         raise RuntimeError("Blender did not finish importing the FBX")
+    # FBX joints allow translations. Blender's inferred connections suppress them.
+    for rig in set(bpy.data.objects)-previous:
+        if rig.type == 'ARMATURE' and any(bone.use_connect for bone in rig.data.bones):
+            with selected([rig]):
+                if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
+                    raise RuntimeError('Could not preserve imported joint translation channels')
+                for bone in rig.data.edit_bones:
+                    bone.use_connect = False
 
 
 def import_fbx(path, name):

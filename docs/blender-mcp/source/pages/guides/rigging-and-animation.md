@@ -282,6 +282,40 @@ See Blender's [ShapeKey reference](https://docs.blender.org/api/5.2/bpy.types.Sh
 for relative-key, mask and channel semantics.
 
 
+## Trim, rebase and retime a clip
+
+The bake's `start_frame` and `end_frame` select the source interval. Add `timing`
+to place that interval on a new timeline and choose its playback speed:
+
+```json
+{"action":"bake","name":"CharacterRig","new_name":"RunClip","action_name":"Run","names":["Body"],"start_frame":12,"end_frame":28,"frame_step":0.1,"timing":{"start_frame":2.5,"playback_rate":2},"lease_id":"<lease>"}
+```
+
+This example maps source frames 12–28 to output frames 2.5–10.5. Rates above one
+play faster; rates between zero and one play slower. Source `frame_step` still
+controls sampling quality. The independent copy keys evaluated bones, rig/skin
+object transforms and shape-key values together. Original actions, constraints,
+drivers and timeline state stay editable. It does not retime material animation
+or simulation caches. Choose the interval and sampling from the actual motion.
+
+The receipt contains source and output sample frames. Zero, negative, nonfinite
+rates, out-of-range output times and samples indistinguishable at native key
+precision are rejected. This creates a sampled clip; it does not repair a loop
+seam or preserve the source's editable curve handles on the baked copy.
+
+For `compare_rig_motion`, set `candidate_frame_scale` to `1 / playback_rate`
+and `candidate_frame_offset` to `output_start - source_start / playback_rate`.
+Candidate samples use `source_frame * scale + offset`. A reimport may shift the
+clip again; use its actual start to calculate the offset. Contact inspection uses
+the same mapping through `contact_frame_scale` and `contact_frame_offset`, with
+the original declared windows and source rig/action as `contact_reference`.
+
+Baked FBX exports use an integer scene envelope and report it as
+`animation_frame_range`. Fractional clip bounds can leave leading or trailing
+padding. Preserve the intended clip bounds when configuring engine clips, and
+account for the imported envelope's time shift when comparing the motion. GLB
+retains the baked action's fractional bounds.
+
 ## Check contacts after bake and reimport
 
 Use the same contact windows on the final bake and each reimport. If an importer
