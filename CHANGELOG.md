@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.34.0 - 2026-11-03
+
+### Added
+
+- Loaded bridge protocol and source fingerprints with runtime compatibility checks.
+- Pinned shared response-schema helpers and a source synchronization check.
+
+### Fixed
+
+- Propagate Python bridge startup failures through Blender's exit status.
+
 ## 0.33.0 - 2026-11-03
 
 ### Added

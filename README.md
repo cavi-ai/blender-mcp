@@ -6,6 +6,16 @@ Local-first MCP tools for Blender scene inspection, mesh editing, previews and
 game asset export. The server publishes 16 tools over stdio and sends every
 operation to a bridge that runs on Blender's main thread.
 
+`scene_info` and `runtime status` report the loaded bridge's protocol and source
+fingerprint. Status exits nonzero when the native implementation differs from
+the installed server. Preserve the active project and edit ownership before
+refreshing an outdated bridge; updating the MCP process alone does not reload it.
+
+The pure response-schema helpers are vendored from Substance MCP with a pinned
+content hash. Maintainers can refresh them with
+`python scripts/sync_protocol.py <substance-mcp-checkout>` and verify alignment
+with the same command plus `--check`. Blender remains independently installable.
+
 Everything runs on the local machine. The bridge binds only to IPv4 loopback and
 requires a random session token. There is no arbitrary Python tool, telemetry,
 external asset download or remote inference.

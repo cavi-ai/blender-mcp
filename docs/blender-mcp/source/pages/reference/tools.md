@@ -13,6 +13,11 @@ Read-only. Returns Blender version, file, workspace, collection tree and a page
 of objects. Mesh objects report `shape_keys`, `shape_key_names` and the
 active `shape_key_action`.
 
+Scene inventory responses include `bridge.protocol` and `bridge.build`, identifying
+the implementation loaded inside Blender. `runtime status` compares this identity
+with the installed server and exits nonzero on a mismatch. Preserve the project
+and edit ownership before refreshing an outdated bridge.
+
 | Parameter | Values |
 | --- | --- |
 | `name` | Optional exact object name; returns that object only |
