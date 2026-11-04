@@ -44,6 +44,9 @@ def linear(action):
 def bake(p):
     with preflight():
         source = armature(p.get('name'))
+        skinning_mode = p.get('skinning_mode', 'preserve')
+        if skinning_mode not in ('preserve', 'linear'):
+            raise ValueError('skinning_mode must be preserve or linear')
         name = new_name(p.get('new_name'))
         action_name = label(p.get('action_name'), 'action_name')
         if action_name in bpy.data.actions:
@@ -129,7 +132,10 @@ def bake(p):
                 keys.animation_data.action_slot = action.slots.new('KEY', keys.name)
             for constraint in list(copy.constraints):
                 copy.constraints.remove(constraint)
-            next(m for m in copy.modifiers if m.type == 'ARMATURE').object = rig
+            modifier = next(m for m in copy.modifiers if m.type == 'ARMATURE')
+            modifier.object = rig
+            if skinning_mode == 'linear':
+                modifier.use_deform_preserve_volume = False
             scene.collection.objects.link(copy)
             copies.append(copy)
         ordered = sorted(rig.pose.bones, key=lambda b: len(b.parent_recursive))
@@ -206,4 +212,5 @@ def bake(p):
             'skins': [{'source': mesh.name, 'name': copy.name}
                       for mesh, copy in zip(skins, copies, strict=True)],
             'constraints_removed_from_copy': True,
+            'skinning_mode': skinning_mode,
             'shape_keys_baked': [copy.name for copy in copies if copy.data.shape_keys is not None]}

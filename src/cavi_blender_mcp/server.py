@@ -35,7 +35,13 @@ from .contracts import (
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
-from .rig_models import Constraint, MotionSkinPair, VertexWeights
+from .rig_models import (
+    Constraint,
+    ContactWindow,
+    MotionSkinPair,
+    RetargetCalibration,
+    VertexWeights,
+)
 from .rig_models import Name as RigName
 from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
@@ -263,16 +269,21 @@ async def inspect_rig(
     checks: Annotated[list[Literal["root_motion", "loop", "deformation"]] | None,
                       Field(max_length=3)] = None,
     samples: Annotated[StrictInt, Field(ge=2, le=32)] = 8,
+    contacts: Annotated[list[ContactWindow] | None, Field(min_length=1, max_length=16)] = None,
 ) -> RigInspection:
     """Inspect skin weights, rest bones and linked clips without changing action or pose.
 
     Exact meshes must each have one vertex-group armature modifier bound to the rig.
     Influence limit is a caller-selected target, not a universal engine requirement.
     checks: root_motion, loop and deformation sample the named or active action.
+    contacts: declared bone-local markers and frame windows measure horizontal drift
+    and absolute height error against a world-Z ground plane in metres.
     """
-    return await run(call, "inspect_rig", armature=armature, meshes=meshes,
-                     max_influences=max_influences, action=action,
-                     checks=checks or [], samples=samples)
+    arguments = {'armature': armature, 'meshes': meshes, 'max_influences': max_influences,
+                 'action': action, 'checks': checks or [], 'samples': samples}
+    if contacts is not None:
+        arguments['contacts'] = [item.model_dump() for item in contacts]
+    return await run(call, "inspect_rig", **arguments)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -358,6 +369,8 @@ async def rig_edit(
     max_distance_m: Annotated[Number | None, Field(gt=0)] = None,
     max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1)] = None,
     shape_names: Annotated[list[RigName] | None, Field(max_length=64)] = None,
+    calibration: RetargetCalibration | None = None,
+    skinning_mode: Literal['preserve', 'linear'] | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
@@ -368,6 +381,8 @@ async def rig_edit(
     keyframe: name=armature, action_name, keyframes=[{frame, poses}];
     clear_pose: name=armature, frame;
     retarget: name=target armature, source, source_action, action_name, mapping, samples;
+    optional calibration preserves target rest offsets, transfers rest-relative rotations,
+    and applies explicit root_translation_scale plus XYZ alignment_degrees.
     set_action: name=armature, action_name (omit to clear);
     rename_action: action_name, new_name; delete_action: action_name;
     nla_push: name=armature, action_name, track_name, strip_name, start_frame=1;
@@ -378,6 +393,7 @@ async def rig_edit(
     copies the target and interpolates rest-surface weights within explicit distance/loss budgets.
     Optional shape_names transfer selected relative morph deltas and follow donor weights/mute.
     bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
+    skinning_mode=preserve keeps copy modifiers; explicit linear changes only new copies.
     Creates a separate constraint-free rig and skin copies; source rig stays editable.
     """
     values = {"location": location, "bones": bones, "names": names,
@@ -390,7 +406,8 @@ async def rig_edit(
               "end_frame": end_frame, "frame_step": frame_step, 'constraint': constraint,
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
               'replace': replace, 'max_distance_m': max_distance_m,
-              'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names}
+              'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
+              'calibration': calibration, 'skinning_mode': skinning_mode}
     if action == 'transfer_weights':
         operation = 'transfer_skin_weights'
         params = pick(action, values, ['source', 'new_name', 'max_distance_m', 'max_discarded_weight'],
@@ -409,7 +426,7 @@ async def rig_edit(
     elif action == 'bake':
         operation = 'bake_rig'
         params = pick(action, values, ['new_name', 'action_name', 'start_frame', 'end_frame'],
-                      {'frame_step': 1, 'names': []})
+                      {'frame_step': 1, 'names': [], 'skinning_mode': 'preserve'})
     elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
@@ -434,7 +451,11 @@ async def rig_edit(
     elif action == "retarget":
         operation = "retarget_rig"
         params = pick(action, values, ["source", "source_action", "action_name"], {
-            "mapping": None, "samples": None})
+            "mapping": None, "samples": None, "calibration": None})
+        if params['calibration'] is not None:
+            params['calibration'] = params['calibration'].model_dump()
+        else:
+            del params['calibration']
     elif action == "set_action":
         operation = "set_action"
         params = pick(action, values, (), {"action_name": None})

@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.42.0 - 2026-11-04
+
+- Add rest-relative retarget calibration with explicit root travel scaling.
+- Measure declared bone contact windows for drift and ground-height error.
+- Allow explicit linear skinning on independent bake copies while preserving authored modifiers.
+- Preserve clip inspection poses, NLA state and subframes.
+
 ## 0.41.0 - 2026-11-04
 
 - Preserve verified preflight rejection outcomes for transfer, bake and retarget operations.

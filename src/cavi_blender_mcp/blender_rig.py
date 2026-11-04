@@ -72,6 +72,9 @@ def action_slot(rig, action):
 
 @contextmanager
 def action_context(rig, action):
+    from .blender_animation import restore, snapshot
+    pose = snapshot(rig)
+    created = rig.animation_data is None
     if rig.animation_data is None:
         rig.animation_data_create()
     animation = rig.animation_data
@@ -79,9 +82,12 @@ def action_context(rig, action):
     previous_slot = animation.action_slot
     scene = bpy.context.scene
     previous_frame = scene.frame_current
+    previous_subframe = scene.frame_subframe
+    previous_nla = animation.use_nla
     try:
         animation.action = action
         animation.action_slot = action_slot(rig, action)
+        animation.use_nla = False
         yield
     finally:
         animation.action = previous_action
@@ -90,7 +96,11 @@ def action_context(rig, action):
                 animation.action_slot = previous_slot
             except (TypeError, RuntimeError):
                 pass
-        scene.frame_set(previous_frame)
+        animation.use_nla = previous_nla
+        scene.frame_set(previous_frame, subframe=previous_subframe)
+        restore(rig, pose)
+        if created:
+            rig.animation_data_clear()
 
 
 def sample_frames(action, samples):
@@ -307,7 +317,8 @@ def inspect(params, find_object):
     scene = bpy.context.scene
     checks_report = None
     analyzed_action = None
-    if requested:
+    contacts = params.get('contacts')
+    if requested or contacts is not None:
         current = rig.animation_data
         action = (bpy.data.actions.get(action_name) if action_name
                   else current.action if current else None)
@@ -327,6 +338,9 @@ def inspect(params, find_object):
                 checks_report["loop"] = loop_report(rig, frames, poses)
             if "deformation" in requested:
                 checks_report["deformation"] = deformation_report(meshes, frames)
+            if contacts is not None:
+                from .blender_rig_contacts import report as contact_report
+                checks_report['contacts'] = contact_report(rig, action, contacts)
     actions = []
     for action in bpy.data.actions:
         slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]
@@ -343,6 +357,8 @@ def inspect(params, find_object):
     actions.sort(key=lambda item: item["name"])
     not_checked = ["foot sliding", "UV mapping quality", "shader appearance",
                    "Unity import"]
+    if contacts is not None:
+        not_checked[0] = 'unsampled contact and mesh-surface collision'
     if "deformation" not in requested:
         not_checked.insert(0, "animation deformation")
     result = {"file": bpy.data.filepath or None, "dirty": bpy.data.is_dirty,

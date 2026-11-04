@@ -164,6 +164,7 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `source`, `source_action` | `retarget`; source armature and action |
 | `mapping` | `retarget`; optional source-to-target bone map |
 | `samples` | `retarget`; optional 2–256 samples |
+| `calibration` | `retarget`; root, root translation scale and XYZ armature alignment |
 | `new_name` | `rename_action`; new action name |
 | `track_name`, `strip_name` | `nla_push`, `nla_remove` |
 | `start_frame` | `nla_push`; default 1 |
@@ -347,3 +348,5 @@ simplification. Imported `source_objects` metadata maps exported identities to
 actual import names; filter it to reported armatures and skinned meshes. Native
 FBX import can shift clip start times, so inspect the actual active action range
 before comparison. Shape-key channels may occupy a separate Action datablock.
+
+`inspect_rig` also accepts declared `contacts` for bone-marker drift and world-Z ground-height checks. See [calibrated retargeting and contact windows](../guides/rigging-and-animation.md#calibrate-differing-rest-poses-and-proportions).
