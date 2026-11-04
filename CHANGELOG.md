@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.40.0 - 2026-11-04
+
+- Inspect sampled garment clearance against closed evaluated body components.
+- Report signed gaps, failing probes, topology and bounded query completeness.
+- Share evaluated mesh sampling between motion and clearance inspections.
+
 ## 0.39.0 - 2026-11-04
 
 - Transfer selected relative morphs alongside skin weights using the same surface projection.

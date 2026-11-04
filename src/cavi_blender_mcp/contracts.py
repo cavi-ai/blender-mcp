@@ -177,6 +177,15 @@ class ObjectFields(VariantResult):
     shape_key_action: str | None = None
 
 
+class SkinClearance(Result):
+    scope: Literal["sampled_garment_clearance"]
+    body: str
+    garments: list[Record]
+    complete: bool
+    passed: bool
+    frames: list[Number]
+
+
 class RigMotionComparison(Result):
     scope: Literal["sampled_evaluated_rig_motion"]
     source: str

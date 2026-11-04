@@ -871,6 +871,9 @@ def _dispatch(operation, p):
         from .blender_scene import author
 
         return author(p, _workspace)
+    if operation == "inspect_skin_clearance":
+        from .blender_clearance import inspect
+        return inspect(p, obj)
     if operation == "compare_rig_motion":
         from .blender_motion_compare import compare
         return compare(p, obj)

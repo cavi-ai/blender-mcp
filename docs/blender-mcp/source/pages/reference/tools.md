@@ -1,6 +1,6 @@
 # Tools
 
-The server publishes 17 tools. Every mutation requires a `lease_id` unless the
+The server publishes 18 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
@@ -121,6 +121,28 @@ bidirectional nearest-point distance and does not establish topology equivalence
 Reports maximum/RMS skin errors, bone-head errors and sampled motion magnitude.
 Missing or extra bones fail comparison. Unsampled times, bone roll/tail
 reconstruction, normals, foot contact and Unity import need separate review.
+
+## inspect_skin_clearance
+
+Read-only. Samples evaluated garment vertices and, by default, triangle centres
+against closed body components. Supply `body`, 1–8 distinct `garments`, increasing
+`start_frame`/`end_frame`, and an explicit `min_clearance_m`. `samples` is 2–32.
+`surface_samples: vertices` omits face-centre probes. `max_queries` bounds nearest,
+component and ray queries (default/maximum 1,000,000); surface samples are capped
+at four million. The call restores frame and subframe.
+
+Reports signed gaps in metres, inside/violating/ambiguous counts, worst frames and
+probe indices, body topology and numerical resolution. Multiple closed body
+components are treated as a union. Ray parity does not depend on face winding.
+Coordinates are normalized around the body before native BVH queries.
+
+`complete` and `passed` must both be true. Open or degenerate bodies, exhausted
+budgets and ambiguous ray/contact classifications cannot pass. A closed skinned
+reference cage can be used when the visible body has intentional openings.
+
+These are sampled clearance measurements. They do not certify every triangle
+or time, body self-intersections, cloth simulation or engine behavior. Review
+reported joints and morph combinations visually before accepting the asset.
 
 ## rig_edit
 
