@@ -882,6 +882,10 @@ def _dispatch(operation, p):
         from .blender_rig_controls import HANDLERS
 
         return HANDLERS[operation](p)
+    if operation == 'transfer_skin_weights':
+        from .blender_skin_transfer import transfer
+
+        return transfer(p)
     if operation == 'bake_rig':
         from .blender_rig_bake import bake
 

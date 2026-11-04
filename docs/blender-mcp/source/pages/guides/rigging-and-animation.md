@@ -164,3 +164,32 @@ can miss skin-weight or shape deformation errors. Export clean baked copies with
 `animation_sample_step`, and GLB retains authored subframe keys. After reimport,
 compare with `vertex_match=point_set` and the measured active-clip frame offset.
 See the [tool reference](../reference/tools.md#compare_rig_motion).
+
+## Transfer skin weights to clothing or new topology
+
+`rig_edit transfer_weights` interpolates a bound source skin's deform weights
+onto a new independent copy of a target mesh. Align their base meshes in rest
+space first; projection uses the current object transforms and base triangles,
+not the animated or modifier-evaluated surface. It does not fit a garment.
+
+```json
+{"action":"transfer_weights","name":"Coat","source":"Body","new_name":"CoatSkin","max_distance_m":0.02,"max_discarded_weight":0.005,"max_influences":4,"lease_id":"<lease>"}
+```
+
+These are example quality budgets; declare them for the asset. The tool uses
+[nearest-triangle queries](https://docs.blender.org/api/current/mathutils.bvhtree.html)
+and barycentric weight interpolation. It keeps the strongest declared number
+of influences and normalizes them. Excess distance or discarded weight rejects
+the transfer before edits. The receipt reports both observed maxima.
+
+Source and target remain unchanged. The copy preserves target mesh attributes,
+UVs, materials, shape data and non-deform groups. It follows the source mesh's
+object motion, replaces its copied armature binding, and binds to the source rig.
+Copied object animation and constraints are cleared; other mesh modifiers remain.
+The tool transfers bone weights, not source modifier masks or shape animations.
+
+Limits match bounded weight editing: 100,000 vertices per mesh, 200,000 source
+triangles and one million source/target deform assignments. Degenerate source
+triangles are ignored and counted. Inspect shoulders, hips, fingers and nearby
+limbs: nearest geometry does not infer anatomical correspondence or cloth
+collision. Continue with sampled bake/export comparisons and engine review.
