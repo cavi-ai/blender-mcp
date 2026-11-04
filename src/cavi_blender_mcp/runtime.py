@@ -36,7 +36,7 @@ def start_runtime(project=None, background=False):
             raise RuntimeError("A different Blender project is connected; it was left untouched")
         return {"connected": True, "launch_requested": False,
                 "workspace": scene.get("workspace"), "file": scene.get("file"),
-                "version": scene.get("version"),
+                "version": scene.get("version"), "bridge": scene.get("bridge"),
                 "object_count": scene.get("total", len(scene.get("objects", [])))}
     configured = os.environ.get("CAVI_BLENDER_BIN")
     default = "/Applications/Blender.app/Contents/MacOS/Blender" if sys.platform == "darwin" else ""
@@ -50,7 +50,7 @@ def start_runtime(project=None, background=False):
                "--factory-startup", "--disable-autoexec"]
     if source is not None:
         command.append(str(source))
-    command.extend(["--python", str(Path(__file__).with_name("bootstrap.py"))])
+    command.extend(["--python-exit-code", "1", "--python", str(Path(__file__).with_name("bootstrap.py"))])
     env = dict(os.environ, CAVI_BLENDER_CONNECTION=str(connection),
                CAVI_BLENDER_WORKSPACE=str(workspace))
     fd, log_path = tempfile.mkstemp(prefix="launch-", suffix=".log", dir=connection.parent)

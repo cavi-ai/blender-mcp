@@ -17,7 +17,10 @@ from pathlib import Path
 import bpy
 from mathutils import Euler, Quaternion, Vector
 
+from .bridge_contract import expected_bridge
 from .geometry import validate_mesh
+
+_LOADED_BRIDGE = expected_bridge()
 from .importing import (
     MAX_BYTES,
     MAX_FBX_BYTES,
@@ -550,6 +553,7 @@ def scene_info(p):
                          key=lambda item: item[0].name)
     return {
         "version": bpy.app.version_string,
+        "bridge": dict(_LOADED_BRIDGE),
         "file": bpy.data.filepath,
         "workspace": str(_workspace),
         "total": len(objects),
@@ -834,6 +838,7 @@ def runtime(operation, p):
         "pid": os.getpid(),
         "generation": _server.bridge_generation,
         "version": bpy.app.version_string,
+        "bridge": dict(_LOADED_BRIDGE),
         "file": bpy.data.filepath,
         "workspace": str(_workspace),
         "object_count": len(bpy.context.scene.objects),

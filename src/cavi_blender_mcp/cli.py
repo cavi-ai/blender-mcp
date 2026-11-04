@@ -3,6 +3,7 @@
 import argparse
 import json
 
+from .bridge_contract import compatibility
 from .client import BridgeClient
 from .runtime import start_runtime
 
@@ -31,12 +32,13 @@ def main(argv=None):
             if args.action == "restart" else None
         )
         result = client.call("runtime_status")
+        result['bridge_compatibility'] = compatibility(result.get('bridge'))
         if restarted and result["generation"] != restarted["generation"]:
             raise RuntimeError("Bridge changed again after restart; inspect runtime status")
         if restarted:
             result["restarted"] = True
         print(json.dumps(result))
-        return 0
+        return 0 if result['bridge_compatibility']['matches'] else 1
     except (ConnectionError, OSError, RuntimeError, ValueError) as exc:
         reason = str(exc)
         if "Unknown operation: runtime_" in reason:
