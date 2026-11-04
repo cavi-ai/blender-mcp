@@ -81,6 +81,36 @@ class BridgeErrorTests(unittest.TestCase):
             self.assertIn(f"HTTP {status}: {message}", str(caught.exception))
             self.assertEqual(len(server.received), 1)
 
+    def test_explicit_preflight_rejection_keeps_the_native_outcome(self):
+        from cavi_blender_mcp.blender_errors import PreflightRejected
+        from cavi_blender_mcp.contracts import failure
+        server = Server(self, body=lambda request: {
+            'id': request['id'], 'error': 'Distance exceeds the transfer budget',
+            'error_outcome': 'rejected'})
+        config = connection(self.folder, port=server.http.server_port)
+        with self.assertRaises(PreflightRejected) as caught:
+            BridgeClient(config).call('owned_edit', {'operation': 'transfer_skin_weights',
+                                                    'params': {}})
+        result = failure('rig_edit', caught.exception).structured_content['error']
+        self.assertEqual(result['outcome'], 'rejected')
+        self.assertFalse(result['retry_safe'])
+        self.assertEqual(len(server.received), 1)
+
+    def test_unproven_or_malformed_outcomes_remain_unknown(self):
+        from cavi_blender_mcp.client import BridgeOperationError
+        from cavi_blender_mcp.contracts import failure
+        for fields in ({}, {'error_outcome': 'unknown'}, {'error_outcome': True},
+                       {'error_outcome': 'rejected', 'result': {}},
+                       {'error_outcome': 'rejected', 'error': {'code': 'bad'}}):
+            server = Server(self, body=lambda request, fields=fields: {
+                'id': request['id'], 'error': 'ValueError: after editing', **fields})
+            config = connection(self.folder, port=server.http.server_port)
+            with self.subTest(fields=fields), self.assertRaises(BridgeOperationError) as caught:
+                BridgeClient(config).call('owned_edit', {'operation': 'bake_rig', 'params': {}})
+            result = failure('rig_edit', caught.exception).structured_content['error']
+            self.assertEqual(result['outcome'], 'unknown')
+            self.assertFalse(result['retry_safe'])
+
     def test_operation_timeout_is_sent_and_bounds_http_wait(self):
         server = Server(self)
         config = connection(self.folder, port=server.http.server_port)

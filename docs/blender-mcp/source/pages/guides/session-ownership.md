@@ -37,3 +37,16 @@ restart does not reload bridge code and itself requires the current edit lease.
 
 - [Run a dedicated session](runtime-and-headless.md)
 - [Security model](../security/model.md)
+
+## Native failure outcomes
+
+Weight/morph transfer, rig baking and retargeting identify validation failures
+that finish before editing application data. These arrive with MCP error
+`outcome: rejected`. They do not authorize an automatic retry: `retry_safe`
+remains false. Correct the reported inputs or state before a new attempt.
+
+Errors after editing begins, transport failures and responses without explicit
+rejection evidence remain `outcome: unknown`. Inspect application state and
+retained outputs before another mutation. Error-message wording alone does not
+establish whether an operation changed the scene. Older bridges without native
+outcome metadata retain the conservative unknown classification.
