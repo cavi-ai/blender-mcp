@@ -53,7 +53,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- TripoSG image-to-3D provider on Apple Silicon, CUDA or CPU, selected with `CAVI_GENERATION_PROVIDER`.
+- TripoSG image-to-3D providers on Apple Silicon, CUDA or CPU, and through mlx-agent as `triposg-mlx`, selected with `CAVI_GENERATION_PROVIDER`.
 
 ## 0.36.0 - 2026-11-03
 

@@ -160,10 +160,13 @@ lives in this repository.
 | `CAVI_TRIPOSR_PYTHON` | unset | Python 3.11 environment for optional local image-to-3D |
 | `CAVI_TRIPOSR_SOURCE` | unset | TripoSR checkout |
 | `CAVI_TRIPOSR_WEIGHTS` | unset | Local TripoSR weights directory |
-| `CAVI_GENERATION_PROVIDER` | `triposr` | Local image-to-3D provider: `triposr` or `triposg` |
+| `CAVI_GENERATION_PROVIDER` | `triposr` | Local image-to-3D provider: `triposr`, `triposg` or `triposg-mlx` |
 | `CAVI_TRIPOSG_PYTHON` | unset | Python 3.11 environment for TripoSG |
 | `CAVI_TRIPOSG_SOURCE` | unset | TripoSG checkout |
 | `CAVI_TRIPOSG_WEIGHTS` | unset | Local TripoSG weights directory |
+| `CAVI_TRIPOSG_MLX_PYTHON` | unset | Python 3.11+ with Pillow for TripoSG through mlx-agent |
+| `CAVI_TRIPOSG_MLX_AGENT` | unset | `mlx-agent` launcher script |
+| `CAVI_TRIPOSG_MLX_MODEL` | unset | Converted TripoSG model directory |
 
 Set a variable in both Blender's environment and the MCP server's environment
 when both processes read it. See [configuration](docs/blender-mcp/source/pages/reference/configuration.md).
