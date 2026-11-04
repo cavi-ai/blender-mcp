@@ -6161,5 +6161,107 @@
     "equals": {
       "/light/type": "SPOT"
     }
+  },
+  {
+    "id": "motion-compare-invalid-samples",
+    "tool": "compare_rig_motion",
+    "arguments": {
+      "source": "Rig",
+      "candidate": "Baked",
+      "meshes": [
+        {
+          "source": "Skin",
+          "candidate": "BakedSkin"
+        }
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "max_error_m": 0.001,
+      "samples": 33
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "motion-compare-invalid-offset",
+    "tool": "compare_rig_motion",
+    "arguments": {
+      "source": "Rig",
+      "candidate": "Baked",
+      "meshes": [
+        {
+          "source": "Skin",
+          "candidate": "BakedSkin"
+        }
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "max_error_m": 0.001,
+      "candidate_frame_offset": 1000001.0
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "motion-compare-invalid-tolerance",
+    "tool": "compare_rig_motion",
+    "arguments": {
+      "source": "Rig",
+      "candidate": "Baked",
+      "meshes": [
+        {
+          "source": "Skin",
+          "candidate": "BakedSkin"
+        }
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "max_error_m": -1
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "motion-compare-identical-native",
+    "tool": "compare_rig_motion",
+    "arguments": {
+      "source": "EvalRig",
+      "candidate": "EvalRig",
+      "meshes": [
+        {
+          "source": "EvalSkin",
+          "candidate": "EvalSkin"
+        }
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "max_error_m": 0,
+      "samples": 2
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/passed": true,
+      "/max_error_m": 0
+    },
+    "required": [
+      "/meshes/0/source_motion_m",
+      "/bone_head_error_m",
+      "/not_checked"
+    ]
   }
 ]

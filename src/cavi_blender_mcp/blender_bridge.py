@@ -372,6 +372,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
             **report,
             "collection": collection.name,
             "objects": [info(item) for item in objects],
+            "source_objects": [{"name": item.name, "exported_name": (item.get("cavi_source_object") or (item.data.get("cavi_source_object") if item.type == "MESH" else None))} for item in objects],
             "armatures": [item.name for item in armatures],
             "skinned_meshes": [item.name for item in skinned],
             "bone_count": bones,
@@ -468,7 +469,7 @@ def _load_fbx(path):
 def import_fbx(path, name):
     return _import_asset(
         _load_fbx, inspect_fbx, path, name, ".fbx", MAX_FBX_BYTES,
-        animations_allowed=True, shape_keys_allowed=False)
+        animations_allowed=True, shape_keys_allowed=True)
 
 
 def _load_obj(path):
@@ -870,6 +871,9 @@ def _dispatch(operation, p):
         from .blender_scene import author
 
         return author(p, _workspace)
+    if operation == "compare_rig_motion":
+        from .blender_motion_compare import compare
+        return compare(p, obj)
     if operation == "inspect_rig":
         from .blender_rig import inspect
 

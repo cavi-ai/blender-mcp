@@ -44,3 +44,9 @@ class VertexWeights(BaseModel):
     model_config = ConfigDict(extra='forbid')
     vertex: Annotated[StrictInt, Field(ge=0)]
     weights: Annotated[dict[Name, Annotated[Number, Field(ge=0, le=1)]], Field(max_length=512)]
+
+
+class MotionSkinPair(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    source: Name
+    candidate: Name

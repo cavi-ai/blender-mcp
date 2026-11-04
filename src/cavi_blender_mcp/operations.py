@@ -8,6 +8,7 @@ OPERATIONS = frozenset(
         "inspect_mesh_quality",
         "inspect_uv_layout",
         "inspect_rig",
+        "compare_rig_motion",
         "create_primitive",
         "create_mesh",
         "import_mesh",
@@ -79,6 +80,7 @@ LEASE_FREE = frozenset(
         "inspect_mesh_quality",
         "inspect_uv_layout",
         "inspect_rig",
+        "compare_rig_motion",
         "render_preview",
         "review_sheet",
     }
@@ -91,6 +93,7 @@ SLOW_OPERATIONS = frozenset(
         "import_obj",
         "import_usd",
         "inspect_rig",
+        "compare_rig_motion",
         "inspect_uv_layout",
         "export_mesh",
         "export_instances",

@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.37.0 - 2026-11-03
+
+- Compare evaluated skinned motion and bone heads in metres without changing the timeline.
+- Bake fractional frames and driven shape weights onto independent export copies.
+- Preserve subframe GLB keys and export a sampled active FBX take with import identity metadata.
+- Accept bounded FBX shape-key imports.
+
 ## Unreleased
 
 ### Added

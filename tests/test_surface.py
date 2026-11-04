@@ -6,7 +6,7 @@ from unittest.mock import patch
 from cavi_blender_mcp import server
 from cavi_blender_mcp.client import OPERATIONS
 
-TOOLS = {"scene_info", "scene_edit", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "rig_edit", "render_preview",
+TOOLS = {"scene_info", "scene_edit", "inspect_uv_layout", "inspect_mesh_quality", "inspect_rig", "compare_rig_motion", "rig_edit", "render_preview",
          "session_control", "object_edit", "mesh_edit", "assign_material", "bake",
          "asset_io", "review_sheet", "level_edit", "scatter"}
 
@@ -42,6 +42,19 @@ class SurfaceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "32"):
             asyncio.run(invalid())
+
+    def test_motion_comparison_is_read_only_and_keeps_matching_options(self):
+        from cavi_blender_mcp.operations import LEASE_FREE
+        calls = self.capture()
+        asyncio.run(server.compare_rig_motion("Rig", "Baked", [server.MotionSkinPair(
+            source="Skin", candidate="BakedSkin")], 1, 25, .001,
+            samples=32, vertex_match="point_set", candidate_frame_offset=1.))
+        self.assertEqual(calls[0][0], "compare_rig_motion")
+        self.assertEqual(calls[0][1]["candidate_frame_offset"], 1.)
+        self.assertEqual(calls[0][1]["meshes"], [{"source": "Skin", "candidate": "BakedSkin"}])
+        self.assertIn("compare_rig_motion", LEASE_FREE)
+        tool = next(t for t in asyncio.run(server.mcp.list_tools()) if t.name == "compare_rig_motion")
+        self.assertTrue(tool.annotations.read_only_hint)
 
     def test_uv_layout_is_read_only_and_requires_measurement_inputs(self):
         from cavi_blender_mcp.operations import LEASE_FREE
