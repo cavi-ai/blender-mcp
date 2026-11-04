@@ -934,6 +934,10 @@ def _dispatch(operation, p):
         from .blender_retarget import retarget
 
         return retarget(p)
+    if operation == 'lock_rig_contacts':
+        from .blender_foot_locks import lock_contacts
+
+        return lock_contacts(p)
     if operation == "review_sheet":
         from .blender_review import review
 

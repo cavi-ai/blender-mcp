@@ -6500,5 +6500,183 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "foot-lock-create-rig",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "create",
+      "name": "ContactSource",
+      "bones": [
+        {
+          "name": "Root",
+          "head": [
+            0,
+            0,
+            1.7
+          ],
+          "tail": [
+            0,
+            0,
+            1.9
+          ]
+        },
+        {
+          "name": "Thigh",
+          "parent": "Root",
+          "head": [
+            0,
+            0,
+            1.7
+          ],
+          "tail": [
+            0,
+            -0.15,
+            0.9
+          ]
+        },
+        {
+          "name": "Shin",
+          "parent": "Thigh",
+          "head": [
+            0,
+            -0.15,
+            0.9
+          ],
+          "tail": [
+            0,
+            0,
+            0.1
+          ],
+          "connect": true
+        },
+        {
+          "name": "Foot",
+          "parent": "Shin",
+          "head": [
+            0,
+            0,
+            0.1
+          ],
+          "tail": [
+            0,
+            -0.3,
+            0.1
+          ],
+          "connect": true
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/bone_count": 4
+    }
+  },
+  {
+    "id": "foot-lock-source-action",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "keyframe",
+      "name": "ContactSource",
+      "action_name": "ContactSliding",
+      "keyframes": [
+        {
+          "frame": 1,
+          "poses": [
+            {
+              "bone": "Root",
+              "location": [
+                0,
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "frame": 11,
+          "poses": [
+            {
+              "bone": "Root",
+              "location": [
+                0.08,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/action": "ContactSliding"
+    }
+  },
+  {
+    "id": "foot-lock-copy-controls",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "contact_lock",
+      "name": "ContactSource",
+      "source_action": "ContactSliding",
+      "action_name": "ContactPlanted",
+      "new_name": "ContactCorrected",
+      "foot_locks": [
+        {
+          "bone": "Foot",
+          "point": [
+            0,
+            0,
+            -0.1
+          ],
+          "start_frame": 3,
+          "end_frame": 9,
+          "max_drift_m": 0.001,
+          "max_height_error_m": 0.001,
+          "ground_z_m": 0,
+          "pole": [
+            0,
+            -2,
+            1
+          ]
+        }
+      ]
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/armature": "ContactCorrected",
+      "/source_action_preserved": true
+    },
+    "required": [
+      "/locks/0/anchor"
+    ]
+  },
+  {
+    "id": "foot-lock-empty-windows",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "contact_lock",
+      "name": "Rig",
+      "source_action": "Walk",
+      "action_name": "NewWalk",
+      "new_name": "NewRig",
+      "foot_locks": []
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

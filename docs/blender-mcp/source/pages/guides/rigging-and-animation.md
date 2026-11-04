@@ -18,6 +18,7 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `keyframe` | Create a new action from 1–32 keyframes |
 | `clear_pose` | Reset every pose bone, optionally at a frame |
 | `retarget` | Bake a source armature action onto the target rig |
+| `contact_lock` | Create an independent rig and skin copy with editable foot-contact anchors |
 | `set_action` | Assign an existing action, or clear the active action |
 | `rename_action` | Rename an action |
 | `delete_action` | Delete an unreferenced action |
@@ -279,3 +280,38 @@ clearance; projected deltas do not establish collision-free clothing.
 
 See Blender's [ShapeKey reference](https://docs.blender.org/api/5.2/bpy.types.ShapeKey.html)
 for relative-key, mask and channel semantics.
+
+
+## Correct declared foot contacts
+
+`rig_edit contact_lock` creates an independent sampled rig and optional skin
+copies, then adds editable two-bone IK anchors and foot rotation constraints to
+the new action. It reuses the existing bake implementation; source rigs, actions,
+constraints, skin weights and mesh data remain intact.
+
+```json
+{"action":"contact_lock","name":"CharacterRig","source_action":"Walk","new_name":"GroundedRig","action_name":"GroundedWalk","names":["Body"],"frame_step":0.1,"foot_locks":[{"bone":"Foot.L","point":[0,0,-0.1],"start_frame":5,"end_frame":15,"samples":16,"max_drift_m":0.001,"max_height_error_m":0.001,"ground_z_m":0,"pole":[-0.2,-1,1],"pole_angle_degrees":0,"blend_in_frames":3,"blend_out_frames":3}],"lease_id":"<lease>"}
+```
+
+Replace the example geometry and quality targets with the actual rig. Each foot
+must attach at the end of a two-bone parent chain. The world-space pole and native
+pole angle define the knee plane; they are not inferred from names. Blend lengths
+are positive frames, clamped to the source clip. Full influence covers the declared
+contact interval, with linear ramps outside it. Overlapping ramps on a shared IK
+chain are rejected. The selected clip needs whole-frame boundaries; `frame_step`
+uses the existing bake sampling budget.
+
+An anchor keeps the marker's horizontal position at the contact start and moves
+its height to `ground_z_m`, in metres along world Z. It preserves the sampled
+start-foot world rotation during the hold. IK stretching is disabled. This is a
+planar stance correction, not stance inference, terrain fitting, pelvis solving
+or an automatic guarantee of reachability.
+
+The receipt identifies the new rig, skins, controls, constraints and blend ranges.
+Setup failures remove generated copies and controls; errors after editing begins
+remain uncertain at the transport boundary. Save the editable working source and
+inspect the returned rig with the same contact windows and deformation checks.
+Unreachable anchors or unsuitable poles must fail review rather than relax the
+contact tolerance. Bake that corrected rig again for constraint-free exports, then
+perform the existing sampled skin and FBX/GLB comparisons. Inspect transitions,
+knee direction, clothing clearance and any unintended limb motion visually.
