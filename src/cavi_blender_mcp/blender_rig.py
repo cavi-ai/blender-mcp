@@ -321,7 +321,8 @@ def inspect(params, find_object):
     reference = None
     reference_spec = params.get('contact_reference')
     frame_offset = params.get('contact_frame_offset', 0)
-    if contacts is None and (reference_spec is not None or frame_offset != 0):
+    frame_scale = params.get('contact_frame_scale', 1)
+    if contacts is None and (reference_spec is not None or frame_offset != 0 or frame_scale != 1):
         raise ValueError('Contact reference and frame offset require contact windows')
     if reference_spec is not None:
         if not isinstance(reference_spec, dict) or set(reference_spec) != {'armature', 'action'}:
@@ -361,7 +362,7 @@ def inspect(params, find_object):
                 checks_report["deformation"] = deformation_report(meshes, frames)
             if contacts is not None:
                 from .blender_rig_contacts import report as contact_report
-                checks_report['contacts'] = contact_report(rig, action, contacts, reference, frame_offset)
+                checks_report['contacts'] = contact_report(rig, action, contacts, reference, frame_offset, frame_scale)
     actions = []
     for action in bpy.data.actions:
         slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]

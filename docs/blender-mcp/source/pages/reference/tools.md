@@ -352,7 +352,11 @@ before comparison. Shape-key channels may occupy a separate Action datablock.
 `inspect_rig` also accepts declared `contacts` for bone-marker drift and world-Z ground-height checks. See [calibrated retargeting and contact windows](../guides/rigging-and-animation.md#calibrate-differing-rest-poses-and-proportions).
 
 For baked or imported rigs, `contact_reference` names the source armature/action
-and `contact_frame_offset` aligns candidate clip time. See
+and `contact_frame_scale`/`contact_frame_offset` align candidate clip time. See
 [delivered contact checks](../guides/rigging-and-animation.md#check-contacts-after-bake-and-reimport).
+
+`rig_edit bake` accepts optional `timing` (`start_frame`, `playback_rate`).
+`compare_rig_motion` accepts `candidate_frame_scale` with its existing offset.
+See [clip timing](../guides/rigging-and-animation.md#trim-rebase-and-retime-a-clip).
 
 `rig_edit contact_lock` takes `source_action`, `new_name`, `action_name`, optional `names`/`frame_step`, and typed `foot_locks`. See [editable contact correction](../guides/rigging-and-animation.md#correct-declared-foot-contacts).

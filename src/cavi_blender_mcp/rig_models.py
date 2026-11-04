@@ -88,3 +88,9 @@ class ContactReference(BaseModel):
     model_config = ConfigDict(extra='forbid')
     armature: Name
     action: Name
+
+
+class ClipTiming(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    start_frame: Annotated[Number, Field(ge=1, le=1000000)]
+    playback_rate: Annotated[Number, Field(gt=0)]

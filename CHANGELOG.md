@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.45.0 - 2026-11-04
+
+- Rebase and retime independent rig bakes, including object and shape-key motion.
+- Compare surfaces and contact markers on explicitly mapped source/candidate times.
+- Reject output samples that collapse at native keyframe precision before creating copies.
+
 ## 0.44.0 - 2026-11-04
 
 - Inspect delivered contact markers across reconstructed bone axes and shifted clips.
