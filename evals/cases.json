@@ -6263,5 +6263,88 @@
       "/bone_head_error_m",
       "/not_checked"
     ]
+  },
+  {
+    "id": "skin-transfer-native-success",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "transfer_weights",
+      "name": "EvalSkin",
+      "source": "EvalSkin",
+      "new_name": "TransferredEvalSkin",
+      "max_distance_m": 0.01,
+      "max_discarded_weight": 0,
+      "max_influences": 4
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/scope": "rest_base_surface_weight_transfer",
+      "/armature": "EvalRig"
+    },
+    "required": [
+      "/weights/normalization_tolerance",
+      "/max_distance_m",
+      "/max_discarded_weight"
+    ]
+  },
+  {
+    "id": "skin-transfer-invalid-distance",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "transfer_weights",
+      "name": "EvalSkin",
+      "source": "EvalSkin",
+      "new_name": "TransferredEvalSkin",
+      "max_distance_m": 0,
+      "max_discarded_weight": 0,
+      "max_influences": 4
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "skin-transfer-invalid-loss",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "transfer_weights",
+      "name": "EvalSkin",
+      "source": "EvalSkin",
+      "new_name": "TransferredEvalSkin",
+      "max_distance_m": 0.01,
+      "max_discarded_weight": 1.1,
+      "max_influences": 4
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "skin-transfer-requires-lease",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "transfer_weights",
+      "name": "EvalSkin",
+      "source": "EvalSkin",
+      "new_name": "NoOwnerSkin",
+      "max_distance_m": 0.01,
+      "max_discarded_weight": 0,
+      "max_influences": 4
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "error": "lease"
   }
 ]

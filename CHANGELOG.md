@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.38.0 - 2026-11-03
+
+- Transfer rest-surface skin weights onto independent clothing or retopology copies.
+- Reject distance and discarded-influence budget failures before editing.
+
 ## 0.37.0 - 2026-11-03
 
 - Compare evaluated skinned motion and bone heads in metres without changing the timeline.

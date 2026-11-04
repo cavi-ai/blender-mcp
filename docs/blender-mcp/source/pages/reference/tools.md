@@ -126,7 +126,7 @@ reconstruction, normals, foot contact and Unity import need separate review.
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `bake`.
+`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`.
 
 | Parameter | Used by |
 | --- | --- |
@@ -145,6 +145,8 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `new_name` | `rename_action`; new action name |
 | `track_name`, `strip_name` | `nla_push`, `nla_remove` |
 | `start_frame` | `nla_push`; default 1 |
+| `source`, `new_name`, `max_distance_m`, `max_discarded_weight` | `transfer_weights`; required source skin, new copy and quality budgets |
+| `max_influences` | `transfer_weights`; strongest influences retained and normalized, default 4 |
 | `start_frame`, `end_frame`, `frame_step` | `bake`; positive fractional steps supported, at most 4096 samples |
 | `new_name`, `action_name`, `names` | `bake`; independent rig/action and optional skinned copies |
 

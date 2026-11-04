@@ -303,7 +303,7 @@ async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_remove", "constraint", "remove_constraint",
-                    "assign_weights", "bake"],
+                    "assign_weights", "transfer_weights", "bake"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -332,6 +332,8 @@ async def rig_edit(
     vertex_weights: Annotated[list[VertexWeights] | None,
                               Field(min_length=1, max_length=100000)] = None,
     replace: StrictBool | None = None,
+    max_distance_m: Annotated[Number | None, Field(gt=0)] = None,
+    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1)] = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
@@ -348,6 +350,8 @@ async def rig_edit(
     nla_remove: name=armature, track_name (omit to clear), strip_name.
     constraint: typed IK (target/pole) or rotation limits; remove_constraint: bone+constraint_name.
     assign_weights: name=skin, vertex_weights, replace=true, normalize=false.
+    transfer_weights: name=target, source=skin, new_name, max_distance_m, max_discarded_weight;
+    copies the target and interpolates rest-surface weights within explicit distance/loss budgets.
     bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
     Creates a separate constraint-free rig and skin copies; source rig stays editable.
     """
@@ -360,8 +364,13 @@ async def rig_edit(
               "strip_name": strip_name, "start_frame": start_frame,
               "end_frame": end_frame, "frame_step": frame_step, 'constraint': constraint,
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
-              'replace': replace}
-    if action == 'constraint':
+              'replace': replace, 'max_distance_m': max_distance_m,
+              'max_discarded_weight': max_discarded_weight}
+    if action == 'transfer_weights':
+        operation = 'transfer_skin_weights'
+        params = pick(action, values, ['source', 'new_name', 'max_distance_m', 'max_discarded_weight'],
+                      {'max_influences': 4})
+    elif action == 'constraint':
         operation = 'add_constraint'
         params = pick(action, values, ['constraint'])
         params['constraint'] = params['constraint'].model_dump()
