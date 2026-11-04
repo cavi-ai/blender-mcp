@@ -82,3 +82,9 @@ class FootLockWindow(ContactWindow):
     pole_angle_degrees: Number = 0
     blend_in_frames: Annotated[StrictInt, Field(ge=1, le=1000)] = 3
     blend_out_frames: Annotated[StrictInt, Field(ge=1, le=1000)] = 3
+
+
+class ContactReference(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    armature: Name
+    action: Name

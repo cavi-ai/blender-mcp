@@ -1,7 +1,7 @@
 """Read-only rig bindings, skin weights and animation QA."""
 
 import math
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 
 import bpy
 import numpy as np
@@ -318,6 +318,24 @@ def inspect(params, find_object):
     checks_report = None
     analyzed_action = None
     contacts = params.get('contacts')
+    reference = None
+    reference_spec = params.get('contact_reference')
+    frame_offset = params.get('contact_frame_offset', 0)
+    if contacts is None and (reference_spec is not None or frame_offset != 0):
+        raise ValueError('Contact reference and frame offset require contact windows')
+    if reference_spec is not None:
+        if not isinstance(reference_spec, dict) or set(reference_spec) != {'armature', 'action'}:
+            raise ValueError('Contact reference requires an armature and action')
+        ref_rig = find_object(reference_spec['armature'])
+        ref_action = bpy.data.actions.get(reference_spec['action'])
+        if ref_rig.type != 'ARMATURE' or ref_action is None or ref_rig == rig:
+            raise ValueError('Contact reference needs a different armature and an existing action')
+        if len(ref_rig.data.bones) > 512:
+            raise ValueError('Contact reference supports at most 512 bones')
+        from .blender_rig_contacts import contact_frames
+        for window in contacts:
+            contact_frames(ref_rig, ref_action, window)
+        reference = (ref_rig, ref_action)
     if requested or contacts is not None:
         current = rig.animation_data
         action = (bpy.data.actions.get(action_name) if action_name
@@ -326,7 +344,10 @@ def inspect(params, find_object):
             raise ValueError("Action does not exist" if action_name
                              else "No active action to analyze")
         analyzed_action = action.name
-        with action_context(rig, action):
+        with ExitStack() as stack:
+            if reference is not None:
+                stack.enter_context(action_context(*reference))
+            stack.enter_context(action_context(rig, action))
             frames = sample_frames(action, samples)
             poses = (pose_matrices(rig, frames)
                      if "root_motion" in requested or "loop" in requested else None)
@@ -340,7 +361,7 @@ def inspect(params, find_object):
                 checks_report["deformation"] = deformation_report(meshes, frames)
             if contacts is not None:
                 from .blender_rig_contacts import report as contact_report
-                checks_report['contacts'] = contact_report(rig, action, contacts)
+                checks_report['contacts'] = contact_report(rig, action, contacts, reference, frame_offset)
     actions = []
     for action in bpy.data.actions:
         slots = [slot for slot in action.slots if slot.target_id_type == "OBJECT"]

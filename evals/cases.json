@@ -1,5 +1,26 @@
 [
   {
+    "id": "contact-reference-invalid-field",
+    "tool": "inspect_rig",
+    "arguments": {
+      "armature": "Rig",
+      "meshes": [
+        "Skin"
+      ],
+      "contact_reference": {
+        "armature": "Source",
+        "action": "Walk",
+        "align_translation": true
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "uv-layout-empty-material",
     "tool": "inspect_uv_layout",
     "arguments": {
