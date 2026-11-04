@@ -58,6 +58,7 @@ def failure(name, error):
 
 class SceneInfo(Result):
     bridge: dict[str, Any] | None = None
+    source_state: dict[str, Any] | None = None
     name: str | None = None
     type: str | None = None
     version: str | None = None
