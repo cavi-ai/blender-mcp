@@ -26,6 +26,46 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `nla_edit` | Edit one named strip's trim, timing and blend settings |
 | `nla_remove` | Remove one strip, one track, or every track |
 
+## Facial performance layers
+
+`set_action`, `nla_push`, `nla_edit` and `nla_remove` accept
+`animation_target: "SHAPE_KEYS"` with `name` set to a mesh. These calls manage its
+Key datablock, leaving the mesh object's and armature's animation independent.
+Omitting the target preserves the armature behavior. The mesh must have authored
+shape keys and single-user mesh data; make a deliberate independent copy before
+editing a linked character. Exit NLA Tweak Mode before managing clips.
+
+Author facial actions with `object_edit` `shape_key_keyframe`. Then compose them
+with the same trim, repeat, scale and blend settings as body actions:
+
+```json
+{"action":"nla_push","name":"Face","animation_target":"SHAPE_KEYS",
+ "action_name":"Blink","track_name":"Blink","strip_name":"Blink",
+ "strip_settings":{"repeat":3,"extrapolation":"NOTHING"},"lease_id":"..."}
+```
+
+Each skin has its own Key owner. Match shape names and action channels on every
+participating skin, including eyes and glints. KEY slots are selected by the
+current binding, exact owner name or a single compatible slot; ambiguous slot
+selection fails before changing the active action. OBJECT actions cannot be
+assigned to KEY owners. Results identify `animation_target`, `animation_owner`
+and the strip's `action_slot`.
+
+`inspect_rig` includes OBJECT and KEY actions with their `target_types` and slots.
+Each skin's `shape_key_animation` reports its owner, active action, slot, NLA
+enabled state and ordered tracks. Inspect both body and facial stacks. Clear an
+unwanted facial active action with `set_action` and `animation_target: "SHAPE_KEYS"`;
+clearing the armature action does not clear the face. To use a fixed fractional
+strip influence, enable `use_animated_influence`; otherwise Blender derives its
+influence from the automatic/manual fade envelope. Existing influence curves
+still apply when animated influence is enabled.
+
+Save the editable source, then `bake` the evaluated rig with all participating
+skins. The independent bake samples shape weights alongside body motion and
+clears copied NLA stacks. Compare the source with the bake and actual FBX/GLB
+reimports at fractional times through expression transitions. A matching clip
+name alone does not establish synchronized facial deformation.
+
 ## Bones
 
 Bone specifications take `name`, `head`, `tail`, `parent`, `connect`, `deform`

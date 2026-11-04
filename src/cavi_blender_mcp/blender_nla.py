@@ -1,4 +1,4 @@
-"""Armature action assignment, rename/delete and NLA clip management."""
+"""Object and shape-key action assignment and NLA clip management."""
 
 import math
 
@@ -19,13 +19,26 @@ def label(value, field="name"):
     return value
 
 
-def rig(params):
+def target(params):
     if bpy.context.mode != "OBJECT":
         raise ValueError("Switch Blender to Object Mode before managing clips")
     value = obj(params.get("name"))
-    if value.type != "ARMATURE":
-        raise ValueError("name must be an armature object")
-    return value
+    kind = params.get('animation_target', 'OBJECT')
+    if kind == 'SHAPE_KEYS':
+        if value.type != 'MESH' or value.data.shape_keys is None:
+            raise ValueError('SHAPE_KEYS requires a mesh with authored shape keys')
+        if value.data.users != 1:
+            raise ValueError('Shape-key animation requires single-user mesh data')
+        owner = value.data.shape_keys
+    elif kind == 'OBJECT':
+        if value.type != 'ARMATURE':
+            raise ValueError('name must be an armature object for OBJECT animation')
+        owner = value
+    else:
+        raise ValueError('animation_target must be OBJECT or SHAPE_KEYS')
+    if owner.animation_data and owner.animation_data.use_tweak_mode:
+        raise ValueError('Exit NLA Tweak Mode before managing clips')
+    return value, owner
 
 
 def action(name):
@@ -41,10 +54,11 @@ def frame(value):
     return value
 
 
-def result(armature):
-    animation = armature.animation_data
+def result(value, owner):
+    animation = owner.animation_data
     slot = animation.action_slot if animation else None
-    return {**info(armature), "active_action": animation.action.name
+    return {**info(value), 'animation_target': 'SHAPE_KEYS' if owner != value else 'OBJECT',
+            'animation_owner': owner.name, "active_action": animation.action.name
             if animation and animation.action else None,
             "action_slot": slot.identifier if slot else None,
             "nla_enabled": animation.use_nla if animation else False,
@@ -55,18 +69,26 @@ def result(armature):
 
 
 def set_action(p):
-    armature = rig(p)
-    if armature.animation_data is None:
-        armature.animation_data_create()
-    animation = armature.animation_data
+    value, owner = target(p)
     name = p.get("action_name")
+    selected = action(name) if name is not None else None
+    slot = action_slot(owner, selected) if selected is not None else None
+    if owner.animation_data is None:
+        owner.animation_data_create()
+    animation = owner.animation_data
     if name is None:
         animation.action = None
-        return result(armature)
-    value = action(name)
-    animation.action = value
-    animation.action_slot = action_slot(armature, value)
-    return result(armature)
+    else:
+        previous, previous_slot = animation.action, animation.action_slot
+        try:
+            animation.action = selected
+            animation.action_slot = slot
+        except Exception:
+            animation.action = previous
+            if previous is not None:
+                animation.action_slot = previous_slot
+            raise
+    return result(value, owner)
 
 
 def rename_action(p):
@@ -104,12 +126,27 @@ def inventory(armature):
     animation = armature.animation_data
     if animation is None:
         return []
+    if total_strips(animation) > MAX_STRIPS:
+        raise ValueError(f'Animation owner exceeds {MAX_STRIPS} NLA strips')
+    if any(strip.type == 'META' for track in animation.nla_tracks for strip in track.strips):
+        raise ValueError('Nested META NLA strips need a separate clip inventory')
     return [{'name': track.name, 'mute': track.mute, 'solo': track.is_solo,
              'strips': [{'name': strip.name, 'type': strip.type,
                          'action': strip.action.name if strip.action else None,
+                         'action_slot': strip.action_slot.identifier if strip.action_slot else None,
                          'frame_range': [strip.frame_start, strip.frame_end],
                          'strip_settings': strip_settings(strip) if strip.type == 'CLIP' else None}
                         for strip in track.strips]} for track in animation.nla_tracks]
+
+
+def shape_animation(keys):
+    if keys is None:
+        return None
+    animation = keys.animation_data
+    slot = animation.action_slot if animation else None
+    return {'owner': keys.name, 'active_action': animation.action.name if animation and animation.action else None,
+            'action_slot': slot.identifier if slot else None,
+            'nla_enabled': animation.use_nla if animation else False, 'nla_tracks': inventory(keys)}
 
 
 def write_settings(strip, values):
@@ -168,43 +205,42 @@ def configure_strip(track, strip, changes):
     return actual
 
 
-def strip_result(armature, track, strip):
-    return {**result(armature), 'action': strip.action.name, 'track': track.name, 'strip': strip.name,
+def strip_result(value, owner, track, strip):
+    return {**result(value, owner), 'action': strip.action.name, 'track': track.name, 'strip': strip.name,
+            'action_slot': strip.action_slot.identifier,
             'start_frame': strip.frame_start, 'frame_range': [strip.frame_start, strip.frame_end],
             'action_frame_range': [strip.action_frame_start, strip.action_frame_end],
             'strip_settings': strip_settings(strip)}
 
 
 def nla_edit(p):
-    armature = rig(p)
-    animation = armature.animation_data
+    value, owner = target(p)
+    animation = owner.animation_data
     track_name = label(p.get('track_name'), 'track_name')
     strip_name = label(p.get('strip_name'), 'strip_name')
     track = animation.nla_tracks.get(track_name) if animation else None
     strip = track.strips.get(strip_name) if track else None
     if strip is None or strip.type != 'CLIP' or strip.action is None:
         raise ValueError('Named NLA action strip does not exist')
-    if animation.use_tweak_mode:
-        raise ValueError('Exit NLA Tweak Mode before editing strip settings')
     configure_strip(track, strip, p.get('strip_settings'))
-    return strip_result(armature, track, strip)
+    return strip_result(value, owner, track, strip)
 
 
 def nla_push(p):
-    armature = rig(p)
-    if armature.animation_data is None:
-        armature.animation_data_create()
-    animation = armature.animation_data
+    object_value, owner = target(p)
+    animation = owner.animation_data
     name = p.get("action_name")
-    value = animation.action if name is None else action(label(name, "action_name"))
+    value = (animation.action if animation else None) if name is None else action(label(name, "action_name"))
     if value is None:
         raise ValueError("Provide action_name or set an active action")
-    slot = action_slot(armature, value)
+    slot = action_slot(owner, value)
     track_name = label(p.get("track_name") or value.name, "track_name")
     strip_name = label(p.get("strip_name") or value.name, "strip_name")
     start = frame(p.get("start_frame", 1))
+    if animation is None:
+        animation = owner.animation_data_create()
     if total_strips(animation) >= MAX_STRIPS:
-        raise ValueError(f"Rigs are limited to {MAX_STRIPS} NLA strips")
+        raise ValueError(f"Animation owners are limited to {MAX_STRIPS} NLA strips")
     track = next((item for item in animation.nla_tracks if item.name == track_name), None)
     created_track = track is None
     strip = None
@@ -228,14 +264,14 @@ def nla_push(p):
         if created_track and track is not None and not track.strips and track.name == track_name:
             animation.nla_tracks.remove(track)
         raise
-    return strip_result(armature, track, strip)
+    return strip_result(object_value, owner, track, strip)
 
 
 def nla_remove(p):
-    armature = rig(p)
-    animation = armature.animation_data
+    value, owner = target(p)
+    animation = owner.animation_data
     if animation is None:
-        return {**result(armature), "removed_tracks": [], "removed_strips": 0}
+        return {**result(value, owner), "removed_tracks": [], "removed_strips": 0}
     track_name = p.get("track_name")
     strip_name = p.get("strip_name")
     if strip_name is not None and track_name is None:
@@ -265,7 +301,7 @@ def nla_remove(p):
             if not track.strips:
                 removed = [track.name]
                 animation.nla_tracks.remove(track)
-    return {**result(armature), "removed_tracks": removed, "removed_strips": strips}
+    return {**result(value, owner), "removed_tracks": removed, "removed_strips": strips}
 
 
 HANDLERS = {"set_action": set_action, "rename_action": rename_action,

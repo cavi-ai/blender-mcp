@@ -1,5 +1,35 @@
 [
   {
+    "id": "facial-invalid-animation-target",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_push",
+      "name": "Face",
+      "animation_target": "MESH"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "facial-target-wrong-operation",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "clear_pose",
+      "name": "Face",
+      "animation_target": "SHAPE_KEYS"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: animation_target"
+  },
+  {
     "id": "nla-edit-empty-settings",
     "tool": "rig_edit",
     "arguments": {

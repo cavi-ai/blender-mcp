@@ -197,6 +197,8 @@ class RigEditResult(ObjectFields):
     action_count: int | None = None
     calibration: Record | None = None
     strip_settings: Record | None = None
+    animation_target: Literal['OBJECT', 'SHAPE_KEYS'] | None = None
+    animation_owner: str | None = None
 
 
 class MeshEditResult(ObjectFields):

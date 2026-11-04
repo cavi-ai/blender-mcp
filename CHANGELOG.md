@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.47.0 - 2026-11-04
+
+- Compose shape-key actions with independent NLA timing, repeats, fades and blends.
+- Inspect facial action slots and ordered tracks on each skinned mesh.
+- Reject incompatible or ambiguous facial slots before changing action bindings.
+
 ## 0.46.0 - 2026-11-04
 
 - Edit NLA strip trims, timing, repetition, fades and blend settings without changing action keys.

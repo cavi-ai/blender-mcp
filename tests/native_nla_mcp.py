@@ -80,7 +80,7 @@ async def exercise(root, env):
                 'bake_max_error_m': compared['max_error_m'], 'fbx_max_error_m': check['max_error_m']}
 
 
-def main():
+def main(exercise=exercise):
     parser = argparse.ArgumentParser()
     parser.add_argument('--blender', default=shutil.which('blender'), required=not shutil.which('blender'))
     args = parser.parse_args()

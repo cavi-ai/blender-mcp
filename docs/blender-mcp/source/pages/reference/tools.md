@@ -167,6 +167,7 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `calibration` | `retarget`; root, root translation scale and XYZ armature alignment |
 | `new_name` | `rename_action`; new action name |
 | `track_name`, `strip_name` | `nla_push`, `nla_edit`, `nla_remove` |
+| `animation_target` | `set_action`, `nla_push`, `nla_edit`, `nla_remove`; `OBJECT` (default) uses an armature, `SHAPE_KEYS` uses the named mesh's Key datablock |
 | `start_frame` | `nla_push`; default 1 |
 | `strip_settings` | Optional for `nla_push`, required for `nla_edit`; sparse trim, scale, repeat, fade, blend, influence, mute and reverse settings |
 | `source`, `new_name`, `max_distance_m`, `max_discarded_weight` | `transfer_weights`; required source skin, new copy and quality budgets |
