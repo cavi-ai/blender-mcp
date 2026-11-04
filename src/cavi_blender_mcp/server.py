@@ -28,6 +28,7 @@ from .contracts import (
     ScatterResult,
     SceneEditResult,
     SceneInfo,
+    SkinClearance,
     UVLayout,
     compact_schema,
     failure,
@@ -272,6 +273,27 @@ async def inspect_rig(
     return await run(call, "inspect_rig", armature=armature, meshes=meshes,
                      max_influences=max_influences, action=action,
                      checks=checks or [], samples=samples)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def inspect_skin_clearance(
+    body: ObjectName,
+    garments: Annotated[list[ObjectName], Field(min_length=1, max_length=8)],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    min_clearance_m: Annotated[Number, Field(ge=0)],
+    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
+    surface_samples: Literal["vertices", "vertices_and_centres"] = "vertices_and_centres",
+    max_queries: Annotated[StrictInt, Field(ge=1, le=1000000)] = 1000000,
+) -> SkinClearance:
+    """Sample signed garment gaps against closed evaluated body components, restoring the frame.
+
+    Probes vertices and optionally triangle centres in metres. Ambiguous classification,
+    open bodies and exhausted query budgets cannot pass. Does not certify continuous collision.
+    """
+    return await run(call, "inspect_skin_clearance", body=body, garments=garments,
+        start_frame=start_frame, end_frame=end_frame, min_clearance_m=min_clearance_m,
+        samples=samples, surface_samples=surface_samples, max_queries=max_queries)
 
 
 @mcp.tool(annotations=READ_ONLY)

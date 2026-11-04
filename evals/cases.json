@@ -6367,5 +6367,94 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "clearance-native-success",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": [
+        "MorphSource"
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "samples": 2
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/scope": "sampled_garment_clearance",
+      "/complete": true,
+      "/passed": true
+    },
+    "required": [
+      "/numerical_resolution_m",
+      "/garments/0/min_clearance_m",
+      "/body_topology/0/components"
+    ]
+  },
+  {
+    "id": "clearance-invalid-threshold",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": [
+        "MorphSource"
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": -1,
+      "samples": 2
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "clearance-invalid-samples",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": [
+        "MorphSource"
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "samples": 33
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "clearance-invalid-budget",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": [
+        "MorphSource"
+      ],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "samples": 2,
+      "max_queries": 0
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

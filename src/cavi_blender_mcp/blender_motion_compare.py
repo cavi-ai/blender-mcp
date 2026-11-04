@@ -14,20 +14,9 @@ def set_frame(frame):
 
 
 def world_points(value, depsgraph):
-    evaluated = value.evaluated_get(depsgraph)
-    try:
-        mesh = evaluated.to_mesh()
-        if not 1 <= len(mesh.vertices) <= 100000:
-            raise ValueError('Compared skins need 1..100000 evaluated vertices')
-        coordinates = np.empty(len(mesh.vertices) * 3, np.float64)
-        mesh.vertices.foreach_get('co', coordinates)
-        matrix = np.asarray(evaluated.matrix_world, np.float64)
-        points = coordinates.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
-        if not len(points) or not np.isfinite(points).all():
-            raise ValueError('Compared skins need finite evaluated vertices')
-        return points
-    finally:
-        evaluated.to_mesh_clear()
+    from .blender_mesh_sample import snapshot
+
+    return snapshot(value, depsgraph)[0]
 
 
 def aligned(points, matrix, meters):
