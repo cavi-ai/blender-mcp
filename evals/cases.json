@@ -5179,6 +5179,50 @@
     ]
   },
   {
+    "id": "rig-retarget-calibrated",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "RetargetRig",
+      "source": "EvalRigNew",
+      "source_action": "EvalWalk",
+      "action_name": "CalibratedWalk",
+      "calibration": {
+        "root": "Root",
+        "root_translation_scale": 1.2
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/calibration/method": "rest_relative_armature_rotations",
+      "/calibration/root_translation_scale": 1.2
+    }
+  },
+  {
+    "id": "rig-retarget-invalid-calibration",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "retarget",
+      "name": "Target",
+      "source": "Source",
+      "source_action": "Walk",
+      "action_name": "Output",
+      "calibration": {
+        "root": "Root",
+        "root_translation_scale": 0
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
     "id": "rig-retarget-missing-action",
     "tool": "rig_edit",
     "arguments": {

@@ -7,6 +7,8 @@ import bpy
 from .blender_animation import ACTION_TAG, previous_action, restore, restore_action, snapshot
 from .blender_bridge import info, obj
 from .blender_errors import preflight
+from .blender_retarget_profile import apply as apply_calibrated
+from .blender_retarget_profile import prepare as prepare_calibration
 from .blender_rig import action_slot, sample_frames
 
 MAX_BONES = 512
@@ -99,17 +101,24 @@ def retarget(p):
         if len(frames) * len(pairs) > MAX_KEYFRAMES:
             raise ValueError(f"Retargeting is limited to {MAX_KEYFRAMES} keyframes")
         ordered = depth_order(target, pairs)
+        calibration = prepare_calibration(source, target, pairs, p.get('calibration'))
     scene = bpy.context.scene
     previous_frame = scene.frame_current
+    previous_subframe = scene.frame_subframe
     source_action_old, source_slot_old = previous_action(source)
     target_action_old, target_slot_old = previous_action(target)
     pose = snapshot(target)
+    source_pose = snapshot(source)
+    source_animation_created = source.animation_data is None
     action = None
+    source_nla = source.animation_data.use_nla if source.animation_data else True
+    previous_rotations = {}
     try:
         if source.animation_data is None:
             source.animation_data_create()
         source.animation_data.action = source_action
         source.animation_data.action_slot = action_slot(source, source_action)
+        source.animation_data.use_nla = False
         target.animation_data_create()
         action = bpy.data.actions.new(target_name)
         action.use_fake_user = True
@@ -118,14 +127,23 @@ def retarget(p):
         for frame in frames:
             scene.frame_set(frame)
             bpy.context.view_layer.update()
+            if calibration:
+                apply_calibrated(source.evaluated_get(bpy.context.evaluated_depsgraph_get()),
+                                 target, ordered, calibration)
+            else:
+                for src_bone, dst_bone in ordered:
+                    target_bone = target.pose.bones[dst_bone]
+                    target_bone.rotation_mode = "QUATERNION"
+                    target_bone.matrix = (target.matrix_world.inverted()
+                                          @ source.matrix_world
+                                          @ source.pose.bones[src_bone].matrix)
             for src_bone, dst_bone in ordered:
                 target_bone = target.pose.bones[dst_bone]
-                target_bone.rotation_mode = "QUATERNION"
-                target_bone.matrix = (target.matrix_world.inverted()
-                                      @ source.matrix_world
-                                      @ source.pose.bones[src_bone].matrix)
-            for src_bone, dst_bone in ordered:
-                target_bone = target.pose.bones[dst_bone]
+                if calibration:
+                    rotation = target_bone.rotation_quaternion
+                    if dst_bone in previous_rotations and rotation.dot(previous_rotations[dst_bone]) < 0:
+                        rotation.negate()
+                    previous_rotations[dst_bone] = rotation.copy()
                 if not target_bone.keyframe_insert("location", frame=frame):
                     raise RuntimeError(f"Could not key {dst_bone} location")
                 if not target_bone.keyframe_insert("rotation_quaternion", frame=frame):
@@ -134,19 +152,30 @@ def retarget(p):
                     raise RuntimeError(f"Could not key {dst_bone} scale")
         action.use_frame_range = True
         action.frame_start, action.frame_end = frames[0], frames[-1]
+        if calibration:
+            from .blender_rig_bake import linear
+            linear(action)
     except Exception:
         if action is not None:
             restore_action(target, target_action_old, target_slot_old)
             bpy.data.actions.remove(action)
         restore_action(source, source_action_old, source_slot_old)
-        scene.frame_set(previous_frame)
+        source.animation_data.use_nla = source_nla
+        scene.frame_set(previous_frame, subframe=previous_subframe)
+        restore(source, source_pose)
+        if source_animation_created:
+            source.animation_data_clear()
         restore(target, pose)
         raise
     restore_action(source, source_action_old, source_slot_old)
-    scene.frame_set(previous_frame)
+    source.animation_data.use_nla = source_nla
+    scene.frame_set(previous_frame, subframe=previous_subframe)
+    restore(source, source_pose)
+    if source_animation_created:
+        source.animation_data_clear()
     slot = target.animation_data.action_slot
     mapped = [{"source": src, "target": dst} for src, dst in ordered]
-    return {**info(target), "armature": target.name, "source": source.name,
+    result = {**info(target), "armature": target.name, "source": source.name,
             "source_action": source_action.name, "action": action.name,
             "action_slot": slot.identifier if slot else None,
             "frames": [frames[0], frames[-1]], "samples": len(frames),
@@ -156,3 +185,7 @@ def retarget(p):
             "unmapped_target": sorted(bone.name for bone in target.data.bones
                                       if bone.name not in set(pairs.values())),
             "keyed_bones": [dst for _, dst in ordered]}
+    if calibration:
+        result['calibration'] = {key: value for key, value in calibration.items() if key != 'alignment'}
+        result['calibration']['method'] = 'rest_relative_armature_rotations'
+    return result

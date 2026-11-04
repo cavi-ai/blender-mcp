@@ -262,6 +262,7 @@ class RigEditResult(ObjectFields):
     previous: str | None = None
     deleted: str | None = None
     action_count: int | None = None
+    calibration: Record | None = None
 
 
 class MeshEditResult(ObjectFields):

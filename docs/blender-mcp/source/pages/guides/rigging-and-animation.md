@@ -100,6 +100,57 @@ selects 2–256 evenly spaced frames instead. Armatures are limited to 512 bones
 mappings to 128 pairs and the result to 100,000 keyframes. The result reports
 mapped and unmapped bones.
 
+## Calibrate differing rest poses and proportions
+
+Add `calibration` to `retarget` for rest-relative transfer. Existing calls without
+it keep world-space matrix transfer. Use a saved, owned target copy with no pose
+drivers, NLA strips or constraints on mapped bones. Map target parents as well
+as their children. The editable target rest rig and skin data stay intact.
+
+```json
+{"action":"retarget","name":"TargetRig","source":"SourceRig","source_action":"Walk","action_name":"TargetWalk","mapping":{"Root":"Root","Thigh.L":"Thigh.L"},"calibration":{"root":"Root","root_translation_scale":1.2,"alignment_degrees":[0,0,0]},"lease_id":"<lease>"}
+```
+
+The abbreviated mapping must be expanded to include the target parent chain.
+`root` names the source root and must map to a target root. Choose the explicit
+positive `root_translation_scale` from the rig pair; it is not inferred from
+names or automatically estimated. `alignment_degrees` is XYZ Euler alignment
+between source and target armature coordinate systems, independent of object
+placement.
+
+At each frame the tool measures each source bone's armature-space rotation
+relative to its rest orientation, aligns that rotation, and applies it to the
+target rest orientation. Target parent-relative rest offsets and lengths remain;
+only the declared root receives scaled source bone translation. Source object
+motion, bone translation on other joints and animated bone scale are not copied.
+The tool samples the selected source action with NLA disabled, writes continuous
+quaternion keys with linear interpolation and verifies target pose matrices.
+Unsupported target inheritance fails rather than silently changing the result.
+The receipt records the calibration and mapped/unmapped bones.
+
+This is explicit skeletal correspondence, not anatomical inference or automatic
+foot locking. Review shoulders, twist joints, long limbs and target proportions.
+A rest pose difference may require authored pose corrections or a different
+alignment; a successful matrix check is not artistic acceptance.
+
+## Measure declared contact windows
+
+`inspect_rig` accepts up to 16 `contacts` alongside the existing checks. Each
+window specifies a bone-local point in armature units, an increasing frame range
+within the selected action, 2–32 samples, and explicit drift/height tolerances.
+
+```json
+{"armature":"TargetRig","meshes":["Body"],"action":"TargetWalk","contacts":[{"bone":"Foot.L","point":[0,0.1,0],"start_frame":1,"end_frame":8,"samples":16,"max_drift_m":0.01,"max_height_error_m":0.005,"ground_z_m":0}]}
+```
+
+Choose the local sole, heel or toe marker from the actual rig. The report measures
+maximum horizontal displacement from that window's first sample and maximum
+absolute height error against a world-Z ground plane, using scene metre scale.
+It includes sample times, worst frames and explicit pass/fail. It does not infer
+stance phases, compensate in-place locomotion, simulate contact or check mesh
+collision. Supply actual root travel before measuring a travelling stance.
+Inspection restores the active action, pose, NLA state, frame and subframe.
+
 ## Verify
 
 Run `inspect_rig` after binding, repair, retargeting or animation. It reports
