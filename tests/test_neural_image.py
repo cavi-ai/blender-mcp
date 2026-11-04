@@ -36,6 +36,19 @@ class NeuralImageTests(unittest.TestCase):
         self.assertEqual(prepared.getpixel((256, 256)), (150, 30, 20))
         self.assertEqual(prepared.getpixel((0, 0)), (128, 128, 128))
 
+    def test_triposg_framing_uses_white_background_and_padding(self):
+        image = Image.new("RGBA", (400, 800), (0, 0, 0, 0))
+        image.paste((150, 30, 20, 255), (100, 0, 300, 800))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "character.png"
+            image.save(path)
+            prepared = neural_worker.prepare_image(path, background=(255, 255, 255), extent=427)
+        self.assertEqual(prepared.size, (512, 512))
+        self.assertEqual(prepared.getpixel((0, 0)), (255, 255, 255))
+        self.assertEqual(prepared.getpixel((256, 256)), (150, 30, 20))
+        rows = [y for y in range(512) if prepared.getpixel((256, y)) != (255, 255, 255)]
+        self.assertEqual(rows[-1] - rows[0] + 1, 427)
+
     def test_empty_transparent_reference_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "visible foreground"):
             self.prepare(Image.new("RGBA", (16, 16), (0, 0, 0, 0)))

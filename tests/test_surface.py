@@ -114,4 +114,4 @@ class SurfaceTests(unittest.TestCase):
         with patch.object(server, "generate", return_value={"path": "g.glb"}) as generate:
             asyncio.run(server.asset_io("generate", "g.glb", image="in.png"))
         self.assertEqual(calls, [("scene_info", {"limit": 1})])
-        generate.assert_called_once_with("/w", "in.png", "g.glb", 128)
+        generate.assert_called_once_with("/w", "in.png", "g.glb", None)

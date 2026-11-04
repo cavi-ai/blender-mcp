@@ -799,14 +799,15 @@ async def asset_io(
     preserve_instances, include_empties, lods, collision, animations (FBX/GLB/USD),
     textures (FBX/USD sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
     <stem>_high.fbx);
-    save: .blend path; generate: image, .glb path, resolution=128 (local TripoSR, no lease).
+    save: .blend path; generate: image, .glb path, resolution=128 for the TripoSR provider
+    (local, no lease; CAVI_GENERATION_PROVIDER=triposg selects TripoSG, without resolution).
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis}
     if action == "generate":
-        params = pick(action, values, ["image"], {"resolution": 128})
+        params = pick(action, values, ["image"], {"resolution": None})
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
         return await run(generate, workspace, params["image"], path, params["resolution"])
     if action == "import":

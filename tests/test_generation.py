@@ -99,6 +99,55 @@ class GenerationTests(unittest.TestCase):
                 self.assertFalse((work / "mesh.glb").exists())
                 self.assertFalse(list(work.glob(".cavi-generation-*")))
 
+    def test_unknown_provider_is_rejected_before_any_asset(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            with (
+                self.configured(work),
+                patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "remote"}),
+                self.assertRaisesRegex(ValueError, "triposr or triposg"),
+            ):
+                generate(work, "input.png", "mesh.glb")
+            self.assertFalse((work / "mesh.glb").exists())
+
+    def test_triposg_requires_its_own_runtime(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            with (
+                self.configured(work),
+                patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "triposg"}),
+                self.assertRaisesRegex(RuntimeError, "CAVI_TRIPOSG_PYTHON"),
+            ):
+                generate(work, "input.png", "mesh.glb")
+            self.assertFalse((work / "mesh.glb").exists())
+
+    def test_triposg_refuses_a_triposr_resolution(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            with (
+                patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "triposg"}),
+                self.assertRaisesRegex(ValueError, "only to the TripoSR"),
+            ):
+                generate(work, "input.png", "mesh.glb", 128)
+            self.assertFalse((work / "mesh.glb").exists())
+
+    def test_triposg_timeout_allows_ten_minutes_and_publishes_nothing(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            runtime = {f"CAVI_TRIPOSG_{key}": str(work) for key in ("PYTHON", "SOURCE", "WEIGHTS")}
+            with (
+                patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "triposg", **runtime}),
+                patch("subprocess.run", side_effect=subprocess.TimeoutExpired("worker", 600)),
+                self.assertRaisesRegex(RuntimeError, "600 seconds"),
+            ):
+                generate(work, "input.png", "mesh.glb")
+            self.assertFalse((work / "mesh.glb").exists())
+            self.assertFalse(list(work.glob(".cavi-generation-*")))
+
     def test_a_competing_output_is_never_replaced(self):
         with tempfile.TemporaryDirectory() as root:
             work = Path(root)

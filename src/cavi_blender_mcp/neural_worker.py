@@ -21,7 +21,8 @@ def clean_mesh(mesh):
     return mesh
 
 
-def prepare_image(source):
+def prepare_image(source, background=(128, 128, 128), extent=435):
+    """Frame the subject inside a 512-pixel square on a flat background."""
     from PIL import Image, ImageChops
 
     with Image.open(source) as original:
@@ -39,8 +40,8 @@ def prepare_image(source):
         if bounds is None:
             raise ValueError("Input image has no visible foreground")
         cutout = cutout.crop(bounds)
-        cutout.thumbnail((435, 435), Image.Resampling.LANCZOS)
-        canvas = Image.new("RGBA", (512, 512), (128, 128, 128, 255))
+        cutout.thumbnail((extent, extent), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (512, 512), (*background, 255))
         canvas.alpha_composite(cutout, ((512 - cutout.width) // 2, (512 - cutout.height) // 2))
         return canvas.convert("RGB")
 
