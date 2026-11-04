@@ -139,7 +139,7 @@ def resolve_config(params, existing):
             raise ValueError("Material does not exist; omit update_existing to create it")
         raw = existing.get(CONFIG_TAG)
         if not isinstance(raw, str):
-            raise ValueError("Only materials created by assign_material can be updated")
+            raise ValueError("Only materials created by assign_material can be updated; use inspect/set_inputs for authored graphs")
         try:
             previous = json.loads(raw)
         except ValueError as exc:

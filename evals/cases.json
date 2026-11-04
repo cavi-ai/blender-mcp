@@ -1968,7 +1968,7 @@
       "protocol",
       "native"
     ],
-    "error": "validation"
+    "error": "material_name is required"
   },
   {
     "id": "texture-material-escape",
@@ -7156,5 +7156,66 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "shader-inspect-assignment-options",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "inspect",
+      "roughness": 0.2
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not accept"
+  },
+  {
+    "id": "shader-set-missing-node",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "set_inputs",
+      "inputs": {
+        "Roughness": 0.2
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "requires: node"
+  },
+  {
+    "id": "shader-set-empty-inputs",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "action": "set_inputs",
+      "node": "Surface",
+      "inputs": {}
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "nonempty inputs"
+  },
+  {
+    "id": "shader-assign-node-options",
+    "tool": "assign_material",
+    "arguments": {
+      "material_name": "ArtistFinish",
+      "names": [
+        "Cube"
+      ],
+      "node": "Surface"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not accept"
   }
 ]
