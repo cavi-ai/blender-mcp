@@ -637,8 +637,8 @@ def transform(p):
         for k in ("location", "rotation_degrees", "scale")
         if p.get(k) is not None
     }
-    if "scale" in updates and any(v <= 0 for v in updates["scale"]):
-        raise ValueError("Scale components must be positive")
+    if "scale" in updates and any(v == 0 for v in updates["scale"]):
+        raise ValueError("Scale components must be nonzero")
     if "location" in updates:
         value.location = updates["location"]
     if "rotation_degrees" in updates:
@@ -877,6 +877,14 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'export_assembly':
+        from .blender_assembly import export
+
+        return export(p)
+    if operation == 'append_asset_library_instances':
+        from .blender_asset_library import append
+
+        return append(p, _workspace, instance_collections=True)
     if operation in {'inspect_asset_library', 'append_asset_library'}:
         from .blender_asset_library import append, inspect
 

@@ -33,3 +33,6 @@ failure the tool removes newly created IDs and restores the selection. Inspect
 the project after a transport failure before another mutation; do not blindly
 repeat an uncertain append. Large batches can create many dependencies, so use
 the source catalog and project budgets before selecting roots.
+
+For shared modular placements, use [collection assemblies](collection-assembly.md)
+with `instance_collections=true` instead of directly linking collection contents.

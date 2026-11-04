@@ -72,12 +72,14 @@ def image_receipts(images, workspace):
     return result
 
 
-def append(params, workspace):
+def append(params, workspace, instance_collections=False):
     path = source(workspace, params['path'])
     expected = params.get('expected_sha256')
     if not isinstance(expected, str) or digest(path) != expected:
         raise ValueError('Library SHA-256 does not match; inspect the source again')
     kind = params.get('kind', 'collections')
+    if instance_collections and kind != 'collections':
+        raise ValueError('instance_collections requires kind=collections')
     available = catalog(path, kind)
     names = params.get('names')
     if (not isinstance(names, list) or not 1 <= len(names) <= 256
@@ -107,7 +109,7 @@ def append(params, workspace):
         status = bpy.ops.wm.append(directory=str(path)+'/'+KINDS[kind][0]+'/',
             files=[{'name': name} for name in names], link=False, do_reuse_local_id=False,
             clear_asset_data=False, autoselect=False, active_collection=True,
-            instance_collections=False, use_recursive=True, set_fake=kind in {'materials', 'node_groups'})
+            instance_collections=instance_collections, use_recursive=True, set_fake=kind in {'materials', 'node_groups'})
         if status != {'FINISHED'} or set(roots) != set(names):
             raise RuntimeError('Native append did not return every selected source ID')
         created = ids()-before
@@ -115,17 +117,36 @@ def append(params, workspace):
             raise RuntimeError('Native append did not create independent local IDs')
         if bpy.context.scene != scene or bpy.data.filepath != filepath:
             raise RuntimeError('Append changed the active project')
+        if instance_collections:
+            for name in names:
+                collection = roots[name]
+                if not any(isinstance(value, bpy.types.Object)
+                           and value.name in scene.objects
+                           and value.instance_type == 'COLLECTION'
+                           and value.instance_collection == collection for value in created):
+                    # Native append can omit an explicitly selected nested definition's
+                    # placement when another selected root already references it.
+                    value = bpy.data.objects.new(collection.name, None)
+                    value.instance_type, value.instance_collection = 'COLLECTION', collection
+                    layer.collection.objects.link(value)
+            created = ids()-before
         images = image_receipts([v for v in created if isinstance(v, bpy.types.Image)], workspace)
         if digest(path) != expected:
             raise ValueError('Library changed during append')
         counts = {}
         for value in created:
             counts[value.id_type] = counts.get(value.id_type, 0)+1
+        instances = [{'name': value.name, 'collection': value.instance_collection.name,
+                      'source_name': name} for name, collection in roots.items()
+                     for value in created if isinstance(value, bpy.types.Object)
+                     and value.name in bpy.context.scene.objects
+                     and value.instance_type == 'COLLECTION' and value.instance_collection == collection]
         return {'path': str(path), 'sha256': expected, 'bytes': path.stat().st_size, 'kind': kind,
                 'roots': [{'source_name': name, 'name': roots[name].name,
                            'id_type': roots[name].id_type, 'asset': roots[name].asset_data is not None}
                           for name in names], 'created_counts': counts,
-                'items': mappings[:1000], 'items_truncated': len(mappings) > 1000, 'images': images}
+                'items': mappings[:1000], 'items_truncated': len(mappings) > 1000,
+                'images': images, 'instances': instances}
     except Exception:
         created = ids()-before
         if created:
