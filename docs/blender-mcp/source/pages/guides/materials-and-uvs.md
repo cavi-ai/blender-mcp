@@ -78,3 +78,38 @@ normal, roughness, metallic and alpha inputs use Non-Color. Save/reopen the
 consumer, inspect the bindings and compare the evaluated material in the assembly
 export. A Geometry Nodes Set Material node can supply generated surfaces through
 its own exposed material control; use `geometry_nodes` for that control.
+
+## Tune an authored shader graph
+
+Use `assign_material(action="inspect", material_name="GlazedCeramic")` without an
+edit lease to discover exact node names, native socket identifiers, values and
+links. `offset` and `limit` page nodes; `node` selects one exact node. Links cover
+edges touching the returned nodes. Image `decoded_depth_bits` describes Blender's
+decoded image buffer; it does not establish the source file's sample precision.
+
+Follow nested shader groups with `group_path`, an ordered list of group **node**
+names from the material root. Inspect each level first. The response reports
+`affected_materials`, their total and truncation state. Editing a shared group
+changes all material users of that group. Root group-node inputs are per-material
+controls; prefer those when a shared shader exposes the intended control.
+
+After claiming ownership, edit only discovered socket identifiers:
+
+```json
+{"action":"set_inputs","material_name":"GlazedCeramic","group_path":["Finish Controls","Inner Layer"],"node":"Hero Surface","inputs":{"Coat Weight":0.4},"lease_id":"<claim-token>"}
+```
+
+Values use the native socket type and bounds. Colors are scene-linear, with no
+implicit sRGB conversion. A linked socket's default is a fallback; changing it
+preserves the incoming link and does not override the connected value. Neither
+mode rebuilds nodes, changes images nor rewires connections. Validate the whole
+batch before writing; a failed edit or receipt restores prior defaults and tags.
+
+An effective native edit moves any affected tool-managed material configuration
+to `cavi_material_config_source` as provenance and removes its rebuild tag. A
+no-op retains the configuration. Continue authored edits with `set_inputs`;
+`update_existing` refuses detached graphs rather than replacing the authored
+nodes from stale settings. Other custom properties remain intact. Save to a new
+blend, reopen it and compare values, links and the rendered finish. Blender's
+native graph is source artwork; Unity delivery still needs a supported shader and
+verified texture handoff.

@@ -261,22 +261,30 @@ class MeshEditResult(ObjectFields):
     triangles_before: int | None = None
 
 
-class MaterialAssignment(Result):
+class MaterialAssignment(VariantResult):
+    shapes = (('material', 'objects', 'slot', 'updated', 'material_users', 'base_color_srgb',
+               'roughness', 'metallic', 'base_color_texture', 'textures', 'config', 'texture_packed'),
+              ('material', 'nodes', 'total', 'links'))
+    nullable_shape_fields = frozenset({'base_color_texture'})
     material: str
-    objects: list[str]
-    slot: int
-    updated: bool
-    material_users: int
-    base_color_srgb: list[Number]
-    roughness: Number
-    metallic: Number
-    base_color_texture: Record | None
-    textures: dict[str, Record]
-    config: Record
-    texture_packed: bool
+    objects: list[str] | None = None
+    slot: int | None = None
+    updated: bool | None = None
+    material_users: int | None = None
+    base_color_srgb: list[Number] | None = None
+    roughness: Number | None = None
+    metallic: Number | None = None
+    base_color_texture: Record | None = None
+    textures: dict[str, Record] | None = None
+    config: Record | None = None
+    texture_packed: bool | None = None
     bindings: list[dict[str, Any]] | None = None
     reserved_empty_slots: list[str] | None = None
     instance: str | None = None
+    nodes: list[dict[str, Any]] | None = None
+    total: int | None = None
+    links: list[dict[str, Any]] | None = None
+    changed_inputs: list[str] | None = None
 
 
 class MapBakeResult(Result):

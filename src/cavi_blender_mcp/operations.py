@@ -43,6 +43,8 @@ OPERATIONS = frozenset(
         "session_control",
         "owned_edit",
         "assign_material",
+        "inspect_material_nodes",
+        "set_material_inputs",
         "assign_instance_material",
         "assign_object_material",
         "decimate_to",
@@ -90,6 +92,7 @@ OPERATIONS = frozenset(
 )
 LEASE_FREE = frozenset(
     {
+        "inspect_material_nodes",
         "scene_info",
         "object_info",
         "runtime_status",

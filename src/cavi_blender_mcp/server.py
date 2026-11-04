@@ -759,8 +759,8 @@ def preserved(values, allowed):
 
 @mcp.tool(annotations=MUTATING)
 async def assign_material(
-    names: Annotated[list[str], Field(min_length=1, max_length=32)],
-    material_name: Annotated[str, Field(min_length=1, max_length=63)],
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=32)] = None,
+    material_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     base_color_texture: Annotated[str | None, Field(description="Workspace sRGB image.")] = None,
     base_color: RGBA | None = None,
     roughness: Number | None = None,
@@ -781,15 +781,41 @@ async def assign_material(
     lease_id: LeaseId = None,
     instance: str | None = None,
     link_mode: Literal['DATA', 'OBJECT'] | None = None,
+    action: Literal['assign', 'inspect', 'set_inputs'] = 'assign',
+    group_path: list[str] | None = None,
+    node: str | None = None,
+    inputs: dict[str, JsonValue] | None = None,
+    offset: Annotated[StrictInt | None, Field(ge=0)] = None,
+    limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
 ) -> MaterialAssignment:
-    """Assign or update a PBR material. Maps are workspace PNG/JPEG files.
-
-    Normal, roughness, metallic and alpha maps are Non-Color; base color and emission
-    are sRGB. update_existing edits a material created by this tool and bound to the slot.
-    instance scopes internal mesh names to a scene collection instance. OBJECT link_mode
-    overrides a material per object without copying shared mesh geometry; updates preserve
-    the current link mode when omitted.
+    """assign: names, material_name; PNG/JPEG maps (color/emission sRGB, data Non-Color).
+    instance scopes kit meshes; OBJECT retains shared geometry.
+    inspect: group_path, node, offset/limit; lease-free.
+    set_inputs: node, inputs by socket ID; linear values, links retained,
+    shared users affected, managed config detached.
     """
+    if material_name is None:
+        raise ValueError('material_name is required')
+    shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'offset': offset, 'limit': limit}
+    if action != 'assign':
+        pick(action, {'names': names, 'base_color_texture': base_color_texture, 'base_color': base_color,
+            'roughness': roughness, 'metallic': metallic, 'roughness_texture': roughness_texture,
+            'metallic_texture': metallic_texture, 'normal_texture': normal_texture, 'normal_strength': normal_strength,
+            'emission_texture': emission_texture, 'emission_strength': emission_strength,
+            'alpha_texture': alpha_texture, 'alpha_mode': alpha_mode, 'uv_scale': uv_scale,
+            'uv_offset': uv_offset, 'uv_rotation_degrees': uv_rotation_degrees,
+            'update_existing': update_existing, 'instance': instance, 'link_mode': link_mode,
+            'slot': slot if slot != 0 else None})
+        if action == 'inspect':
+            params = pick(action, shader, (), {'group_path': [], 'node': None, 'offset': 0, 'limit': 100})
+            return await run(call, 'inspect_material_nodes', material_name=material_name, **params)
+        params = pick(action, shader, ['node', 'inputs'], {'group_path': []})
+        if not params['inputs']:
+            raise ValueError('Provide nonempty inputs')
+        return await run(call, 'set_material_inputs', material_name=material_name, lease_id=lease_id, **params)
+    pick(action, shader)
+    if names is None:
+        raise ValueError('assign requires names')
     operation = 'assign_instance_material' if instance is not None else (
         'assign_object_material' if link_mode is not None else 'assign_material')
     options = {}

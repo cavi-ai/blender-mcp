@@ -877,6 +877,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation in {'inspect_material_nodes', 'set_material_inputs'}:
+        from .blender_shader_inputs import inspect, set_inputs
+
+        return (inspect if operation == 'inspect_material_nodes' else set_inputs)(p)
     if operation == 'make_instance_unique':
         from .blender_instance_variants import make_unique
 

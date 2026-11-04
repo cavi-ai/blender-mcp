@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.54.0 - 2026-11-04
+
+- Inspect authored material nodes and native socket defaults inside nested shader groups.
+- Edit native defaults without rebuilding nodes or disconnecting linked inputs.
+- Report shared material owners and retain detached managed configuration as provenance.
+
 ## 0.53.0 - 2026-11-04
 
 - Assign materials to internal kit meshes through explicit scene-instance scope.
