@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 - Add rest-relative retarget calibration with explicit root travel scaling.
 - Measure declared bone contact windows for drift and ground-height error.
+- Allow explicit linear skinning on independent bake copies while preserving authored modifiers.
 - Preserve clip inspection poses, NLA state and subframes.
 
 ## 0.41.0 - 2026-11-04

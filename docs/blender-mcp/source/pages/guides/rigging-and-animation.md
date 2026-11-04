@@ -198,6 +198,14 @@ on a separate rig without constraints. The source rig, action and constraints
 remain editable. Each skin copy receives its own mesh data and binds to the new
 rig. Source and copy names are returned in `skins`.
 
+`skinning_mode` defaults to `preserve`. Explicit `linear` disables Preserve Volume
+only on the new skin copies, for linear blend-skinning handoffs. It leaves the
+authored modifiers and weights intact and records the selected mode. This changes
+deformation; compare the converted copy with the authored source and review joints
+before accepting it. FBX/GLB skin export can differ from Blender's Preserve Volume
+deformation even when bone motion matches. Keep the declared error tolerance and
+prepare the intended runtime skinning before retargeting and export comparisons.
+
 It checks evaluated bone matrices at every declared sample and restores the
 original frame. Dense keys use linear interpolation; larger steps require their
 own between-sample motion review. The budget is 4096 samples and one million

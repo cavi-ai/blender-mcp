@@ -69,5 +69,10 @@ assert snapshot(source) == saved_pose
 scene.frame_set(11);bpy.context.view_layer.update()
 assert abs(target.pose.bones['Root'].head.y - 2) < 1e-5
 assert abs(target.pose.bones['Root'].head.x) < 1e-5
+skin.modifiers[0].use_deform_preserve_volume = True
+linear_copy=edit('bake_rig',name='Target',new_name='LinearTarget',action_name='LinearMotion',
+                 start_frame=1,end_frame=11,names=['TargetSkin'],skinning_mode='linear')
+assert skin.modifiers[0].use_deform_preserve_volume
+assert not bpy.data.objects[linear_copy['skins'][0]['name']].modifiers[0].use_deform_preserve_volume
 print(json.dumps({'calibration':result.get('calibration'),'contacts':report,'negative_contact_passed':negative['passed']}))
 folder.cleanup()

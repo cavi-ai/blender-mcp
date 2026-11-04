@@ -370,6 +370,7 @@ async def rig_edit(
     max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1)] = None,
     shape_names: Annotated[list[RigName] | None, Field(max_length=64)] = None,
     calibration: RetargetCalibration | None = None,
+    skinning_mode: Literal['preserve', 'linear'] | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
     """Create an armature, bind or repair weights, or author an animation.
@@ -392,6 +393,7 @@ async def rig_edit(
     copies the target and interpolates rest-surface weights within explicit distance/loss budgets.
     Optional shape_names transfer selected relative morph deltas and follow donor weights/mute.
     bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
+    skinning_mode=preserve keeps copy modifiers; explicit linear changes only new copies.
     Creates a separate constraint-free rig and skin copies; source rig stays editable.
     """
     values = {"location": location, "bones": bones, "names": names,
@@ -405,7 +407,7 @@ async def rig_edit(
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
               'replace': replace, 'max_distance_m': max_distance_m,
               'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
-              'calibration': calibration}
+              'calibration': calibration, 'skinning_mode': skinning_mode}
     if action == 'transfer_weights':
         operation = 'transfer_skin_weights'
         params = pick(action, values, ['source', 'new_name', 'max_distance_m', 'max_discarded_weight'],
@@ -424,7 +426,7 @@ async def rig_edit(
     elif action == 'bake':
         operation = 'bake_rig'
         params = pick(action, values, ['new_name', 'action_name', 'start_frame', 'end_frame'],
-                      {'frame_step': 1, 'names': []})
+                      {'frame_step': 1, 'names': [], 'skinning_mode': 'preserve'})
     elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})

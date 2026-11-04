@@ -40,6 +40,7 @@ class RigControlsSurfaceTests(unittest.TestCase):
         with patch.object(server,'BridgeClient',return_value=SimpleNamespace(call=call)):
             asyncio.run(server.rig_edit('bake','Rig',new_name='Rig_Baked',
                 action_name='Walk_Baked',start_frame=1,end_frame=24,frame_step=1,
-                names=['Skin'],lease_id='L'))
+                names=['Skin'],skinning_mode='linear',lease_id='L'))
         self.assertEqual(calls[0]['operation'],'bake_rig')
         self.assertEqual(calls[0]['params']['end_frame'],24)
+        self.assertEqual(calls[0]['params']['skinning_mode'],'linear')
