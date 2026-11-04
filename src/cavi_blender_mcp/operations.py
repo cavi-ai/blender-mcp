@@ -43,6 +43,8 @@ OPERATIONS = frozenset(
         "session_control",
         "owned_edit",
         "assign_material",
+        "assign_instance_material",
+        "assign_object_material",
         "decimate_to",
         "remesh_quad",
         "lod_chain",

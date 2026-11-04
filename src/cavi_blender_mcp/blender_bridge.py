@@ -944,9 +944,16 @@ def _dispatch(operation, p):
         from .blender_quality import inspect
 
         return {**inspect(p, obj), "project_id": project_identity()}
-    if operation == "assign_material":
+    if operation in {'assign_material', 'assign_object_material', 'assign_instance_material'}:
         from .blender_materials import assign
 
+        if operation == 'assign_instance_material':
+            from .blender_collection_instances import object_in_instance
+
+            if not isinstance(p.get('instance'), str) or not p['instance']:
+                raise ValueError('instance must name a scene collection instance')
+            return {**assign(p, _workspace, lambda name, mesh=False: object_in_instance(name, p['instance'], mesh)),
+                    'instance': p['instance']}
         return assign(p, _workspace, obj)
     if operation == "import_mesh":
         return import_glb(p["path"], p["name"])

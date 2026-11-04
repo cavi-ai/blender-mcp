@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.53.0 - 2026-11-04
+
+- Assign materials to internal kit meshes through explicit scene-instance scope.
+- Add per-object material overrides without copying shared mesh geometry.
+- Preserve binding modes on updates and restore slot bindings on assignment failure.
+- Inspect material slots and link modes in collection definition pages.
+
 ## 0.52.0 - 2026-11-04
 
 - Make an edited collection instance independent without resetting its current controls.

@@ -274,6 +274,9 @@ class MaterialAssignment(Result):
     textures: dict[str, Record]
     config: Record
     texture_packed: bool
+    bindings: list[dict[str, Any]] | None = None
+    reserved_empty_slots: list[str] | None = None
+    instance: str | None = None
 
 
 class MapBakeResult(Result):

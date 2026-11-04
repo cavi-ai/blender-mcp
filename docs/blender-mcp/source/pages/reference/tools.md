@@ -16,6 +16,10 @@ definition; the ordinary scene-object route remains unchanged.
 collection `new_name` and lease. It branches the current editable definition and
 retargets that placement, returning actual source/copy ID mappings.
 
+`assign_material` accepts `instance` for internal mesh targets and `link_mode`
+(DATA/OBJECT) for slot binding. Object overrides retain shared geometry; omitted
+modes on updates preserve existing links. Definition pages report `material_slots`.
+
 ## asset_library
 
 `inspect` is lease-free; `append` requires a lease. Paths are workspace `.blend`

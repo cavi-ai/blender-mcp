@@ -18,13 +18,15 @@ workspace PNG or JPEG maps.
 | `uv_scale`, `uv_offset`, `uv_rotation_degrees` | One Mapping node for all maps |
 | `update_existing` | Edit a material created by this tool and bound to the slot |
 | `slot` | Material slot 0–31 |
+| `instance` | Scene collection instance containing internal mesh targets |
+| `link_mode` | DATA binding or OBJECT override; updates preserve omitted modes |
 
 Base color and emission use sRGB. Normal, roughness, metallic and alpha use
 Non-Color.
 
 ## Requirements
 
-- Meshes need single-user data.
+- DATA assignment needs single-user mesh data; OBJECT overrides retain shared geometry.
 - Textured assignment needs an existing UV layer.
 - Each image is at most 16 MiB and 4096². The combined budget is 32 million
   pixels.
@@ -50,3 +52,29 @@ Run `review_sheet` with `mode="uv_checker"` to inspect UV layout visually, or
 - [Prepare meshes](mesh-preparation.md)
 - [Preview and review](previews-and-review.md)
 - [Bake maps](baking.md)
+
+## Material variants inside a kit
+
+Inspect the collection instance with `scene_info(name=..., definition=true)`.
+Each member reports material slot indices, names and DATA/OBJECT link modes.
+Pass the internal mesh `names` and scene `instance` to `assign_material` to bind
+its finish without linking source meshes into the scene.
+
+Use `link_mode="OBJECT"` for a per-object override on shared mesh geometry. Use a
+new `material_name` for a separate finish; changing an existing material changes
+its users. For a kit variant, branch the definition with `object_edit make_unique`
+first. DATA binding remains available for single-user mesh data. An
+`update_existing` call preserves each target's current mode when `link_mode` is
+omitted.
+
+The response's `bindings` identifies the actual mode, mesh and mesh user count.
+When an empty shared mesh needs its first slot, an empty data slot is reserved;
+other users remain unassigned. `reserved_empty_slots` identifies these meshes.
+Assignment failures restore previous slot modes and materials, including an
+initially empty slot list.
+
+Keep the authored UV and texture-role contract. Color/emission inputs use sRGB;
+normal, roughness, metallic and alpha inputs use Non-Color. Save/reopen the
+consumer, inspect the bindings and compare the evaluated material in the assembly
+export. A Geometry Nodes Set Material node can supply generated surfaces through
+its own exposed material control; use `geometry_nodes` for that control.

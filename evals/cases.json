@@ -7139,5 +7139,22 @@
       "native"
     ],
     "error": "linked"
+  },
+  {
+    "id": "material-invalid-link-mode",
+    "tool": "assign_material",
+    "arguments": {
+      "names": [
+        "Cube"
+      ],
+      "material_name": "Finish",
+      "link_mode": "mesh"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]
