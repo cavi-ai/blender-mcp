@@ -6903,5 +6903,87 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "library-eval-source",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "save",
+      "path": "eval-library.blend"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ]
+  },
+  {
+    "id": "library-inspect",
+    "tool": "asset_library",
+    "arguments": {
+      "action": "inspect",
+      "path": "eval-library.blend"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/sha256",
+      "/names",
+      "/total"
+    ]
+  },
+  {
+    "id": "library-append-without-lease",
+    "tool": "asset_library",
+    "arguments": {
+      "action": "append",
+      "path": "eval-library.blend",
+      "names": [
+        "Collection"
+      ],
+      "expected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "error": "lease"
+  },
+  {
+    "id": "library-requires-source-sha",
+    "tool": "asset_library",
+    "arguments": {
+      "action": "append",
+      "path": "source.blend",
+      "names": [
+        "Kit"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: expected_sha256"
+  },
+  {
+    "id": "library-invalid-source-sha",
+    "tool": "asset_library",
+    "arguments": {
+      "action": "append",
+      "path": "source.blend",
+      "names": [
+        "Kit"
+      ],
+      "expected_sha256": "old"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

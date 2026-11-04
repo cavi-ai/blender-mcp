@@ -9,6 +9,8 @@ OPERATIONS = frozenset(
         "inspect_uv_layout",
         "inspect_rig",
         "inspect_geometry_nodes",
+        "inspect_asset_library",
+        "append_asset_library",
         "set_geometry_inputs",
         "snapshot_geometry",
         "compare_rig_motion",
@@ -87,6 +89,7 @@ LEASE_FREE = frozenset(
         "inspect_uv_layout",
         "inspect_rig",
         "inspect_geometry_nodes",
+        "inspect_asset_library",
         "compare_rig_motion",
         "inspect_skin_clearance",
         "render_preview",
@@ -97,6 +100,8 @@ SERVER_LEASE_FREE = LEASE_FREE | {"session_control"}
 SLOW_OPERATIONS = frozenset(
     {
         "import_mesh",
+        "inspect_asset_library",
+        "append_asset_library",
         "import_fbx",
         "import_obj",
         "import_usd",

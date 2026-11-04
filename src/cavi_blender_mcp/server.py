@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, Strict
 
 from .client import BridgeClient
 from .contracts import (
+    AssetLibraryResult,
     AssetResult,
     LevelEditResult,
     MapBakeResult,
@@ -889,6 +890,26 @@ async def asset_io(
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"
     return await run(call, operation, lease_id=lease_id, path=path, **params)
+
+
+@mcp.tool(annotations=ADDITIVE)
+async def asset_library(
+    action: Literal['inspect', 'append'],
+    path: str,
+    kind: Literal['objects', 'collections', 'materials', 'node_groups'] = 'collections',
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=256)] = None,
+    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
+    offset: Annotated[StrictInt | None, Field(ge=0)] = None,
+    limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
+    lease_id: LeaseId = None,
+) -> AssetLibraryResult:
+    """Inspect .blend library names or append independent native assets with their dependencies."""
+    values = {'names': names, 'expected_sha256': expected_sha256, 'offset': offset, 'limit': limit}
+    if action == 'inspect':
+        params = pick(action, values, (), {'offset': 0, 'limit': 100})
+        return await run(call, 'inspect_asset_library', path=path, kind=kind, **params)
+    params = pick(action, values, ['names', 'expected_sha256'])
+    return await run(call, 'append_asset_library', path=path, kind=kind, lease_id=lease_id, **params)
 
 
 @mcp.tool(annotations=MUTATING)

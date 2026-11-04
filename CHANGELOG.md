@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.49.0 - 2026-11-04
+
+- Inspect native Blender libraries by data type with exact source hashes.
+- Append independent editable assets with procedural, rig and image dependencies.
+- Map native name collisions to source IDs and remove new IDs when append fails.
+
 ## 0.48.0 - 2026-11-04
 
 - Inspect Geometry Nodes socket identifiers, types, ranges and attribute modes.

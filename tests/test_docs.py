@@ -126,7 +126,7 @@ class DocumentationTests(unittest.TestCase):
 
     def test_readme_links_and_tool_count(self):
         readme = (Path(REPO_ROOT) / "README.md").read_text()
-        self.assertRegex(readme, r"publishes 19 tools")
+        self.assertRegex(readme, r"publishes 20 tools")
         broken = []
         for target in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", readme):
             if re.match(r"^[a-z]+:", target):
@@ -140,7 +140,7 @@ class DocumentationTests(unittest.TestCase):
         text = (PAGES / "reference/tools.md").read_text()
         documented = set(re.findall(r"^## ([a-z_]+)$", text, re.MULTILINE))
         self.assertEqual(documented, {tool.name for tool in tools})
-        self.assertEqual(len(tools), 19)
+        self.assertEqual(len(tools), 20)
 
     def test_release_artifact_is_deterministic(self):
         with tempfile.TemporaryDirectory() as temp:
