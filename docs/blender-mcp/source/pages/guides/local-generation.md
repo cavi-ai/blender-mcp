@@ -8,13 +8,14 @@ The MCP process does not import PyTorch, download weights or send images to a
 remote service. The worker runs in a separate Python 3.11 environment with local
 weights.
 
-Two providers are available. `CAVI_GENERATION_PROVIDER` selects one and defaults
-to `triposr`.
+Three providers are available. `CAVI_GENERATION_PROVIDER` selects one and
+defaults to `triposr`.
 
 | Provider | Output | Device | Timeout |
 | --- | --- | --- | --- |
 | `triposr` | Vertex-colored surface, resolution 64–192 | CPU, four threads | 180 seconds |
 | `triposg` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MPS), CUDA or CPU | 600 seconds |
+| `triposg-mlx` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MLX) through mlx-agent | 600 seconds |
 
 ## Prepare TripoSR
 
@@ -65,6 +66,27 @@ CAVI_TRIPOSG_SOURCE=/path/to/TripoSG
 CAVI_TRIPOSG_WEIGHTS=/path/to/TripoSG-weights
 ```
 
+## Prepare TripoSG on MLX
+
+`triposg-mlx` runs the same model without PyTorch through
+`mlx-agent convert mesh` on Apple Silicon.
+
+Install the `mlx-3d` backend with `mlx-agent backend install mlx-3d`, then
+convert the public `VAST-AI/TripoSG` model to a 32-bit MLX model with
+`mlx-agent convert start --q-bits 32`. The backend is found under
+`$XDG_DATA_HOME/mlx-workbench/backends`, which defaults to `~/.local/share`.
+
+Configure absolute local paths in the MCP server environment.
+`CAVI_TRIPOSG_MLX_PYTHON` is a Python 3.11 or newer environment with Pillow. It
+frames the image and runs the launcher.
+
+```text
+CAVI_GENERATION_PROVIDER=triposg-mlx
+CAVI_TRIPOSG_MLX_PYTHON=/path/to/python
+CAVI_TRIPOSG_MLX_AGENT=/path/to/mlx-agent/scripts/mlx-agent
+CAVI_TRIPOSG_MLX_MODEL=/path/to/converted-triposg
+```
+
 ## Run
 
 Put an image of one isolated object on white or transparency inside the
@@ -79,16 +101,23 @@ workspace, then call:
 ```
 
 `resolution` applies only to TripoSR, defaults to 128 and is bounded to 64–192.
-TripoSG refuses it. Input images are at most 16 MiB and 4096 pixels per side.
-An existing transparent cutout is used as provided. The output is published
-without replacing an existing file.
+Both TripoSG providers refuse it. Input images are at most 16 MiB and 4096
+pixels per side. An existing transparent cutout is used as provided. The output
+is published without replacing an existing file.
 
 TripoSG runs 50 sampling steps with a fixed seed, extracts the surface on a
 512³ grid and reduces it to at most 500,000 triangles. On an Apple M5 Max a
 character takes about two minutes.
 
+`triposg-mlx` frames the image exactly like `triposg`, then runs 50 sampling
+steps with seed 42 and a 512³ grid and reduces the surface to at most 500,000
+faces. `triposg` uses seed 0, so the two providers return different meshes. A
+character takes two to three minutes and peaks near 10 GB of memory. The agent
+stops itself 30 seconds before the timeout and reports why.
+
 The result includes the provider, device, object counts, the input SHA-256 and
-the output path.
+the output path. `triposg-mlx` returns `backend`, `vertices`, `faces`, `seconds`,
+`stage_seconds` and `peak_memory_gb` instead of the device and triangle count.
 
 ## Continue
 

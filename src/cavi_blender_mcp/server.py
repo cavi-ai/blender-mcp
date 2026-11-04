@@ -834,7 +834,8 @@ async def asset_io(
     textures (FBX/USD sidecars), axis=unity; or bake_pair alone (writes <stem>_low.fbx,
     <stem>_high.fbx);
     save: .blend path; generate: image, .glb path, resolution=128 for the TripoSR provider
-    (local, no lease; CAVI_GENERATION_PROVIDER=triposg selects TripoSG, without resolution).
+    (local, no lease; CAVI_GENERATION_PROVIDER=triposg or triposg-mlx selects TripoSG, without
+    resolution).
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,

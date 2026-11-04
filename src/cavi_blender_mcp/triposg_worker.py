@@ -8,7 +8,7 @@ import sys
 import types
 from pathlib import Path
 
-from neural_worker import prepare_image
+from triposg_frame import frame
 
 MAX_TRIANGLES = 500000
 
@@ -70,7 +70,7 @@ def main():
         inference_utils.expand_edge_region_fast = expand_on_device
         pipeline = TripoSGPipeline.from_pretrained(os.environ["CAVI_TRIPOSG_WEIGHTS"])
         pipeline = pipeline.to(device, dtype)
-        prepared = prepare_image(source, background=(255, 255, 255), extent=427)
+        prepared = frame(source)
         with torch.inference_mode():
             vertices, faces = pipeline(
                 image=prepared,
