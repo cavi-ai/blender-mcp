@@ -23,6 +23,7 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `rename_action` | Rename an action |
 | `delete_action` | Delete an unreferenced action |
 | `nla_push` | Move an action into an NLA track/strip |
+| `nla_edit` | Edit one named strip's trim, timing and blend settings |
 | `nla_remove` | Remove one strip, one track, or every track |
 
 ## Bones
@@ -57,7 +58,8 @@ pose.
 ## Clip management
 
 `inspect_rig` lists every action with an object slot in `actions`, in addition
-to active and NLA-linked `clips`.
+to active and NLA-linked `clips`. `nla_tracks` records track order, mute/solo state,
+strip timeline ranges and native `strip_settings`.
 
 `set_action` assigns `action_name` to the rig; omit it to clear the active
 action. `rename_action` changes the action name and refuses collisions.
@@ -69,6 +71,32 @@ references first.
 push the active action is cleared and the clip stays available for export.
 `nla_remove` removes a named strip, a whole track, or every track when
 `track_name` is omitted.
+
+Both `nla_push` and `nla_edit` accept sparse `strip_settings`. Editing an existing
+strip requires its exact `track_name` and `strip_name`. For example:
+
+```json
+{"action":"nla_edit","name":"Character","track_name":"Gesture","strip_name":"Wave",
+ "strip_settings":{"frame_start":12.5,"action_frame_start":3,"action_frame_end":19,
+                   "scale":0.5,"repeat":2,"blend_in":2,"blend_out":2,
+                   "blend_type":"COMBINE","extrapolation":"NOTHING"},"lease_id":"..."}
+```
+
+The duration is the selected action interval multiplied by `scale` and `repeat`.
+A smaller scale plays faster. The tool reports the resulting native frame range
+and settings; omitted fields and source action keys are preserved. Same-track
+overlaps are rejected. Put overlapping clips on separate tracks to blend them.
+Native clamping causes an error and restores the prior strip settings.
+
+`use_auto_blend` lets Blender determine the fades; set it false before supplying
+manual fades. `influence` and `use_animated_influence` expose Blender's own controls;
+existing influence curves remain in place. `mute` and `use_reverse` are also available.
+Inspect active actions, track order and solo/mute states when a layer does not
+contribute as expected. Repetition does not repair a clip's loop seam.
+
+Bake the evaluated NLA stack to an independent rig before exporting one composed
+performance. Sample finely enough through fades to meet the declared skin-error
+tolerance, and compare the bake and actual export round trip.
 
 ## Animation QA
 

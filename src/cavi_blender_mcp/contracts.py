@@ -146,6 +146,7 @@ class RigInspection(Result):
     clips: list[Record]
     active_action: str | None
     nla_enabled: bool
+    nla_tracks: list[Record] | None = None
     not_checked: list[str]
     project_id: str
     analyzed_action: str | None = None
@@ -195,6 +196,7 @@ class RigEditResult(ObjectFields):
     deleted: str | None = None
     action_count: int | None = None
     calibration: Record | None = None
+    strip_settings: Record | None = None
 
 
 class MeshEditResult(ObjectFields):

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.46.0 - 2026-11-04
+
+- Edit NLA strip trims, timing, repetition, fades and blend settings without changing action keys.
+- Inspect ordered NLA tracks and their native strip settings before composing layered performances.
+- Reject same-track overlaps and restore strip settings when native values are clamped.
+
 ## 0.45.0 - 2026-11-04
 
 - Rebase and retime independent rig bakes, including object and shape-key motion.

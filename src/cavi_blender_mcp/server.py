@@ -37,6 +37,7 @@ from .rig_models import (
     ContactWindow,
     FootLockWindow,
     MotionSkinPair,
+    NlaStripSettings,
     RetargetCalibration,
     VertexWeights,
 )
@@ -295,7 +296,7 @@ async def compare_rig_motion(
 async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
-                    "nla_push", "nla_remove", "constraint", "remove_constraint",
+                    "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
                     "assign_weights", "transfer_weights", "bake", "contact_lock"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
@@ -332,25 +333,10 @@ async def rig_edit(
     skinning_mode: Literal['preserve', 'linear'] | None = None,
     foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16)] = None,
     timing: ClipTiming | None = None,
+    strip_settings: NlaStripSettings | None = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
-    """Edit rigs under a lease; bake and contact_lock create independent rig/skin copies.
-
-    create: bones, optional location; bind: names=skins; weights: repair mesh weights.
-    pose: poses, optional frame/reset; keyframe: action_name and keyframes; clear_pose: frame.
-    retarget: source, source_action, action_name, optional mapping/samples/calibration.
-    Calibration preserves target rest offsets and scales only declared root translation.
-    set_action: action_name (omit to clear); rename_action: action_name/new_name;
-    delete_action: action_name; nla_push: action_name/track_name/strip_name/start_frame;
-    nla_remove: optional track_name/strip_name.
-    constraint: typed constraint; remove_constraint: bone/constraint_name;
-    assign_weights: vertex_weights; transfer_weights: source/new_name/distance/loss budgets,
-    optional shape_names. Existing targets remain editable.
-    bake: new_name/action_name/start_frame/end_frame; optional names/frame_step/skinning_mode/timing.
-    timing: output start_frame and playback_rate; source sampling stays at frame_step.
-    contact_lock: source_action/new_name/action_name/foot_locks, optional names/frame_step.
-    Contact anchors require separate contact/deformation inspection before export.
-    """
+    """Author rigs, skinning, clips and NLA layers under a lease; bake/contact_lock create independent copies."""
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
@@ -363,7 +349,7 @@ async def rig_edit(
               'replace': replace, 'max_distance_m': max_distance_m,
               'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
               'calibration': calibration, 'skinning_mode': skinning_mode, 'foot_locks': foot_locks,
-              'timing': timing}
+              'timing': timing, 'strip_settings': strip_settings}
     if action == 'contact_lock':
         operation = 'lock_rig_contacts'
         params = pick(action, values, ['source_action', 'action_name', 'new_name', 'foot_locks'],
@@ -434,7 +420,15 @@ async def rig_edit(
         operation = "nla_push"
         params = pick(action, values, (), {
             "action_name": None, "track_name": None, "strip_name": None,
-            "start_frame": 1})
+            "start_frame": 1, "strip_settings": None})
+        if params.get('strip_settings') is not None:
+            params['strip_settings'] = params['strip_settings'].model_dump(exclude_none=True)
+        else:
+            params.pop('strip_settings')
+    elif action == 'nla_edit':
+        operation = 'nla_edit'
+        params = pick(action, values, ['track_name', 'strip_name', 'strip_settings'])
+        params['strip_settings'] = params['strip_settings'].model_dump(exclude_none=True)
     elif action == "nla_remove":
         operation = "nla_remove"
         params = pick(action, values, (), {"track_name": None, "strip_name": None})

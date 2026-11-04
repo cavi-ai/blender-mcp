@@ -383,6 +383,8 @@ def inspect(params, find_object):
         not_checked[0] = 'unsampled contact and mesh-surface collision'
     if "deformation" not in requested:
         not_checked.insert(0, "animation deformation")
+    from .blender_nla import inventory as nla_inventory
+
     result = {"file": bpy.data.filepath or None, "dirty": bpy.data.is_dirty,
               "blender_version": bpy.app.version_string, "frame": scene.frame_current,
               "fps": scene.render.fps / scene.render.fps_base,
@@ -393,6 +395,7 @@ def inspect(params, find_object):
               "clips": clips, "active_action": animation.action.name
               if animation and animation.action else None,
               "nla_enabled": animation.use_nla if animation else False,
+              "nla_tracks": nla_inventory(rig),
               "not_checked": not_checked}
     if checks_report is not None:
         result["analyzed_action"] = analyzed_action

@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
+from .blender_nla_settings import validate as validate_nla_settings
+
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 Vector = tuple[Number, Number, Number]
 Name = Annotated[str, Field(min_length=1, max_length=63)]
@@ -94,3 +96,26 @@ class ClipTiming(BaseModel):
     model_config = ConfigDict(extra='forbid')
     start_frame: Annotated[Number, Field(ge=1, le=1000000)]
     playback_rate: Annotated[Number, Field(gt=0)]
+
+
+class NlaStripSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    frame_start: Number | None = None
+    action_frame_start: Number | None = None
+    action_frame_end: Number | None = None
+    scale: Number | None = None
+    repeat: Number | None = None
+    blend_in: Number | None = None
+    blend_out: Number | None = None
+    influence: Number | None = None
+    blend_type: Literal['REPLACE', 'COMBINE', 'ADD', 'SUBTRACT', 'MULTIPLY'] | None = None
+    extrapolation: Literal['NOTHING', 'HOLD', 'HOLD_FORWARD'] | None = None
+    mute: StrictBool | None = None
+    use_reverse: StrictBool | None = None
+    use_auto_blend: StrictBool | None = None
+    use_animated_influence: StrictBool | None = None
+
+    @model_validator(mode='after')
+    def native_settings(self):
+        validate_nla_settings(self.model_dump(exclude_none=True))
+        return self
