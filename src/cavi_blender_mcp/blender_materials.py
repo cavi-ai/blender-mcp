@@ -292,11 +292,23 @@ def assign(params, workspace, find_object):
     values = [find_object(value, mesh=True) for value in names]
     existing = bpy.data.materials.get(name)
     config, update = resolve_config(params, existing)
+    link_mode = params.get('link_mode')
+    if link_mode is not None and link_mode not in {'DATA', 'OBJECT'}:
+        raise ValueError('link_mode must be DATA or OBJECT')
     if existing is not None and not update:
         raise ValueError("Material name already exists; pass update_existing=true to change it")
+    if update and not existing.is_editable:
+        raise ValueError('Material needs an editable local copy or library override')
+    modes = {}
     for value in values:
-        if value.data.users != 1:
+        if not value.is_editable:
+            raise ValueError('Target object needs an editable local copy or library override')
+        modes[value] = link_mode or (value.material_slots[slot].link
+                                    if update and slot < len(value.material_slots) else 'DATA')
+        if modes[value] == 'DATA' and value.data.users != 1:
             raise ValueError("Material assignment requires single-user mesh data")
+        if (modes[value] == 'DATA' or not value.material_slots) and not value.data.is_editable:
+            raise ValueError('Mesh data needs an editable material slot')
         if slot >= len(value.material_slots):
             if not (slot == 0 and not value.material_slots):
                 raise ValueError("Requested material slot does not exist")
@@ -317,6 +329,8 @@ def assign(params, workspace, find_object):
     material = existing
     created = material is None
     new_images = []
+    data_slots = {value.data: list(value.data.materials) for value in values}
+    object_slots = {value: [(s.link, s.material) for s in value.material_slots] for value in values}
     try:
         if created:
             material = bpy.data.materials.new(name)
@@ -325,11 +339,24 @@ def assign(params, workspace, find_object):
               old_images if update else None)
         for value in values:
             if not value.material_slots:
-                value.data.materials.append(material)
-            value.material_slots[slot].link = "DATA"
+                value.data.materials.append(None if modes[value] == 'OBJECT' else material)
+            value.material_slots[slot].link = modes[value]
             value.material_slots[slot].material = material
         material[CONFIG_TAG] = json.dumps(config, sort_keys=True)
     except Exception:
+        for data, previous in data_slots.items():
+            if not previous and data.materials:
+                data.materials.clear()
+            else:
+                while len(data.materials) > len(previous):
+                    data.materials.pop(index=len(data.materials)-1)
+            for index, old in enumerate(previous):
+                if data.materials[index] != old:
+                    data.materials[index] = old
+        for value, previous in object_slots.items():
+            for index, (link, old) in enumerate(previous):
+                value.material_slots[index].link = link
+                value.material_slots[index].material = old
         if created:
             if material is not None:
                 bpy.data.materials.remove(material)
@@ -360,4 +387,8 @@ def assign(params, workspace, find_object):
         "textures": {key: value[0] for key, value in receipts.items()},
         "config": config,
         "texture_packed": packed,
+        'bindings': [{'object': value.name, 'link_mode': modes[value],
+                      'mesh': value.data.name, 'mesh_users': value.data.users} for value in values],
+        'reserved_empty_slots': [data.name for data, previous in data_slots.items()
+                                 if not previous and data.users > 1],
     }

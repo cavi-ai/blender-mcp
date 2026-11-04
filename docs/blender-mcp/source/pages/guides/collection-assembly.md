@@ -62,3 +62,7 @@ source and variant before export. The private native snapshot is removed after
 copying. An operation failure restores the original definition and removes newly
 created IDs. After an uncertain transport result, inspect the selected object's
 current definition before attempting another mutation.
+
+Use [material variants](materials-and-uvs.md) for internal slot assignment and
+per-object finishes on shared mesh geometry. Inspect slot names and link modes
+from the definition page before binding maps.

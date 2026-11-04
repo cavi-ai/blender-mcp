@@ -779,13 +779,25 @@ async def assign_material(
     update_existing: StrictBool | None = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
     lease_id: LeaseId = None,
+    instance: str | None = None,
+    link_mode: Literal['DATA', 'OBJECT'] | None = None,
 ) -> MaterialAssignment:
     """Assign or update a PBR material. Maps are workspace PNG/JPEG files.
 
     Normal, roughness, metallic and alpha maps are Non-Color; base color and emission
     are sRGB. update_existing edits a material created by this tool and bound to the slot.
+    instance scopes internal mesh names to a scene collection instance. OBJECT link_mode
+    overrides a material per object without copying shared mesh geometry; updates preserve
+    the current link mode when omitted.
     """
-    return await run(call, "assign_material", names=names, material_name=material_name,
+    operation = 'assign_instance_material' if instance is not None else (
+        'assign_object_material' if link_mode is not None else 'assign_material')
+    options = {}
+    if instance is not None:
+        options['instance'] = instance
+    if link_mode is not None:
+        options['link_mode'] = link_mode
+    return await run(call, operation, names=names, material_name=material_name,
                      base_color_texture=base_color_texture, base_color=base_color,
                      roughness=roughness, metallic=metallic,
                      roughness_texture=roughness_texture,
@@ -795,7 +807,7 @@ async def assign_material(
                      alpha_mode=alpha_mode, uv_scale=uv_scale, uv_offset=uv_offset,
                      uv_rotation_degrees=uv_rotation_degrees,
                      update_existing=False if update_existing is None else update_existing,
-                     slot=slot, lease_id=lease_id)
+                     slot=slot, lease_id=lease_id, **options)
 
 
 @mcp.tool(annotations=MUTATING)

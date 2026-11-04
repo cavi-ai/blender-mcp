@@ -27,10 +27,12 @@ def members(collection):
     return objects
 
 
-def object_in_instance(name, instance):
+def object_in_instance(name, instance, mesh=False):
     value = bpy.data.objects.get(name)
     if value is None or value not in members(root(instance).instance_collection):
         raise ValueError('Object is not a member of the selected instance definition')
+    if mesh and value.type != 'MESH':
+        raise ValueError('Object must be a mesh')
     return value
 
 
@@ -49,6 +51,8 @@ def inspect(params):
             'scene_instances_truncated': len(users) > 1000,
             'objects': [{'name': v.name, 'type': v.type,
                          'collections': [c.name for c in v.users_collection],
+                         'material_slots': [{'index': i, 'material': s.material.name if s.material else None,
+                                             'link': s.link} for i, s in enumerate(v.material_slots)],
                          'modifiers': [{'name': m.name, 'type': m.type} for m in v.modifiers]}
                         for v in objects[offset:offset+limit]],
             'total': len(objects), 'offset': offset, 'limit': limit}
