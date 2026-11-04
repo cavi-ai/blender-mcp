@@ -196,13 +196,13 @@ Eevee requires material colors and at most 1024 pixels.
 
 ## session_control
 
-Lease-free. Inspects, claims, renews or releases edit ownership.
+Lease-free. Inspects, claims, renews, releases or breaks edit ownership.
 
 | Parameter | Values |
 | --- | --- |
-| `action` | `inspect`, `claim`, `renew`, `release` |
+| `action` | `inspect`, `claim`, `renew`, `release`, `break` |
 | `owner` | Claim label, at most 128 characters |
-| `expected_project` | Exact `project_id` from inspect |
+| `expected_project` | Exact `project_id` from inspect, for claim and break |
 | `lease_id` | Claim token for renew and release |
 | `ttl_seconds` | 30–3600, default 600 |
 

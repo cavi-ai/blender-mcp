@@ -98,5 +98,43 @@ class LeaseTests(unittest.TestCase):
         self.assertNotEqual(result, [token])
 
 
+    def test_non_ascii_token_is_refused_as_an_invalid_lease(self):
+        token = self.claim()
+        with self.assertRaisesRegex(RuntimeError, "valid lease_id"):
+            self.session.control({"action": "renew", "lease_id": "é"}, self.project)
+        with self.assertRaisesRegex(RuntimeError, "matching lease_id"):
+            self.session.control({"action": "release", "lease_id": "é"}, self.project)
+        with self.assertRaisesRegex(RuntimeError, "valid lease_id"), self.session.edit("é", lambda: self.project):
+            self.fail("A non-ASCII token edited")
+        with self.session.edit(token, lambda: self.project):
+            pass
+
+    def test_break_needs_an_owner_idle_for_the_break_window(self):
+        token = self.session.control(
+            {"action": "claim", "owner": "agent-A", "expected_project": self.project,
+             "ttl_seconds": 3600}, self.project,
+        )["lease_id"]
+        breaking = {"action": "break", "expected_project": self.project}
+        with self.assertRaisesRegex(RuntimeError, "break requires"):
+            self.session.control(breaking, self.project)
+        self.now.return_value = 150.0
+        with self.session.edit(token, lambda: self.project):
+            pass
+        self.now.return_value = 150.0 + lease.BREAK_IDLE_SECONDS - 1
+        with self.assertRaisesRegex(RuntimeError, "break requires"):
+            self.session.control(breaking, self.project)
+        with self.assertRaisesRegex(RuntimeError, "inspected project changed"):
+            self.session.control({**breaking, "expected_project": "old"}, self.project)
+        self.now.return_value = 150.0 + lease.BREAK_IDLE_SECONDS
+        self.assertEqual(self.session.status(self.project)["idle_seconds"], lease.BREAK_IDLE_SECONDS)
+        broken = self.session.control(breaking, self.project)
+        self.assertEqual((broken["active"], broken["owner"], broken["previous_owner"]),
+                         (False, None, "agent-A"))
+        with self.assertRaisesRegex(RuntimeError, "valid lease_id"), self.session.edit(token, lambda: self.project):
+            self.fail("A broken lease edited")
+        with self.assertRaisesRegex(RuntimeError, "No active lease"):
+            self.session.control(breaking, self.project)
+        self.assertNotEqual(self.claim("agent-B"), token)
+
 if __name__ == "__main__":
     unittest.main()
