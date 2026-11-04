@@ -30,8 +30,8 @@ Every mutation requires an edit lease. Read-only calls do not.
 }
 ```
 
-Renew or release with the same `lease_id`. Release and expiry never save,
-close or discard a project. See
+Renew or release with the same `lease_id`. Break ends a lease unused for 300
+seconds. Release, break and expiry never save, close or discard a project. See
 [Share application ownership](../guides/session-ownership.md).
 
 ## 3. Make a bounded change

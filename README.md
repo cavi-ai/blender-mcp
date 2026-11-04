@@ -98,8 +98,8 @@ Make a bounded change with `object_edit`:
 }
 ```
 
-Read-only calls do not need a lease. Release or expiry never saves, closes or
-discards a project. See the
+Read-only calls do not need a lease. `break` ends a lease unused for 300 seconds.
+Release, break or expiry never saves, closes or discards a project. See the
 [ownership guide](docs/blender-mcp/source/pages/guides/session-ownership.md).
 
 You can also let the CLI manage the session:

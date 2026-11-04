@@ -496,7 +496,7 @@ async def render_preview(
 
 @mcp.tool(annotations=ADDITIVE)
 async def session_control(
-    action: Literal["inspect", "claim", "renew", "release"],
+    action: Literal["inspect", "claim", "renew", "release", "break"],
     owner: Annotated[str | None, Field(max_length=128)] = None,
     expected_project: Annotated[
         str | None, Field(description="Exact project_id from inspect.")
@@ -504,10 +504,11 @@ async def session_control(
     lease_id: Annotated[str | None, Field(max_length=128)] = None,
     ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600)] = 600,
 ) -> Ownership:
-    """Inspect ownership or claim, renew or release an edit lease.
+    """Inspect ownership or claim, renew, release or break an edit lease.
 
-    Claim returns a private lease_id; pass it on every edit. Expiry and release never
-    save, close or discard a project.
+    Claim returns a private lease_id; pass it on every edit. Break needs expected_project
+    and a lease unused for 300 s. Expiry, release and break never save, close or discard
+    a project.
     """
     return await run(
         call,

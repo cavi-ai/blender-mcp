@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Break an edit lease whose owner has not used it for 300 seconds; inspection reports idle time.
+- Refuse a non-ASCII `lease_id` as an invalid lease instead of raising `TypeError`.
+
 ## 0.47.0 - 2026-11-04
 
 - Compose shape-key actions with independent NLA timing, repeats, fades and blends.
