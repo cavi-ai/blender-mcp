@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -47,6 +47,7 @@ version = "0.43.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
+    { name = "cavi-mcp-core" },
     { name = "mcp" },
     { name = "pydantic" },
 ]
@@ -62,6 +63,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.5,<5" },
+    { name = "cavi-mcp-core", git = "https://github.com/cavi-ai/mcp-core.git?rev=76f427f6c6f2ca0dc12faaebd53063930ff67b51" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
@@ -71,6 +73,15 @@ dev = [
     { name = "numpy", specifier = ">=2,<3" },
     { name = "pillow", specifier = ">=13,<14" },
     { name = "ruff", specifier = ">=0.14,<1" },
+]
+
+[[package]]
+name = "cavi-mcp-core"
+version = "0.1.0"
+source = { git = "https://github.com/cavi-ai/mcp-core.git?rev=76f427f6c6f2ca0dc12faaebd53063930ff67b51#76f427f6c6f2ca0dc12faaebd53063930ff67b51" }
+dependencies = [
+    { name = "mcp" },
+    { name = "pydantic" },
 ]
 
 [[package]]

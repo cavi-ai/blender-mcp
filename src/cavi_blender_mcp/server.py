@@ -1,15 +1,12 @@
 """Typed MCP tools for the Blender bridge."""
 
-import logging
-from functools import partial, wraps
-from importlib.metadata import version
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Literal
 
 import anyio
-from mcp.server.mcpserver import Image, MCPServer
-from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
-from mcp.types import ToolAnnotations
+from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES, Server
+from mcp.server.mcpserver import Image
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from .client import BridgeClient
@@ -30,8 +27,6 @@ from .contracts import (
     SceneInfo,
     SkinClearance,
     UVLayout,
-    compact_schema,
-    failure,
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
@@ -46,59 +41,9 @@ from .rig_models import (
 from .rig_models import Name as RigName
 from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
-# The SDK hides the text of any other exception; these carry messages agents can act on.
-ANTICIPATED = (ValueError, RuntimeError, OSError)
-
-
-def _report_anticipated(fn):
-    @wraps(fn)
-    async def tool(*args, **kwargs):
-        try:
-            return await fn(*args, **kwargs)
-        except ToolError:
-            raise
-        except ANTICIPATED as exc:
-            raise ToolError(str(exc)) from exc
-
-    return tool
-
-
-class Server(MCPServer):
-    def __init__(self, name: str, **kwargs):
-        super().__init__(name, version=version("cavi-blender-mcp"), **kwargs)
-
-    async def list_tools(self):
-        return [tool.model_copy(update={
-            "input_schema": compact_schema(tool.input_schema),
-            "output_schema": compact_schema(tool.output_schema, output=True)})
-            for tool in await super().list_tools()]
-
-    async def call_tool(self, name, arguments, context=None):
-        try:
-            return await super().call_tool(name, arguments, context)
-        except UnexpectedToolError as exc:
-            if context is None:
-                raise
-            logging.getLogger(__name__).exception("Tool execution or output conversion failed")
-            return failure(name, exc)
-        except ToolError as exc:
-            if context is None:
-                raise
-            return failure(name, exc)
-
-    def tool(self, *args, **kwargs):
-        register = super().tool(*args, **kwargs)
-
-        def decorator(fn):
-            register(_report_anticipated(fn))
-            # Direct callers keep the original exception types.
-            return fn
-
-        return decorator
-
-
 mcp = Server(
     "cavi-blender-mcp",
+    package="cavi-blender-mcp",
     instructions=(
         "Inspect the scene before editing. Saves and exports refuse existing paths. "
         "Paths are relative to the Blender session workspace. Claim session_control ownership "
@@ -111,11 +56,8 @@ Vector3 = tuple[Number, Number, Number]
 RGBA = tuple[Number, Number, Number, Number]
 ObjectName = Annotated[str, Field(description="Exact object name from scene_info.")]
 LeaseId = Annotated[str | None, Field(description="lease_id from session_control claim.")]
-MUTATING = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=False)
-ADDITIVE = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
-READ_ONLY = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
+MUTATING = DESTRUCTIVE
+ADDITIVE = WRITES
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
 Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
 View = Literal["front", "back", "left", "right", "top", "persp"]

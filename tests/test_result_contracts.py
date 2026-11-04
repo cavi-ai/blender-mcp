@@ -7,10 +7,10 @@ from mcp.client.stdio import stdio_client
 
 class ResultContractTests(unittest.IsolatedAsyncioTestCase):
     def test_nested_decode_failure_keeps_transport_outcome_unknown(self):
+        from cavi_mcp_core.contracts import failure
         from mcp.server.mcpserver.exceptions import ToolError
 
         from cavi_blender_mcp.client import BridgeError
-        from cavi_blender_mcp.contracts import failure
         transport = BridgeError("Invalid response; outcome unknown")
         transport.__cause__ = ValueError("Malformed response JSON")
         wrapper = ToolError("Inspect outputs")
@@ -21,7 +21,7 @@ class ResultContractTests(unittest.IsolatedAsyncioTestCase):
                          "inspect_application_and_outputs")
 
     def test_schema_compaction_preserves_property_names_and_literal_values(self):
-        from cavi_blender_mcp.contracts import compact_schema
+        from cavi_mcp_core.schema import compact_schema
 
         schema = {"title": "Arguments", "properties": {"title": {"title": "Title", "type": "string"}},
                   "const": {"title": "literal"}, "default": {"title": "default"}}
@@ -75,9 +75,8 @@ class ResultContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(AssetResult.model_validate(result).model_dump(), result)
 
     async def test_transport_failure_never_invites_mutation_retry(self):
+        from cavi_mcp_core.contracts import failure
         from mcp.server.mcpserver.exceptions import ToolError
-
-        from cavi_blender_mcp.contracts import failure
 
         try:
             raise ConnectionError("Outcome may be unknown")
@@ -116,9 +115,8 @@ class OutputFailureTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("private_detail", str(reply.content))
 
     def test_compact_unions_preserve_schema_acceptance_and_input_defaults(self):
+        from cavi_mcp_core.schema import compact_schema
         from jsonschema import Draft202012Validator
-
-        from cavi_blender_mcp.contracts import compact_schema
 
         schemas = [
             {"anyOf": [{"type": "integer"}, {"type": "number"}, {"type": "null"}],
