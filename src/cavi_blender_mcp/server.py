@@ -24,6 +24,7 @@ from .contracts import (
     Ownership,
     RigEditResult,
     RigInspection,
+    RigMotionComparison,
     ScatterResult,
     SceneEditResult,
     SceneInfo,
@@ -33,7 +34,7 @@ from .contracts import (
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
-from .rig_models import Constraint, VertexWeights
+from .rig_models import Constraint, MotionSkinPair, VertexWeights
 from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
 
 # The SDK hides the text of any other exception; these carry messages agents can act on.
@@ -272,6 +273,31 @@ async def inspect_rig(
                      checks=checks or [], samples=samples)
 
 
+@mcp.tool(annotations=READ_ONLY)
+async def compare_rig_motion(
+    source: ObjectName,
+    candidate: ObjectName,
+    meshes: Annotated[list[MotionSkinPair], Field(min_length=1, max_length=8)],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    max_error_m: Annotated[Number, Field(ge=0)],
+    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
+    space: Literal["world", "start_root"] = "world",
+    vertex_match: Literal["index", "point_set"] = "index",
+    candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000)] = 0,
+) -> RigMotionComparison:
+    """Compare evaluated skin positions and matching bone heads on the current timeline.
+
+    Index matching is for unchanged vertex order. Bidirectional point sets allow export seam
+    splits; they do not establish vertex correspondence. start_root removes only initial rig
+    placement. Offset aligns a known imported clip start. Restores frame and subframe; no edits.
+    """
+    return await run(call, "compare_rig_motion", source=source, candidate=candidate,
+        meshes=[pair.model_dump() for pair in meshes], start_frame=start_frame, end_frame=end_frame,
+        max_error_m=max_error_m, samples=samples, space=space, vertex_match=vertex_match,
+        candidate_frame_offset=candidate_frame_offset)
+
+
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
@@ -299,7 +325,7 @@ async def rig_edit(
     strip_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
     end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
-    frame_step: Annotated[StrictInt | None, Field(ge=1, le=10000)] = None,
+    frame_step: Annotated[Number | None, Field(gt=0, le=10000)] = None,
     constraint: Constraint | None = None,
     bone: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     constraint_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
@@ -789,6 +815,8 @@ async def asset_io(
     lods: StrictBool | None = None,
     collision: StrictBool | None = None,
     animations: StrictBool | None = None,
+    baked_animation: StrictBool | None = None,
+    animation_sample_step: Annotated[Number | None, Field(gt=0)] = None,
     textures: StrictBool | None = None,
     bake_pair: BakePair | None = None,
     axis: Literal["unity", "unreal", "godot"] | None = None,
@@ -805,7 +833,8 @@ async def asset_io(
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
-              "textures": textures, "bake_pair": bake_pair, "axis": axis}
+              "textures": textures, "bake_pair": bake_pair, "axis": axis,
+              "baked_animation": baked_animation, "animation_sample_step": animation_sample_step}
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None})
         workspace = (await run(call, "scene_info", limit=1))["workspace"]
@@ -827,12 +856,12 @@ async def asset_io(
     params = pick(action, values, ["names"], {"preserve_instances": False,
                                               "include_empties": False, "lods": False,
                                               "collision": False, "animations": False,
-                                              "textures": False, "axis": None})
+                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None})
     if (params["lods"] or params["collision"] or params["animations"]
-            or params["textures"] or params["axis"]
+            or params["textures"] or params["axis"] or params["baked_animation"] or params["animation_sample_step"] is not None
             or path.lower().endswith((".usd", ".usda", ".usdc"))):
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    for key in ("lods", "collision", "animations", "textures", "axis"):
+    for key in ("lods", "collision", "animations", "textures", "axis", "baked_animation", "animation_sample_step"):
         params.pop(key)
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"

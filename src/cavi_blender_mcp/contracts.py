@@ -177,6 +177,17 @@ class ObjectFields(VariantResult):
     shape_key_action: str | None = None
 
 
+class RigMotionComparison(Result):
+    scope: Literal["sampled_evaluated_rig_motion"]
+    source: str
+    candidate: str
+    passed: bool
+    max_error_m: Number
+    tolerance_m: Number
+    frames: list[Number]
+    meshes: list[Record]
+
+
 class RigInspection(Result):
     file: str | None
     dirty: bool

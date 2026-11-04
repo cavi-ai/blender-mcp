@@ -1,5 +1,7 @@
 """Bake evaluated bone motion onto an independent rig and optional skin copies."""
 
+import math
+
 import bpy
 from mathutils import Matrix
 
@@ -46,11 +48,17 @@ def bake(p):
         raise ValueError('Baked action name already exists')
     start, end = frame_number(p.get('start_frame')), frame_number(p.get('end_frame'))
     step = p.get('frame_step', 1)
-    if start > end or type(step) is not int or not 1 <= step <= 10000:
+    if start > end or isinstance(step, bool) or not isinstance(step, (int, float)) or not math.isfinite(step) or not 0 < step <= 10000:
         raise ValueError('Invalid bake frame range or frame_step')
-    frames = list(range(start, end+1, step))
-    if frames[-1] != end:
+    intervals = (end-start)/step
+    if not math.isfinite(intervals) or intervals > 4095:
+        raise ValueError('Bake exceeds 4096 samples')
+    count = math.floor(intervals) + 1
+    frames = [start + index * step for index in range(count)]
+    if abs(frames[-1]-end) > 1e-8:
         frames.append(end)
+    else:
+        frames[-1] = float(end)
     if len(frames) > 4096 or len(frames) * len(source.pose.bones) > 1000000:
         raise ValueError('Bake exceeds 4096 samples or one million bone poses')
     names = p.get('names') or []
@@ -103,11 +111,20 @@ def bake(p):
             mesh_data.append(copy.data)
             copy.name = mesh_name
             copy.animation_data_clear()
-            copy.parent = None
+            copy.parent = rig
+            copy.matrix_parent_inverse = Matrix.Identity(4)
             copy.rotation_mode = 'QUATERNION'
             copy.animation_data_create()
             copy.animation_data.action = action
             copy.animation_data.action_slot = action.slots.new('OBJECT', copy.name)
+            keys = copy.data.shape_keys
+            if keys is not None:
+                if keys == mesh.data.shape_keys:
+                    raise ValueError('Bake copy shares source shape-key data')
+                keys.animation_data_clear()
+                keys.animation_data_create()
+                keys.animation_data.action = action
+                keys.animation_data.action_slot = action.slots.new('KEY', keys.name)
             for constraint in list(copy.constraints):
                 copy.constraints.remove(constraint)
             next(m for m in copy.modifiers if m.type == 'ARMATURE').object = rig
@@ -115,12 +132,19 @@ def bake(p):
             copies.append(copy)
         ordered = sorted(rig.pose.bones, key=lambda b: len(b.parent_recursive))
         for frame in frames:
-            scene.frame_set(frame)
+            scene.frame_set(math.floor(frame), subframe=frame % 1)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             evaluated = source.evaluated_get(depsgraph)
             world = evaluated.matrix_world.copy()
             matrices = {b.name: b.matrix.copy() for b in evaluated.pose.bones}
             skin_worlds = [mesh.evaluated_get(depsgraph).matrix_world.copy() for mesh in skins]
+            shape_states = []
+            for mesh in skins:
+                keys = mesh.data.shape_keys
+                evaluated_keys = keys.evaluated_get(depsgraph) if keys is not None else None
+                shape_states.append(None if evaluated_keys is None else {
+                    'relative': evaluated_keys.use_relative, 'time': evaluated_keys.eval_time,
+                    'values': {key.name: key.value for key in evaluated_keys.key_blocks[1:]}})
             transform(rig, world, previous, ('object', rig.name))
             key_transform(rig, frame)
             for bone in ordered:
@@ -131,9 +155,23 @@ def bake(p):
                 previous[key] = bone.rotation_quaternion.copy()
                 key_transform(bone, frame)
                 bpy.context.view_layer.update()
-            for copy, matrix in zip(copies, skin_worlds, strict=True):
-                transform(copy, matrix, previous, ('object', copy.name))
+            for copy, matrix, shapes in zip(copies, skin_worlds, shape_states, strict=True):
+                transform(copy, world.inverted() @ matrix, previous, ('object', copy.name))
                 key_transform(copy, frame)
+                if shapes is not None:
+                    keys = copy.data.shape_keys
+                    if shapes['relative']:
+                        for key_name, value in shapes['values'].items():
+                            if not math.isfinite(value):
+                                raise ValueError('Evaluated shape weights must be finite')
+                            key = keys.key_blocks[key_name]
+                            key.value = value
+                            key.keyframe_insert('value', frame=frame)
+                    else:
+                        if not math.isfinite(shapes['time']):
+                            raise ValueError('Evaluated shape time must be finite')
+                        keys.eval_time = shapes['time']
+                        keys.keyframe_insert('eval_time', frame=frame)
                 mesh_action = copy.animation_data.action
                 if mesh_action not in actions:
                     actions.append(mesh_action)
@@ -165,4 +203,5 @@ def bake(p):
             'maximum_matrix_component_error': maximum,
             'skins': [{'source': mesh.name, 'name': copy.name}
                       for mesh, copy in zip(skins, copies, strict=True)],
-            'constraints_removed_from_copy': True}
+            'constraints_removed_from_copy': True,
+            'shape_keys_baked': [copy.name for copy in copies if copy.data.shape_keys is not None]}

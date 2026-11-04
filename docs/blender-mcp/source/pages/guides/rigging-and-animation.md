@@ -151,7 +151,16 @@ It checks evaluated bone matrices at every declared sample and restores the
 original frame. Dense keys use linear interpolation; larger steps require their
 own between-sample motion review. The budget is 4096 samples and one million
 bone poses per call. Object shear that transform keys cannot preserve is refused.
-This bakes bone/object transforms; blend-shape drivers, simulation and engine
-import behavior need their respective validation. Save the source `.blend`, then
+It also keys evaluated relative shape weights or absolute shape evaluation time
+on independent shape data. Source drivers remain on the editable source.
+Simulation and engine import behavior need separate validation. Save the source `.blend`, then
 export the returned skin names with `asset_io animations=true`; the exporter includes
 their bound armature.
+
+Use `compare_rig_motion` with an explicit metre tolerance to compare evaluated
+skins and bone heads, including times between bake keys. A bone-matrix pass alone
+can miss skin-weight or shape deformation errors. Export clean baked copies with
+`asset_io animations=true baked_animation=true`; FBX accepts an explicit
+`animation_sample_step`, and GLB retains authored subframe keys. After reimport,
+compare with `vertex_match=point_set` and the measured active-clip frame offset.
+See the [tool reference](../reference/tools.md#compare_rig_motion).

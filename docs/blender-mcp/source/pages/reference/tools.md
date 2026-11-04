@@ -1,6 +1,6 @@
 # Tools
 
-The server publishes 16 tools. Every mutation requires a `lease_id` unless the
+The server publishes 17 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
@@ -105,6 +105,23 @@ Each mesh needs one vertex-group Armature modifier bound to that rig. With
 `checks`, the call samples the named or active action and restores the action,
 pose and frame afterward.
 
+## compare_rig_motion
+
+Read-only. Compares the current evaluated source and candidate timelines at 2–32
+samples, restoring the frame and subframe afterward. Supply exact armatures,
+1–8 `{source, candidate}` skin pairs, integer `start_frame`/`end_frame`, and an
+explicit `max_error_m` in metres. Both rigs must use the same scene unit scale.
+
+`vertex_match: index` compares corresponding vertices for an unchanged bake copy.
+Use `point_set` after export, where UV seams can duplicate vertices; it measures
+bidirectional nearest-point distance and does not establish topology equivalence.
+`candidate_frame_offset` handles a measured imported clip start offset.
+`space: start_root` removes each rig's initial placement; `world` preserves it.
+
+Reports maximum/RMS skin errors, bone-head errors and sampled motion magnitude.
+Missing or extra bones fail comparison. Unsampled times, bone roll/tail
+reconstruction, normals, foot contact and Unity import need separate review.
+
 ## rig_edit
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
@@ -128,6 +145,8 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `new_name` | `rename_action`; new action name |
 | `track_name`, `strip_name` | `nla_push`, `nla_remove` |
 | `start_frame` | `nla_push`; default 1 |
+| `start_frame`, `end_frame`, `frame_step` | `bake`; positive fractional steps supported, at most 4096 samples |
+| `new_name`, `action_name`, `names` | `bake`; independent rig/action and optional skinned copies |
 
 [Guide](../guides/rigging-and-animation.md)
 
@@ -294,3 +313,12 @@ Texture sidecars preserve loaded high precision images at PNG16. Color samples
 are encoded once through sRGB; data-map samples use Raw. PNG sidecars require
 finite normalized samples; remap signed/HDR values explicitly. Source images and
 scene render profiles remain unchanged.
+
+Animated `asset_io` exports accept `baked_animation: true` for a constraint- and
+driver-free baked copy. GLB retains authored subframe keys; FBX exports the active
+take rather than unrelated actions. FBX's optional `animation_sample_step` is a
+positive frame interval within Blender's exporter bounds and disables key
+simplification. Imported `source_objects` metadata maps exported identities to
+actual import names; filter it to reported armatures and skinned meshes. Native
+FBX import can shift clip start times, so inspect the actual active action range
+before comparison. Shape-key channels may occupy a separate Action datablock.

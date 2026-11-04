@@ -1,5 +1,6 @@
 """Engine-targeted exports: LOD groups, collision, bake pairs, axis presets and USD."""
 
+import math
 import re
 import shutil
 from contextlib import ExitStack, contextmanager, nullcontext
@@ -34,17 +35,72 @@ def collision_objects(base):
     return found
 
 
-def fbx(path, preset, empties=False, animations=False, textures=False):
+@contextmanager
+def export_identities(objects):
+    key = 'cavi_source_object'
+    identities = {value: value.name for value in objects}
+    identities.update({value.data: value.name for value in objects if value.type == 'MESH' and value.data.users == 1})
+    prior = {value: value.get(key) for value in identities}
+    if any(item is not None and not isinstance(item, str) for item in prior.values()):
+        raise ValueError('cavi_source_object export metadata must be a string')
+    try:
+        for value, identity in identities.items():
+            value[key] = identity
+        yield
+    finally:
+        for value, saved in prior.items():
+            if saved is None:
+                del value[key]
+            else:
+                value[key] = saved
+
+
+@contextmanager
+def active_clip():
+    objects = list(bpy.context.selected_objects)
+    owners = objects + [value.data.shape_keys for value in objects if value.type == 'MESH' and value.data.shape_keys]
+    actions = list(dict.fromkeys(value.animation_data.action for value in owners
+        if value.animation_data and value.animation_data.action))
+    if not actions:
+        raise ValueError('Baked animation needs an active action')
+    scene = bpy.context.scene
+    previous = scene.name, scene.frame_start, scene.frame_end, scene.frame_current, scene.frame_subframe
+    try:
+        scene.name = actions[0].name
+        scene.frame_start = math.floor(min(action.frame_range[0] for action in actions))
+        scene.frame_end = math.ceil(max(action.frame_range[1] for action in actions))
+        yield scene
+    finally:
+        scene.name, scene.frame_start, scene.frame_end = previous[:3]
+        scene.frame_set(previous[3], subframe=previous[4])
+
+
+def fbx(path, preset, empties=False, animations=False, textures=False, animation_step=None, baked_animation=False):
     object_types = {"MESH", "EMPTY", "ARMATURE"} if animations else (
         {"MESH", "EMPTY"} if empties else {"MESH"})
-    return bpy.ops.export_scene.fbx(
-        filepath=str(path), use_selection=True, object_types=object_types,
-        mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False,
-        bake_anim=animations, bake_anim_use_all_bones=animations,
-        bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations,
-        bake_anim_force_startend_keying=animations,
-        global_scale=1, path_mode="RELATIVE" if textures else "STRIP",
-        **AXIS_PRESETS[preset])
+    with active_clip() if baked_animation else nullcontext():
+        step = 1 if animation_step is None else animation_step
+        if baked_animation and animation_step is not None:
+            duration = bpy.context.scene.frame_end - bpy.context.scene.frame_start
+            if duration > 0:
+                count = math.ceil(duration / animation_step)
+                if count > 4095:
+                    raise ValueError('FBX sampling exceeds 4096 poses')
+                exact = duration / count
+                step = np.float32(exact)
+                if float(step) > exact:
+                    step = np.nextafter(step, np.float32(-math.inf))
+                step = float(step)
+        return bpy.ops.export_scene.fbx(
+            filepath=str(path), use_selection=True, object_types=object_types,
+            mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False,
+            bake_anim=animations, bake_anim_use_all_bones=animations,
+            bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations and not baked_animation,
+            bake_anim_force_startend_keying=animations, use_custom_props=animations,
+            bake_anim_step=step,
+            bake_anim_simplify_factor=1 if animation_step is None else 0,
+            global_scale=1, path_mode="RELATIVE" if textures else "STRIP",
+            **AXIS_PRESETS[preset])
 
 
 def usd(path, preset, instances, animations=False):
@@ -59,20 +115,21 @@ def usd(path, preset, instances, animations=False):
 
 
 def write(path, objects, selection, preset, instances, empties, animations=False,
-          textures=False):
+          textures=False, baked_animation=False, animation_step=None):
     suffix = path.suffix.lower()
-    with selected(selection):
+    with selected(selection), (export_identities(selection) if animations else nullcontext()):
         if suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if instances else nullcontext():
-                result = fbx(path, preset, empties, animations, textures)
+                result = fbx(path, preset, empties, animations, textures, animation_step, baked_animation)
         elif suffix == ".glb":
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
                 export_apply=not animations, export_animations=animations,
                 export_skins=animations, export_animation_mode="ACTIONS",
-                export_anim_single_armature=False,
+                export_anim_single_armature=False, export_extras=animations,
+                export_force_sampling=not baked_animation,
                 export_morph=True, export_morph_animation=animations)
         else:
             result = usd(path, preset, instances, animations)
@@ -254,6 +311,8 @@ def export_asset(p):
         return bake_pair(p)
     names = p.get("names")
     animations = flag(p, "animations")
+    baked_animation = flag(p, "baked_animation")
+    animation_step = p.get("animation_sample_step")
     maximum = 64 if animations else 1000
     if not isinstance(names, list) or not 1 <= len(names) <= maximum:
         raise ValueError(f"Provide between 1 and {maximum} mesh names")
@@ -263,6 +322,13 @@ def export_asset(p):
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
     preset = preset_for(p, suffix)
+    if (baked_animation or animation_step is not None) and not animations:
+        raise ValueError('Animation sampling options require animations=true')
+    if animation_step is not None:
+        prop = bpy.ops.export_scene.fbx.get_rna_type().properties['bake_anim_step']
+        if (suffix != '.fbx' or isinstance(animation_step, bool) or not isinstance(animation_step, (float, int))
+                or not math.isfinite(animation_step) or not prop.hard_min <= animation_step <= prop.hard_max):
+            raise ValueError('FBX sample step is outside the native operator range or format')
     lods, collision = flag(p, "lods"), flag(p, "collision")
     instances, empties = flag(p, "preserve_instances"), flag(p, "include_empties")
     textures = flag(p, "textures")
@@ -294,6 +360,17 @@ def export_asset(p):
                         for item in meshes)
         if vertices > 100000 or triangles > 200000:
             raise ValueError("Animated exports are limited to 100,000 vertices and 200,000 triangles")
+        if baked_animation:
+            for value in [*armatures, *meshes, *(m.data.shape_keys for m in morph_meshes)]:
+                if value is None:
+                    continue
+                if value.animation_data and value.animation_data.drivers:
+                    raise ValueError('Bake drivers before exporting baked animation')
+                if any(not c.mute and c.influence > 0 for c in getattr(value, 'constraints', ())):
+                    raise ValueError('Bake object constraints before exporting baked animation')
+                if (isinstance(value, bpy.types.Object) and value.type == 'ARMATURE'
+                        and any(not c.mute and c.influence > 0 for b in value.pose.bones for c in b.constraints)):
+                    raise ValueError('Bake bone constraints before exporting baked animation')
         actions = []
         for rig in armatures:
             if len(rig.data.bones) > 128:
@@ -322,7 +399,7 @@ def export_asset(p):
             try:
                 with prepared_images(objects, directory) if textures else nullcontext():
                     write(path, objects, selection, preset, False, empties,
-                          animations=True, textures=textures)
+                          animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step)
                     files = texture_receipt(directory) if directory else []
             except Exception:
                 if directory is not None:
@@ -334,6 +411,7 @@ def export_asset(p):
                 "skinned_meshes": [item.name for item in skinned],
                 "morph_meshes": [item.name for item in morph_meshes],
                 "animations": actions,
+                "baked_animation": baked_animation, "animation_sample_step": animation_step,
                 "shape_key_animations": shape_key_animations,
                 "textures": files}
     selection = with_empties(objects) if empties else list(objects)
