@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.44.0 - 2026-11-04
+
+- Inspect delivered contact markers across reconstructed bone axes and shifted clips.
+- Preserve world-space height and drift errors, and reject unstable axis mappings.
+
 ## 0.43.0 - 2026-11-04
 
 - Create independent rig and skin copies with editable foot-contact IK anchors.

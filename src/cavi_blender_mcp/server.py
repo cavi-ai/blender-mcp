@@ -32,6 +32,7 @@ from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .rig_models import (
     Constraint,
+    ContactReference,
     ContactWindow,
     FootLockWindow,
     MotionSkinPair,
@@ -213,6 +214,8 @@ async def inspect_rig(
                       Field(max_length=3)] = None,
     samples: Annotated[StrictInt, Field(ge=2, le=32)] = 8,
     contacts: Annotated[list[ContactWindow] | None, Field(min_length=1, max_length=16)] = None,
+    contact_reference: ContactReference | None = None,
+    contact_frame_offset: Number = 0,
 ) -> RigInspection:
     """Inspect skin weights, rest bones and linked clips without changing action or pose.
 
@@ -221,11 +224,17 @@ async def inspect_rig(
     checks: root_motion, loop and deformation sample the named or active action.
     contacts: declared bone-local markers and frame windows measure horizontal drift
     and absolute height error against a world-Z ground plane in metres.
+    contact_reference: source rig/action maps marker offsets across fixed rest-axis
+    changes. contact_frame_offset shifts candidate sampling relative to source windows.
     """
     arguments = {'armature': armature, 'meshes': meshes, 'max_influences': max_influences,
                  'action': action, 'checks': checks or [], 'samples': samples}
     if contacts is not None:
         arguments['contacts'] = [item.model_dump() for item in contacts]
+    if contact_reference is not None:
+        arguments['contact_reference'] = contact_reference.model_dump()
+    if contact_frame_offset != 0:
+        arguments['contact_frame_offset'] = contact_frame_offset
     return await run(call, "inspect_rig", **arguments)
 
 

@@ -282,6 +282,26 @@ See Blender's [ShapeKey reference](https://docs.blender.org/api/5.2/bpy.types.Sh
 for relative-key, mask and channel semantics.
 
 
+## Check contacts after bake and reimport
+
+Use the same contact windows on the final bake and each reimport. If an importer
+reconstructs bone axes, provide `contact_reference` with the exact source
+`armature` and `action`. `contact_frame_offset` is the candidate clip start minus
+the source clip start; it supports fractional frames. Windows remain in source
+time, and both actions must contain their corresponding samples.
+
+```json
+{"armature":"ImportedRig","meshes":["ImportedBody"],"action":"ImportedWalk","contact_reference":{"armature":"GroundedRig","action":"GroundedWalk"},"contact_frame_offset":1,"contacts":[{"bone":"Foot.L","point":[0,0,-0.1],"start_frame":5,"end_frame":15,"samples":16,"max_drift_m":0.001,"max_height_error_m":0.001,"ground_z_m":0}]}
+```
+
+The reference converts the marker offset through the two rigs' rest axes and
+world rotation/scale. Bone and object translations remain measurable. The
+conversion must stay fixed across the sampled interval; unstable or singular
+bases cannot pass. Receipts include the mapped point, both sample timelines,
+basis stability and the existing drift/height results. Review the marker against
+the delivered mesh as well as general skin fidelity. These checks sample Blender
+motion; engine playback and surface contact need their own validation.
+
 ## Correct declared foot contacts
 
 `rig_edit contact_lock` creates an independent sampled rig and optional skin
