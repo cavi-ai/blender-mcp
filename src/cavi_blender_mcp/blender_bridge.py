@@ -17,6 +17,7 @@ from pathlib import Path
 import bpy
 from mathutils import Euler, Quaternion, Vector
 
+from .blender_errors import PreflightRejected
 from .bridge_contract import expected_bridge
 from .geometry import validate_mesh
 from .source_identity import LoadedSource
@@ -1111,6 +1112,8 @@ def pump():
         job["result"] = dispatch(job["operation"], job["params"])
     except Exception as exc:  # noqa: BLE001 -- serialize application failures at the RPC boundary
         job["error"] = f"{type(exc).__name__}: {exc}"
+        if isinstance(exc, PreflightRejected):
+            job["error_outcome"] = "rejected"
     finally:
         job["done"].set()
     return 0.01
@@ -1215,6 +1218,8 @@ class Handler(BaseHTTPRequestHandler):
             result = {"error": "Timed out; inspect the scene before retrying. Outcome may be unknown."}
         elif "error" in job:
             result = {"error": job["error"]}
+            if job.get("error_outcome") == "rejected":
+                result["error_outcome"] = "rejected"
         else:
             result = {"result": job.get("result")}
         self.reply(200, {"id": request_id, **result})

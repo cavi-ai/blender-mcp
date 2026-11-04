@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.41.0 - 2026-11-04
+
+- Preserve verified preflight rejection outcomes for transfer, bake and retarget operations.
+- Keep post-edit, transport and unmarked native failures unknown and non-retryable.
+
 ## 0.40.0 - 2026-11-04
 
 - Inspect sampled garment clearance against closed evaluated body components.

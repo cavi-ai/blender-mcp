@@ -6,6 +6,7 @@ import bpy
 
 from .blender_animation import ACTION_TAG, previous_action, restore, restore_action, snapshot
 from .blender_bridge import info, obj
+from .blender_errors import preflight
 from .blender_rig import action_slot, sample_frames
 
 MAX_BONES = 512
@@ -73,30 +74,31 @@ def depth_order(target, pairs):
 
 
 def retarget(p):
-    if bpy.context.mode != "OBJECT":
-        raise ValueError("Switch Blender to Object Mode before retargeting")
-    target = armature(p.get("name"))
-    source = armature(p.get("source"))
-    if source == target:
-        raise ValueError("source and target must be different armatures")
-    source_name = p.get("source_action")
-    if (not isinstance(source_name, str) or not source_name
-            or len(source_name.encode()) > 63):
-        raise ValueError("source_action must be a nonempty action name")
-    source_action = bpy.data.actions.get(source_name)
-    if source_action is None:
-        raise ValueError("Source action does not exist")
-    target_name = p.get("action_name")
-    if (not isinstance(target_name, str) or not target_name
-            or len(target_name.encode()) > 63):
-        raise ValueError("action_name must be a nonempty action name")
-    if target_name in bpy.data.actions:
-        raise ValueError("Action name already exists")
-    pairs = mapping_for(source, target, p.get("mapping"))
-    frames = frames_for(source_action, p.get("samples"))
-    if len(frames) * len(pairs) > MAX_KEYFRAMES:
-        raise ValueError(f"Retargeting is limited to {MAX_KEYFRAMES} keyframes")
-    ordered = depth_order(target, pairs)
+    with preflight():
+        if bpy.context.mode != "OBJECT":
+            raise ValueError("Switch Blender to Object Mode before retargeting")
+        target = armature(p.get("name"))
+        source = armature(p.get("source"))
+        if source == target:
+            raise ValueError("source and target must be different armatures")
+        source_name = p.get("source_action")
+        if (not isinstance(source_name, str) or not source_name
+                or len(source_name.encode()) > 63):
+            raise ValueError("source_action must be a nonempty action name")
+        source_action = bpy.data.actions.get(source_name)
+        if source_action is None:
+            raise ValueError("Source action does not exist")
+        target_name = p.get("action_name")
+        if (not isinstance(target_name, str) or not target_name
+                or len(target_name.encode()) > 63):
+            raise ValueError("action_name must be a nonempty action name")
+        if target_name in bpy.data.actions:
+            raise ValueError("Action name already exists")
+        pairs = mapping_for(source, target, p.get("mapping"))
+        frames = frames_for(source_action, p.get("samples"))
+        if len(frames) * len(pairs) > MAX_KEYFRAMES:
+            raise ValueError(f"Retargeting is limited to {MAX_KEYFRAMES} keyframes")
+        ordered = depth_order(target, pairs)
     scene = bpy.context.scene
     previous_frame = scene.frame_current
     source_action_old, source_slot_old = previous_action(source)

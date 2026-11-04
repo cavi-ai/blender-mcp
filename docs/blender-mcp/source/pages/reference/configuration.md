@@ -62,3 +62,8 @@ external network requests.
 - [CLI](cli.md)
 - [Security model](../security/model.md)
 - [Installation](../introduction/installation.md)
+
+Native RPC error envelopes may include `error_outcome: rejected` for explicitly
+verified preflight failures. The field is optional and accompanies the error
+string and matching request ID. Missing, unknown or malformed outcome metadata
+does not establish rejection. The MCP error result keeps `retry_safe: false`.

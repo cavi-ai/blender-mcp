@@ -7,6 +7,7 @@ import stat
 import uuid
 from pathlib import Path
 
+from .blender_errors import PreflightRejected
 from .operations import (
     DEFAULT_TIMEOUT,
     LONG_OPERATIONS,
@@ -147,6 +148,9 @@ class BridgeClient:
                 raise BridgeError("Bridge response ID mismatch")
             if "error" in result:
                 message = result["error"]
+                if (result.get("error_outcome") == "rejected" and "result" not in result
+                        and isinstance(message, str) and message):
+                    raise PreflightRejected(message)
                 raise BridgeOperationError(
                     message if isinstance(message, str) and message else "no diagnostic"
                 )

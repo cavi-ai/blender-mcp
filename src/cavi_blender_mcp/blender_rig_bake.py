@@ -7,6 +7,7 @@ from mathutils import Matrix
 
 from .blender_animation import ACTION_TAG, frame_number
 from .blender_bridge import info, new_name, obj
+from .blender_errors import preflight
 from .blender_rig_controls import armature
 from .blender_rigging import label
 
@@ -41,37 +42,38 @@ def linear(action):
 
 
 def bake(p):
-    source = armature(p.get('name'))
-    name = new_name(p.get('new_name'))
-    action_name = label(p.get('action_name'), 'action_name')
-    if action_name in bpy.data.actions:
-        raise ValueError('Baked action name already exists')
-    start, end = frame_number(p.get('start_frame')), frame_number(p.get('end_frame'))
-    step = p.get('frame_step', 1)
-    if start > end or isinstance(step, bool) or not isinstance(step, (int, float)) or not math.isfinite(step) or not 0 < step <= 10000:
-        raise ValueError('Invalid bake frame range or frame_step')
-    intervals = (end-start)/step
-    if not math.isfinite(intervals) or intervals > 4095:
-        raise ValueError('Bake exceeds 4096 samples')
-    count = math.floor(intervals) + 1
-    frames = [start + index * step for index in range(count)]
-    if abs(frames[-1]-end) > 1e-8:
-        frames.append(end)
-    else:
-        frames[-1] = float(end)
-    if len(frames) > 4096 or len(frames) * len(source.pose.bones) > 1000000:
-        raise ValueError('Bake exceeds 4096 samples or one million bone poses')
-    names = p.get('names') or []
-    if not isinstance(names, list) or len(names) > 16 or len(set(names)) != len(names):
-        raise ValueError('names must contain up to 16 unique skins')
-    skins, skin_names = [], []
-    for index, mesh_name in enumerate(names, 1):
-        mesh = obj(mesh_name, mesh=True)
-        modifiers = [m for m in mesh.modifiers if m.type == 'ARMATURE']
-        if len(modifiers) != 1 or modifiers[0].object != source:
-            raise ValueError('Each skin needs one armature modifier bound to the source rig')
-        skins.append(mesh)
-        skin_names.append(new_name(f'{name}_Skin{index}'))
+    with preflight():
+        source = armature(p.get('name'))
+        name = new_name(p.get('new_name'))
+        action_name = label(p.get('action_name'), 'action_name')
+        if action_name in bpy.data.actions:
+            raise ValueError('Baked action name already exists')
+        start, end = frame_number(p.get('start_frame')), frame_number(p.get('end_frame'))
+        step = p.get('frame_step', 1)
+        if start > end or isinstance(step, bool) or not isinstance(step, (int, float)) or not math.isfinite(step) or not 0 < step <= 10000:
+            raise ValueError('Invalid bake frame range or frame_step')
+        intervals = (end-start)/step
+        if not math.isfinite(intervals) or intervals > 4095:
+            raise ValueError('Bake exceeds 4096 samples')
+        count = math.floor(intervals) + 1
+        frames = [start + index * step for index in range(count)]
+        if abs(frames[-1]-end) > 1e-8:
+            frames.append(end)
+        else:
+            frames[-1] = float(end)
+        if len(frames) > 4096 or len(frames) * len(source.pose.bones) > 1000000:
+            raise ValueError('Bake exceeds 4096 samples or one million bone poses')
+        names = p.get('names') or []
+        if not isinstance(names, list) or len(names) > 16 or len(set(names)) != len(names):
+            raise ValueError('names must contain up to 16 unique skins')
+        skins, skin_names = [], []
+        for index, mesh_name in enumerate(names, 1):
+            mesh = obj(mesh_name, mesh=True)
+            modifiers = [m for m in mesh.modifiers if m.type == 'ARMATURE']
+            if len(modifiers) != 1 or modifiers[0].object != source:
+                raise ValueError('Each skin needs one armature modifier bound to the source rig')
+            skins.append(mesh)
+            skin_names.append(new_name(f'{name}_Skin{index}'))
     scene = bpy.context.scene
     old_frame, old_subframe = scene.frame_current, scene.frame_subframe
     objects, mesh_data, rig_data, actions = [], [], [], []
