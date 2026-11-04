@@ -19,6 +19,7 @@ from mathutils import Euler, Quaternion, Vector
 
 from .bridge_contract import expected_bridge
 from .geometry import validate_mesh
+from .source_identity import LoadedSource
 
 _LOADED_BRIDGE = expected_bridge()
 from .importing import (
@@ -47,6 +48,7 @@ _connection = None
 _workspace = None
 _lease = Lease()
 _project_epoch = secrets.token_hex(16)
+_loaded_source = LoadedSource()
 GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
                       "collision", "cleanup_mesh"})
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh",
@@ -66,6 +68,12 @@ RENDERLESS = frozenset({"CAMERA", "LIGHT", "LIGHT_PROBE", "LIGHTPROBE", "SPEAKER
 def project_loaded(_):
     global _project_epoch
     _project_epoch = secrets.token_hex(16)
+    _loaded_source.capture(bpy.data.filepath)
+
+
+@bpy.app.handlers.persistent
+def project_saved(_):
+    _loaded_source.capture(bpy.data.filepath)
 
 
 def project_identity():
@@ -554,6 +562,7 @@ def scene_info(p):
     return {
         "version": bpy.app.version_string,
         "bridge": dict(_LOADED_BRIDGE),
+        "source_state": _loaded_source.inspect(bpy.data.filepath, bpy.data.is_dirty),
         "file": bpy.data.filepath,
         "workspace": str(_workspace),
         "total": len(objects),
@@ -1262,6 +1271,10 @@ def register():
     replace_server()
     if project_loaded not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(project_loaded)
+    if project_saved not in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.append(project_saved)
+    if _loaded_source.source is None:
+        _loaded_source.capture(bpy.data.filepath)
     bpy.app.timers.register(pump, persistent=True)
 
 
@@ -1275,6 +1288,8 @@ def unregister():
         bpy.app.timers.unregister(pump)
     if project_loaded in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(project_loaded)
+    if project_saved in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(project_saved)
     if _connection and _connection.exists():
         try:
             if json.loads(_connection.read_text()).get("token") == _token:

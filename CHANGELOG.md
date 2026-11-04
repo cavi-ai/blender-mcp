@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.35.0 - 2026-11-03
+
+### Added
+
+- Saved source hashes captured at Blender load/save boundaries, with current dirty state.
+
 ## 0.34.0 - 2026-11-03
 
 ### Added

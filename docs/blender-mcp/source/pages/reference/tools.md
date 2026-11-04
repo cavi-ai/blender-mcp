@@ -18,6 +18,11 @@ the implementation loaded inside Blender. `runtime status` compares this identit
 with the installed server and exits nonzero on a mismatch. Preserve the project
 and edit ownership before refreshing an outdated bridge.
 
+`source_state.saved_source` retains the saved path, SHA-256 and byte count captured
+at bridge startup or the latest load/save event. It remains unchanged when a file
+is replaced externally. Compare it with the declared production source and require
+`source_state.dirty=false` before deriving exports from that saved revision.
+
 | Parameter | Values |
 | --- | --- |
 | `name` | Optional exact object name; returns that object only |

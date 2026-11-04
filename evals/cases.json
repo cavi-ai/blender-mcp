@@ -80,6 +80,7 @@
       "/version",
       "/bridge/protocol",
       "/bridge/build",
+      "/source_state/dirty",
       "/objects",
       "/workspace"
     ]
