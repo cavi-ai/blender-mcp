@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- TripoSG image-to-3D provider on Apple Silicon, CUDA or CPU, selected with `CAVI_GENERATION_PROVIDER`.
+
 ## 0.36.0 - 2026-11-03
 
 ### Added

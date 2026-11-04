@@ -8,8 +8,17 @@ from pathlib import Path
 
 from .paths import destination
 
+PROVIDERS = {
+    "triposr": {"prefix": "CAVI_TRIPOSR", "worker": "neural_worker.py", "timeout": 180},
+    "triposg": {"prefix": "CAVI_TRIPOSG", "worker": "triposg_worker.py", "timeout": 600},
+}
 
-def generate(workspace, image, path, resolution):
+
+def generate(workspace, image, path, resolution=None):
+    provider = os.environ.get("CAVI_GENERATION_PROVIDER", "triposr")
+    if provider not in PROVIDERS:
+        raise ValueError("CAVI_GENERATION_PROVIDER must be triposr or triposg")
+    settings = PROVIDERS[provider]
     workspace = Path(workspace).resolve()
     source = (workspace / image).resolve()
     if Path(image).is_absolute() or not source.is_relative_to(workspace):
@@ -19,14 +28,22 @@ def generate(workspace, image, path, resolution):
     if not 0 < source.stat().st_size <= 16 * 1024 * 1024:
         raise ValueError("Input image must be at most 16 MiB")
     target = destination(workspace, path, {".glb"})
-    if type(resolution) is not int or not 64 <= resolution <= 192:
-        raise ValueError("Resolution must be between 64 and 192")
+    if provider == "triposg":
+        if resolution is not None:
+            raise ValueError("Resolution applies only to the TripoSR provider")
+        arguments = []
+    else:
+        resolution = 128 if resolution is None else resolution
+        if type(resolution) is not int or not 64 <= resolution <= 192:
+            raise ValueError("Resolution must be between 64 and 192")
+        arguments = [str(resolution)]
     configured = {}
-    for key in ("CAVI_TRIPOSR_PYTHON", "CAVI_TRIPOSR_SOURCE", "CAVI_TRIPOSR_WEIGHTS"):
+    for suffix in ("PYTHON", "SOURCE", "WEIGHTS"):
+        key = f"{settings['prefix']}_{suffix}"
         value = os.environ.get(key)
         if not value or not Path(value).is_absolute() or not Path(value).exists():
             raise RuntimeError(f"Configure {key} with an existing absolute local path")
-        configured[key] = value
+        configured[suffix] = value
     env = dict(
         os.environ,
         HF_HUB_OFFLINE="1",
@@ -34,22 +51,23 @@ def generate(workspace, image, path, resolution):
         HF_HUB_DISABLE_IMPLICIT_TOKEN="1",
         OMP_NUM_THREADS="4",
     )
+    timeout = settings["timeout"]
     with tempfile.TemporaryDirectory(prefix=".cavi-generation-", dir=workspace) as temporary:
         generated = Path(temporary) / "mesh.glb"
         command = [
-            configured["CAVI_TRIPOSR_PYTHON"],
-            str(Path(__file__).with_name("neural_worker.py")),
+            configured["PYTHON"],
+            str(Path(__file__).with_name(settings["worker"])),
             str(source),
             str(generated),
-            str(resolution),
+            *arguments,
         ]
         try:
             result = subprocess.run(
-                command, env=env, capture_output=True, text=True, timeout=180, check=False
+                command, env=env, capture_output=True, text=True, timeout=timeout, check=False
             )
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(
-                "Local reconstruction exceeded 180 seconds; no asset published"
+                f"Local reconstruction exceeded {timeout} seconds; no asset published"
             ) from exc
         if result.returncode:
             detail = result.stderr.strip() or result.stdout.strip() or "No worker diagnostics"

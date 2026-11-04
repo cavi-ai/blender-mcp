@@ -33,6 +33,7 @@ jobs:
         run: |
           uv venv --python 3.11 "$RUNNER_TEMP/neural"
           uv pip install --dry-run --python "$RUNNER_TEMP/neural" -r requirements-neural.txt
+          uv pip install --dry-run --python "$RUNNER_TEMP/neural" -r requirements-triposg.txt
       - uses: actions/setup-node@v7
         with:
           node-version: '22'

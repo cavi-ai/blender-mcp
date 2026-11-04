@@ -24,11 +24,15 @@ These are read by the MCP server. All must be absolute local paths.
 
 | Variable | Purpose |
 | --- | --- |
+| `CAVI_GENERATION_PROVIDER` | `triposr` (default) or `triposg` |
 | `CAVI_TRIPOSR_PYTHON` | Python 3.11 worker environment |
 | `CAVI_TRIPOSR_SOURCE` | TripoSR checkout |
 | `CAVI_TRIPOSR_WEIGHTS` | Directory with `config.yaml`, `model.ckpt` and `dino-config.json` |
+| `CAVI_TRIPOSG_PYTHON` | Python 3.11 worker environment |
+| `CAVI_TRIPOSG_SOURCE` | TripoSG checkout |
+| `CAVI_TRIPOSG_WEIGHTS` | Local `VAST-AI/TripoSG` model directory |
 
-The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
+Only the selected provider's paths are required. The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
 `HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS=4`. See
 [Generate a mesh locally](../guides/local-generation.md).
 
