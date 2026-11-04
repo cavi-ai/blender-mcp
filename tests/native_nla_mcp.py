@@ -14,7 +14,9 @@ from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-REPO = Path(__file__).resolve().parents[1]
+import cavi_blender_mcp
+
+PACKAGE_ROOT = Path(cavi_blender_mcp.__file__).resolve().parents[1]
 
 
 async def exercise(root, env):
@@ -84,11 +86,12 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary).resolve()
-        env = {**os.environ, 'PYTHONPATH': str(REPO/'src'), 'CAVI_BLENDER_WORKSPACE': str(root),
+        env = {**os.environ, 'CAVI_BLENDER_WORKSPACE': str(root),
                'CAVI_BLENDER_CONNECTION': str(root/'connection.json')}
-        worker = f"""import sys,time
+        env.pop('PYTHONPATH', None)
+        worker = f"""import runpy,time
 from pathlib import Path
-sys.path.insert(0, {str(REPO/'src')!r})
+runpy.run_path({str(PACKAGE_ROOT/'cavi_blender_mcp/bootstrap.py')!r})['load_package']()
 from cavi_blender_mcp import blender_bridge as bridge
 bridge.register()
 deadline=time.monotonic()+120
