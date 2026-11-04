@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.52.0 - 2026-11-04
+
+- Make an edited collection instance independent without resetting its current controls.
+- Retain native dependencies and placement transforms while copying the definition.
+- Share native append handling between library imports and instance variants.
+
 ## 0.51.0 - 2026-11-04
 
 - Inspect nested collection definitions through their scene instances with pagination.

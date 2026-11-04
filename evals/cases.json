@@ -7109,5 +7109,35 @@
       "native"
     ],
     "error": "instance"
+  },
+  {
+    "id": "instance-variant-needs-name",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "make_unique",
+      "name": "Kit"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: new_name"
+  },
+  {
+    "id": "instance-variant-rejects-linked",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "make_unique",
+      "name": "Kit",
+      "new_name": "Variant",
+      "linked": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "linked"
   }
 ]

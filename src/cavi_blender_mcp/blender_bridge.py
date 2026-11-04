@@ -877,6 +877,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'make_instance_unique':
+        from .blender_instance_variants import make_unique
+
+        return make_unique(p, _workspace)
     if operation == 'inspect_collection_instance':
         from .blender_collection_instances import inspect
 

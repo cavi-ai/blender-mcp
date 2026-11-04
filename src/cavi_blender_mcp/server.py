@@ -534,13 +534,13 @@ async def session_control(
 async def object_edit(
     action: Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
-                    "duplicate", "parent", "unparent", "move_to_collection", "shape_key_add",
+                    "duplicate", "make_unique", "parent", "unparent", "move_to_collection", "shape_key_add",
                     "shape_key_value", "shape_key_keyframe", "shape_key_remove"],
     name: Annotated[str, Field(description="Object name; new and unique for create_*.")],
     kind: Literal["cube", "sphere", "cylinder", "cone", "plane"] | None = None,
     location: Vector3 | None = None,
     rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler.")] = None,
-    scale: Annotated[Vector3 | None, Field(description="Positive.")] = None,
+    scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors.")] = None,
     vertices: Annotated[list[Vector3] | None, Field(min_length=3, max_length=10000)] = None,
     faces: Annotated[
         list[Annotated[list[StrictInt], Field(min_length=3, max_length=64)]] | None,
@@ -574,6 +574,7 @@ async def object_edit(
     set_origin: origin=bounds_bottom_center (point: world location); snap_to_grid: grid;
     rename: new_name; add_socket: new_name, local location, rotation_degrees;
     duplicate: new_name, count=1, offset=(0,0,0), linked=false;
+    make_unique: new_name (independent collection definition for this instance);
     parent: new_name (parent); unparent: no extra params;
     move_to_collection: new_name (collection), create=true;
     shape_key_add: new_name, value=0, offsets, source; shape_key_value: new_name, value;
@@ -605,6 +606,7 @@ async def object_edit(
             "location": None, "rotation_degrees": None})),
         "duplicate": ("duplicate_object", lambda: pick(action, values, ["new_name"], {
             "count": 1, "offset": (0, 0, 0), "linked": False})),
+        "make_unique": ("make_instance_unique", lambda: pick(action, values, ["new_name"])),
         "parent": ("parent_object", lambda: pick(action, values, ["new_name"])),
         "unparent": ("unparent_object", lambda: pick(action, values)),
         "move_to_collection": ("move_to_collection", lambda: pick(action, values, ["new_name"], {

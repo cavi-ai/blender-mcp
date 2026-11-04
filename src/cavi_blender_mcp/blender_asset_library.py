@@ -72,23 +72,9 @@ def image_receipts(images, workspace):
     return result
 
 
-def append(params, workspace, instance_collections=False):
-    path = source(workspace, params['path'])
-    expected = params.get('expected_sha256')
-    if not isinstance(expected, str) or digest(path) != expected:
-        raise ValueError('Library SHA-256 does not match; inspect the source again')
-    kind = params.get('kind', 'collections')
-    if instance_collections and kind != 'collections':
-        raise ValueError('instance_collections requires kind=collections')
-    available = catalog(path, kind)
-    names = params.get('names')
-    if (not isinstance(names, list) or not 1 <= len(names) <= 256
-            or any(not isinstance(n, str) for n in names) or len(set(names)) != len(names)
-            or not set(names) <= set(available)):
-        raise ValueError('Choose 1 to 256 unique names present in the inspected library')
-    if bpy.context.mode != 'OBJECT':
-        raise ValueError('Switch to Object Mode before appending assets')
-    before = ids()
+def native_append(path, kind, names, instance_collections=False):
+    """Load native IDs with collision mappings, preserving the consuming context."""
+    path = Path(path).resolve()
     selected, active = list(bpy.context.selected_objects), bpy.context.view_layer.objects.active
     layer, scene, filepath = bpy.context.view_layer.active_layer_collection, bpy.context.scene, bpy.data.filepath
     roots, mappings = {}, []
@@ -112,11 +98,43 @@ def append(params, workspace, instance_collections=False):
             instance_collections=instance_collections, use_recursive=True, set_fake=kind in {'materials', 'node_groups'})
         if status != {'FINISHED'} or set(roots) != set(names):
             raise RuntimeError('Native append did not return every selected source ID')
+        if bpy.context.scene != scene or bpy.data.filepath != filepath:
+            raise RuntimeError('Append changed the active project')
+        return roots, mappings
+    finally:
+        bpy.app.handlers.blend_import_post.remove(imported)
+        bpy.context.view_layer.active_layer_collection = layer
+        for value in list(bpy.context.selected_objects):
+            value.select_set(False)
+        for value in selected:
+            if value.name in bpy.context.view_layer.objects:
+                value.select_set(True)
+        bpy.context.view_layer.objects.active = active
+
+
+def append(params, workspace, instance_collections=False):
+    path = source(workspace, params['path'])
+    expected = params.get('expected_sha256')
+    if not isinstance(expected, str) or digest(path) != expected:
+        raise ValueError('Library SHA-256 does not match; inspect the source again')
+    kind = params.get('kind', 'collections')
+    if instance_collections and kind != 'collections':
+        raise ValueError('instance_collections requires kind=collections')
+    available = catalog(path, kind)
+    names = params.get('names')
+    if (not isinstance(names, list) or not 1 <= len(names) <= 256
+            or any(not isinstance(n, str) for n in names) or len(set(names)) != len(names)
+            or not set(names) <= set(available)):
+        raise ValueError('Choose 1 to 256 unique names present in the inspected library')
+    if bpy.context.mode != 'OBJECT':
+        raise ValueError('Switch to Object Mode before appending assets')
+    before = ids()
+    layer, scene = bpy.context.view_layer.active_layer_collection, bpy.context.scene
+    try:
+        roots, mappings = native_append(path, kind, names, instance_collections)
         created = ids()-before
         if any(value not in created or value.library for value in roots.values()):
             raise RuntimeError('Native append did not create independent local IDs')
-        if bpy.context.scene != scene or bpy.data.filepath != filepath:
-            raise RuntimeError('Append changed the active project')
         if instance_collections:
             for name in names:
                 collection = roots[name]
@@ -152,12 +170,3 @@ def append(params, workspace, instance_collections=False):
         if created:
             bpy.data.batch_remove(ids=tuple(created))
         raise
-    finally:
-        bpy.app.handlers.blend_import_post.remove(imported)
-        bpy.context.view_layer.active_layer_collection = layer
-        for value in list(bpy.context.selected_objects):
-            value.select_set(False)
-        for value in selected:
-            if value.name in bpy.context.view_layer.objects:
-                value.select_set(True)
-        bpy.context.view_layer.objects.active = active

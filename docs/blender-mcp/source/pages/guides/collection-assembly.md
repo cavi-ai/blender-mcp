@@ -12,8 +12,8 @@ placement empties carry each kit's transform.
    receive suffixes. Each append imports independent definitions.
 3. Use `object_edit` `duplicate` on the returned instance object, then `transform`
    each placement. Duplicated collection instances share their definition even
-   when `linked=false`: they have no mesh data to copy. Reappend the library for
-   independent definitions. Negative nonzero scale supports mirrored placement.
+   when `linked=false`: they have no mesh data to copy. Use `object_edit` `make_unique` with a unique `new_name` to branch the current
+   definition, or reappend the library to start from its saved source. Negative nonzero scale supports mirrored placement.
    To edit its source controls, inspect `scene_info` with `name` and
    `definition=true`, then use `geometry_nodes` inspect/set_inputs with the exact
    member name and scene `instance`. See [procedural controls](procedural-assets.md).
@@ -38,3 +38,27 @@ the mesh handoff. Inspect these before accepting an export. This mode produces
 static surfaces, not animated rigs, lights, cameras, volumes or an engine prefab
 hierarchy. Use the rig/animation export path for animated characters. No LOD or
 collision semantics are inferred from collection membership.
+
+## Branch the currently edited kit
+
+Select the placement to vary and call `object_edit` with `action="make_unique"`,
+its existing `name`, a unique collection `new_name`, and the current lease. The
+object keeps its name and placement transform. Its new definition retains current
+procedural overrides, nested collections, materials and native dependencies.
+Other placements continue to reference the original definition.
+
+The response's `source_collection` and `instance_collection` identify the branch.
+Use `items` to map current source IDs to their copied names, or inspect the new
+`scene_info` definition page. Names can receive native suffixes. `created_counts`
+covers copied dependencies; `items_truncated` qualifies the mapping inventory.
+
+Packed maps retain their stored bytes. External texture files retain their file
+bindings and color spaces; they remain shared files. Use new texture outputs and
+bind them through the material workflow when the variant needs independent file
+contents. Forking a definition does not duplicate those external files.
+
+Save the editable consumer, change the new controls, and compare the evaluated
+source and variant before export. The private native snapshot is removed after
+copying. An operation failure restores the original definition and removes newly
+created IDs. After an uncertain transport result, inspect the selected object's
+current definition before attempting another mutation.
