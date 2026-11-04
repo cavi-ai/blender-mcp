@@ -6346,5 +6346,26 @@
     ],
     "without_lease": true,
     "error": "lease"
+  },
+  {
+    "id": "skin-transfer-shape-name-bound",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "transfer_weights",
+      "name": "EvalSkin",
+      "source": "EvalSkin",
+      "new_name": "ShapeTransfer",
+      "max_distance_m": 0.01,
+      "max_discarded_weight": 0,
+      "shape_names": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

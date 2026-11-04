@@ -25,6 +25,17 @@ class SkinTransferSurfaceTests(unittest.TestCase):
         self.assertEqual(params['max_discarded_weight'], .005)
         self.assertEqual(params['lease_id'], 'L')
 
+    def test_selected_morph_channels_share_the_weight_transfer(self):
+        calls = []
+        def call(operation, params):
+            calls.append(params)
+            return {'name': 'CoatSkin'}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.rig_edit('transfer_weights', 'Coat', source='Body',
+                new_name='CoatSkin', max_distance_m=.02, max_discarded_weight=.005,
+                shape_names=['BodyFit', 'ShoulderCorrective'], lease_id='L'))
+        self.assertEqual(calls[0]['params']['shape_names'], ['BodyFit', 'ShoulderCorrective'])
+
     def test_distance_and_loss_budgets_are_required_before_any_native_edit(self):
         for args in ({'max_distance_m': .02}, {'max_discarded_weight': .005}):
             with self.subTest(args=args), self.assertRaisesRegex(ValueError, 'requires'):

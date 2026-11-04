@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.39.0 - 2026-11-04
+
+- Transfer selected relative morphs alongside skin weights using the same surface projection.
+- Preserve mask and relative-key deltas across transforms and follow donor weight/mute channels.
+
 ## 0.38.0 - 2026-11-03
 
 - Transfer rest-surface skin weights onto independent clothing or retopology copies.

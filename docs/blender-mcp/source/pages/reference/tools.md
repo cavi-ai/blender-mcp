@@ -146,6 +146,7 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `track_name`, `strip_name` | `nla_push`, `nla_remove` |
 | `start_frame` | `nla_push`; default 1 |
 | `source`, `new_name`, `max_distance_m`, `max_discarded_weight` | `transfer_weights`; required source skin, new copy and quality budgets |
+| `shape_names` | `transfer_weights`; optional selected relative donor morphs, driven by donor value and mute |
 | `max_influences` | `transfer_weights`; strongest influences retained and normalized, default 4 |
 | `start_frame`, `end_frame`, `frame_step` | `bake`; positive fractional steps supported, at most 4096 samples |
 | `new_name`, `action_name`, `names` | `bake`; independent rig/action and optional skinned copies |

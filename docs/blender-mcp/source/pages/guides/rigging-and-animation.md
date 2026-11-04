@@ -193,3 +193,30 @@ triangles and one million source/target deform assignments. Degenerate source
 triangles are ignored and counted. Inspect shoulders, hips, fingers and nearby
 limbs: nearest geometry does not infer anatomical correspondence or cloth
 collision. Continue with sampled bake/export comparisons and engine review.
+
+### Follow selected body morphs
+
+Add `shape_names` to `transfer_weights` to project selected relative body morphs
+onto the same independent target copy. It reuses the weight transfer's triangle
+projection. Deltas are measured against each source key's relative key, including
+its vertex-group mask, then transformed into target-local coordinates. Existing
+target shapes remain intact; selected names must be unused on the target.
+
+```json
+{"action":"transfer_weights","name":"Coat","source":"Body","new_name":"CoatSkin","max_distance_m":0.02,"max_discarded_weight":0.005,"max_influences":4,"shape_names":["BodyFit","ShoulderCorrective"],"lease_id":"<lease>"}
+```
+
+The new keys follow the donor's value and mute channels through native drivers.
+Relative-key offsets and masks are copied into the new deltas; later geometry or
+mask edits require a new transfer. The workflow preserves the editable coupling;
+`rig_edit bake` samples those driven weights onto the independent export copy.
+The existing baked-animation export path removes the need for engine drivers.
+
+This path accepts relative source and target keys and shares the existing
+64-key limit including Basis. Source and target vertex samples across selected
+keys are capped at one million. Names, masks, finite coordinates and collisions
+are checked before creating the copy. Review morph combinations and garment
+clearance; projected deltas do not establish collision-free clothing.
+
+See Blender's [ShapeKey reference](https://docs.blender.org/api/5.2/bpy.types.ShapeKey.html)
+for relative-key, mask and channel semantics.
