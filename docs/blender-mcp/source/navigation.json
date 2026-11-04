@@ -21,6 +21,7 @@
         { "title": "Import and export assets", "path": "guides/asset-import-export.md" },
         { "title": "Generate a mesh locally", "path": "guides/local-generation.md" },
         { "title": "Rig and animate", "path": "guides/rigging-and-animation.md" },
+        { "title": "Procedural assets", "path": "guides/procedural-assets.md" },
         { "title": "Preview and review", "path": "guides/previews-and-review.md" },
         { "title": "Build a level", "path": "guides/level-assembly.md" },
         { "title": "Scatter instances", "path": "guides/scatter.md" },

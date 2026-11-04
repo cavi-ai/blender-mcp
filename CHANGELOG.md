@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.48.0 - 2026-11-04
+
+- Inspect Geometry Nodes socket identifiers, types, ranges and attribute modes.
+- Edit modifier-local procedural inputs without changing shared node groups.
+- Snapshot evaluated meshes with material usage and preserve editable sources.
+
 ## 0.47.0 - 2026-11-04
 
 - Compose shape-key actions with independent NLA timing, repeats, fades and blends.

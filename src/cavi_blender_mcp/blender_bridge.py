@@ -877,6 +877,11 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation in {'inspect_geometry_nodes', 'set_geometry_inputs', 'snapshot_geometry'}:
+        from .blender_node_inputs import inspect, set_inputs, snapshot
+
+        return {'inspect_geometry_nodes': inspect, 'set_geometry_inputs': set_inputs,
+                'snapshot_geometry': snapshot}[operation](p)
     if operation == 'scene_authoring':
         from .blender_scene import author
 

@@ -80,7 +80,7 @@ async def exercise(root, env):
                 'bake_max_error_m': compared['max_error_m'], 'fbx_max_error_m': check['max_error_m']}
 
 
-def main(exercise=exercise):
+def main(exercise=exercise, setup=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--blender', default=shutil.which('blender'), required=not shutil.which('blender'))
     args = parser.parse_args()
@@ -89,9 +89,11 @@ def main(exercise=exercise):
         env = {**os.environ, 'CAVI_BLENDER_WORKSPACE': str(root),
                'CAVI_BLENDER_CONNECTION': str(root/'connection.json')}
         env.pop('PYTHONPATH', None)
+        prelude = f'runpy.run_path({str(setup)!r})' if setup is not None else ''
         worker = f"""import runpy,time
 from pathlib import Path
 runpy.run_path({str(PACKAGE_ROOT/'cavi_blender_mcp/bootstrap.py')!r})['load_package']()
+{prelude}
 from cavi_blender_mcp import blender_bridge as bridge
 bridge.register()
 deadline=time.monotonic()+120

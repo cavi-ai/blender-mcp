@@ -6831,5 +6831,77 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "procedural-host",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "create_primitive",
+      "name": "NodeEvalHost",
+      "kind": "cube"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ]
+  },
+  {
+    "id": "procedural-inspect",
+    "tool": "geometry_nodes",
+    "arguments": {
+      "action": "inspect",
+      "name": "NodeEvalHost"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/modifiers": []
+    }
+  },
+  {
+    "id": "procedural-missing-lease",
+    "tool": "geometry_nodes",
+    "arguments": {
+      "action": "bake_copy",
+      "name": "NodeEvalHost",
+      "new_name": "UnownedCopy"
+    },
+    "kind": "safety",
+    "modes": [
+      "native"
+    ],
+    "without_lease": true,
+    "error": "lease"
+  },
+  {
+    "id": "procedural-empty-edit",
+    "tool": "geometry_nodes",
+    "arguments": {
+      "action": "set_inputs",
+      "name": "NodeEvalHost",
+      "modifier": "Nodes"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "Provide inputs"
+  },
+  {
+    "id": "procedural-invalid-action",
+    "tool": "geometry_nodes",
+    "arguments": {
+      "action": "invented",
+      "name": "NodeEvalHost"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

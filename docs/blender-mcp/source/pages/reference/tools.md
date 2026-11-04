@@ -1,11 +1,36 @@
 # Tools
 
-The server publishes 18 tools. Every mutation requires a `lease_id` unless the
+The server publishes 19 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
+
+## geometry_nodes
+
+`inspect` is lease-free. `set_inputs` and `bake_copy` require a lease.
+
+| Parameter | Used by |
+| --- | --- |
+| `name` | Existing procedural object |
+| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs` |
+| `inputs` | Socket identifier to typed value; omitted values are preserved |
+| `attributes` | Socket identifier to attribute name; null disables attribute mode |
+| `new_name` | `bake_copy`; independent static mesh of the evaluated stack at the current frame |
+
+Read socket identifiers, types, ranges, values and field modes before edits.
+Datablock values use `{name, id_type}` or null. Source node groups remain shared
+and unchanged; values belong to the named object's modifier. The full batch is
+validated before assignment; a native setter or value mismatch restores prior
+values. Inputs driven by animation still follow that animation when time changes.
+
+`bake_copy` preserves evaluated mesh layers, material slots and world transform.
+It reports fractional frame time, triangle counts and triangle usage per material
+slot. It captures the mesh component; curves and volumes need conversion in the
+source graph. Unrealized instances fail before allocation; use Realize Instances
+in the graph or the existing instance-preserving export instead. The source is
+preserved. See [procedural variants](../guides/procedural-assets.md).
 
 ## scene_info
 

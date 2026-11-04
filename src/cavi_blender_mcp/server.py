@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import anyio
 from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES, Server
 from mcp.server.mcpserver import Image
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt
 
 from .client import BridgeClient
 from .contracts import (
@@ -19,6 +19,7 @@ from .contracts import (
     MeshQuality,
     ObjectEditResult,
     Ownership,
+    ProceduralAssetResult,
     RigEditResult,
     RigInspection,
     RigMotionComparison,
@@ -888,6 +889,30 @@ async def asset_io(
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"
     return await run(call, operation, lease_id=lease_id, path=path, **params)
+
+
+@mcp.tool(annotations=MUTATING)
+async def geometry_nodes(
+    action: Literal['inspect', 'set_inputs', 'bake_copy'],
+    name: str,
+    modifier: str | None = None,
+    inputs: dict[str, JsonValue] | None = None,
+    attributes: dict[str, str | None] | None = None,
+    new_name: str | None = None,
+    lease_id: LeaseId = None,
+) -> ProceduralAssetResult:
+    """Inspect exposed Geometry Nodes inputs, edit modifier-local values, or snapshot the evaluated mesh."""
+    values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name}
+    if action == 'inspect':
+        params = pick(action, values, (), {'modifier': None})
+        return await run(call, 'inspect_geometry_nodes', name=name, **params)
+    if action == 'set_inputs':
+        params = pick(action, values, ['modifier'], {'inputs': {}, 'attributes': {}})
+        if not (params['inputs'] or params['attributes']):
+            raise ValueError('Provide inputs or attributes')
+        return await run(call, 'set_geometry_inputs', name=name, lease_id=lease_id, **params)
+    params = pick(action, values, ['new_name'])
+    return await run(call, 'snapshot_geometry', name=name, lease_id=lease_id, **params)
 
 
 @mcp.tool(annotations=ADDITIVE)

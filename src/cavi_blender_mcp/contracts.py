@@ -201,6 +201,17 @@ class RigEditResult(ObjectFields):
     animation_owner: str | None = None
 
 
+class ProceduralAssetResult(Result):
+    name: str
+    modifiers: list[Record]
+    source: str | None = None
+    scope: str | None = None
+    frame: Number | None = None
+    triangles: int | None = None
+    materials: list[str | None] | None = None
+    material_triangles: list[Record] | None = None
+
+
 class MeshEditResult(ObjectFields):
     nullable_shape_fields = frozenset(
         {"parent", "symmetry_axis", "density_before", "density_after", "shape_key_action"}
