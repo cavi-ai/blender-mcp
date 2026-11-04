@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.36.0 - 2026-11-03
+
+### Added
+
+- Material-filtered UV inspection with source face counts and used slot bindings.
+
 ## 0.35.0 - 2026-11-03
 
 ### Added

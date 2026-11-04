@@ -237,16 +237,18 @@ async def inspect_uv_layout(
     padding_pixels: Annotated[Number, Field(ge=0, le=256)],
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
+    material: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
 ) -> UVLayout:
     """Inspect one texture set's source UVs (max 20,000 triangles); default layer index 0.
 
     Analytic overlaps, chart gutters and tile borders use the supplied dimensions.
     unique_tile_ready concerns unique 0..1 baking; incomplete analysis is never ready.
+    Optional material selects faces using that exact material across slots and meshes.
     Modifiers are not evaluated. No mesh or selection edits.
     """
     return await run(call, "inspect_uv_layout", names=names,
                      texture_resolution=texture_resolution, padding_pixels=padding_pixels,
-                     uv_layer=uv_layer, comparison_budget=comparison_budget)
+                     uv_layer=uv_layer, comparison_budget=comparison_budget, material=material)
 
 
 @mcp.tool(annotations=READ_ONLY)
