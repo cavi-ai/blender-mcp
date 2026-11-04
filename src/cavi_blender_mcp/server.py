@@ -156,8 +156,15 @@ async def scene_info(
     name: Annotated[str | None, Field(description="Return only this object's details.")] = None,
     limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 200,
     offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    definition: StrictBool | None = None,
 ) -> SceneInfo:
-    """Inspect Blender version, file, workspace and a page of scene objects, or one object."""
+    """Inspect the scene or one object. With name and definition=true, page through a
+    collection instance's nested source objects and report its shared scene placements.
+    """
+    if definition:
+        if name is None:
+            raise ValueError('definition requires a scene-instance name')
+        return await run(call, 'inspect_collection_instance', name=name, limit=limit, offset=offset)
     if name is not None:
         return await run(call, "object_info", name=name)
     return await run(call, "scene_info", limit=limit, offset=offset)
@@ -941,17 +948,28 @@ async def geometry_nodes(
     inputs: dict[str, JsonValue] | None = None,
     attributes: dict[str, str | None] | None = None,
     new_name: str | None = None,
+    instance: str | None = None,
     lease_id: LeaseId = None,
 ) -> ProceduralAssetResult:
-    """Inspect exposed Geometry Nodes inputs, edit modifier-local values, or snapshot the evaluated mesh."""
-    values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name}
+    """Inspect/edit exposed inputs or snapshot an evaluated mesh. For inspect/set_inputs,
+    instance names a scene collection instance containing the source object; edits affect
+    its shared definition. Use scene_info definition=true to find exact member names.
+    """
+    values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
+              'instance': instance}
     if action == 'inspect':
-        params = pick(action, values, (), {'modifier': None})
+        params = pick(action, values, (), {'modifier': None, 'instance': None})
+        scoped = params.pop('instance')
+        if scoped is not None:
+            return await run(call, 'inspect_instance_geometry_nodes', name=name, instance=scoped, **params)
         return await run(call, 'inspect_geometry_nodes', name=name, **params)
     if action == 'set_inputs':
-        params = pick(action, values, ['modifier'], {'inputs': {}, 'attributes': {}})
+        params = pick(action, values, ['modifier'], {'inputs': {}, 'attributes': {}, 'instance': None})
+        scoped = params.pop('instance')
         if not (params['inputs'] or params['attributes']):
             raise ValueError('Provide inputs or attributes')
+        if scoped is not None:
+            return await run(call, 'set_instance_geometry_inputs', name=name, instance=scoped, lease_id=lease_id, **params)
         return await run(call, 'set_geometry_inputs', name=name, lease_id=lease_id, **params)
     params = pick(action, values, ['new_name'])
     return await run(call, 'snapshot_geometry', name=name, lease_id=lease_id, **params)

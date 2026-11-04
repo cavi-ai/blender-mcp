@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.51.0 - 2026-11-04
+
+- Inspect nested collection definitions through their scene instances with pagination.
+- Edit procedural inputs on internal kit objects through explicit instance scope.
+- Retain shared definitions while keeping independently appended kits separate.
+
 ## 0.50.0 - 2026-11-04
 
 - Append collections as native instances for editable modular kit placement.

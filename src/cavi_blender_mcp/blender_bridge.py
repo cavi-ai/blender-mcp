@@ -877,6 +877,16 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'inspect_collection_instance':
+        from .blender_collection_instances import inspect
+
+        return inspect(p)
+    if operation in {'inspect_instance_geometry_nodes', 'set_instance_geometry_inputs'}:
+        from .blender_node_inputs import inspect, set_inputs
+
+        if not isinstance(p.get('instance'), str) or not p['instance']:
+            raise ValueError('instance must name a scene collection instance')
+        return (inspect if operation == 'inspect_instance_geometry_nodes' else set_inputs)(p)
     if operation == 'export_assembly':
         from .blender_assembly import export
 

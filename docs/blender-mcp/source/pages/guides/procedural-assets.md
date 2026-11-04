@@ -34,3 +34,29 @@ baked mesh. Snapshots capture the mesh component; convert curve/volume component
 in the source if required. A graph with unrealized instances must use Realize
 Instances for this snapshot path, or retain instances through `asset_io` export
 with `preserve_instances`. No instance content is silently dropped by the snapshot.
+
+## Edit controls inside a collection instance
+
+Use `scene_info` with a scene instance's `name`, `definition=true`, `offset` and
+`limit` to discover nested source objects. This read-only page reports actual
+object and modifier names, the collection definition, its pivot offset and its
+direct scene instances. `scene_instance_total` and `scene_instances_truncated`
+qualify the placement list; `total` qualifies the paginated object list.
+
+Call `geometry_nodes` `inspect` or `set_inputs` with the internal object's exact
+`name` and `instance` equal to the scene instance name. The object must belong
+to that instance's definition, including child collections and nested instances.
+Inspection is lease-free; edits use the consuming project's lease and the same
+validated socket-value/attribute path as ordinary procedural edits. Responses
+identify both the chosen `instance` and its root `definition`.
+
+These are shared source edits: every placement referencing that internal object
+sees the override. Reappend an independent library definition before making a
+variant that must differ. Node-group topology and defaults remain unchanged.
+Unrelated objects cannot be reached by supplying an arbitrary name alongside an
+instance. Inspection preserves scene context and does not dirty a saved file.
+
+Save the editable consumer, then use [assembly export](collection-assembly.md)
+to capture the changed placements at their evaluated world transforms. A source
+object can occur more than once inside one kit, so `bake_copy` does not infer a
+placement from `instance`. Its existing scene-object snapshot route is unchanged.

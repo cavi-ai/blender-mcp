@@ -14,6 +14,9 @@ placement empties carry each kit's transform.
    each placement. Duplicated collection instances share their definition even
    when `linked=false`: they have no mesh data to copy. Reappend the library for
    independent definitions. Negative nonzero scale supports mirrored placement.
+   To edit its source controls, inspect `scene_info` with `name` and
+   `definition=true`, then use `geometry_nodes` inspect/set_inputs with the exact
+   member name and scene `instance`. See [procedural controls](procedural-assets.md).
 4. Save the editable destination `.blend`. For a static engine handoff, call
    `asset_io` `export` with the placement `names`, `assembly=true` and an FBX or
    GLB path. Optional `axis` selects the existing target preset; `textures=true`
