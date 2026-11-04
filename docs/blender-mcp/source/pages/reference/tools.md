@@ -148,7 +148,7 @@ reported joints and morph combinations visually before accepting the asset.
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`.
+`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
 
 | Parameter | Used by |
 | --- | --- |
@@ -350,3 +350,5 @@ FBX import can shift clip start times, so inspect the actual active action range
 before comparison. Shape-key channels may occupy a separate Action datablock.
 
 `inspect_rig` also accepts declared `contacts` for bone-marker drift and world-Z ground-height checks. See [calibrated retargeting and contact windows](../guides/rigging-and-animation.md#calibrate-differing-rest-poses-and-proportions).
+
+`rig_edit contact_lock` takes `source_action`, `new_name`, `action_name`, optional `names`/`frame_step`, and typed `foot_locks`. See [editable contact correction](../guides/rigging-and-animation.md#correct-declared-foot-contacts).

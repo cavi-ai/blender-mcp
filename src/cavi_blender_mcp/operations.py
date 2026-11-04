@@ -61,6 +61,7 @@ OPERATIONS = frozenset(
         "keyframe_rig",
         "clear_pose",
         "retarget_rig",
+        "lock_rig_contacts",
         "apply_transforms",
         "set_origin",
         "snap_to_grid",
@@ -129,7 +130,7 @@ SLOW_OPERATIONS = frozenset(
     }
 )
 LONG_OPERATIONS = frozenset({"remesh_quad", "lod_chain", "bake_map", "bake_png", "retarget_rig",
-                             "bake_rig", "scene_authoring"})
+                             "bake_rig", "lock_rig_contacts", "scene_authoring"})
 DEFAULT_TIMEOUT = 60
 SLOW_TIMEOUT = 300
 MAX_TIMEOUT = 600

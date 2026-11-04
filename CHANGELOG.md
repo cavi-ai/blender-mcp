@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.43.0 - 2026-11-04
+
+- Create independent rig and skin copies with editable foot-contact IK anchors.
+- Blend contact and foot rotation constraints over declared stance windows.
+- Preserve authored rigs and actions, and remove generated data when correction setup fails.
+
 ## 0.42.0 - 2026-11-04
 
 - Add rest-relative retarget calibration with explicit root travel scaling.

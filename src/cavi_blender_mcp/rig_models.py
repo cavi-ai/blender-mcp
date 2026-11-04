@@ -75,3 +75,10 @@ class ContactWindow(BaseModel):
         if self.end_frame <= self.start_frame:
             raise ValueError('Contact windows need an increasing frame range')
         return self
+
+
+class FootLockWindow(ContactWindow):
+    pole: Vector
+    pole_angle_degrees: Number = 0
+    blend_in_frames: Annotated[StrictInt, Field(ge=1, le=1000)] = 3
+    blend_out_frames: Annotated[StrictInt, Field(ge=1, le=1000)] = 3

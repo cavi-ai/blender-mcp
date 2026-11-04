@@ -38,6 +38,7 @@ from .operations import SERVER_LEASE_FREE
 from .rig_models import (
     Constraint,
     ContactWindow,
+    FootLockWindow,
     MotionSkinPair,
     RetargetCalibration,
     VertexWeights,
@@ -337,7 +338,7 @@ async def rig_edit(
     action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_remove", "constraint", "remove_constraint",
-                    "assign_weights", "transfer_weights", "bake"],
+                    "assign_weights", "transfer_weights", "bake", "contact_lock"],
     name: Annotated[str, Field(description="New armature, armature or skinned mesh.")],
     location: Vector3 | None = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
@@ -371,30 +372,24 @@ async def rig_edit(
     shape_names: Annotated[list[RigName] | None, Field(max_length=64)] = None,
     calibration: RetargetCalibration | None = None,
     skinning_mode: Literal['preserve', 'linear'] | None = None,
+    foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16)] = None,
     lease_id: LeaseId = None,
 ) -> RigEditResult:
-    """Create an armature, bind or repair weights, or author an animation.
+    """Edit rigs under a lease; bake and contact_lock create independent rig/skin copies.
 
-    create: bones, location=(0,0,0); bind: name=armature, names=meshes;
-    weights: name=mesh, max_influences=4, clean_threshold=.0001, normalize=true;
-    pose: name=armature, poses, frame, reset=false;
-    keyframe: name=armature, action_name, keyframes=[{frame, poses}];
-    clear_pose: name=armature, frame;
-    retarget: name=target armature, source, source_action, action_name, mapping, samples;
-    optional calibration preserves target rest offsets, transfers rest-relative rotations,
-    and applies explicit root_translation_scale plus XYZ alignment_degrees.
-    set_action: name=armature, action_name (omit to clear);
-    rename_action: action_name, new_name; delete_action: action_name;
-    nla_push: name=armature, action_name, track_name, strip_name, start_frame=1;
-    nla_remove: name=armature, track_name (omit to clear), strip_name.
-    constraint: typed IK (target/pole) or rotation limits; remove_constraint: bone+constraint_name.
-    assign_weights: name=skin, vertex_weights, replace=true, normalize=false.
-    transfer_weights: name=target, source=skin, new_name, max_distance_m, max_discarded_weight;
-    copies the target and interpolates rest-surface weights within explicit distance/loss budgets.
-    Optional shape_names transfer selected relative morph deltas and follow donor weights/mute.
-    bake: new_name, action_name, start_frame, end_frame, frame_step=1, optional names=skins.
-    skinning_mode=preserve keeps copy modifiers; explicit linear changes only new copies.
-    Creates a separate constraint-free rig and skin copies; source rig stays editable.
+    create: bones, optional location; bind: names=skins; weights: repair mesh weights.
+    pose: poses, optional frame/reset; keyframe: action_name and keyframes; clear_pose: frame.
+    retarget: source, source_action, action_name, optional mapping/samples/calibration.
+    Calibration preserves target rest offsets and scales only declared root translation.
+    set_action: action_name (omit to clear); rename_action: action_name/new_name;
+    delete_action: action_name; nla_push: action_name/track_name/strip_name/start_frame;
+    nla_remove: optional track_name/strip_name.
+    constraint: typed constraint; remove_constraint: bone/constraint_name;
+    assign_weights: vertex_weights; transfer_weights: source/new_name/distance/loss budgets,
+    optional shape_names. Existing targets remain editable.
+    bake: new_name/action_name/start_frame/end_frame, optional names/frame_step/skinning_mode.
+    contact_lock: source_action/new_name/action_name/foot_locks, optional names/frame_step.
+    Contact anchors require separate contact/deformation inspection before export.
     """
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
@@ -407,8 +402,13 @@ async def rig_edit(
               'bone': bone, 'constraint_name': constraint_name, 'vertex_weights': vertex_weights,
               'replace': replace, 'max_distance_m': max_distance_m,
               'max_discarded_weight': max_discarded_weight, 'shape_names': shape_names,
-              'calibration': calibration, 'skinning_mode': skinning_mode}
-    if action == 'transfer_weights':
+              'calibration': calibration, 'skinning_mode': skinning_mode, 'foot_locks': foot_locks}
+    if action == 'contact_lock':
+        operation = 'lock_rig_contacts'
+        params = pick(action, values, ['source_action', 'action_name', 'new_name', 'foot_locks'],
+                      {'names': [], 'frame_step': 1})
+        params['foot_locks'] = [item.model_dump() for item in params['foot_locks']]
+    elif action == 'transfer_weights':
         operation = 'transfer_skin_weights'
         params = pick(action, values, ['source', 'new_name', 'max_distance_m', 'max_discarded_weight'],
                       {'max_influences': 4, 'shape_names': []})
