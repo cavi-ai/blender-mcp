@@ -1,8 +1,11 @@
 """Armature action assignment, rename/delete and NLA clip management."""
 
+import math
+
 import bpy
 
 from .blender_bridge import info, obj
+from .blender_nla_settings import FIELDS, validate
 from .blender_rig import action_slot
 
 MAX_STRIPS = 32
@@ -93,6 +96,100 @@ def total_strips(animation):
     return sum(len(track.strips) for track in animation.nla_tracks)
 
 
+def strip_settings(strip):
+    return {key: getattr(strip, key) for key in FIELDS}
+
+
+def inventory(armature):
+    animation = armature.animation_data
+    if animation is None:
+        return []
+    return [{'name': track.name, 'mute': track.mute, 'solo': track.is_solo,
+             'strips': [{'name': strip.name, 'type': strip.type,
+                         'action': strip.action.name if strip.action else None,
+                         'frame_range': [strip.frame_start, strip.frame_end],
+                         'strip_settings': strip_settings(strip) if strip.type == 'CLIP' else None}
+                        for strip in track.strips]} for track in animation.nla_tracks]
+
+
+def write_settings(strip, values):
+    # Set the end first when moving an action range beyond its previous end.
+    if values['action_frame_start'] >= strip.action_frame_end:
+        strip.action_frame_end = values['action_frame_end']
+        strip.action_frame_start = values['action_frame_start']
+    else:
+        strip.action_frame_start = values['action_frame_start']
+        strip.action_frame_end = values['action_frame_end']
+    strip.repeat = values['repeat']
+    strip.scale = values['scale']
+    duration = (values['action_frame_end']-values['action_frame_start'])*values['scale']*values['repeat']
+    strip.frame_start_raw = values['frame_start']
+    strip.frame_end_raw = values['frame_start']+duration
+    strip.use_auto_blend = values['use_auto_blend']
+    for key in FIELDS:
+        if key not in {'frame_start', 'action_frame_start', 'action_frame_end', 'scale', 'repeat', 'use_auto_blend'}:
+            setattr(strip, key, values[key])
+
+
+def configure_strip(track, strip, changes):
+    validate(changes)
+    before = strip_settings(strip)
+    desired = {**before, **changes}
+    duration = (desired['action_frame_end']-desired['action_frame_start'])*desired['scale']*desired['repeat']
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError('NLA action frame range must increase')
+    if desired['blend_in']+desired['blend_out'] > duration and not desired['use_auto_blend']:
+        raise ValueError('NLA fades must fit the resulting strip duration')
+    if desired['use_auto_blend'] and {'blend_in', 'blend_out'} & set(changes):
+        raise ValueError('Disable automatic blending before setting manual fades')
+    end = desired['frame_start']+duration
+    neighbors = [(other, other.frame_start, other.frame_end) for other in track.strips if other != strip]
+    if any(desired['frame_start'] < last and end > first for _, first, last in neighbors):
+        raise ValueError('NLA strips cannot overlap on one track; use a separate blend track')
+    try:
+        write_settings(strip, desired)
+        actual = strip_settings(strip)
+        for key, expected in desired.items():
+            if key in {'blend_in', 'blend_out'} and desired['use_auto_blend']:
+                continue
+            observed = actual[key]
+            matches = math.isclose(observed, expected, abs_tol=1e-5, rel_tol=1e-7) if type(expected) in (int, float) else observed == expected
+            if not matches:
+                raise ValueError('Blender clamped or changed NLA setting: ' + key)
+        if not math.isclose(strip.frame_end, end, abs_tol=1e-5, rel_tol=1e-7):
+            raise ValueError('Blender changed the requested NLA duration')
+        if any(other.frame_start != first or other.frame_end != last for other, first, last in neighbors):
+            raise ValueError('Blender changed a neighboring NLA strip')
+    except Exception:
+        write_settings(strip, before)
+        for other, first, last in neighbors:
+            other.frame_start_raw, other.frame_end_raw = first, last
+        raise
+    return actual
+
+
+def strip_result(armature, track, strip):
+    return {**result(armature), 'action': strip.action.name, 'track': track.name, 'strip': strip.name,
+            'start_frame': strip.frame_start, 'frame_range': [strip.frame_start, strip.frame_end],
+            'action_frame_range': [strip.action_frame_start, strip.action_frame_end],
+            'strip_settings': strip_settings(strip)}
+
+
+def nla_edit(p):
+    armature = rig(p)
+    animation = armature.animation_data
+    track_name = label(p.get('track_name'), 'track_name')
+    strip_name = label(p.get('strip_name'), 'strip_name')
+    track = animation.nla_tracks.get(track_name) if animation else None
+    strip = track.strips.get(strip_name) if track else None
+    if strip is None or strip.type != 'CLIP' or strip.action is None:
+        raise ValueError('Named NLA action strip does not exist')
+    if animation.use_tweak_mode:
+        raise ValueError('Exit NLA Tweak Mode before editing strip settings')
+    configure_strip(track, strip, p.get('strip_settings'))
+    return strip_result(armature, track, strip)
+
+
 def nla_push(p):
     armature = rig(p)
     if armature.animation_data is None:
@@ -120,6 +217,8 @@ def nla_push(p):
         strip = track.strips.new(strip_name, start, value)
         strip.name = strip_name
         strip.action_slot = slot
+        if p.get('strip_settings') is not None:
+            configure_strip(track, strip, p['strip_settings'])
         value.use_fake_user = True
         animation.action = None
         animation.use_nla = True
@@ -129,10 +228,7 @@ def nla_push(p):
         if created_track and track is not None and not track.strips and track.name == track_name:
             animation.nla_tracks.remove(track)
         raise
-    return {**result(armature), "action": value.name, "track": track.name,
-            "strip": strip.name, "start_frame": start,
-            "frame_range": [strip.frame_start, strip.frame_end],
-            "action_frame_range": list(value.frame_range)}
+    return strip_result(armature, track, strip)
 
 
 def nla_remove(p):
@@ -174,4 +270,4 @@ def nla_remove(p):
 
 HANDLERS = {"set_action": set_action, "rename_action": rename_action,
             "delete_action": delete_action, "nla_push": nla_push,
-            "nla_remove": nla_remove}
+            "nla_edit": nla_edit, "nla_remove": nla_remove}

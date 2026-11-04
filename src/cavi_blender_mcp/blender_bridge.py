@@ -930,7 +930,7 @@ def _dispatch(operation, p):
         from .blender_shape_keys import HANDLERS
 
         return HANDLERS[operation](p)
-    if operation in {"set_action", "rename_action", "delete_action", "nla_push",
+    if operation in {"set_action", "rename_action", "delete_action", "nla_push", "nla_edit",
                      "nla_remove"}:
         from .blender_nla import HANDLERS
 

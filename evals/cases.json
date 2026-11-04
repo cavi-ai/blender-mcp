@@ -1,5 +1,59 @@
 [
   {
+    "id": "nla-edit-empty-settings",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_edit",
+      "name": "Rig",
+      "track_name": "Base",
+      "strip_name": "Walk",
+      "strip_settings": {}
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "nla-edit-invalid-repeat",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_edit",
+      "name": "Rig",
+      "track_name": "Base",
+      "strip_name": "Walk",
+      "strip_settings": {
+        "repeat": 0
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "nla-edit-missing-strip",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_edit",
+      "name": "Rig",
+      "track_name": "Base",
+      "strip_settings": {
+        "repeat": 2
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: strip_name"
+  },
+  {
     "id": "clip-timing-zero-rate",
     "tool": "rig_edit",
     "arguments": {
@@ -5660,6 +5714,32 @@
     "required": [
       "/strip"
     ]
+  },
+  {
+    "id": "rig-nla-edit",
+    "tool": "rig_edit",
+    "arguments": {
+      "action": "nla_edit",
+      "name": "EvalRigNew",
+      "track_name": "Locomotion",
+      "strip_name": "Walk",
+      "strip_settings": {
+        "frame_start": 2.5,
+        "repeat": 2,
+        "blend_in": 1,
+        "blend_out": 1
+      }
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "equals": {
+      "/strip_settings/frame_start": 2.5,
+      "/strip_settings/repeat": 2,
+      "/strip_settings/blend_in": 1,
+      "/strip_settings/blend_out": 1
+    }
   },
   {
     "id": "rig-nla-remove",

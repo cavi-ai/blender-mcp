@@ -148,7 +148,7 @@ reported joints and morph combinations visually before accepting the asset.
 
 Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
+`nla_push`, `nla_edit`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
 
 | Parameter | Used by |
 | --- | --- |
@@ -166,8 +166,9 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | `samples` | `retarget`; optional 2–256 samples |
 | `calibration` | `retarget`; root, root translation scale and XYZ armature alignment |
 | `new_name` | `rename_action`; new action name |
-| `track_name`, `strip_name` | `nla_push`, `nla_remove` |
+| `track_name`, `strip_name` | `nla_push`, `nla_edit`, `nla_remove` |
 | `start_frame` | `nla_push`; default 1 |
+| `strip_settings` | Optional for `nla_push`, required for `nla_edit`; sparse trim, scale, repeat, fade, blend, influence, mute and reverse settings |
 | `source`, `new_name`, `max_distance_m`, `max_discarded_weight` | `transfer_weights`; required source skin, new copy and quality budgets |
 | `shape_names` | `transfer_weights`; optional selected relative donor morphs, driven by donor value and mute |
 | `max_influences` | `transfer_weights`; strongest influences retained and normalized, default 4 |
