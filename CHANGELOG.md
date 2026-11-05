@@ -7,6 +7,7 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+- Require Python 3.15 or newer; CI, documentation and PyPI publishing run Python 3.15.
 - Branch authored materials and nested shader groups onto selected mesh slots.
 - Preserve shared geometry with object bindings and retain external image/action references.
 - Share material-slot capture and rollback across assignment and finish variants.
