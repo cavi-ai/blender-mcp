@@ -706,11 +706,7 @@ async def mesh_edit(
     uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
 ) -> MeshEditResult:
-    """Edit a mesh; parameters are action-specific (see reference/tools.md).
-    uv_transform: explicit source faces and offset/scale/rotation about pivot; uv_layer
-    selects an existing layer (default UV0). Preserves topology, skin and shape keys.
-    Use a single-user mesh in Object Mode; edits require lease_id.
-    """
+    """Edit a leased single-user mesh in Object Mode; see reference/tools.md."""
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
               "uv_layer": uv_layer, "target_triangles": target_triangles,
