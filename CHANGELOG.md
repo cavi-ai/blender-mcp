@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+- Make shared mesh data independent without replacing the object or applying transforms.
+- Retain skin, animated shape keys and material-slot bindings; clean failed copies.
+- Keep scene and object-transform dispatch separate from UV transforms.
+
 - Transform explicit source-face UVs on an existing layer without rebuilding geometry.
 - Preserve skin weights, shape keys, other UVs and selection; roll back failed writes.
 - Report affected faces, materials and before/after UV bounds.

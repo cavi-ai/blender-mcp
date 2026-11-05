@@ -56,7 +56,7 @@ COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mes
                      "array_mesh", "solidify_mesh"})
 RIG = frozenset({"create_armature", "bind_skin", "repair_weights"})
 ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})
-OBJECTS = frozenset({"apply_transforms", "set_origin", "snap_to_grid", "rename_object",
+OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
                      "move_to_collection"})
 MAX_MODIFIERS = 16
@@ -108,7 +108,7 @@ def obj(name, mesh=False):
 def editable_mesh(name):
     value = obj(name, mesh=True)
     if value.data.users > 1:
-        raise ValueError("Mesh data is shared; make it single-user in Blender before editing")
+        raise ValueError("Mesh data is shared; use object_edit make_single_user before editing")
     return value
 
 

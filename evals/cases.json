@@ -7488,5 +7488,35 @@
       "native"
     ],
     "error": "does not accept: amount"
+  },
+  {
+    "id": "mesh-single-user-extra-parameter",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "make_single_user",
+      "name": "Body",
+      "components": [
+        "scale"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: components"
+  },
+  {
+    "id": "mesh-single-user-missing-object",
+    "tool": "object_edit",
+    "arguments": {
+      "action": "make_single_user"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

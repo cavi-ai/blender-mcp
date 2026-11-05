@@ -274,9 +274,13 @@ Lease-free. Inspects, claims, renews, releases or breaks edit ownership.
 
 ## object_edit
 
+`make_single_user` copies shared mesh data on one editable object, including
+shape keys, while retaining scene identity, transforms and material bindings.
+It takes only `name` and `lease_id`; `mesh_copy` reports whether a copy was needed.
+
 Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
-`add_socket`, `duplicate`, `parent`, `unparent`, `move_to_collection`,
+`add_socket`, `duplicate`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
 `shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`.
 
 [Guide](../guides/object-editing.md)

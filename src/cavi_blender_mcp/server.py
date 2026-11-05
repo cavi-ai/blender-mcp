@@ -565,7 +565,7 @@ async def session_control(
 async def object_edit(
     action: Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
-                    "duplicate", "make_unique", "parent", "unparent", "move_to_collection", "shape_key_add",
+                    "duplicate", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
                     "shape_key_value", "shape_key_keyframe", "shape_key_remove"],
     name: Annotated[str, Field(description="Object name; new and unique for create_*.")],
     kind: Literal["cube", "sphere", "cylinder", "cone", "plane"] | None = None,
@@ -606,6 +606,7 @@ async def object_edit(
     rename: new_name; add_socket: new_name, local location, rotation_degrees;
     duplicate: new_name, count=1, offset=(0,0,0), linked=false;
     make_unique: new_name (independent collection definition for this instance);
+    make_single_user: no extra params; copy shared mesh data, keep the object;
     parent: new_name (parent); unparent: no extra params;
     move_to_collection: new_name (collection), create=true;
     shape_key_add: new_name, value=0, offsets, source; shape_key_value: new_name, value;
@@ -638,6 +639,7 @@ async def object_edit(
         "duplicate": ("duplicate_object", lambda: pick(action, values, ["new_name"], {
             "count": 1, "offset": (0, 0, 0), "linked": False})),
         "make_unique": ("make_instance_unique", lambda: pick(action, values, ["new_name"])),
+        "make_single_user": ("make_mesh_single_user", lambda: pick(action, values)),
         "parent": ("parent_object", lambda: pick(action, values, ["new_name"])),
         "unparent": ("unparent_object", lambda: pick(action, values)),
         "move_to_collection": ("move_to_collection", lambda: pick(action, values, ["new_name"], {

@@ -18,6 +18,7 @@ Unrelated action parameters are refused before contacting Blender.
 | `rename` | `new_name`; also renames single-user mesh data |
 | `add_socket` | `new_name`, local `location`, `rotation_degrees` |
 | `duplicate` | `new_name`, `count`, world `offset`, `linked` |
+| `make_single_user` | no extra parameters; independent mesh data on the existing object |
 | `parent` | `new_name` is the parent; preserves world transform |
 | `unparent` | no extra parameters; preserves world transform |
 | `move_to_collection` | `new_name`, `create` |
@@ -50,6 +51,25 @@ does the same while removing the parent.
 `duplicate` creates `new_name` or `<new_name>_01` through `_NN` for multiple
 copies. `linked=true` shares mesh data; the default copies it. Each copy is
 offset in world space by its index.
+
+`make_single_user` copies shared or linked mesh data for one editable scene
+object. It keeps the object's identity, name, transforms, hierarchy, vertex
+groups, modifiers and material-slot overrides. UVs, attributes, skin weights
+and shape-key data are retained. Materials, rig references and animation actions
+stay shared; editing an action or material still affects its other users.
+
+Use this before local UV, topology or expression edits on a linked duplicate:
+
+```json
+{"action":"make_single_user","name":"CharacterVariant","lease_id":"<claim-token>"}
+```
+
+The `mesh_copy` result identifies the original and current mesh, user counts,
+shape-key data and whether a copy was needed. An already local, single-user mesh
+is unchanged. The original fake-user flag is retained; the copy has one object
+user. Failed copies restore the old binding and remove their new data. This
+operation does not make a collection instance independent; use `make_unique`
+for its collection definition.
 
 `move_to_collection` moves the object to a named collection. `create=true`
 creates the collection when missing.

@@ -5,6 +5,9 @@ Every call needs a `lease_id`. Topology-changing actions require their own
 modifier and shape-key preflight; `uv_transform` edits existing UV loops and
 retains modifiers, skin weights and shape keys.
 
+For shared meshes, first use `object_edit` `make_single_user` to copy the data
+on the same object without applying transforms or changing scene references.
+
 ## Surface actions
 
 | Action | Use |
