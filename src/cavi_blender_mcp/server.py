@@ -661,7 +661,7 @@ async def object_edit(
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "mirror", "array", "solidify", "uv_transform"],
+                    "join", "separate", "extract_faces", "mirror", "array", "solidify", "uv_transform"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -696,6 +696,9 @@ async def mesh_edit(
     self_intersection: StrictBool | None = None,
     names: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
     by: Literal["loose_parts", "materials"] | None = None,
+    new_name: ObjectName | None = None,
+    face_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
+                            Field(min_length=1, max_length=20000)] = None,
     count: Annotated[StrictInt | None, Field(ge=2, le=1000)] = None,
     offset: Vector3 | None = None,
     thickness: Annotated[Number | None, Field(gt=0, le=100)] = None,
@@ -703,11 +706,7 @@ async def mesh_edit(
     uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
 ) -> MeshEditResult:
-    """Edit a mesh; parameters are action-specific (see reference/tools.md).
-    uv_transform: explicit source faces and offset/scale/rotation about pivot; uv_layer
-    selects an existing layer (default UV0). Preserves topology, skin and shape keys.
-    Use a single-user mesh in Object Mode; edits require lease_id.
-    """
+    """Edit a leased mesh."""
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
               "uv_layer": uv_layer, "target_triangles": target_triangles,
@@ -719,7 +718,8 @@ async def mesh_edit(
               "max_hull_vertices": max_hull_vertices, "merge_distance": merge_distance,
               "steps": steps, "operand": operand, "operation": operation, "solver": solver,
               "keep_operand": keep_operand, "self_intersection": self_intersection,
-              "names": names, "by": by, "count": count, "offset": offset,
+              "names": names, "by": by, "new_name": new_name, "face_indices": face_indices,
+              "count": count, "offset": offset,
               "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform}
     if action == "modifier":
         operation = "add_modifier"
@@ -764,6 +764,11 @@ async def mesh_edit(
     elif action == "separate":
         operation = "separate_mesh"
         params = pick(action, values, (), {"by": "loose_parts"})
+    elif action == "extract_faces":
+        operation = action
+        params = pick(action, values, ["new_name", "face_indices"])
+        if len(set(params["face_indices"])) != len(params["face_indices"]):
+            raise ValueError("face_indices must be unique")
     elif action == "mirror":
         operation = "mirror_mesh"
         params = pick(action, values, (), {

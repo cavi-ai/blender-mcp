@@ -280,6 +280,7 @@ class MeshEditResult(ObjectFields):
     uniform_scale: bool | None = None
     by: Literal["loose_parts", "materials"] | None = None
     parts: list[Record] | None = None
+    face_indices: list[int] | None = None
     triangles_before: int | None = None
     uv_transform: Record | None = None
 

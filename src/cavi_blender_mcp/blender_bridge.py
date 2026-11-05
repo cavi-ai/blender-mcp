@@ -52,7 +52,7 @@ _project_epoch = secrets.token_hex(16)
 _loaded_source = LoadedSource()
 GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", "texel_density",
                       "collision", "cleanup_mesh"})
-COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "mirror_mesh",
+COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "extract_faces", "mirror_mesh",
                      "array_mesh", "solidify_mesh"})
 RIG = frozenset({"create_armature", "bind_skin", "repair_weights"})
 ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})

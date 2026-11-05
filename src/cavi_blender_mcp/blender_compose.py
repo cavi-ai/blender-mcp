@@ -1,9 +1,12 @@
 """Multi-mesh composition: booleans, joins, splits, mirrors, arrays and shells."""
 
+import math
+
 import bmesh
 import bpy
+from mathutils import Matrix
 
-from .blender_bridge import info, number, selected, vector
+from .blender_bridge import info, new_name, number, selected, vector
 from .blender_geometry import MAX_TRIANGLES, bake, free_name, loose_parts, source, triangle_count
 
 MAX_JOIN_OBJECTS = 64
@@ -139,8 +142,9 @@ def join_meshes(p):
             "triangles": triangle_count(target.data)}
 
 
-def subset(mesh, keep, by_vertex):
+def subset(mesh, keep, by_vertex, copy_data=False):
     bm = bmesh.new()
+    result = None
     try:
         bm.from_mesh(mesh)
         bm.verts.ensure_lookup_table()
@@ -154,14 +158,65 @@ def subset(mesh, keep, by_vertex):
             loose = [v for v in bm.verts if not v.link_faces]
             if loose:
                 bmesh.ops.delete(bm, geom=loose, context="VERTS")
-        result = bpy.data.meshes.new("CAVI Part")
+        result = mesh.copy() if copy_data else bpy.data.meshes.new("CAVI Part")
+        result.use_fake_user = False
         bm.to_mesh(result)
-        for material in mesh.materials:
-            result.materials.append(material)
+        if not copy_data:
+            for material in mesh.materials:
+                result.materials.append(material)
+        elif mesh.uv_layers:
+            result.uv_layers.active_index = mesh.uv_layers.active_index
+            for original, copied in zip(mesh.uv_layers, result.uv_layers, strict=True):
+                copied.active_render = original.active_render
         result.update()
         return result
+    except Exception:
+        if result is not None:
+            bpy.data.meshes.remove(result)
+        raise
     finally:
         bm.free()
+
+
+def extract_faces(p):
+    value, _ = source(p.get("name"))
+    label = new_name(p.get("new_name"))
+    faces = p.get("face_indices")
+    if (not isinstance(faces, list) or not 1 <= len(faces) <= 20000
+            or any(type(index) is not int or not 0 <= index < len(value.data.polygons)
+                   for index in faces) or len(set(faces)) != len(faces)):
+        raise ValueError("face_indices must contain 1 to 20000 unique source polygon indices")
+    if value.vertex_groups or value.find_armature() is not None:
+        raise ValueError("Face extraction requires an unrigged mesh without vertex groups")
+    world = value.matrix_world.copy()
+    determinant = world.determinant()
+    if (not all(math.isfinite(component) for row in world for component in row)
+            or not math.isfinite(determinant) or determinant == 0):
+        raise ValueError("Face extraction requires a finite nonsingular world transform")
+    ordinary = Matrix.LocRotScale(*world.decompose())
+    if any(not math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-6)
+           for left, right in zip(world, ordinary, strict=True)
+           for a, b in zip(left, right, strict=True)):
+        raise ValueError("Face extraction does not support sheared world transforms")
+    mesh, item = None, None
+    try:
+        mesh = subset(value.data, set(faces), False, copy_data=True)
+        mesh.name = label
+        item = bpy.data.objects.new(label, mesh)
+        (value.users_collection or [bpy.context.scene.collection])[0].objects.link(item)
+        item.matrix_world = world
+        for original, copied in zip(value.material_slots, item.material_slots, strict=True):
+            copied.link = original.link
+            if original.link == "OBJECT":
+                copied.material = original.material
+        return {**info(item), "source": value.name, "face_indices": sorted(faces),
+                "triangles": triangle_count(mesh)}
+    except Exception:
+        if item is not None:
+            bpy.data.objects.remove(item, do_unlink=True)
+        if mesh is not None:
+            bpy.data.meshes.remove(mesh)
+        raise
 
 
 def separate_mesh(p):
@@ -293,5 +348,5 @@ def solidify_mesh(p):
 
 
 HANDLERS = {"boolean_mesh": boolean_mesh, "join_meshes": join_meshes,
-            "separate_mesh": separate_mesh, "mirror_mesh": mirror_mesh,
+            "separate_mesh": separate_mesh, "extract_faces": extract_faces, "mirror_mesh": mirror_mesh,
             "array_mesh": array_mesh, "solidify_mesh": solidify_mesh}

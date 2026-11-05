@@ -289,7 +289,12 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `mirror`, `array`, `solidify`, `uv_transform`.
+`join`, `separate`, `extract_faces`, `mirror`, `array`, `solidify`, `uv_transform`.
+
+`extract_faces` takes a unique `new_name` and 1–20,000 unique `face_indices`.
+It copies those source polygons to an independent unrigged surface, retaining
+the world transform, materials, UVs and native mesh data without changing the
+original. Modifiers, shape keys and rigged sources are refused.
 
 `uv_transform` takes a `uv_transform` object with required source `faces` and
 optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an

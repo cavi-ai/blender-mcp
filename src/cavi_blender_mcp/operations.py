@@ -62,6 +62,7 @@ OPERATIONS = frozenset(
         "boolean_mesh",
         "join_meshes",
         "separate_mesh",
+        "extract_faces",
         "mirror_mesh",
         "array_mesh",
         "solidify_mesh",
