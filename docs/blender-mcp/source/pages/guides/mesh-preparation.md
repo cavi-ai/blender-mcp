@@ -25,6 +25,7 @@ on the same object without applying transforms or changing scene references.
 | `boolean` | Union, difference or intersect against one operand |
 | `join` | Consume sources into the target with transform, UV, group and slot remapping |
 | `separate` | Split by loose parts or material |
+| `extract_faces` | Copy explicit source polygons into an independent unrigged surface |
 | `mirror` | Mirror across the object origin with optional clipping and merge |
 | `array` | Constant object-space copies |
 | `solidify` | Add thickness with an offset |
@@ -75,6 +76,18 @@ Reinspect coverage and render the actual material before accepting a repair.
 Booleans, joins, splits, mirrors, arrays and solidify restore the original scene
 on failure. `join` takes 1–64 sources; `separate` creates 1–64 parts; `array`
 allows 2–1000 copies.
+
+`extract_faces` takes `new_name` and 1–20,000 unique `face_indices` from the
+current source polygons. The new object keeps the source world transform,
+material slots, selected corner UVs and native mesh attributes; the original
+mesh is unchanged. It removes unused geometry without filling boundaries or
+inferring garment regions. The source must have no modifiers, shape keys,
+vertex groups or armature binding. Every index and the new name are checked
+before copying; failure removes only the new output.
+
+```json
+{"action":"extract_faces","name":"Surface","new_name":"GarmentPatch","face_indices":[12,13],"lease_id":"<claim-token>"}
+```
 
 ## Related
 

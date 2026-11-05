@@ -34,6 +34,7 @@ def cases():
             object_info(action="Walk", mapped=[{"source": "Root", "target": "Root"}],
                         frames=[1., 24.], samples=2, action_slot=None)],
         "MeshEditResult": [object_info(uv_layer="UVMap"),
+            object_info(source="Surface", face_indices=[0, 2], triangles=4),
             object_info(triangles_before=20, triangles_target=10, triangles=10,
                         target=10, achieved=10, preservation="weighted", warnings=[]),
             object_info(faces_target=10, faces=10, quad_ratio=1.),
