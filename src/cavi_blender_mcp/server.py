@@ -723,7 +723,8 @@ async def mesh_edit(
         params = pick(action, values, ["kind", "amount"], {"apply": False})
     elif action == "unwrap":
         operation = "unwrap_mesh"
-        params = pick(action, values, (), {"angle_limit_degrees": 66, "island_margin": 0.02,
+        params = pick(action, values, (), {"angle_limit_degrees": 66, "island_margin": None,
+                                           "margin_px": 4, "texture_resolution": 1024,
                                            "uv_layer": None})
     elif action in {"decimate_to", "lod_chain"}:
         operation = action

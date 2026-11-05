@@ -109,7 +109,8 @@ class SurfaceTests(unittest.TestCase):
         self.assertEqual(inner[1], ("set_color", {"lease_id": "L", "name": "Cube",
                                                   "rgba": (1, 0, 0, 1), "slot": 0}))
         self.assertEqual(inner[2][1]["angle_limit_degrees"], 66)
-        self.assertEqual(inner[2][1]["island_margin"], 0.02)
+        self.assertIsNone(inner[2][1]["island_margin"])
+        self.assertEqual((inner[2][1]["margin_px"], inner[2][1]["texture_resolution"]), (4, 1024))
         self.assertEqual(inner[3][0], "export_mesh")
         self.assertFalse(inner[3][1]["include_empties"])
 
