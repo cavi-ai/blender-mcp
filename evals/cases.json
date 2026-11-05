@@ -7354,5 +7354,69 @@
       "protocol"
     ],
     "error": "validation"
+  },
+  {
+    "id": "uv-layout-needs-mode-inputs",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Body"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "requires texture_resolution and padding_pixels"
+  },
+  {
+    "id": "udim-coverage-rejects-padding",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Body"
+      ],
+      "udim_image": "Skin",
+      "padding_pixels": 2
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not take"
+  },
+  {
+    "id": "udim-coverage-rejects-resolution",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Body"
+      ],
+      "udim_image": "Skin",
+      "texture_resolution": [
+        1024,
+        1024
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "does not take"
+  },
+  {
+    "id": "udim-coverage-rejects-empty-image",
+    "tool": "inspect_uv_layout",
+    "arguments": {
+      "names": [
+        "Body"
+      ],
+      "udim_image": ""
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "validation"
   }
 ]

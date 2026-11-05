@@ -941,6 +941,10 @@ def _dispatch(operation, p):
         return bake(p)
     if operation == "export_instances":
         operation, p = "export_mesh", {**p, "preserve_instances": True}
+    if operation == 'inspect_udim_coverage':
+        from .blender_uv_layout import inspect_udim
+
+        return inspect_udim(p, obj)
     if operation == "inspect_uv_layout":
         from .blender_uv_layout import inspect
 

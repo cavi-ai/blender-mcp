@@ -183,3 +183,37 @@ UDIM authoring does not make a destination shader tile-aware. Declare the game's
 supported texture layout and color/data roles before delivery. Preserve the
 editable tiled source when making an explicit atlas or separate material sets;
 verify the adapted result with the consuming renderer.
+
+### Check source UV coverage
+
+After binding a tiled image, copy its actual native image name from shader
+inspection and check the mesh UV layer:
+
+```json
+{"names":["CharacterBody"],"udim_image":"skin.<UDIM>.exr","material":"CharacterFinish","uv_layer":"UVMap","comparison_budget":100000}
+```
+
+These are `inspect_uv_layout` arguments. This mode needs neither texture
+resolution nor padding inputs. It uses UV0 unless `uv_layer` is named, filters
+faces using actual object material-slot bindings, and reads the source without
+editing geometry, selection, images or ownership. Modifiers are not evaluated.
+
+The scope is `source_uv_udim_coverage`. `coverage` reports required, missing,
+unavailable and unused tiles, degenerate/nonfinite triangles, coordinates outside
+the ten-column nonnegative UDIM grid, and affected object/face examples. A tile
+is required when a UV triangle has positive intersection area with its cell;
+boundary-only contact does not require a neighbor. Cells enclosed by a triangle
+are included even when no vertex lies in them. Native tile buffers without
+positive dimensions/channels are unavailable.
+
+Require both `complete` and `coverage.passed`. Exhausted candidate budgets cannot
+pass, and unused tiles are unknown (`null`) until analysis completes. Tile lists
+are capped at 1000 and examples at 32, with exact counts and truncation flags.
+Read `image.tile_count` and `tiles_truncated` when inspecting image metadata.
+
+This is source UV-layer coverage, not shader-vector evaluation. Mapping nodes,
+procedural coordinates, projections, exported/evaluated UVs, filtering, overlaps,
+gutters and file precision require their corresponding checks. Verify that the
+chosen layer is the one sampled by the material before using this result as part
+of visual acceptance. Unique 0..1 overlap/gutter analysis remains available with
+`texture_resolution` and `padding_pixels` instead of `udim_image`.

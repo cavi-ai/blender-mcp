@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.57.0 - 2026-11-04
+
+- Check source UV coverage against an existing tiled image before rendering.
+- Report missing, unavailable and unused tiles with affected object and face examples.
+- Keep incomplete analysis from passing and retain per-material object overrides.
+- Share source UV collection and analytic clipping with unique-tile inspection.
+
 ## 0.56.0 - 2026-11-04
 
 - Bind explicitly declared UDIM tiles using packed native image snapshots.

@@ -212,19 +212,26 @@ async def inspect_mesh_quality(
 async def inspect_uv_layout(
     names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
     texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
-                              Annotated[StrictInt, Field(ge=1, le=16384)]],
-    padding_pixels: Annotated[Number, Field(ge=0, le=256)],
+                              Annotated[StrictInt, Field(ge=1, le=16384)]] | None = None,
+    padding_pixels: Annotated[Number | None, Field(ge=0, le=256)] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
     material: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    udim_image: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
 ) -> UVLayout:
-    """Inspect one texture set's source UVs (max 20,000 triangles); default layer index 0.
-
-    Analytic overlaps, chart gutters and tile borders use the supplied dimensions.
-    unique_tile_ready concerns unique 0..1 baking; incomplete analysis is never ready.
-    Optional material selects faces using that exact material across slots and meshes.
-    Modifiers are not evaluated. No mesh or selection edits.
+    """Source UVs, max 20,000 triangles; layer index 0 unless named. material filters faces.
+    texture_resolution + padding_pixels: unique 0..1 overlaps and gutters.
+    udim_image: coverage of native tiles by source UVs; excludes shader vector transforms.
+    comparison_budget bounds candidates. Incomplete work cannot pass. No geometry,
+    selection or image edits; modifiers are not evaluated.
     """
+    if udim_image is not None:
+        if texture_resolution is not None or padding_pixels is not None:
+            raise ValueError('UDIM coverage does not take texture_resolution or padding_pixels')
+        return await run(call, 'inspect_udim_coverage', names=names, uv_layer=uv_layer,
+                         comparison_budget=comparison_budget, material=material, udim_image=udim_image)
+    if texture_resolution is None or padding_pixels is None:
+        raise ValueError('Unique-tile analysis requires texture_resolution and padding_pixels')
     return await run(call, "inspect_uv_layout", names=names,
                      texture_resolution=texture_resolution, padding_pixels=padding_pixels,
                      uv_layer=uv_layer, comparison_budget=comparison_budget, material=material)

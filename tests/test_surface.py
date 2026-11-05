@@ -68,8 +68,11 @@ class SurfaceTests(unittest.TestCase):
         tool = next(t for t in asyncio.run(server.mcp.list_tools())
                     if t.name == "inspect_uv_layout")
         self.assertTrue(tool.annotations.read_only_hint)
-        self.assertEqual(set(tool.input_schema['required']),
-                         {'names', 'texture_resolution', 'padding_pixels'})
+        self.assertEqual(set(tool.input_schema['required']), {'names'})
+        self.assertTrue({'texture_resolution','padding_pixels','udim_image'} <=
+                        set(tool.input_schema['properties']))
+        with self.assertRaisesRegex(ValueError, 'requires texture_resolution and padding_pixels'):
+            asyncio.run(server.inspect_uv_layout(['Prop']))
 
     def test_scene_info_pages_or_targets_one_object(self):
         calls = self.capture()
