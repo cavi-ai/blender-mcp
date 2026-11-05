@@ -14,7 +14,7 @@ npm run eval:protocol
 ```
 
 The unit suite does not need Blender. Native checks under `tests/blender_*.py`
-run against a disposable factory scene and an empty workspace:
+are optional, never part of a gate, and run one script at a time against a disposable factory scene and an empty workspace:
 
 ```bash
 blender --background --factory-startup --python-exit-code 1 \
@@ -48,6 +48,8 @@ blender --background --factory-startup --python-exit-code 1 \
 - Update `reference/tools.md`, the README tool count and `evals/cases.json` when
   the tool surface changes.
 - Keep a pull request to one concern.
+- Do not change a version. Add CHANGELOG lines under `## Unreleased`; releases
+  are cut from a `vX.Y.Z` tag when the owner calls one.
 
 ## Commits
 
