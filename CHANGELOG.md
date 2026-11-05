@@ -6,15 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
-- Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
-
-## 0.58.0 - 2026-11-04
-
 - Transform explicit source-face UVs on an existing layer without rebuilding geometry.
 - Preserve skin weights, shape keys, other UVs and selection; roll back failed writes.
 - Report affected faces, materials and before/after UV bounds.
 
-## 0.57.0 - 2026-11-04
+- Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
 
 - Check source UV coverage against an existing tiled image before rendering.
 - Report missing, unavailable and unused tiles with affected object and face examples.
