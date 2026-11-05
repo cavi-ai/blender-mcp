@@ -344,6 +344,8 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
 a lease. Export supports animated FBX, GLB and USD output and FBX and USD
 texture sidecars with `textures=true`.
+`uv_layer` exports a named map as UV0 for FBX/GLB or `st` for USD, including
+evaluated assemblies. `uv_maps` records the mapping; source data is restored.
 
 [Guide](../guides/asset-import-export.md) and
 [local generation](../guides/local-generation.md).

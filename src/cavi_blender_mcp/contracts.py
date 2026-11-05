@@ -80,6 +80,7 @@ class Ownership(Result):
 
 
 class AssetResult(Result):
+    uv_maps: list[dict[str,Any]] | None = None
     path: str | None = None
     bytes: int | None = None
     objects: list[str | dict[str, Any]] | None = None

@@ -7721,5 +7721,54 @@
       "native"
     ],
     "error": "bit_depth validation"
+  },
+  {
+    "id": "save-uv-argument",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "save",
+      "path": "unused.blend",
+      "uv_layer": "Atlas"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: uv_layer"
+  },
+  {
+    "id": "import-uv-argument",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "import",
+      "path": "unused.fbx",
+      "name": "Loaded",
+      "uv_layer": "Atlas"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: uv_layer"
+  },
+  {
+    "id": "empty-export-uv",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "unused.fbx",
+      "names": [
+        "Hero"
+      ],
+      "uv_layer": ""
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   }
 ]

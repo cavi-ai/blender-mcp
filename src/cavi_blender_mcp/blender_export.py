@@ -10,6 +10,7 @@ import bpy
 import numpy as np
 
 from .blender_bridge import obj, output_file, selected, with_empties
+from .blender_export_uv import promote
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base
 from .presets import AXIS_PRESETS, USD_AXES
 
@@ -117,10 +118,11 @@ def usd(path, preset, instances, animations=False):
 
 
 def write(path, objects, selection, preset, instances, empties, animations=False,
-          textures=False, baked_animation=False, animation_step=None):
+          textures=False, baked_animation=False, animation_step=None, uv_layer=None, uv_objects=None):
     suffix = path.suffix.lower()
     sampled = {}
-    with selected(selection), (export_identities(selection) if animations else nullcontext()):
+    primary='st' if suffix in {'.usd','.usda','.usdc'} else None
+    with promote(objects if uv_objects is None else uv_objects,uv_layer,primary) as uv_maps, selected(selection), (export_identities(selection) if animations else nullcontext()):
         if suffix == ".fbx":
             from .export_instances import instance_meshes
 
@@ -138,7 +140,7 @@ def write(path, objects, selection, preset, instances, empties, animations=False
             result = usd(path, preset, instances, animations)
     if "FINISHED" not in result:
         raise RuntimeError("Export did not finish")
-    return sampled
+    return {**sampled,**({'uv_maps':uv_maps} if uv_maps is not None else {})}
 
 
 def flag(p, key):
@@ -403,7 +405,8 @@ def export_asset(p):
             try:
                 with prepared_images(objects, directory) if textures else nullcontext():
                     sampled = write(path, objects, selection, preset, False, empties,
-                          animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step)
+                          animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step,
+                          uv_layer=p.get('uv_layer'))
                     files = texture_receipt(directory) if directory else []
             except Exception:
                 if directory is not None:
@@ -423,14 +426,14 @@ def export_asset(p):
         directory = sidecars(path) if textures else None
         try:
             with prepared_images(objects, directory) if textures else nullcontext():
-                write(path, meshes if instances else objects, selection, preset,
-                      instances, empties, textures=textures)
+                sampled=write(path, meshes if instances else objects, selection, preset,
+                      instances, empties, textures=textures,uv_layer=p.get('uv_layer'),uv_objects=meshes)
                 files = texture_receipt(directory) if directory else []
         except Exception:
             if directory is not None:
                 shutil.rmtree(directory, ignore_errors=True)
             raise
-    return {"path": str(path), "bytes": path.stat().st_size, "axis": preset,
+    return {**sampled,"path": str(path), "bytes": path.stat().st_size, "axis": preset,
             "textures": files,
             "objects": [item.name for item in objects],
             "lods": [item.name for item in meshes if LOD.search(item.name)] if lods else [],

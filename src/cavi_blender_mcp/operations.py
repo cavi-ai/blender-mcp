@@ -18,6 +18,8 @@ OPERATIONS = frozenset(
         "append_asset_library_instances",
         "make_instance_unique",
         "export_assembly",
+        "export_uv_assembly",
+        "export_uv_asset",
         "set_geometry_inputs",
         "snapshot_geometry",
         "compare_rig_motion",
@@ -120,6 +122,8 @@ LEASE_FREE = frozenset(
 SERVER_LEASE_FREE = LEASE_FREE | {"session_control"}
 SLOW_OPERATIONS = frozenset(
     {
+        "export_uv_assembly",
+        "export_uv_asset",
         "make_instance_unique",
         "import_mesh",
         "inspect_asset_library",
