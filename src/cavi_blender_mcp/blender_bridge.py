@@ -988,7 +988,7 @@ def _dispatch(operation, p):
         if not isinstance(p.get('instance'), str) or not p['instance']:
             raise ValueError('instance must name a scene collection instance')
         return (inspect if operation == 'inspect_instance_geometry_nodes' else set_inputs)(p)
-    if operation == 'export_assembly':
+    if operation in {'export_assembly','export_uv_assembly'}:
         from .blender_assembly import export
 
         return export(p)
@@ -1104,7 +1104,7 @@ def _dispatch(operation, p):
         if operation == "create_terrain":
             return HANDLERS[operation](p, _workspace)
         return HANDLERS[operation](p)
-    if operation == "export_asset":
+    if operation in {"export_asset","export_uv_asset"}:
         from .blender_export import export_asset
 
         return export_asset(p)

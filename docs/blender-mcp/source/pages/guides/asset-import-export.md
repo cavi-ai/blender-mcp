@@ -68,6 +68,37 @@ Formats are `.fbx`, `.glb`, `.usd`, `.usda` and `.usdc`.
 - GLB and USD exports include shape keys/morph targets and shape-key animation.
   FBX shape-key animation remains out of scope.
 
+### Choose primary texture coordinates
+
+Use `uv_layer` when baked textures target a named atlas that differs from the
+authoring shader's default coordinates:
+
+```json
+{"action":"export","names":["Hero"],"path":"exports/hero.fbx","uv_layer":"BakeAtlas","lease_id":"<claim-token>"}
+```
+
+FBX and GLB receive that map as UV0. USD receives it as the named `st` primvar;
+USD primvars do not define an ordinal UV0. The selected map becomes render-active
+on temporary mesh data. Other UV coordinates are retained. In USD, an existing
+secondary `st` map takes the selected map's former name to avoid a collision.
+
+The `uv_maps` receipt identifies each object, original layer/index and exported
+layer mapping. FBX/GLB report `export_index: 0`; USD reports
+`export_primvar: st` and a null index. Consume this mapping rather than inferring
+the primary coordinates from a USD importer's layer order.
+
+The source mesh, shared-data relationships, material bindings and authoring UV
+flags are restored after export, including a failed encoder. Named layers must
+exist on every selected render mesh, including requested LODs. Generated collision
+meshes do not need the atlas. The option also applies to evaluated collection
+assemblies and the existing animated export path. Bake pairs use their source UVs.
+
+This chooses geometry coordinates; it does not translate a procedural material
+or attach baked maps automatically. Bind the actual maps in the consuming material
+and validate its UV channel and normal-map tangent convention. This option requires
+an updated server and bridge; older bridges refuse the distinct export operation
+before writing a file.
+
 ### Axis presets
 
 | Preset | FBX and USD |

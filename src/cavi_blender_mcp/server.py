@@ -970,29 +970,28 @@ async def asset_io(
     textures: StrictBool | None = None,
     bake_pair: BakePair | None = None,
     axis: Literal["unity", "unreal", "godot"] | None = None,
+    uv_layer: Annotated[str | None, Field(min_length=1,max_length=63)] = None,
     lease_id: LeaseId = None,
 ) -> AssetResult:
-    """Move assets in or out. Params per action:
-    import: GLB, FBX, OBJ or USD path, name (new prefix); export: names, .fbx/.glb/.usd path,
-    preserve_instances, include_empties, lods, collision, animations (FBX/GLB/USD),
-    textures (FBX/USD sidecars), axis=unity; assembly=true instead exports evaluated
-    static collection-instance names to FBX/GLB with axis and textures only;
-    or bake_pair alone (writes <stem>_low.fbx,
-    <stem>_high.fbx);
-    save: .blend path; generate: image, .glb path, resolution=128 for the TripoSR provider
-    (local, no lease; CAVI_GENERATION_PROVIDER=triposg or triposg-mlx selects TripoSG, without
-    resolution).
+    """Import GLB/FBX/OBJ/USD with a new name prefix; save a new .blend; export names to FBX/GLB/USD.
+    uv_layer selects UV0 for FBX/GLB or st for USD on temporary mesh data.
+    assembly exports evaluated static collection instances to FBX/GLB.
+    bake_pair alone writes <stem>_low.fbx and <stem>_high.fbx.
+    textures writes FBX/USD sidecars; axis defaults to unity.
+    generate uses image and new GLB path with the configured local provider, without a lease;
+    resolution applies only to TripoSR (default 128).
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
-              'assembly': assembly}
+              'assembly': assembly,'uv_layer':uv_layer}
     if action == 'export' and assembly is True:
         values.pop('assembly')
-        params = pick(action, values, ['names'], {'axis': None, 'textures': False})
-        return await run(call, 'export_assembly', path=path, lease_id=lease_id, **params)
+        params = pick(action, values, ['names'], {'axis': None, 'textures': False,'uv_layer':None})
+        if params['uv_layer'] is None:params.pop('uv_layer')
+        return await run(call, 'export_uv_assembly' if uv_layer is not None else 'export_assembly', path=path, lease_id=lease_id, **params)
     if action == 'export' and assembly is False:
         values.pop('assembly')
     if action == "generate":
@@ -1016,7 +1015,10 @@ async def asset_io(
     params = pick(action, values, ["names"], {"preserve_instances": False,
                                               "include_empties": False, "lods": False,
                                               "collision": False, "animations": False,
-                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None})
+                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None,'uv_layer':None})
+    if params['uv_layer'] is None:params.pop('uv_layer')
+    else:
+        return await run(call,'export_uv_asset',lease_id=lease_id,path=path,**params)
     if (params["lods"] or params["collision"] or params["animations"]
             or params["textures"] or params["axis"] or params["baked_animation"] or params["animation_sample_step"] is not None
             or path.lower().endswith((".usd", ".usda", ".usdc"))):

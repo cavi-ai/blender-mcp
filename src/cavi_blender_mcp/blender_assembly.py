@@ -94,13 +94,14 @@ def export(params):
         directory = sidecars(path) if textures else None
         try:
             with prepared_images(objects, directory) if textures else nullcontext():
-                write(path, objects, objects, preset, False, False, textures=textures)
+                uv_result=write(path, objects, objects, preset, False, False, textures=textures,
+                                uv_layer=params.get('uv_layer'))
             files = texture_receipt(directory) if directory else []
         except Exception:
             if directory:
                 shutil.rmtree(directory, ignore_errors=True)
             raise
-        return {**report, 'path': str(path), 'bytes': path.stat().st_size,
+        return {**report,**uv_result, 'path': str(path), 'bytes': path.stat().st_size,
                 'roots': params['names'], 'textures': files,
                 'scope': 'evaluated_static_assembly_current_frame',
                 'frame': bpy.context.scene.frame_current+bpy.context.scene.frame_subframe}
