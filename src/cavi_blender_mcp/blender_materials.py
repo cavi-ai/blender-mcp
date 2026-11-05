@@ -7,6 +7,7 @@ from pathlib import Path
 
 import bpy
 
+from .blender_material_bindings import bind, capture, restore
 from .textures import read_image
 
 CONFIG_TAG = "cavi_material_config"
@@ -329,34 +330,17 @@ def assign(params, workspace, find_object):
     material = existing
     created = material is None
     new_images = []
-    data_slots = {value.data: list(value.data.materials) for value in values}
-    object_slots = {value: [(s.link, s.material) for s in value.material_slots] for value in values}
+    data_slots, object_slots = capture(values)
     try:
         if created:
             material = bpy.data.materials.new(name)
         material.use_nodes = True
         build(material, config, workspace, receipts, new_images,
               old_images if update else None)
-        for value in values:
-            if not value.material_slots:
-                value.data.materials.append(None if modes[value] == 'OBJECT' else material)
-            value.material_slots[slot].link = modes[value]
-            value.material_slots[slot].material = material
+        bind(values, material, slot, modes)
         material[CONFIG_TAG] = json.dumps(config, sort_keys=True)
     except Exception:
-        for data, previous in data_slots.items():
-            if not previous and data.materials:
-                data.materials.clear()
-            else:
-                while len(data.materials) > len(previous):
-                    data.materials.pop(index=len(data.materials)-1)
-            for index, old in enumerate(previous):
-                if data.materials[index] != old:
-                    data.materials[index] = old
-        for value, previous in object_slots.items():
-            for index, (link, old) in enumerate(previous):
-                value.material_slots[index].link = link
-                value.material_slots[index].material = old
+        restore((data_slots, object_slots))
         if created:
             if material is not None:
                 bpy.data.materials.remove(material)

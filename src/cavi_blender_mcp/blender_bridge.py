@@ -887,6 +887,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation=='make_material_unique':
+        from .blender_material_variants import make_unique as copy_material
+
+        return copy_material(p,obj)
     if operation == 'transform_uv':
         from .blender_uv_edit import transform as transform_uv
 

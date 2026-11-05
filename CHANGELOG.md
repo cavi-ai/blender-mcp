@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+- Branch authored materials and nested shader groups onto selected mesh slots.
+- Preserve shared geometry with object bindings and retain external image/action references.
+- Share material-slot capture and rollback across assignment and finish variants.
+
 - Make shared mesh data independent without replacing the object or applying transforms.
 - Retain skin, animated shape keys and material-slot bindings; clean failed copies.
 - Keep scene and object-transform dispatch separate from UV transforms.

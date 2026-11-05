@@ -1,9 +1,36 @@
 # Materials and UVs
 
-`assign_material` binds a PBR material to exact mesh slots and packs bounded
-workspace PNG or JPEG maps.
+## Independent authored finishes
 
-## Inputs
+To branch an existing finish on selected scene meshes, call `assign_material`:
+
+```json
+{"action":"make_unique","names":["Lamp"],"material_name":"BlueGlaze","slot":0,"lease_id":"<claim-token>"}
+```
+
+The selected slots must have the same source material, and the new name must be
+unused. Native material and nested shader-group copies preserve links, defaults,
+interfaces and custom properties. Reused groups stay shared within the new graph
+while becoming independent from the source graph. The default `OBJECT` binding
+retains shared mesh geometry and other objects' finishes. Explicit `DATA` binding
+requires single-user editable meshes.
+
+Images, animation actions and scene-object references stay shared. Use `set_image`
+to replace a variant's texture binding independently; copying a graph does not
+duplicate texture pixels or animation actions. `material_copy` reports the source
+and copied group mapping; `bindings` reports each target's actual slot mode.
+
+Inspect the copy, compare matched renders before and after tuning, and save/reopen
+the source. Failed copies restore slot bindings and remove their new material and
+group data. Blender shader preservation still requires explicit adaptation to the
+consuming game shader.
+
+## Managed PBR assignment
+
+`assign_material` with `action="assign"` builds a managed PBR material on exact
+mesh slots and packs bounded workspace PNG or JPEG maps.
+
+### Inputs
 
 | Parameter | Purpose |
 | --- | --- |
@@ -24,7 +51,7 @@ workspace PNG or JPEG maps.
 Base color and emission use sRGB. Normal, roughness, metallic and alpha use
 Non-Color.
 
-## Requirements
+### Requirements
 
 - DATA assignment needs single-user mesh data; OBJECT overrides retain shared geometry.
 - Textured assignment needs an existing UV layer.
@@ -32,13 +59,13 @@ Non-Color.
   pixels.
 - The requested slot must exist, unless it is slot 0 on a mesh with no slots.
 
-## Updating
+### Updating
 
 `update_existing=true` preserves unspecified settings and replaces supplied maps.
 The material must carry this tool's configuration tag and must be bound to the
 requested slot. Untagged materials are refused, and maps cannot be removed.
 
-## Verification
+### Verification
 
 Run `inspect_mesh_quality` with `checks=["materials"]`. It reports PBR bindings,
 expected color spaces, packed state, resolution consistency, unsupported graph

@@ -813,7 +813,7 @@ async def assign_material(
     lease_id: LeaseId = None,
     instance: str | None = None,
     link_mode: Literal['DATA', 'OBJECT'] | None = None,
-    action: Literal['assign', 'inspect', 'set_inputs', 'set_image'] = 'assign',
+    action: Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique'] = 'assign',
     group_path: list[str] | None = None,
     node: str | None = None,
     inputs: dict[str, JsonValue] | None = None,
@@ -822,25 +822,30 @@ async def assign_material(
     offset: Annotated[StrictInt | None, Field(ge=0)] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
 ) -> MaterialAssignment:
-    """assign: names, material_name; PNG/JPEG maps (color/emission sRGB, data Non-Color).
-    instance scopes kit meshes; OBJECT retains shared geometry.
-    inspect: group_path, node, offset/limit; lease-free.
-    set_inputs: node, inputs/outputs by socket ID; linear values, links retained,
-    shared users affected, managed config detached. set_image: node, image
-    (workspace path, explicit color_space, alpha_mode); packs source bytes.
+    """assign: names, material_name; color/emission sRGB, data Non-Color.
+    instance scopes kit meshes; OBJECT shares geometry.
+    inspect: group_path, node, offset/limit; read-only.
+    set_inputs: node, inputs/outputs socket IDs; linear, links kept, shared users
+    affected, config detached. set_image: node, image(path,color_space,alpha_mode,tiles); packed.
+    make_unique: names, new material_name; copy groups, share images/actions.
     """
     if material_name is None:
         raise ValueError('material_name is required')
     shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
-    if action != 'assign':
-        pick(action, {'names': names, 'base_color_texture': base_color_texture, 'base_color': base_color,
+    values = {'names': names, 'base_color_texture': base_color_texture, 'base_color': base_color,
             'roughness': roughness, 'metallic': metallic, 'roughness_texture': roughness_texture,
             'metallic_texture': metallic_texture, 'normal_texture': normal_texture, 'normal_strength': normal_strength,
             'emission_texture': emission_texture, 'emission_strength': emission_strength,
             'alpha_texture': alpha_texture, 'alpha_mode': alpha_mode, 'uv_scale': uv_scale,
             'uv_offset': uv_offset, 'uv_rotation_degrees': uv_rotation_degrees,
             'update_existing': update_existing, 'instance': instance, 'link_mode': link_mode,
-            'slot': slot if slot != 0 else None})
+            'slot': slot if slot != 0 else None}
+    if action == 'make_unique':
+        pick(action, shader)
+        params = pick(action, values, ['names'], {'slot': 0, 'link_mode': 'OBJECT'})
+        return await run(call, 'make_material_unique', material_name=material_name, lease_id=lease_id, **params)
+    if action != 'assign':
+        pick(action, values)
         if action == 'inspect':
             params = pick(action, shader, (), {'group_path': [], 'node': None, 'offset': 0, 'limit': 100})
             return await run(call, 'inspect_material_nodes', material_name=material_name, **params)

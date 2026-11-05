@@ -300,6 +300,11 @@ reports affected faces, materials and UV bounds. No implicit chart expansion.
 
 ## assign_material
 
+`make_unique` copies the selected slots' authored material and nested node groups
+to a new `material_name`. It takes `names`, `slot` (default 0) and `link_mode`
+(default OBJECT). Image, action and scene references remain shared. Results include
+`material_copy` and actual `bindings`.
+
 Mutating. Binds a PBR material to exact mesh slots.
 
 | Parameter | Values |
