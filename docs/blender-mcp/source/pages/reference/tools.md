@@ -430,3 +430,12 @@ inferred connected-bone flags while preserving hierarchy and rest positions, so
 joint translation keys remain effective.
 
 `rig_edit contact_lock` takes `source_action`, `new_name`, `action_name`, optional `names`/`frame_step`, and typed `foot_locks`. See [editable contact correction](../guides/rigging-and-animation.md#correct-declared-foot-contacts).
+
+## Source UV coverage
+
+`inspect_uv_layout` with `udim_image` checks source UV triangles against an actual
+tiled image. Use the exact `material` and `uv_layer` when needed. Its
+`source_uv_udim_coverage` result requires `complete` and `coverage.passed`; it
+reports missing/unavailable tiles and affected faces without claiming shader
+vector evaluation. Omit texture resolution and padding in this mode. See
+[source UV coverage](../guides/materials-and-uvs.md#check-source-uv-coverage).

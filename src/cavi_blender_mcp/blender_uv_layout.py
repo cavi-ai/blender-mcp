@@ -4,7 +4,7 @@ import bpy
 from .uv_layout import MAX_TRIANGLES, analyze
 
 
-def inspect(params, find_object):
+def collect(params, find_object):
     names = params['names']
     if (not isinstance(names, list) or not 1 <= len(names) <= 32
             or any(not isinstance(n, str) or not n for n in names) or len(set(names)) != len(names)):
@@ -15,7 +15,7 @@ def inspect(params, find_object):
     material = params.get('material')
     if material is not None and (not isinstance(material, str) or not 1 <= len(material) <= 63):
         raise ValueError('Material must be an exact 1..63 character name')
-    triangles, vertices, objects = [], [], []
+    triangles, vertices, objects, sources = [], [], [], []
     vertex_offset = 0
     for name in names:
         value = find_object(name)
@@ -44,18 +44,45 @@ def inspect(params, find_object):
         for triangle in selected:
             triangles.append([tuple(layer.data[loop].uv) for loop in triangle.loops])
             vertices.append([vertex + vertex_offset for vertex in triangle.vertices])
+            sources.append({'object':name, 'face':triangle.polygon_index, 'source_triangle':triangle.index})
         vertex_offset += len(mesh.vertices)
         objects.append({'name': name, 'mesh': mesh.name, 'uv_layer': layer.name,
                         'uv_layer_index': list(mesh.uv_layers).index(layer),
+                        'render_uv_layer': next((u.name for u in mesh.uv_layers if u.active_render), None),
                         'first_triangle': first, 'triangles': count,
                         'source_triangles': len(mesh.loop_triangles),
                         'material_slots': list(slots.values()),
                         'unevaluated_modifiers': [m.type for m in value.modifiers]})
     if not triangles:
         raise ValueError('No source triangles use the requested material')
+    return triangles, vertices, objects, sources
+
+
+def inspect(params, find_object):
+    triangles, vertices, objects, _sources = collect(params, find_object)
     result = analyze(triangles, vertices, params['texture_resolution'], params['padding_pixels'],
                      params.get('comparison_budget', 100000))
-    return {**result, 'scope': 'source_uv_one_texture_set', 'material': material, 'objects': objects,
+    return {**result, 'scope': 'source_uv_one_texture_set', 'material': params.get('material'), 'objects': objects,
             'file': bpy.data.filepath, 'dirty': bpy.data.is_dirty,
             'not_checked': ['evaluated or exported UVs', 'material UV transforms',
                             'bake projection and cage', 'dilation and mip filtering']}
+
+
+def inspect_udim(params, find_object):
+    from .udim_coverage import analyze as coverage
+
+    image = bpy.data.images.get(params['udim_image'])
+    if image is None or image.source != 'TILED':
+        raise ValueError('udim_image must name an existing tiled image')
+    triangles, _vertices, objects, sources = collect(params, find_object)
+    tiles = [{'tile':t.number, 'size':list(t.size), 'channels':t.channels} for t in image.tiles]
+    unavailable = [t['tile'] for t in tiles if min(t['size']) <= 0 or t['channels'] <= 0]
+    result = coverage(triangles, [t['tile'] for t in tiles], params.get('comparison_budget',100000), unavailable)
+    result['examples'] = [{**example, **sources[example['triangle']]} for example in result['examples']]
+    return {'scope':'source_uv_udim_coverage', 'complete':result['complete'],
+        'material':params.get('material'), 'objects':objects, 'coverage':result,
+        'image':{'name':image.name, 'tiles':tiles[:1000], 'tile_count':len(tiles),
+                 'tiles_truncated':len(tiles) > 1000, 'dirty':image.is_dirty},
+        'file':bpy.data.filepath, 'dirty':bpy.data.is_dirty,
+        'not_checked':['evaluated or exported UVs', 'shader vector transforms and projections',
+                       'overlaps and gutters', 'file hashes and source precision', 'texture filtering']}

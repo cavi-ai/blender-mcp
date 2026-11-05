@@ -1,8 +1,9 @@
 """Declared response fields for the Blender tools."""
 
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from cavi_mcp_core.contracts import Result, VariantResult
+from pydantic import model_validator
 
 
 class SceneInfo(Result):
@@ -35,16 +36,36 @@ class MeshQuality(Result):
     not_checked: list[str]
 
 
-class UVLayout(Result):
+class UVLayout(VariantResult):
+    scopes: ClassVar = ('source_uv_one_texture_set', 'source_uv_udim_coverage')
+    shapes = (('unique_tile_ready', 'texture_resolution', 'overlap', 'padding'), ('coverage',))
+    nullable_shape_fields = frozenset({'material'})
     material: str | None = None
-    scope: Literal["source_uv_one_texture_set"]
+    scope: Literal['source_uv_one_texture_set', 'source_uv_udim_coverage']
     complete: bool
-    unique_tile_ready: bool
-    texture_resolution: list[int]
     objects: list[dict[str, Any]]
-    overlap: dict[str, Any]
-    padding: dict[str, Any]
     not_checked: list[str]
+    unique_tile_ready: bool | None = None
+    texture_resolution: list[int] | None = None
+    overlap: dict[str, Any] | None = None
+    padding: dict[str, Any] | None = None
+    coverage: dict[str, Any] | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def require_scope_fields(cls, value):
+        if isinstance(value, dict) and value.get('scope') in cls.scopes:
+            fields = cls.shapes[cls.scopes.index(value['scope'])]
+            if not all(key in value for key in fields):
+                raise ValueError('UV result is missing the fields required by its scope')
+        return value
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema, handler):
+        schema = super().__get_pydantic_json_schema__(core_schema, handler)
+        for scope, branch in zip(cls.scopes, schema['anyOf'], strict=True):
+            branch['properties'] = {'scope': {'const': scope}}
+        return schema
 
 
 class Ownership(Result):

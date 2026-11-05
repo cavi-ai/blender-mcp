@@ -20,7 +20,7 @@ def _area(poly):
                    for i in range(1, len(poly) - 1))) / 2
 
 
-def _intersection(a, b):
+def triangle_intersection_area(a, b):
     """Sutherland-Hodgman clipping of two triangles, independent of winding."""
     poly = list(a)
     sign = 1 if _cross(b[1] - b[0], b[2] - b[0]) > 0 else -1
@@ -134,7 +134,7 @@ def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget):
             if lo[y, 1] > hi[x, 1] + padding_pixels or lo[x, 1] > hi[y, 1] + padding_pixels:
                 continue
             j = int(valid[y])
-            area = _intersection(pixels[i], pixels[j])
+            area = triangle_intersection_area(pixels[i], pixels[j])
             if area > AREA_EPSILON:
                 overlaps += 1
                 total_area += area

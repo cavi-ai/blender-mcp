@@ -94,6 +94,9 @@ def node_report(node):
     report = {'name': node.name, 'type': node.type,
               'inputs': [socket_report(s) for s in node.inputs],
               'outputs': [socket_report(s) for s in node.outputs]}
+    for name in ['uv_map', 'from_instancer', 'vector_type', 'projection', 'extension']:
+        if hasattr(node, name):
+            report[name] = getattr(node, name)
     if node.type == 'GROUP' and node.node_tree:
         report['group'] = node.node_tree.name
     if hasattr(node, 'image') and node.image:
