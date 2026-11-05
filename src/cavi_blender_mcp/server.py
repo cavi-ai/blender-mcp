@@ -706,7 +706,7 @@ async def mesh_edit(
     uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
 ) -> MeshEditResult:
-    """Edit a leased single-user mesh in Object Mode; see reference/tools.md."""
+    """Edit a leased mesh."""
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
               "uv_layer": uv_layer, "target_triangles": target_triangles,
