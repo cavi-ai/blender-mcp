@@ -2,7 +2,8 @@
 
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
-[Semantic Versioning](https://semver.org/).
+[Semantic Versioning](https://semver.org/). Versions come from git tags; a pull request
+adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
@@ -10,6 +11,7 @@ All notable changes to this project are documented here. The format follows
 - Preserve skin weights, shape keys, other UVs and selection; roll back failed writes.
 - Report affected faces, materials and before/after UV bounds.
 
+- The package version, and the release the documentation names, come from the git tag.
 - Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
 
 - Check source UV coverage against an existing tiled image before rendering.

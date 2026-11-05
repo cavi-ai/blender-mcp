@@ -35,13 +35,9 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Could not resolve pyproject.toml version"
-            exit 1
-          fi
-          if [[ "$RELEASE_TAG" != "v$version" ]]; then
-            echo "::error::Expected release tag v$version, got $RELEASE_TAG"
+          version="${RELEASE_TAG#v}"
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$RELEASE_TAG is not a vX.Y.Z release tag"
             exit 1
           fi
           commit="$GITHUB_SHA"
