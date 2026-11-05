@@ -61,7 +61,7 @@ def collect(params, find_object):
 def inspect(params, find_object):
     triangles, vertices, objects, _sources = collect(params, find_object)
     result = analyze(triangles, vertices, params['texture_resolution'], params['padding_pixels'],
-                     params.get('comparison_budget', 100000))
+                     params.get('comparison_budget'))
     return {**result, 'scope': 'source_uv_one_texture_set', 'material': params.get('material'), 'objects': objects,
             'file': bpy.data.filepath, 'dirty': bpy.data.is_dirty,
             'not_checked': ['evaluated or exported UVs', 'material UV transforms',
@@ -77,7 +77,7 @@ def inspect_udim(params, find_object):
     triangles, _vertices, objects, sources = collect(params, find_object)
     tiles = [{'tile':t.number, 'size':list(t.size), 'channels':t.channels} for t in image.tiles]
     unavailable = [t['tile'] for t in tiles if min(t['size']) <= 0 or t['channels'] <= 0]
-    result = coverage(triangles, [t['tile'] for t in tiles], params.get('comparison_budget',100000), unavailable)
+    result = coverage(triangles, [t['tile'] for t in tiles], params.get('comparison_budget'), unavailable)
     result['examples'] = [{**example, **sources[example['triangle']]} for example in result['examples']]
     return {'scope':'source_uv_udim_coverage', 'complete':result['complete'],
         'material':params.get('material'), 'objects':objects, 'coverage':result,

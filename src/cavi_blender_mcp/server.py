@@ -224,14 +224,15 @@ async def inspect_uv_layout(
                               Annotated[StrictInt, Field(ge=1, le=16384)]] | None = None,
     padding_pixels: Annotated[Number | None, Field(ge=0, le=256)] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
+    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000)] = None,
     material: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     udim_image: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
 ) -> UVLayout:
     """Source UVs, max 20,000 triangles; layer index 0 unless named. material filters faces.
     texture_resolution + padding_pixels: unique 0..1 overlaps and gutters.
     udim_image: coverage of native tiles by source UVs; excludes shader vector transforms.
-    comparison_budget bounds candidates. Incomplete work cannot pass. No geometry,
+    comparison_budget bounds candidates, 50 per inspected triangle unless given.
+    Incomplete work cannot pass. No geometry,
     selection or image edits; modifiers are not evaluated.
     """
     if udim_image is not None:

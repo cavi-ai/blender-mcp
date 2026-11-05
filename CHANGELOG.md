@@ -21,7 +21,9 @@ adds its lines under Unreleased and never edits a version.
 
 - The package version, and the release the documentation names, come from the git tag.
 - Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
-- `unwrap` packs islands `margin_px` apart (default 4 px at `texture_resolution` 1024) instead of 2% of the UV square; `island_margin` still sets a fraction.
+- `unwrap` packs islands `margin_px` apart (default 4 px at `texture_resolution` 1024) instead of 2% of the UV square, clear of the tile border, and gives faces that fold over their own island new islands; `island_margin` still sets a fraction.
+- `decimate_to` dissolves faces collapsed onto coincident vertices.
+- `inspect_uv_layout` sizes its comparison budget at 50 per inspected triangle unless one is given.
 
 - Check source UV coverage against an existing tiled image before rendering.
 - Report missing, unavailable and unused tiles with affected object and face examples.
