@@ -21,20 +21,56 @@ def clean_mesh(mesh):
     return mesh
 
 
+BACKDROP_TOLERANCE = 48
+BACKDROP_BORDER_SHARE = 0.9
+BACKDROP_WORK_SIDE = 1024
+
+
+def backdrop_alpha(rgb):
+    """Alpha for an opaque image: 0 on the plain backdrop reached from the border, 255 elsewhere.
+
+    Pixels the subject encloses keep their colour, so white eyes and clothes survive a white backdrop.
+    """
+    from collections import deque
+
+    import numpy as np
+    from PIL import Image
+
+    small = rgb.convert("RGB")
+    small.thumbnail((BACKDROP_WORK_SIDE, BACKDROP_WORK_SIDE), Image.Resampling.BILINEAR)
+    width, height = small.size
+    colours = np.asarray(small, dtype=np.int16)
+    edge = np.zeros((height, width), dtype=bool)
+    edge[0, :] = edge[-1, :] = edge[:, 0] = edge[:, -1] = True
+    backdrop = np.median(colours[edge], axis=0)
+    close = np.abs(colours - backdrop).max(axis=2) <= BACKDROP_TOLERANCE
+    if close[edge].mean() < BACKDROP_BORDER_SHARE:
+        raise ValueError(
+            "Input image has no transparency and no plain background; supply a cutout with alpha"
+        )
+    reached = edge & close
+    queue = deque(zip(*np.nonzero(reached)))
+    while queue:
+        y, x = queue.popleft()
+        for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+            if 0 <= ny < height and 0 <= nx < width and close[ny, nx] and not reached[ny, nx]:
+                reached[ny, nx] = True
+                queue.append((ny, nx))
+    mask = Image.fromarray(np.where(reached, 0, 255).astype(np.uint8))
+    return mask.resize(rgb.size, Image.Resampling.BILINEAR)
+
+
 def prepare_image(source, background=(128, 128, 128), extent=435):
     """Frame the subject inside a 512-pixel square on a flat background."""
-    from PIL import Image, ImageChops
+    from PIL import Image
 
     with Image.open(source) as original:
         if original.width > 4096 or original.height > 4096:
             raise ValueError("Input image must be at most 4096 pixels per side")
         rgba = original.convert("RGBA")
-        # An existing cutout is authoritative. Removing white pixels from it
-        # also erases white clothes, eyes and ceramic parts of the subject.
+        # An existing cutout is authoritative; an opaque image loses only its plain backdrop.
         if rgba.getchannel("A").getextrema()[0] == 255:
-            red, green, blue, _ = rgba.split()
-            darkest = ImageChops.darker(ImageChops.darker(red, green), blue)
-            rgba.putalpha(darkest.point(lambda value: min(255, (255 - value) * 255 // 12)))
+            rgba.putalpha(backdrop_alpha(rgba))
         cutout = rgba
         bounds = cutout.getbbox()
         if bounds is None:

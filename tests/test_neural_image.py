@@ -36,6 +36,28 @@ class NeuralImageTests(unittest.TestCase):
         self.assertEqual(prepared.getpixel((256, 256)), (150, 30, 20))
         self.assertEqual(prepared.getpixel((0, 0)), (128, 128, 128))
 
+    def test_opaque_coloured_backdrop_is_removed_like_a_white_one(self):
+        image = Image.new("RGB", (600, 600), (150, 120, 170))
+        image.paste((150, 30, 20), (240, 80, 360, 520))
+        prepared = self.prepare(image)
+        self.assertEqual(prepared.getpixel((0, 0)), (128, 128, 128))
+        self.assertEqual(prepared.getpixel((100, 256)), (128, 128, 128), "beside the subject, the backdrop is gone")
+        self.assertEqual(prepared.getpixel((256, 256)), (150, 30, 20))
+
+    def test_white_inside_the_subject_survives_a_white_backdrop(self):
+        image = Image.new("RGB", (64, 64), (255, 255, 255))
+        image.paste((20, 40, 160), (16, 16, 48, 48))
+        image.paste((255, 255, 255), (28, 28, 36, 36))
+        prepared = self.prepare(image)
+        self.assertEqual(prepared.getpixel((0, 0)), (128, 128, 128))
+        self.assertEqual(prepared.getpixel((256, 256)), (255, 255, 255))
+
+    def test_opaque_image_without_a_plain_background_is_refused(self):
+        rows = [[((x * 37 + y * 91) % 256, (x * 53) % 256, (y * 29) % 256) for x in range(32)] for y in range(32)]
+        image = Image.fromarray(np.array(rows, dtype=np.uint8))
+        with self.assertRaisesRegex(ValueError, "no plain background"):
+            self.prepare(image)
+
     def test_triposg_framing_uses_white_background_and_padding(self):
         image = Image.new("RGBA", (400, 800), (0, 0, 0, 0))
         image.paste((150, 30, 20, 255), (100, 0, 300, 800))
