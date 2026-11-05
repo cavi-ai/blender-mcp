@@ -7,7 +7,7 @@ for native checks. Then:
 
 ```bash
 uv sync --locked --dev
-npm ci
+npm install
 uv run --locked python -m unittest discover -s tests
 uv run --locked ruff check .
 npm run eval:protocol

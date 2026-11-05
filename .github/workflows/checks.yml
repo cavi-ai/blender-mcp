@@ -61,8 +61,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm run eval:protocol
       - uses: actions/upload-artifact@v7
         if: always()
