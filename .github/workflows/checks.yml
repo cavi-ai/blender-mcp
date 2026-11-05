@@ -49,3 +49,15 @@ jobs:
             .tmp/evals/*/cases.json
             .tmp/evals/*/mcpeval.json
           if-no-files-found: error
+
+  pin-consumers:
+    # A green main moves the blender-mcp pin in game-art-pipeline through its pin-servers workflow.
+    needs: [python]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch server-merged to game-art-pipeline
+        env:
+          GH_TOKEN: ${{ secrets.CONSUMER_DISPATCH_TOKEN }}
+        run: gh api repos/cavi-ai/game-art-pipeline/dispatches --method POST -f event_type=server-merged
