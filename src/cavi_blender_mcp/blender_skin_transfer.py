@@ -6,12 +6,12 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
-from mathutils.geometry import barycentric_transform
 
 from .blender_bridge import info, new_name, obj
 from .blender_errors import preflight
 from .blender_rig import weights
 from .blender_rigging import MAX_ASSIGNMENTS, label
+from .skin_projection import barycentric_factors
 
 
 def world_vertices(value, origin):
@@ -87,7 +87,6 @@ def transfer(p):
                    if item.group in group_names and item.weight > 0} for vertex in source.data.vertices]
         projected, maximum_distance, maximum_loss = [], 0., 0.
         outside, excessive = [], []
-        basis = (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1)))
         for index, point in enumerate(target_points):
             nearest, _, triangle_index, gap = tree.find_nearest(point)
             if nearest is None or not math.isfinite(gap):
@@ -97,7 +96,7 @@ def transfer(p):
             if gap > distance:
                 outside.append(index)
             triangle = triangles[triangle_index]
-            factors = barycentric_transform(nearest, *(source_points[i] for i in triangle), *basis)
+            factors = barycentric_factors(nearest, [source_points[i] for i in triangle])
             if any(not math.isfinite(value) or value < -1e-5 or value > 1+1e-5 for value in factors):
                 raise ValueError('Source surface produced invalid barycentric coordinates')
             factors = [min(1., max(0., value)) for value in factors]
