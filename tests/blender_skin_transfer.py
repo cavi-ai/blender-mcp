@@ -125,4 +125,24 @@ for frame, angle in ((1, 0), (25, .4)):
             assert error < 2e-6, error
     finally:
         evaluated.to_mesh_clear()
-print('Native skin transfer: barycentric weights, motion, originals and rejection budgets passed')
+# A float32 barycentric transform can put an exact corner outside the admission tolerance.
+triangle = [(0.3108440935611725, -0.015848562121391296, 1.1760691404342651),
+            (0.30041956901550293, -0.018298104405403137, 1.1816051006317139),
+            (0.2994089126586914, -0.01226722914725542, 1.1807605028152466)]
+precise_source = surface('CornerSource', triangle)
+precise_target = surface('CornerTarget', [triangle[1], triangle[0], triangle[2]])
+for value in (precise_source, precise_target):
+    value.parent = None
+    value.matrix_world = Matrix.Identity(4)
+precise_source.modifiers.new('Skin', 'ARMATURE').object = rig
+for index, name in enumerate(('A', 'B', 'C')):
+    precise_source.vertex_groups.new(name=name).add([index], 1, 'REPLACE')
+bpy.context.view_layer.update()
+original_meshes = (precise_source.data, precise_target.data)
+precise = edit('transfer_skin_weights', name='CornerTarget', source='CornerSource',
+               new_name='CornerSkin', max_distance_m=1e-6, max_discarded_weight=0., max_influences=3)
+precise_copy = bpy.data.objects[precise['name']]
+for index, bone in enumerate(('B', 'A', 'C')):
+    assert abs(precise_copy.vertex_groups[bone].weight(index)-1) < 1e-6
+assert (precise_source.data, precise_target.data) == original_meshes
+print('Native skin transfer: barycentric weights, exact corners, motion, originals and rejection budgets passed')
