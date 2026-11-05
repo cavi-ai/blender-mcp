@@ -1,5 +1,7 @@
 """Bounded analytic UV intersections and chart clearance; no application dependency."""
 import math
+from bisect import bisect_right
+from heapq import heappop, heappush
 
 import numpy as np
 
@@ -80,12 +82,59 @@ def _charts(triangles, vertices, valid):
     return [root(i) for i in range(len(triangles))]
 
 
+def _candidate_pairs(lo, hi, padding):
+    """Sweep X and query active Y intervals before spending a comparison.
+
+    A fixed tree over sorted Y starts stores the maximum active padded Y end.
+    Empty subtrees and intervals outside either axis are pruned without emitting
+    pairs; the heap expires X intervals. Both indexes use linear storage.
+    """
+    count = len(lo)
+    if not count:
+        return
+    by_y = sorted(range(count), key=lambda i: (lo[i, 1], i))
+    starts = [lo[i, 1] for i in by_y]
+    ranks = [0] * count
+    for rank, index in enumerate(by_y):
+        ranks[index] = rank
+    size = 1
+    while size < count:
+        size *= 2
+    maxima = [-math.inf] * (2 * size)
+
+    def update(index, value):
+        node = size + ranks[index]
+        maxima[node] = value
+        while node > 1:
+            node //= 2
+            maxima[node] = max(maxima[2 * node], maxima[2 * node + 1])
+
+    expires = []
+    for current in sorted(range(count), key=lambda i: (lo[i, 0], i)):
+        while expires and expires[0][0] < lo[current, 0]:
+            _, expired = heappop(expires)
+            update(expired, -math.inf)
+        stop = bisect_right(starts, hi[current, 1] + padding)
+        pending = [(1, 0, size)]
+        while pending:
+            node, start, end = pending.pop()
+            if start >= stop or maxima[node] < lo[current, 1]:
+                continue
+            if end - start == 1:
+                yield by_y[start], current
+            else:
+                middle = (start + end) // 2
+                pending.extend(((2 * node + 1, middle, end), (2 * node, start, middle)))
+        update(current, hi[current, 1] + padding)
+        heappush(expires, (hi[current, 0] + padding, current))
+
+
 def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget):
     """Treat all input triangles as one texture set in a unique 0..1 tile.
 
     Source vertex IDs must be disjoint across objects. Pairwise intersection area
     is a sum over pairs, not the union area or an occupancy percentage. Work is
-    bounded even when broadphase boxes overlap but their triangles do not.
+    bounded even when two-dimensional broadphase boxes overlap but their triangles do not.
     """
     if (len(resolution) != 2 or any(type(x) is not int or not 1 <= x <= 16384
                                     for x in resolution)):
@@ -117,37 +166,27 @@ def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget):
                         np.min(np.asarray(resolution) - pixels[i]))) for i in valid]
     border_bad = sum(value + DISTANCE_EPSILON < padding_pixels for value in border)
     lo, hi = pixels[valid].min(axis=1), pixels[valid].max(axis=1)
-    order = sorted(range(len(valid)), key=lambda i: (lo[i, 0], int(valid[i])))
     overlaps, padding_hits, comparisons, total_area = 0, 0, 0, 0.
     overlap_examples, padding_examples = [], []
     complete = True
-    for position, x in enumerate(order):
-        i = int(valid[x])
-        for other in range(position + 1, len(order)):
-            y = order[other]
-            if lo[y, 0] > hi[x, 0] + padding_pixels:
-                break
-            if comparisons == comparison_budget:
-                complete = False
-                break
-            comparisons += 1
-            if lo[y, 1] > hi[x, 1] + padding_pixels or lo[x, 1] > hi[y, 1] + padding_pixels:
-                continue
-            j = int(valid[y])
-            area = triangle_intersection_area(pixels[i], pixels[j])
-            if area > AREA_EPSILON:
-                overlaps += 1
-                total_area += area
-                if len(overlap_examples) < EXAMPLES:
-                    overlap_examples.append({'triangles': [i, j], 'area_pixels2': area})
-            if charts[i] != charts[j] and padding_pixels > 0:
-                distance = 0. if area > 0 else _distance(pixels[i], pixels[j])
-                if distance + DISTANCE_EPSILON < padding_pixels:
-                    padding_hits += 1
-                    if len(padding_examples) < EXAMPLES:
-                        padding_examples.append({'triangles': [i, j], 'distance_pixels': distance})
-        if not complete:
+    for x, y in _candidate_pairs(lo, hi, padding_pixels):
+        if comparisons == comparison_budget:
+            complete = False
             break
+        comparisons += 1
+        i, j = int(valid[x]), int(valid[y])
+        area = triangle_intersection_area(pixels[i], pixels[j])
+        if area > AREA_EPSILON:
+            overlaps += 1
+            total_area += area
+            if len(overlap_examples) < EXAMPLES:
+                overlap_examples.append({'triangles': [i, j], 'area_pixels2': area})
+        if charts[i] != charts[j] and padding_pixels > 0:
+            distance = 0. if area > 0 else _distance(pixels[i], pixels[j])
+            if distance + DISTANCE_EPSILON < padding_pixels:
+                padding_hits += 1
+                if len(padding_examples) < EXAMPLES:
+                    padding_examples.append({'triangles': [i, j], 'distance_pixels': distance})
     invalid = int((~finite).sum()) + int(degenerate.sum()) + int(outside.sum())
     return {
         'complete': complete, 'comparison_budget': comparison_budget,

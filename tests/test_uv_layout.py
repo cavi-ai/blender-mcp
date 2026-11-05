@@ -1,7 +1,9 @@
 """Analytic UV preflight regressions, independent of Blender."""
 import unittest
 
-from cavi_blender_mcp.uv_layout import analyze
+import numpy as np
+
+from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze
 
 QUAD = [[(.1, .1), (.4, .1), (.4, .4)], [(.1, .1), (.4, .4), (.1, .4)]]
 IDS = [[0, 1, 2], [0, 2, 3]]
@@ -67,13 +69,44 @@ class UVLayoutTests(unittest.TestCase):
         self.assertGreater(r['padding']['border_triangles_below_requested'], 0)
 
     def test_budget_exhaustion_is_incomplete_even_when_nothing_found(self):
-        # Many x-overlapping, y-separated triangles exercise broadphase work limits.
-        triangles = [[(.1, .1 + i * .1), (.2, .1 + i * .1), (.1, .12 + i * .1)]
+        # Disjoint thin triangles still have overlapping two-dimensional bounds.
+        triangles = [[(.1, .1 + i * .02), (.8, .8 + i * .02), (.1, .101 + i * .02)]
                      for i in range(6)]
-        r = check(triangles, [[i * 3 + j for j in range(3)] for i in range(6)], budget=1)
+        r = check(triangles, [[i * 3 + j for j in range(3)] for i in range(6)], padding=0, budget=1)
         self.assertFalse(r['complete'])
         self.assertFalse(r['unique_tile_ready'])
         self.assertEqual(r['comparisons'], 1)
+
+    def test_y_separated_charts_do_not_consume_pair_budget(self):
+        triangles = [[(.1, .05 + i * .014), (.2, .05 + i * .014), (.1, .052 + i * .014)]
+                     for i in range(64)]
+        r = check(triangles, [[i * 3 + j for j in range(3)] for i in range(64)],
+                  resolution=(1000, 1000), padding=8, budget=1)
+        self.assertTrue(r['complete'])
+        self.assertTrue(r['unique_tile_ready'])
+        self.assertEqual(r['comparisons'], 0)
+
+    def test_y_padding_candidates_are_not_culled(self):
+        triangles = [[(.1, .1), (.2, .1), (.1, .2)],
+                     [(.1, .21), (.2, .21), (.1, .31)]]
+        r = check(triangles, [[0, 1, 2], [3, 4, 5]], budget=1)
+        self.assertTrue(r['complete'])
+        self.assertEqual(r['comparisons'], 1)
+        self.assertEqual(r['overlap']['triangle_pairs'], 0)
+        self.assertEqual(r['padding']['triangle_pairs_below_requested'], 1)
+
+    def test_two_dimensional_candidates_match_all_pairs_reference(self):
+        rng = np.random.default_rng(42)
+        lo = rng.uniform(-2, 2, (80, 2))
+        hi = lo + rng.uniform(0, .5, (80, 2))
+        for padding in (0, .125, 1):
+            with self.subTest(padding=padding):
+                expected = {(i, j) for i in range(len(lo)) for j in range(i + 1, len(lo))
+                            if all(lo[i, axis] <= hi[j, axis] + padding and
+                                   lo[j, axis] <= hi[i, axis] + padding for axis in (0, 1))}
+                pairs = [tuple(sorted(pair)) for pair in _candidate_pairs(lo, hi, padding)]
+                self.assertEqual(len(pairs), len(set(pairs)))
+                self.assertEqual(set(pairs), expected)
 
     def test_exact_budget_is_complete_when_no_work_remains(self):
         self.assertTrue(check(budget=1)['complete'])
