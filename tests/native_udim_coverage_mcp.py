@@ -25,7 +25,14 @@ async def exercise(root, env):
                 image={'path':'glaze.<UDIM>.png','tiles':numbers,'color_space':'Non-Color'})
             return result['nodes'][0]['image']['name']
         image = await bind([1001,1002,1011])
-        options = {'names':['TileGrid','OtherSurface'], 'udim_image':image, 'material':'ArtistFinish'}
+        graph = await call('assign_material', action='inspect', material_name='ArtistFinish',
+            group_path=['Finish Controls','Inner Layer'])
+        coordinate = next(n for n in graph['nodes'] if n['type'] == 'UVMAP')
+        texture = next(n for n in graph['nodes'] if n['name'] == 'Pattern')
+        assert coordinate['uv_map'] == 'UVMap' and not coordinate['from_instancer']
+        assert texture['projection'] == 'FLAT'
+        options = {'names':['TileGrid','OtherSurface'], 'udim_image':image, 'material':'ArtistFinish',
+                   'uv_layer':coordinate['uv_map']}
         before = await call('scene_info', limit=1)
         missing = await call('inspect_uv_layout', **options)
         after = await call('scene_info', limit=1)
@@ -38,7 +45,7 @@ async def exercise(root, env):
         incomplete = await call('inspect_uv_layout', **options, comparison_budget=1)
         assert not incomplete['complete'] and not incomplete['coverage']['passed']
         assert incomplete['coverage']['unused_tiles'] is None
-        collapsed = await call('inspect_uv_layout', **options, uv_layer='CollapsedUV')
+        collapsed = await call('inspect_uv_layout', **(options | {'uv_layer':'CollapsedUV'}))
         assert not collapsed['coverage']['passed'] and collapsed['coverage']['degenerate_triangles'] == 2
         unavailable = await call('inspect_uv_layout', **(options | {'udim_image':'UnavailableTiles'}))
         assert 1012 in unavailable['coverage']['unavailable_tiles'] and not unavailable['coverage']['passed']
@@ -47,7 +54,7 @@ async def exercise(root, env):
         assert repaired['complete'] and repaired['coverage']['passed']
         assert repaired['coverage']['required_tiles'] == [1001,1002,1011,1012]
         assert repaired['coverage']['missing_tiles'] == []
-        assert all(o['uv_layer_index'] == 0 for o in repaired['objects'])
+        assert all(o['uv_layer_index'] == 0 and o['render_uv_layer'] == 'CollapsedUV' for o in repaired['objects'])
         assert (await call('session_control', action='inspect'))['owner'] == 'texture-author'
         assert 'shader vector transforms and projections' in repaired['not_checked']
         wrong = await client.call_tool('inspect_uv_layout', {'names':['TileGrid'],'udim_image':'missing'})
@@ -59,7 +66,7 @@ async def exercise(root, env):
             'missing_tile':missing['coverage']['missing_tiles'], 'repaired_tiles':repaired['coverage']['required_tiles'],
             'affected_faces':missing['coverage']['examples'],'object_material_override_filtered':True,
             'incomplete_and_unavailable_never_pass':True,'source_uv0_and_named_layer_checked':True,
-            'inspection_lease_free_while_author_owned':True}
+            'inspection_lease_free_while_author_owned':True, 'native_shader_coordinate_metadata_checked':True}
 
 
 if __name__ == '__main__':

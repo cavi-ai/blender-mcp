@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format follows
 - Report missing, unavailable and unused tiles with affected object and face examples.
 - Keep incomplete analysis from passing and retain per-material object overrides.
 - Share source UV collection and analytic clipping with unique-tile inspection.
+- Expose native shader UV-map/projection settings and mesh render-active UV names.
 
 ## 0.56.0 - 2026-11-04
 

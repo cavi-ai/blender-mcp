@@ -48,6 +48,7 @@ def collect(params, find_object):
         vertex_offset += len(mesh.vertices)
         objects.append({'name': name, 'mesh': mesh.name, 'uv_layer': layer.name,
                         'uv_layer_index': list(mesh.uv_layers).index(layer),
+                        'render_uv_layer': next((u.name for u in mesh.uv_layers if u.active_render), None),
                         'first_triangle': first, 'triangles': count,
                         'source_triangles': len(mesh.loop_triangles),
                         'material_slots': list(slots.values()),

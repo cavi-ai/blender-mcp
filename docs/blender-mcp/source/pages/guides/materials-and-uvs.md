@@ -217,3 +217,9 @@ gutters and file precision require their corresponding checks. Verify that the
 chosen layer is the one sampled by the material before using this result as part
 of visual acceptance. Unique 0..1 overlap/gutter analysis remains available with
 `texture_resolution` and `padding_pixels` instead of `udim_image`.
+
+Shader inspection reports `uv_map` and `from_instancer` on UV Map nodes,
+`vector_type` on Mapping nodes, and image-node `projection`/`extension` settings.
+Follow the reported vector links before choosing a source layer. Mesh inspection
+rows include `render_uv_layer` for comparison with an implicit active-UV source.
+These settings are metadata; the coverage check does not evaluate a vector graph.
