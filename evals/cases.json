@@ -7638,5 +7638,88 @@
       "native"
     ],
     "error": "does not accept: node"
+  },
+  {
+    "id": "bake-shader-missing-source",
+    "tool": "bake",
+    "arguments": {
+      "map": "shader",
+      "name": "Low",
+      "path": "channel.png"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires source"
+  },
+  {
+    "id": "bake-shader-invalid-source",
+    "tool": "bake",
+    "arguments": {
+      "map": "shader",
+      "name": "Low",
+      "path": "channel.png",
+      "source": {
+        "material": "Finish",
+        "node": "Surface",
+        "socket": "Roughness",
+        "direction": "INPUT",
+        "code": "run()"
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "bake-shader-projection-options",
+    "tool": "bake",
+    "arguments": {
+      "map": "shader",
+      "name": "Low",
+      "path": "channel.png",
+      "source": {
+        "material": "Finish",
+        "node": "Surface",
+        "socket": "Roughness",
+        "direction": "INPUT"
+      },
+      "high": [
+        "High"
+      ]
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: high"
+  },
+  {
+    "id": "bake-shader-invalid-png-precision",
+    "tool": "bake",
+    "arguments": {
+      "map": "shader",
+      "name": "Low",
+      "path": "channel.png",
+      "source": {
+        "material": "Finish",
+        "node": "Surface",
+        "socket": "Roughness",
+        "direction": "INPUT"
+      },
+      "bit_depth": 32
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "bit_depth validation"
   }
 ]

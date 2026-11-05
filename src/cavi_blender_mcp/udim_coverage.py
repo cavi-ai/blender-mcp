@@ -4,16 +4,18 @@ import math
 
 import numpy as np
 
-from .uv_layout import MAX_TRIANGLES, triangle_intersection_area
+from .uv_layout import MAX_TRIANGLES, default_budget, triangle_intersection_area
 
 REPORT_LIMIT = 1000
 EXAMPLE_LIMIT = 32
 
 
-def analyze(triangles, tiles, comparison_budget=100000, unavailable_tiles=()):
+def analyze(triangles, tiles, comparison_budget=None, unavailable_tiles=()):
     data = np.asarray(triangles, dtype=float)
     if data.ndim != 3 or data.shape[1:] != (3,2) or not 1 <= len(data) <= MAX_TRIANGLES:
         raise ValueError('Provide 1..20000 UV triangles')
+    if comparison_budget is None:
+        comparison_budget = default_budget(len(data))
     if (any(type(t) is not int or t < 1001 for t in tiles)
             or len(set(tiles)) != len(tiles) or not set(unavailable_tiles) <= set(tiles)):
         raise ValueError('Provide unique UDIM numbers and their unavailable subset')

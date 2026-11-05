@@ -122,7 +122,7 @@ Without a filter, all faces are measured together.
 | `texture_resolution` | Required width and height, each 1–16384 |
 | `padding_pixels` | Required minimum chart separation and tile-border clearance, 0–256 pixels |
 | `uv_layer` | Optional exact name; default is layer **index 0** |
-| `comparison_budget` | 1–1000000 candidate comparisons; default 100000 |
+| `comparison_budget` | 1–1000000 candidate comparisons; default 50 per inspected triangle |
 | `material` | Optional exact material name; at least one source face must use it |
 
 Up to 20000 selected triangles and 200000 source vertices per call, with at most
@@ -330,10 +330,12 @@ Mutating. Binds a PBR material to exact mesh slots.
 
 ## bake
 
-Mutating. Bakes a normal, AO, curvature or lightmap map into a new PNG.
-`bit_depth` accepts 8 or 16 and defaults to 16. Returns actual precision,
-color-space role and canonical normal channels; requires an updated bridge.
-Data maps bypass artistic view transforms; lightmaps use the sRGB transfer.
+Mutating. Bakes geometry maps into a new PNG or an explicit numeric/color/vector
+shader socket into PNG/EXR. `source` selects the material, nested group path,
+node, socket identifier, INPUT/OUTPUT direction and data/color role. PNG defaults
+to 16-bit; shader EXR to 32-bit. Shader bakes preserve the actor and shader UVs
+while rasterizing the chosen 0..1 atlas. Signed/HDR channels require EXR.
+Returns precision, color space, file hash and channel metadata. Requires an updated bridge.
 
 [Guide](../guides/baking.md)
 

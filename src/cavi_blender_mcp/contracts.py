@@ -313,13 +313,14 @@ class MaterialAssignment(VariantResult):
 
 
 class MapBakeResult(Result):
-    bit_depth: Literal[8, 16]
-    color_space: Literal["sRGB", "Non-Color"]
+    bit_depth: Literal[8, 16, 32]
+    color_space: str
+    source: Record | None = None
     normal_channels: list[str] | None = None
     path: str
     bytes: int
     sha256: str
-    map: Literal["normal", "ao", "curvature", "lightmap"]
+    map: Literal["normal", "ao", "curvature", "lightmap", "shader"]
     resolution: int
     samples: int
     margin: int

@@ -66,8 +66,8 @@ def _vector_schema(size):
 Vector2 = Annotated[tuple[Number, Number], _vector_schema(2)]
 Vector3 = Annotated[tuple[Number, Number, Number], _vector_schema(3)]
 RGBA = Annotated[tuple[Number, Number, Number, Number], _vector_schema(4)]
-ObjectName = Annotated[str, Field(description="Exact object name from scene_info.")]
-LeaseId = Annotated[str | None, Field(description="lease_id from session_control claim.")]
+ObjectName = Annotated[str, Field(description="scene_info name.")]
+LeaseId = str | None
 MUTATING = DESTRUCTIVE
 ADDITIVE = WRITES
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
@@ -224,14 +224,15 @@ async def inspect_uv_layout(
                               Annotated[StrictInt, Field(ge=1, le=16384)]] | None = None,
     padding_pixels: Annotated[Number | None, Field(ge=0, le=256)] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    comparison_budget: Annotated[StrictInt, Field(ge=1, le=1000000)] = 100000,
+    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000)] = None,
     material: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     udim_image: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
 ) -> UVLayout:
     """Source UVs, max 20,000 triangles; layer index 0 unless named. material filters faces.
     texture_resolution + padding_pixels: unique 0..1 overlaps and gutters.
     udim_image: coverage of native tiles by source UVs; excludes shader vector transforms.
-    comparison_budget bounds candidates. Incomplete work cannot pass. No geometry,
+    comparison_budget bounds candidates, 50 per inspected triangle unless given.
+    Incomplete work cannot pass. No geometry,
     selection or image edits; modifiers are not evaluated.
     """
     if udim_image is not None:
@@ -891,30 +892,56 @@ async def assign_material(
                      slot=slot, lease_id=lease_id, **options)
 
 
+class ShaderBakeSource(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    material: Annotated[str, Field(min_length=1, max_length=63)]
+    node: Annotated[str, Field(min_length=1, max_length=63)]
+    socket: Annotated[str, Field(min_length=1, max_length=255)]
+    group_path: Annotated[list[str], Field(max_length=16)] = []
+    direction: Literal['INPUT', 'OUTPUT'] = 'OUTPUT'
+    role: Literal['data', 'color'] = 'data'
+
+
 @mcp.tool(annotations=MUTATING)
 async def bake(
-    map: Literal["normal", "ao", "curvature", "lightmap"],
+    map: Literal["normal", "ao", "curvature", "lightmap", "shader"],
     name: ObjectName,
-    path: Annotated[str, Field(description="New workspace .png path.")],
+    path: Annotated[str, Field(description="New workspace PNG; shader also accepts EXR.")],
     high: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
     resolution: Annotated[StrictInt, Field(ge=64, le=4096)] = 1024,
     samples: Annotated[StrictInt, Field(ge=1, le=256)] = 16,
     margin: Annotated[StrictInt, Field(ge=0, le=64)] = 4,
-    bit_depth: Literal[8, 16] = 16,
+    bit_depth: Literal[8, 16, 32] | None = None,
     cage_extrusion: Annotated[Number | None, Field(ge=0, le=1)] = None,
     max_ray_distance: Annotated[Number | None, Field(ge=0, le=10)] = None,
     normal_space: Literal["tangent", "object"] | None = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     isolate: StrictBool = True,
+    source: ShaderBakeSource | None = None,
     lease_id: LeaseId = None,
 ) -> MapBakeResult:
-    """Bake normal/AO, pointiness curvature or diffuse lightmap to a new PNG (default 16-bit).
+    """Bake geometry or an explicit shader socket. PNG defaults to 16-bit; shader EXR to 32-bit.
 
-    high: selected-to-active normal/AO; normal_space: tangent/object, RGB +X,+Y,+Z.
-    Requires an updated Blender bridge.
+    high: normal/AO projection. Shader uses source socket identifiers and a target UV atlas;
+    data is raw, color PNG is sRGB. Signed/HDR samples require EXR. Alpha needs a separate socket.
     """
+    if map == 'shader':
+        if source is None:
+            raise ValueError('shader requires source')
+        pick(map, {'high':high, 'cage_extrusion':cage_extrusion,
+                   'max_ray_distance':max_ray_distance, 'normal_space':normal_space})
+        depth = bit_depth if bit_depth is not None else (32 if Path(path).suffix.lower()=='.exr' else 16)
+        if depth not in ({16,32} if Path(path).suffix.lower()=='.exr' else {8,16}):
+            raise ValueError('bit_depth validation: PNG accepts 8/16; EXR accepts 16/32')
+        return await run(call, 'bake_shader', name=name, path=path,
+            source=source.model_dump(), resolution=resolution, samples=samples, margin=margin,
+            bit_depth=depth, uv_layer=uv_layer, isolate=isolate, lease_id=lease_id)
+    if source is not None:
+        raise ValueError('source applies only to shader bakes')
+    if bit_depth is not None and bit_depth not in {8,16}:
+        raise ValueError('bit_depth validation: geometry bakes accept 8/16')
     values = {"high": high, "resolution": resolution, "samples": samples, "margin": margin,
-              "bit_depth": bit_depth,
+              "bit_depth": 16 if bit_depth is None else bit_depth,
               "cage_extrusion": cage_extrusion, "max_ray_distance": max_ray_distance,
               "normal_space": normal_space, "uv_layer": uv_layer, "isolate": isolate}
     defaults = {"resolution": 1024, "samples": 16, "margin": 4, "bit_depth": 16,
