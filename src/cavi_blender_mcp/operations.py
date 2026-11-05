@@ -35,6 +35,7 @@ OPERATIONS = frozenset(
         "add_modifier",
         "shade_mesh",
         "unwrap_mesh",
+        "transform_uv",
         "export_mesh",
         "export_instances",
         "save_project",

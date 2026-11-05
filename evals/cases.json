@@ -7418,5 +7418,75 @@
       "protocol"
     ],
     "error": "validation"
+  },
+  {
+    "id": "uv-transform-missing",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "uv_transform",
+      "name": "Body"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: uv_transform"
+  },
+  {
+    "id": "uv-transform-empty",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "uv_transform",
+      "name": "Body",
+      "uv_transform": {
+        "faces": []
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "uv-transform-face-type",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "uv_transform",
+      "name": "Body",
+      "uv_transform": {
+        "faces": [
+          true
+        ]
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "uv-transform-unrelated",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "uv_transform",
+      "name": "Body",
+      "uv_transform": {
+        "faces": [
+          0
+        ]
+      },
+      "amount": 1
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: amount"
   }
 ]

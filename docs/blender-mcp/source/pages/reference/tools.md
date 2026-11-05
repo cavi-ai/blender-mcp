@@ -285,7 +285,12 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `mirror`, `array`, `solidify`.
+`join`, `separate`, `mirror`, `array`, `solidify`, `uv_transform`.
+
+`uv_transform` takes a `uv_transform` object with required source `faces` and
+optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an
+existing layer (default UV0). It preserves topology, skin and shape keys and
+reports affected faces, materials and UV bounds. No implicit chart expansion.
 
 [Guide](../guides/mesh-preparation.md)
 
