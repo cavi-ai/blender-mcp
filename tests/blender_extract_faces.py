@@ -133,7 +133,10 @@ with tempfile.TemporaryDirectory() as folder:
     output = bpy.data.objects[result['name']]
     assert output.data != original_mesh and output.parent is None and not output.vertex_groups
     assert not output.modifiers and output.data.shape_keys is None
-    assert [list(row) for row in output.matrix_world] == before['world']
+    matrix_error = max(abs(component - original) for row, source_row in
+                       zip(output.matrix_world, before['world'], strict=True)
+                       for component, original in zip(row, source_row, strict=True))
+    assert matrix_error <= 1e-6, {'world_matrix_error': matrix_error}
     assert snapshot(value) == before and value.data == original_mesh
     assert context == (set(bpy.context.selected_objects), bpy.context.view_layer.objects.active)
     assert result['face_indices'] == [0, 2] and result['triangles'] == 4
@@ -143,6 +146,10 @@ with tempfile.TemporaryDirectory() as folder:
     assert output.data.uv_layers.active_index == 1 and output.data.uv_layers[0].active_render
     points = {tuple(v.co): v.index for v in mesh.vertices}
     point_map = [points[tuple(v.co)] for v in output.data.vertices]
+    world_error = max((output.matrix_world @ vertex.co
+                       - value.matrix_world @ mesh.vertices[original].co).length
+                      for vertex, original in zip(output.data.vertices, point_map, strict=True))
+    assert world_error <= 1e-6, {'world_vertex_error': world_error}
     edge_ids = {frozenset(e.vertices): e.index for e in mesh.edges}
     edge_map = [edge_ids[frozenset(point_map[i] for i in e.vertices)] for e in output.data.edges]
     face_map, corner_map = [], []
@@ -164,4 +171,5 @@ with tempfile.TemporaryDirectory() as folder:
     print(json.dumps({'extract_faces': 'passed', 'source_exact': True, 'triangles': 4,
         'uv_layers': 2, 'custom_attribute_domains': sorted(maps), 'receipt_rollback': True,
         'invalid_selection_modifier_shape_key_weights_refused': True,
-        'sheared_and_singular_transforms_refused': True, 'custom_normals_preserved': True}))
+        'sheared_and_singular_transforms_refused': True, 'custom_normals_preserved': True,
+        'world_matrix_error': matrix_error, 'world_vertex_error': world_error}))
