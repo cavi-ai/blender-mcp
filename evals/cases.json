@@ -7518,5 +7518,55 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "material-variant-missing-targets",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "make_unique",
+      "material_name": "Variant"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: names"
+  },
+  {
+    "id": "material-variant-unrelated-control",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "make_unique",
+      "material_name": "Variant",
+      "names": [
+        "Body"
+      ],
+      "roughness": 0.5
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: roughness"
+  },
+  {
+    "id": "material-variant-shader-edit-parameter",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "make_unique",
+      "material_name": "Variant",
+      "names": [
+        "Body"
+      ],
+      "node": "Surface"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: node"
   }
 ]

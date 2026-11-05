@@ -308,6 +308,7 @@ class MaterialAssignment(VariantResult):
     total: int | None = None
     links: list[dict[str, Any]] | None = None
     changed_inputs: list[str] | None = None
+    material_copy: Record | None = None
 
 
 class MapBakeResult(Result):

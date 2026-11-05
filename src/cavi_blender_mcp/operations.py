@@ -45,6 +45,7 @@ OPERATIONS = frozenset(
         "session_control",
         "owned_edit",
         "assign_material",
+        "make_material_unique",
         "inspect_material_nodes",
         "set_material_inputs",
         "set_material_image",
