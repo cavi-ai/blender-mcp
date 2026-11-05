@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 0.56.0 - 2026-11-04
+
+- Bind explicitly declared UDIM tiles using packed native image snapshots.
+- Inspect per-tile dimensions and packed file hashes, with a source-manifest fingerprint.
+- Retain mixed tile sizes, native precision and logical tile paths through material-library handoff.
+- Reuse unchanged sets and refresh changed tiles without altering other image users.
+
 ## 0.55.0 - 2026-11-04
 
 - Replace authored shader image bindings with exact packed native image snapshots.

@@ -89,6 +89,7 @@ class ShaderImage(BaseModel):
     path: str
     color_space: str
     alpha_mode: Literal['STRAIGHT', 'PREMUL', 'CHANNEL_PACKED', 'NONE'] = 'STRAIGHT'
+    tiles: Annotated[list[Annotated[StrictInt, Field(ge=1001)]] | None, Field(min_length=1)] = None
 
 
 class BakePair(BaseModel):
@@ -828,7 +829,7 @@ async def assign_material(
             return await run(call, 'inspect_material_nodes', material_name=material_name, **params)
         if action == 'set_image':
             params = pick(action, shader, ['node', 'image'], {'group_path': []})
-            params['image'] = image.model_dump()
+            params['image'] = image.model_dump(exclude_none=True)
             return await run(call, 'set_material_image', material_name=material_name, lease_id=lease_id, **params)
         params = pick(action, shader, ['node'], {'group_path': [], 'inputs': {}, 'outputs': {}})
         if not (params['inputs'] or params['outputs']):

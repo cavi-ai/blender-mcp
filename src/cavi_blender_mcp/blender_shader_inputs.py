@@ -9,6 +9,7 @@ import bpy
 from .blender_images import packed_snapshot
 from .blender_materials import CONFIG_TAG
 from .blender_node_inputs import encode, matches
+from .blender_udim import packed_receipts, packed_tiles, tile_sources, verify_tiles
 
 PROVENANCE_TAG = 'cavi_material_config_source'
 
@@ -100,7 +101,11 @@ def node_report(node):
         report['image'] = {'name': image.name, 'source': image.source, 'path': image.filepath,
             'size': list(image.size), 'color_space': image.colorspace_settings.name,
             'decoded_depth_bits': image.depth, 'float_buffer': image.is_float,
-            'alpha_mode': image.alpha_mode, 'packed': bool(image.packed_file)}
+            'alpha_mode': image.alpha_mode, 'packed': bool(image.packed_files)}
+        if image.source == 'TILED':
+            report['image'].update(dirty=image.is_dirty,
+                tiles=[{'tile': t.number, 'label': t.label, 'size': list(t.size), 'channels': t.channels}
+                       for t in image.tiles], packed_tiles=packed_receipts(image))
     return report
 
 
@@ -204,7 +209,7 @@ def set_image(params, workspace):
     if not hasattr(node, 'image') or node.is_property_readonly('image'):
         raise ValueError('Shader node has no editable image binding')
     spec = params.get('image')
-    if not isinstance(spec, dict) or set(spec)-{'path', 'color_space', 'alpha_mode'}:
+    if not isinstance(spec, dict) or set(spec)-{'path', 'color_space', 'alpha_mode', 'tiles'}:
         raise ValueError('Provide image path, color_space and optional alpha_mode')
     if any(not isinstance(spec.get(k), str) or not spec[k].strip() for k in ['path', 'color_space']):
         raise ValueError('Provide image path and explicit color_space')
@@ -212,14 +217,26 @@ def set_image(params, workspace):
     if alpha not in {'STRAIGHT', 'PREMUL', 'CHANNEL_PACKED', 'NONE'}:
         raise ValueError('Unknown native image alpha_mode')
     root = Path(workspace).resolve(strict=True)
-    path = (root/spec['path']).resolve(strict=True)
-    if not path.is_relative_to(root) or not path.is_file():
-        raise ValueError('Image must be a file inside the workspace')
+    numbers = spec.get('tiles')
+    if numbers is None:
+        if '<UDIM>' in spec['path']:
+            raise ValueError('UDIM patterns require explicit tiles')
+        path = (root/spec['path']).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ValueError('Image must be a file inside the workspace')
+    else:
+        path, sources = tile_sources(root, spec['path'], numbers)
     previous = node.image
-    reusable = previous if (previous and previous.source == 'FILE'
+    kind = 'FILE' if numbers is None else 'TILED'
+    reusable = previous if (previous and previous.source == kind
         and Path(bpy.path.abspath(previous.filepath, library=previous.library)).resolve() == path
         and previous.colorspace_settings.name == spec['color_space'] and previous.alpha_mode == alpha) else None
-    image, fingerprint = packed_snapshot(path, root, reusable)
+    if numbers is None:
+        image, fingerprint = packed_snapshot(path, root, reusable)
+        source = {'path': path.relative_to(root).as_posix(), 'sha256': fingerprint,
+                  'bytes': len(image.packed_file.data) if image.packed_file else 0}
+    else:
+        image, source = packed_tiles(path, sources, root, reusable)
     changed = image != previous
     try:
         if changed:
@@ -228,18 +245,20 @@ def set_image(params, workspace):
             except TypeError as exc:
                 raise ValueError('color_space is not available in the active OCIO configuration') from exc
             image.alpha_mode = alpha
-        if min(image.size) <= 0 or not image.packed_file:
-            raise ValueError('Image could not be decoded and packed')
-        payload = image.packed_file.data
-        if hashlib.sha256(payload).hexdigest() != fingerprint:
-            raise ValueError('Packed image does not match the source snapshot')
+        if numbers is None:
+            if min(image.size) <= 0 or not image.packed_file:
+                raise ValueError('Image could not be decoded and packed')
+            if hashlib.sha256(image.packed_file.data).hexdigest() != fingerprint:
+                raise ValueError('Packed image does not match the source snapshot')
+        else:
+            verify_tiles(image, source['tiles'], root)
         node.image = image
         update(tree)
         if node.image != image or image.colorspace_settings.name != spec['color_space']:
             raise ValueError('Blender changed the requested image binding')
         return finish_edit(params, tree, changed, changed_image=changed,
             previous_image=previous.name if previous else None,
-            image_source={'path': path.relative_to(root).as_posix(), 'sha256': fingerprint, 'bytes': len(payload)})
+            image_source=source)
     except Exception:
         try:
             node.image = previous

@@ -7293,5 +7293,66 @@
       "protocol"
     ],
     "error": "does not accept"
+  },
+  {
+    "id": "udim-empty-tiles",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "set_image",
+      "material_name": "Glaze",
+      "node": "Pattern",
+      "image": {
+        "path": "glaze.<UDIM>.exr",
+        "color_space": "Non-Color",
+        "tiles": []
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "udim-boolean-tile",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "set_image",
+      "material_name": "Glaze",
+      "node": "Pattern",
+      "image": {
+        "path": "glaze.<UDIM>.exr",
+        "color_space": "Non-Color",
+        "tiles": [
+          true
+        ]
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "udim-low-tile",
+    "tool": "assign_material",
+    "arguments": {
+      "action": "set_image",
+      "material_name": "Glaze",
+      "node": "Pattern",
+      "image": {
+        "path": "glaze.<UDIM>.exr",
+        "color_space": "Non-Color",
+        "tiles": [
+          1000
+        ]
+      }
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol"
+    ],
+    "error": "validation"
   }
 ]
