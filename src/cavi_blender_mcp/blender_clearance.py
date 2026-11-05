@@ -82,15 +82,22 @@ def inside_component(point, component, budget):
     parities = []
     for direction in DIRECTIONS:
         origin, hits = point.copy(), 0
+        seen = set()
         while True:
             budget.use()
-            hit, _, _, distance = tree.ray_cast(origin, direction, 4.)
+            hit, _, face, distance = tree.ray_cast(origin, direction, 4.)
             if hit is None:
                 break
-            if distance <= EPSILON/4:
+            if face not in seen:
+                if distance <= EPSILON/4:
+                    return None
+                seen.add(face)
+                hits += 1
+            advanced = hit + direction*(2*EPSILON)
+            progress = (advanced-origin).dot(direction)
+            if not math.isfinite(progress) or progress <= 0:
                 return None
-            hits += 1
-            origin = hit + direction*(2*EPSILON)
+            origin = advanced
         parities.append(hits % 2 == 1)
     return parities[0] if len(set(parities)) == 1 else None
 

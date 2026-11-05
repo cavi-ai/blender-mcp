@@ -1,6 +1,7 @@
 """Native signed clearance, component union, sampling coverage and frame restoration."""
 
 import sys
+import unittest
 from pathlib import Path
 
 import bmesh
@@ -8,6 +9,14 @@ import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from cavi_blender_mcp import blender_bridge as bridge
+from cavi_blender_mcp import blender_clearance
+
+sys.path.insert(0, str(Path(__file__).parent))
+from test_clearance_parity import ClearanceParityTests
+
+native_parity = type('NativeClearanceParityTests', (ClearanceParityTests,), {'kernel': blender_clearance})
+parity_result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(native_parity))
+assert parity_result.wasSuccessful()
 
 for value in list(bpy.data.objects):
     bpy.data.objects.remove(value, do_unlink=True)
