@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "cavi-blender-mcp"
-version = "0.56.0"
+dynamic = ["version"]
 description = "Local-first MCP tools for Blender scene editing and game asset export"
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,10 @@ cavi-blender-mcp = "cavi_blender_mcp.server:main"
 
 [dependency-groups]
 dev = ["numpy>=2,<3", "pillow>=13,<14", "ruff>=0.14,<1"]
+
+# The version comes from the git tag: vX.Y.Z builds X.Y.Z, later commits X.Y.(Z+1).devN+g<sha>.
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cavi_blender_mcp"]
