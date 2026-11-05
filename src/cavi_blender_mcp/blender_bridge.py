@@ -1000,6 +1000,10 @@ def _dispatch(operation, p):
         from .blender_nla import HANDLERS
 
         return HANDLERS[operation](p)
+    if operation == 'bake_shader':
+        from .blender_shader_bake import bake as bake_shader
+
+        return bake_shader(p)
     if operation in {"bake_map", "bake_png"}:
         from .blender_bake import bake
 
