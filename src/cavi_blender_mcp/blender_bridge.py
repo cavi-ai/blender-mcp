@@ -736,9 +736,18 @@ def add_modifier(p):
 
 
 def unwrap(p):
+    from .blender_geometry import PACK, integer
+
     value = editable_mesh(p["name"])
     angle = number(p.get("angle_limit_degrees", 66), 1, 89, "angle_limit_degrees")
-    margin = number(p.get("island_margin", 0.02), 0, 0.5, "island_margin")
+    # Margins are a fraction of the texture: margin_px at texture_resolution unless island_margin is given.
+    if p.get("island_margin") is not None:
+        margin = number(p["island_margin"], 0, 0.5, "island_margin")
+    else:
+        resolution = integer(p, "texture_resolution", 1024, 1, 4096)
+        margin = number(p.get("margin_px", 4), 0, 64, "margin_px") / resolution
+        if margin >= 0.25:
+            raise ValueError("margin_px is too large for texture_resolution")
     name = p.get("uv_layer")
     if name is not None and (
         not isinstance(name, str) or not name.strip() or len(name.encode()) > 63
@@ -760,11 +769,12 @@ def unwrap(p):
             bpy.ops.object.mode_set(mode="EDIT")
             bpy.ops.mesh.select_all(action="SELECT")
             if "FINISHED" not in bpy.ops.uv.smart_project(
-                angle_limit=math.radians(angle), island_margin=margin
+                angle_limit=math.radians(angle), island_margin=margin,
+                margin_method="FRACTION", rotate_method="AXIS_ALIGNED"
             ):
                 raise RuntimeError("Smart UV Project did not finish")
             bpy.ops.uv.select_all(action="SELECT")
-            if "FINISHED" not in bpy.ops.uv.pack_islands(margin=margin):
+            if "FINISHED" not in bpy.ops.uv.pack_islands(margin=margin, scale=True, **PACK):
                 raise RuntimeError("UV island packing did not finish")
     except Exception:
         if created is not None:
@@ -772,7 +782,7 @@ def unwrap(p):
             if previous is not None:
                 layers.active = previous
         raise
-    return {**info(value), "uv_layer": layers.active.name}
+    return {**info(value), "uv_layer": layers.active.name, "margin_uv": margin}
 
 
 def with_empties(objects):

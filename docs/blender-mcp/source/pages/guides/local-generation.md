@@ -105,7 +105,8 @@ Both TripoSG providers refuse it. Input images are at most 16 MiB and 4096
 pixels per side. An existing transparent cutout is used as provided. An opaque
 image loses the plain background that frames its border, in any colour, while
 colours the object encloses stay; an opaque image without a plain background is
-refused. The output is published without replacing an existing file.
+refused. The output is published without replacing an existing file, into a
+folder that already exists in the workspace, as for every file the server writes.
 
 TripoSG runs 50 sampling steps with a fixed seed, extracts the surface on a
 512³ grid and reduces it to at most 500,000 triangles. On an Apple M5 Max a
