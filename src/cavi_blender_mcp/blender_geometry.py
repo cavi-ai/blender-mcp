@@ -22,6 +22,7 @@ TOLERANCE = 1.1
 PACK = {"margin_method": "FRACTION", "rotate": True, "rotate_method": "CARDINAL",
         "shape_method": "AABB"}
 AXES = {"X", "Y", "Z"}
+COINCIDENT = 1e-9  # Below float32 spacing at unit scale: only vertices collapsed onto each other.
 CLEANUP_STEPS = {"merge", "delete_loose", "recalc_normals", "triangulate",
                  "clear_custom_normals"}
 
@@ -136,6 +137,18 @@ def collapse(value, ratio, axis, weight):
     finally:
         if label and value.vertex_groups.get(label):
             value.vertex_groups.remove(value.vertex_groups[label])
+    drop_collapsed(value.data)
+
+
+def drop_collapsed(mesh):
+    """Collapse can leave faces on coincident vertices; dissolve them so every face keeps an area."""
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        bmesh.ops.dissolve_degenerate(bm, dist=COINCIDENT, edges=list(bm.edges))
+        bm.to_mesh(mesh)
+    finally:
+        bm.free()
 
 
 def reduce(value, current, target, axis, seams):

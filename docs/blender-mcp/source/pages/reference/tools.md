@@ -122,7 +122,7 @@ Without a filter, all faces are measured together.
 | `texture_resolution` | Required width and height, each 1–16384 |
 | `padding_pixels` | Required minimum chart separation and tile-border clearance, 0–256 pixels |
 | `uv_layer` | Optional exact name; default is layer **index 0** |
-| `comparison_budget` | 1–1000000 candidate comparisons; default 100000 |
+| `comparison_budget` | 1–1000000 candidate comparisons; default 50 per inspected triangle |
 | `material` | Optional exact material name; at least one source face must use it |
 
 Up to 20000 selected triangles and 200000 source vertices per call, with at most

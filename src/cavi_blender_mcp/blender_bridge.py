@@ -735,6 +735,60 @@ def add_modifier(p):
     return info(value)
 
 
+# Float32 UVs land within 1e-4 px of a margin packed exactly at it; pack a thousandth wider.
+PACK_HEADROOM = 1.001
+
+
+def folded_faces(mesh, layer):
+    """Edit-mode faces whose UV triangles overlap another triangle of the layer."""
+    import bmesh
+
+    from .uv_layout import overlapping
+
+    bm = bmesh.from_edit_mesh(mesh)
+    bm.faces.index_update()
+    uv = bm.loops.layers.uv[layer]
+    corners = bm.calc_loop_triangles()
+    found = overlapping([[tuple(loop[uv].uv) for loop in corner] for corner in corners])
+    return {corners[i][0].face.index for i in found}
+
+
+def select_faces(mesh, indices):
+    import bmesh
+
+    bm = bmesh.from_edit_mesh(mesh)
+    bm.faces.index_update()
+    for face in bm.faces:
+        face.select_set(face.index in indices)
+    bm.select_flush_mode()
+    bmesh.update_edit_mesh(mesh, loop_triangles=False, destructive=False)
+
+
+def planar_islands(mesh, layer, indices):
+    """Give each face its own island: its corners on its own plane at true scale, spaced apart."""
+    import bmesh
+
+    bm = bmesh.from_edit_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+    uv = bm.loops.layers.uv[layer]
+    cursor = 0.0
+    for index in sorted(indices):
+        face = bm.faces[index]
+        origin = face.loops[0].vert.co
+        axis = face.loops[1].vert.co - origin
+        if face.normal.length == 0 or axis.length == 0:
+            continue
+        axis.normalize()
+        across = face.normal.cross(axis)
+        corners = [((loop.vert.co - origin).dot(axis), (loop.vert.co - origin).dot(across)) for loop in face.loops]
+        left = min(u for u, _ in corners)
+        # Faces sit side by side, so a shared mesh vertex never links two new islands.
+        for loop, (u, v) in zip(face.loops, corners):
+            loop[uv].uv = (cursor + u - left, v)
+        cursor += 2 * (max(u for u, _ in corners) - left)
+    bmesh.update_edit_mesh(mesh, loop_triangles=False, destructive=False)
+
+
 def unwrap(p):
     from .blender_geometry import PACK, integer
 
@@ -765,17 +819,37 @@ def unwrap(p):
     try:
         if name is not None:
             layers.active = layers[name]
-        with selected([value]):
-            bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_all(action="SELECT")
+        def project(limit):
             if "FINISHED" not in bpy.ops.uv.smart_project(
-                angle_limit=math.radians(angle), island_margin=margin,
+                angle_limit=math.radians(limit), island_margin=margin,
                 margin_method="FRACTION", rotate_method="AXIS_ALIGNED"
             ):
                 raise RuntimeError("Smart UV Project did not finish")
+
+        def pack():
+            bpy.ops.mesh.select_all(action="SELECT")
             bpy.ops.uv.select_all(action="SELECT")
-            if "FINISHED" not in bpy.ops.uv.pack_islands(margin=margin, scale=True, **PACK):
+            if "FINISHED" not in bpy.ops.uv.pack_islands(
+                margin=margin * PACK_HEADROOM, scale=True, **PACK
+            ):
                 raise RuntimeError("UV island packing did not finish")
+
+        with selected([value]):
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            project(angle)
+            pack()
+            # Faces folded over their own island are projected again at half the angle;
+            # any still folded become islands of their own.
+            folded = folded_faces(value.data, layers.active.name)
+            if folded:
+                select_faces(value.data, folded)
+                project(max(1.0, angle / 2))
+                pack()
+                folded = folded_faces(value.data, layers.active.name)
+            if folded:
+                planar_islands(value.data, layers.active.name, folded)
+                pack()
     except Exception:
         if created is not None:
             layers.remove(layers[name])

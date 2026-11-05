@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze
+from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze, overlapping
 
 QUAD = [[(.1, .1), (.4, .1), (.4, .4)], [(.1, .1), (.4, .4), (.1, .4)]]
 IDS = [[0, 1, 2], [0, 2, 3]]
@@ -134,6 +134,18 @@ class UVLayoutTests(unittest.TestCase):
         self.assertEqual(r['overlap']['triangle_pairs'], 45)
         self.assertEqual(len(r['overlap']['examples']), 32)
         self.assertTrue(r['complete'])
+
+    def test_unset_budget_grows_with_the_inspected_triangles(self):
+        row = [[(.01 * i, .5), (.01 * i + .005, .5), (.01 * i, .505)] for i in range(80)]
+        r = analyze(row, [[3 * i, 3 * i + 1, 3 * i + 2] for i in range(80)], (100, 100), 0)
+        self.assertEqual(r['comparison_budget'], 50 * 80)
+        self.assertTrue(r['complete'])
+        self.assertEqual(analyze(QUAD, IDS, (100, 100), 0)['comparison_budget'], 100)
+
+    def test_overlapping_names_both_folded_triangles_and_no_edge_neighbour(self):
+        apart = [(.6, .6), (.7, .6), (.7, .7)]
+        self.assertEqual(overlapping([QUAD[0], QUAD[1], QUAD[0], apart]), [0, 2])
+        self.assertEqual(overlapping(QUAD + [apart]), [])
 
     def test_invalid_or_unbounded_arguments_are_rejected(self):
         for kwargs in ({'resolution': (0, 10)}, {'padding': -1}, {'budget': 0},

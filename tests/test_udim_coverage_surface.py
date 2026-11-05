@@ -22,7 +22,7 @@ class CoverageSurfaceTests(unittest.TestCase):
         with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
             asyncio.run(server.inspect_uv_layout(names=['Body'], udim_image='Skin', material='Finish'))
         self.assertEqual(calls, [('inspect_udim_coverage', {'names':['Body'], 'udim_image':'Skin',
-            'material':'Finish', 'uv_layer':None, 'comparison_budget':100000})])
+            'material':'Finish', 'uv_layer':None, 'comparison_budget':None})])
 
     def test_modes_reject_ineffective_or_missing_parameters(self):
         for options in [{}, {'udim_image':'Skin','texture_resolution':(1024,1024)},

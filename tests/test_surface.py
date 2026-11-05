@@ -63,7 +63,7 @@ class SurfaceTests(unittest.TestCase):
         asyncio.run(server.inspect_uv_layout(["Prop"], (2048, 1024), 8.))
         self.assertEqual(calls, [("inspect_uv_layout", {
             "names": ["Prop"], "texture_resolution": (2048, 1024), "padding_pixels": 8.,
-            "uv_layer": None, "comparison_budget": 100000, "material": None})])
+            "uv_layer": None, "comparison_budget": None, "material": None})])
         self.assertIn("inspect_uv_layout", LEASE_FREE)
         tool = next(t for t in asyncio.run(server.mcp.list_tools())
                     if t.name == "inspect_uv_layout")

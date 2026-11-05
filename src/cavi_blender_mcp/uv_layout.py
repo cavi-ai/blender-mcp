@@ -6,9 +6,16 @@ from heapq import heappop, heappush
 import numpy as np
 
 MAX_TRIANGLES = 20000
+MAX_COMPARISONS = 1000000
+COMPARISONS_PER_TRIANGLE = MAX_COMPARISONS // MAX_TRIANGLES
 AREA_EPSILON = 1e-8  # Pixel squared, also the degenerate-area threshold.
 DISTANCE_EPSILON = 1e-6  # Pixels; only used for the requested padding comparison.
 EXAMPLES = 32
+
+
+def default_budget(triangles):
+    """Candidate comparisons grow with the inspected triangles, up to the analysis maximum."""
+    return max(1, min(MAX_COMPARISONS, COMPARISONS_PER_TRIANGLE * triangles))
 
 
 def _cross(a, b):
@@ -129,7 +136,31 @@ def _candidate_pairs(lo, hi, padding):
         heappush(expires, (hi[current, 0] + padding, current))
 
 
-def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget):
+def overlapping(triangles, resolution=4096):
+    """Triangles whose UV interior overlaps another's, by the rule analyze counts at this resolution.
+
+    The search stops after the default comparison budget, so a pathological stack returns a subset.
+    """
+    tri = np.asarray(triangles, dtype=np.float64)
+    if tri.ndim != 3 or tri.shape[1:] != (3, 2):
+        raise ValueError('Provide UV triangles as three (u, v) corners')
+    finite = np.isfinite(tri).all(axis=(1, 2))
+    pixels = tri * resolution
+    valid = np.array([i for i in np.flatnonzero(finite) if _area(pixels[i]) > AREA_EPSILON], dtype=int)
+    if not len(valid):
+        return []
+    lo, hi = pixels[valid].min(axis=1), pixels[valid].max(axis=1)
+    found, budget = set(), default_budget(len(tri))
+    for comparisons, (x, y) in enumerate(_candidate_pairs(lo, hi, 0.)):
+        if comparisons == budget:
+            break
+        i, j = int(valid[x]), int(valid[y])
+        if triangle_intersection_area(pixels[i], pixels[j]) > AREA_EPSILON:
+            found.update((i, j))
+    return sorted(found)
+
+
+def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget=None):
     """Treat all input triangles as one texture set in a unique 0..1 tile.
 
     Source vertex IDs must be disjoint across objects. Pairwise intersection area
@@ -142,7 +173,9 @@ def analyze(triangles, vertices, resolution, padding_pixels, comparison_budget):
     if (isinstance(padding_pixels, bool) or not math.isfinite(padding_pixels)
             or not 0 <= padding_pixels <= 256):
         raise ValueError('Padding must be finite, from 0 to 256 pixels')
-    if type(comparison_budget) is not int or not 1 <= comparison_budget <= 1000000:
+    if comparison_budget is None:
+        comparison_budget = default_budget(len(triangles))
+    if type(comparison_budget) is not int or not 1 <= comparison_budget <= MAX_COMPARISONS:
         raise ValueError('Comparison budget must be an integer from 1 to 1000000')
     tri = np.asarray(triangles, dtype=np.float64)
     ids = np.asarray(vertices)

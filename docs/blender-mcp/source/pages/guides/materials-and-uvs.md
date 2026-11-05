@@ -217,7 +217,7 @@ After binding a tiled image, copy its actual native image name from shader
 inspection and check the mesh UV layer:
 
 ```json
-{"names":["CharacterBody"],"udim_image":"skin.<UDIM>.exr","material":"CharacterFinish","uv_layer":"UVMap","comparison_budget":100000}
+{"names":["CharacterBody"],"udim_image":"skin.<UDIM>.exr","material":"CharacterFinish","uv_layer":"UVMap"}
 ```
 
 These are `inspect_uv_layout` arguments. This mode needs neither texture
