@@ -98,6 +98,15 @@ class BakePair(BaseModel):
     low: Names
 
 
+class UVTransform(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    faces: Annotated[list[Annotated[StrictInt, Field(ge=0)]], Field(min_length=1, max_length=20000)]
+    offset: Vector2 = (0, 0)
+    scale: Vector2 = (1, 1)
+    rotation_degrees: Number = 0
+    pivot: Vector2 = (0, 0)
+
+
 class BoneSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: Annotated[str, Field(min_length=1, max_length=63)]
@@ -649,7 +658,7 @@ async def object_edit(
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "mirror", "array", "solidify"],
+                    "join", "separate", "mirror", "array", "solidify", "uv_transform"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -688,19 +697,13 @@ async def mesh_edit(
     offset: Vector3 | None = None,
     thickness: Annotated[Number | None, Field(gt=0, le=100)] = None,
     clipping: StrictBool | None = None,
+    uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
 ) -> MeshEditResult:
-    """Edit mesh surface. Params per action (defaults after =):
-    modifier: kind, amount, apply=false; unwrap: angle_limit_degrees=66, island_margin=.02,
-    uv_layer; decimate_to: target_triangles|amount, symmetry_axis, preserve=[seams];
-    remesh_quad: target_faces, preserve=[boundary]; lod_chain: ratios=[.5,.25,.125]|
-    triangle_targets, rename_source=false, symmetry_axis, preserve; lightmap_uv:
-    uv_layer=UVMap_Lightmap, lightmap_resolution=64, margin_px=4; texel_density:
-    target_px_per_m, texture_resolution=1024, uv_layer, pack=false; collision: shape=convex,
-    max_hull_vertices=32; cleanup: merge_distance=.0001, steps=[merge,delete_loose,recalc_normals];
-    boolean: operand, operation, solver=exact, keep_operand=false, self_intersection=false;
-    join: names; separate: by=loose_parts; mirror: symmetry_axis=X, merge_distance=.001,
-    clipping=false; array: count, offset; solidify: thickness, offset=-1.
+    """Edit a mesh; parameters are action-specific (see reference/tools.md).
+    uv_transform: explicit source faces and offset/scale/rotation about pivot; uv_layer
+    selects an existing layer (default UV0). Preserves topology, skin and shape keys.
+    Use a single-user mesh in Object Mode; edits require lease_id.
     """
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
@@ -714,7 +717,7 @@ async def mesh_edit(
               "steps": steps, "operand": operand, "operation": operation, "solver": solver,
               "keep_operand": keep_operand, "self_intersection": self_intersection,
               "names": names, "by": by, "count": count, "offset": offset,
-              "thickness": thickness, "clipping": clipping}
+              "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform}
     if action == "modifier":
         operation = "add_modifier"
         params = pick(action, values, ["kind", "amount"], {"apply": False})
@@ -743,6 +746,10 @@ async def mesh_edit(
         operation = action
         params = pick(action, values, ["target_px_per_m"], {
             "texture_resolution": 1024, "uv_layer": None, "pack": False})
+    elif action == 'uv_transform':
+        operation = 'transform_uv'
+        params = pick(action, values, ['uv_transform'], {'uv_layer':None})
+        params['transform'] = params.pop('uv_transform').model_dump()
     elif action == "boolean":
         operation = "boolean_mesh"
         params = pick(action, values, ["operand", "operation"], {

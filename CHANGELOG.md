@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+- Transform explicit source-face UVs on an existing layer without rebuilding geometry.
+- Preserve skin weights, shape keys, other UVs and selection; roll back failed writes.
+- Report affected faces, materials and before/after UV bounds.
+
 - The package version, and the release the documentation names, come from the git tag.
 - Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
 

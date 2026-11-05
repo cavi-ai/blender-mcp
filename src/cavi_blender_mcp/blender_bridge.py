@@ -877,6 +877,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'transform_uv':
+        from .blender_uv_edit import transform
+
+        return transform(p, editable_mesh, info)
     if operation in {'inspect_material_nodes', 'set_material_inputs', 'set_material_image'}:
         from .blender_shader_inputs import inspect, set_image, set_inputs
 
