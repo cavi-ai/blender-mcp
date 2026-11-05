@@ -138,8 +138,8 @@ a linear EXR is not automatically sRGB.
 
 A fresh image datablock keeps other nodes' images, color spaces, alpha modes and
 unsaved pixels intact. The edited node keeps its links, interpolation, projection,
-extension and other settings. The image is a packed single-file binding; it does
-not define a UDIM set or image-sequence delivery. `image_source` reports the exact
+extension and other settings. Without `tiles`, the image is a packed single-file binding. Supply `tiles` for
+a declared UDIM set as below; image-sequence delivery is separate. `image_source` reports the exact
 snapshot SHA-256 and byte count. `changed_image` distinguishes replacements from
 unchanged packed snapshots, which are reused. A changed file at the same path is
 loaded from a fresh snapshot, bypassing stale image-cache contents.
@@ -148,3 +148,38 @@ A failed edit restores the old image binding and managed tags and removes the
 new image. Effective replacements use the same managed-configuration handoff as
 socket edits. Save/reopen, inspect the binding, and review the authored material
 before adapting it for the destination game shader.
+
+### Declared UDIM texture sets
+
+Pass a filename pattern containing one `<UDIM>` token and the exact tile numbers:
+
+```json
+{"action":"set_image","material_name":"CharacterFinish","group_path":["Surface"],"node":"BaseColor","image":{"path":"textures/skin.<UDIM>.exr","tiles":[1001,1002,1011],"color_space":"Non-Color","alpha_mode":"CHANNEL_PACKED"},"lease_id":"<claim-token>"}
+```
+
+The filenames come from substituting each declared number into the pattern.
+All files must resolve inside the workspace. Duplicate declarations, missing
+files, invalid images and unsupported native tile layouts fail without replacing
+the binding. Tile 1001 is optional; gaps and mixed resolutions are preserved.
+Neighboring undeclared files are excluded from the native snapshot. Ensure the
+declared set covers the asset's intended UVs; a missing UV tile still produces
+Blender's missing-texture fallback. Keep the authored UV coordinates instead of
+packing a UDIM source into one tile during validation.
+
+`image_source.tiles` reports each tile's path, byte count and SHA-256.
+`manifest_sha256` identifies the sorted tile manifest; it is not a file hash.
+Inspection returns native tile sizes/channels and actual `packed_tiles` receipts.
+Packing retains original file bytes, including high-precision PNG/TIFF/EXR.
+The active image buffer's `decoded_depth_bits` is not every source tile's precision.
+Logical paths remain aligned with the declared pattern even for internal symlinks.
+
+Unchanged clean sets with matching packed bytes are reused. Changed source bytes
+produce a fresh image while preserving other users and unsaved source pixels.
+Failures restore the previous binding and managed tags and remove new IDs and
+snapshots. Save/reopen the blend and check its tile table and hashes. A packed
+material can be appended through `asset_library` without the external tile files.
+
+UDIM authoring does not make a destination shader tile-aware. Declare the game's
+supported texture layout and color/data roles before delivery. Preserve the
+editable tiled source when making an explicit atlas or separate material sets;
+verify the adapted result with the consuming renderer.
