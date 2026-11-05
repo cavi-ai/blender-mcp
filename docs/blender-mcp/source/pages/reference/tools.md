@@ -7,8 +7,9 @@ Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `in
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
 `assign_material` `inspect` is lease-free; `set_inputs` requires ownership. Inspect
-native shader sockets and shared owners before tuning defaults through nested
-`group_path` nodes. See [authored shader controls](../guides/materials-and-uvs.md#tune-an-authored-shader-graph).
+native shader inputs/outputs and shared owners before tuning defaults through nested
+`group_path` nodes. `set_image` replaces an image binding with a packed native
+workspace snapshot and explicit color/alpha interpretation. See [authored shader controls](../guides/materials-and-uvs.md#tune-an-authored-shader-graph).
 
 For a nested kit definition, `scene_info(name=..., definition=true)` pages through
 its source objects. `geometry_nodes` inspect/set_inputs accepts `instance` to

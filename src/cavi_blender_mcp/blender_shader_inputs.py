@@ -1,9 +1,12 @@
 """Inspect and edit native shader socket defaults without rebuilding authored graphs."""
 
+import hashlib
 import math
+from pathlib import Path
 
 import bpy
 
+from .blender_images import packed_snapshot
 from .blender_materials import CONFIG_TAG
 from .blender_node_inputs import encode, matches
 
@@ -78,23 +81,26 @@ def owners(tree):
     return sorted(found, key=lambda m: m.name)
 
 
+def socket_report(socket):
+    prop = socket.bl_rna.properties.get('default_value')
+    return {'identifier': socket.identifier, 'name': socket.name, 'type': socket.type,
+        'editable': editable(socket), 'linked': socket.is_linked,
+        'value': encode(socket.default_value) if editable(socket) else None,
+        'minimum': getattr(prop, 'hard_min', None), 'maximum': getattr(prop, 'hard_max', None)}
+
+
 def node_report(node):
-    inputs = []
-    for socket in node.inputs:
-        prop = socket.bl_rna.properties.get('default_value')
-        inputs.append({'identifier': socket.identifier, 'name': socket.name, 'type': socket.type,
-            'editable': editable(socket), 'linked': socket.is_linked,
-            'value': encode(socket.default_value) if editable(socket) else None,
-            'minimum': getattr(prop, 'hard_min', None), 'maximum': getattr(prop, 'hard_max', None)})
-    report = {'name': node.name, 'type': node.type, 'inputs': inputs}
+    report = {'name': node.name, 'type': node.type,
+              'inputs': [socket_report(s) for s in node.inputs],
+              'outputs': [socket_report(s) for s in node.outputs]}
     if node.type == 'GROUP' and node.node_tree:
         report['group'] = node.node_tree.name
-    if node.type == 'TEX_IMAGE' and node.image:
+    if hasattr(node, 'image') and node.image:
         image = node.image
         report['image'] = {'name': image.name, 'source': image.source, 'path': image.filepath,
             'size': list(image.size), 'color_space': image.colorspace_settings.name,
             'decoded_depth_bits': image.depth, 'float_buffer': image.is_float,
-            'packed': bool(image.packed_file)}
+            'alpha_mode': image.alpha_mode, 'packed': bool(image.packed_file)}
     return report
 
 
@@ -124,47 +130,121 @@ def inspect(params):
         'link_scope': 'touching_returned_nodes'}
 
 
-def set_inputs(params):
+def editable_node(params):
     _material, tree = target(params)
     if tree is None or not tree.is_editable:
         raise ValueError('Shader node tree needs an editable local copy or library override')
     node = tree.nodes.get(params.get('node', ''))
-    inputs = params.get('inputs')
-    if node is None or not isinstance(inputs, dict) or not inputs:
-        raise ValueError('Provide a shader node and nonempty inputs')
-    sockets = {s.identifier: s for s in node.inputs}
-    if not set(inputs) <= set(sockets):
-        raise ValueError('Unknown native input socket identifier')
-    updates = [(sockets[key], decode(sockets[key], value)) for key, value in inputs.items()]
-    before = [(s, encode(s.default_value)) for s, _ in updates]
-    managed = [m for m in owners(tree) if m.is_editable and CONFIG_TAG in m]
+    if node is None:
+        raise ValueError('Shader node does not exist')
+    return tree, node
+
+
+def finish_edit(params, tree, changed, **fields):
+    managed = [m for m in owners(tree) if m.is_editable and CONFIG_TAG in m] if changed else []
     tags = [(m, m[CONFIG_TAG], PROVENANCE_TAG in m, m.get(PROVENANCE_TAG)) for m in managed]
     try:
-        for socket, value in updates:
-            socket.default_value = value
-        tree.update_tag()
-        bpy.context.view_layer.update()
-        for socket, value in updates:
-            if not matches(socket.default_value, value):
-                raise ValueError('Blender changed the requested socket default')
-        changed = [s.identifier for s, old in before if encode(s.default_value) != old]
-        if not changed:
-            managed = []
         for owner in managed:
             owner[PROVENANCE_TAG] = owner[CONFIG_TAG]
             del owner[CONFIG_TAG]
-        return {**inspect({**params, 'offset': 0, 'limit': 1}),
-                'changed_inputs': changed,
+        return {**inspect({**params, 'offset': 0, 'limit': 1}), **fields,
                 'managed_materials_detached': [m.name for m in managed]}
     except Exception:
-        for socket, value in before:
-            socket.default_value = value
         for owner, config, existed, provenance in tags:
             owner[CONFIG_TAG] = config
             if existed:
                 owner[PROVENANCE_TAG] = provenance
             elif PROVENANCE_TAG in owner:
                 del owner[PROVENANCE_TAG]
-        tree.update_tag()
-        bpy.context.view_layer.update()
+        raise
+
+
+def update(tree):
+    tree.update_tag()
+    bpy.context.view_layer.update()
+
+
+def set_inputs(params):
+    tree, node = editable_node(params)
+    updates = []
+    for side in ['inputs', 'outputs']:
+        values = params.get(side, {})
+        if not isinstance(values, dict) or any(not isinstance(k, str) for k in values):
+            raise ValueError('Provide nonempty inputs or outputs by native socket identifier')
+        sockets = {s.identifier: s for s in getattr(node, side)}
+        if not set(values) <= set(sockets):
+            raise ValueError('Unknown native '+side+' socket identifier')
+        updates.extend((side, sockets[key], decode(sockets[key], value)) for key, value in values.items())
+    if not updates:
+        raise ValueError('Provide nonempty inputs or outputs')
+    before = [(side, s, encode(s.default_value)) for side, s, _ in updates]
+    try:
+        for _, socket, value in updates:
+            socket.default_value = value
+        update(tree)
+        for _, socket, value in updates:
+            if not matches(socket.default_value, value):
+                raise ValueError('Blender changed the requested socket default')
+        changed = {side: [s.identifier for direction, s, old in before
+                         if side == direction and encode(s.default_value) != old]
+                   for side in ['inputs', 'outputs']}
+        fields = {'changed_inputs': changed['inputs']}
+        if params.get('outputs'):
+            fields['changed_outputs'] = changed['outputs']
+        return finish_edit(params, tree, bool(changed['inputs'] or changed['outputs']), **fields)
+    except Exception:
+        for _, socket, value in before:
+            socket.default_value = value
+        update(tree)
+        raise
+
+
+def set_image(params, workspace):
+    tree, node = editable_node(params)
+    if not hasattr(node, 'image') or node.is_property_readonly('image'):
+        raise ValueError('Shader node has no editable image binding')
+    spec = params.get('image')
+    if not isinstance(spec, dict) or set(spec)-{'path', 'color_space', 'alpha_mode'}:
+        raise ValueError('Provide image path, color_space and optional alpha_mode')
+    if any(not isinstance(spec.get(k), str) or not spec[k].strip() for k in ['path', 'color_space']):
+        raise ValueError('Provide image path and explicit color_space')
+    alpha = spec.get('alpha_mode', 'STRAIGHT')
+    if alpha not in {'STRAIGHT', 'PREMUL', 'CHANNEL_PACKED', 'NONE'}:
+        raise ValueError('Unknown native image alpha_mode')
+    root = Path(workspace).resolve(strict=True)
+    path = (root/spec['path']).resolve(strict=True)
+    if not path.is_relative_to(root) or not path.is_file():
+        raise ValueError('Image must be a file inside the workspace')
+    previous = node.image
+    reusable = previous if (previous and previous.source == 'FILE'
+        and Path(bpy.path.abspath(previous.filepath, library=previous.library)).resolve() == path
+        and previous.colorspace_settings.name == spec['color_space'] and previous.alpha_mode == alpha) else None
+    image, fingerprint = packed_snapshot(path, root, reusable)
+    changed = image != previous
+    try:
+        if changed:
+            try:
+                image.colorspace_settings.name = spec['color_space']
+            except TypeError as exc:
+                raise ValueError('color_space is not available in the active OCIO configuration') from exc
+            image.alpha_mode = alpha
+        if min(image.size) <= 0 or not image.packed_file:
+            raise ValueError('Image could not be decoded and packed')
+        payload = image.packed_file.data
+        if hashlib.sha256(payload).hexdigest() != fingerprint:
+            raise ValueError('Packed image does not match the source snapshot')
+        node.image = image
+        update(tree)
+        if node.image != image or image.colorspace_settings.name != spec['color_space']:
+            raise ValueError('Blender changed the requested image binding')
+        return finish_edit(params, tree, changed, changed_image=changed,
+            previous_image=previous.name if previous else None,
+            image_source={'path': path.relative_to(root).as_posix(), 'sha256': fingerprint, 'bytes': len(payload)})
+    except Exception:
+        try:
+            node.image = previous
+            update(tree)
+        finally:
+            if changed and image.users == 0:
+                bpy.data.images.remove(image)
         raise

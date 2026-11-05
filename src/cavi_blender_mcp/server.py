@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import anyio
 from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES, Server
 from mcp.server.mcpserver import Image
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, WithJsonSchema
 
 from .client import BridgeClient
 from .contracts import (
@@ -56,9 +56,16 @@ mcp = Server(
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
-Vector2 = tuple[Number, Number]
-Vector3 = tuple[Number, Number, Number]
-RGBA = tuple[Number, Number, Number, Number]
+
+
+def _vector_schema(size):
+    return WithJsonSchema({'type': 'array', 'items': {'type': 'number'},
+                           'minItems': size, 'maxItems': size})
+
+
+Vector2 = Annotated[tuple[Number, Number], _vector_schema(2)]
+Vector3 = Annotated[tuple[Number, Number, Number], _vector_schema(3)]
+RGBA = Annotated[tuple[Number, Number, Number, Number], _vector_schema(4)]
 ObjectName = Annotated[str, Field(description="Exact object name from scene_info.")]
 LeaseId = Annotated[str | None, Field(description="lease_id from session_control claim.")]
 MUTATING = DESTRUCTIVE
@@ -75,6 +82,13 @@ class NamingRules(BaseModel):
     mesh_prefix: Annotated[str | None, Field(max_length=16)] = None
     lod_suffix: Annotated[str, Field(max_length=32)] = "_LOD{n}"
     collision_prefixes: Annotated[list[str], Field(max_length=8)] = ["UCX_", "UBX_", "USP_"]
+
+
+class ShaderImage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: str
+    color_space: str
+    alpha_mode: Literal['STRAIGHT', 'PREMUL', 'CHANNEL_PACKED', 'NONE'] = 'STRAIGHT'
 
 
 class BakePair(BaseModel):
@@ -781,22 +795,25 @@ async def assign_material(
     lease_id: LeaseId = None,
     instance: str | None = None,
     link_mode: Literal['DATA', 'OBJECT'] | None = None,
-    action: Literal['assign', 'inspect', 'set_inputs'] = 'assign',
+    action: Literal['assign', 'inspect', 'set_inputs', 'set_image'] = 'assign',
     group_path: list[str] | None = None,
     node: str | None = None,
     inputs: dict[str, JsonValue] | None = None,
+    outputs: dict[str, JsonValue] | None = None,
+    image: ShaderImage | None = None,
     offset: Annotated[StrictInt | None, Field(ge=0)] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
 ) -> MaterialAssignment:
     """assign: names, material_name; PNG/JPEG maps (color/emission sRGB, data Non-Color).
     instance scopes kit meshes; OBJECT retains shared geometry.
     inspect: group_path, node, offset/limit; lease-free.
-    set_inputs: node, inputs by socket ID; linear values, links retained,
-    shared users affected, managed config detached.
+    set_inputs: node, inputs/outputs by socket ID; linear values, links retained,
+    shared users affected, managed config detached. set_image: node, image
+    (workspace path, explicit color_space, alpha_mode); packs source bytes.
     """
     if material_name is None:
         raise ValueError('material_name is required')
-    shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'offset': offset, 'limit': limit}
+    shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
     if action != 'assign':
         pick(action, {'names': names, 'base_color_texture': base_color_texture, 'base_color': base_color,
             'roughness': roughness, 'metallic': metallic, 'roughness_texture': roughness_texture,
@@ -809,9 +826,15 @@ async def assign_material(
         if action == 'inspect':
             params = pick(action, shader, (), {'group_path': [], 'node': None, 'offset': 0, 'limit': 100})
             return await run(call, 'inspect_material_nodes', material_name=material_name, **params)
-        params = pick(action, shader, ['node', 'inputs'], {'group_path': []})
-        if not params['inputs']:
-            raise ValueError('Provide nonempty inputs')
+        if action == 'set_image':
+            params = pick(action, shader, ['node', 'image'], {'group_path': []})
+            params['image'] = image.model_dump()
+            return await run(call, 'set_material_image', material_name=material_name, lease_id=lease_id, **params)
+        params = pick(action, shader, ['node'], {'group_path': [], 'inputs': {}, 'outputs': {}})
+        if not (params['inputs'] or params['outputs']):
+            raise ValueError('Provide nonempty inputs or outputs')
+        if not params['outputs']:
+            params.pop('outputs')
         return await run(call, 'set_material_inputs', material_name=material_name, lease_id=lease_id, **params)
     pick(action, shader)
     if names is None:
