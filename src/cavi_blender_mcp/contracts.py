@@ -206,6 +206,7 @@ class ObjectEditResult(ObjectFields):
     action: str | None = None
     frame_range: list[Number] | None = None
     frames: list[Number] | None = None
+    mesh_copy: Record | None = None
 
 
 class RigEditResult(ObjectFields):

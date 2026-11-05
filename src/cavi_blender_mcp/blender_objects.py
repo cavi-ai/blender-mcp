@@ -7,6 +7,7 @@ import numpy as np
 from mathutils import Euler, Matrix, Vector
 
 from .blender_bridge import editable_mesh, info, new_name, number, obj, vector
+from .blender_errors import preflight
 
 COMPONENTS = ("location", "rotation", "scale")
 ORIGINS = {"bounds_bottom_center", "bounds_center", "world_origin", "point"}
@@ -15,6 +16,39 @@ ORIGINS = {"bounds_bottom_center", "bounds_center", "world_origin", "point"}
 def object_mode():
     if bpy.context.mode != "OBJECT":
         raise ValueError("Switch Blender to Object Mode before this operation")
+
+
+def make_single_user(p):
+    with preflight():
+        object_mode()
+        value = obj(p['name'], mesh=True)
+        if not value.is_editable:
+            raise ValueError('Mesh ownership requires an editable scene object')
+        source = value.data
+        previous_users = source.users
+        needed = source.users > 1 or source.library is not None
+    clone, key = None, None
+    try:
+        if needed:
+            clone = source.copy()
+            key = clone.shape_keys if clone.shape_keys != source.shape_keys else None
+            clone.use_fake_user = False
+            value.data = clone
+            value.update_tag()
+            bpy.context.view_layer.update()
+            if clone.library is not None or clone.users != 1:
+                raise RuntimeError('Native copy did not produce single-user local mesh data')
+        return {**info(value), 'mesh_copy':{'copied':needed, 'source':source.name,
+            'mesh':value.data.name, 'previous_users':previous_users,
+            'source_users':source.users, 'users':value.data.users,
+            'shape_keys':value.data.shape_keys.name if value.data.shape_keys else None}}
+    except Exception:
+        if clone is not None:
+            value.data = source
+            bpy.data.batch_remove(ids=tuple(v for v in (clone, key) if v is not None))
+            value.update_tag()
+            bpy.context.view_layer.update()
+        raise
 
 
 def reparent_children(value, delta):
@@ -220,7 +254,8 @@ def move_to_collection(p):
     return {**info(value), "collection": collection.name}
 
 
-HANDLERS = {"apply_transforms": apply_transforms, "set_origin": set_origin,
+HANDLERS = {"make_mesh_single_user": make_single_user,
+            "apply_transforms": apply_transforms, "set_origin": set_origin,
             "snap_to_grid": snap_to_grid, "rename_object": rename, "add_socket": add_socket,
             "duplicate_object": duplicate, "parent_object": parent,
             "unparent_object": unparent, "move_to_collection": move_to_collection}

@@ -81,6 +81,7 @@ OPERATIONS = frozenset(
         "retarget_rig",
         "lock_rig_contacts",
         "apply_transforms",
+        "make_mesh_single_user",
         "set_origin",
         "snap_to_grid",
         "rename_object",
