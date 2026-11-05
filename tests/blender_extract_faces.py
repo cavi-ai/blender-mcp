@@ -74,6 +74,7 @@ with tempfile.TemporaryDirectory() as folder:
                 item.color = (.01 * index, .02 * index, .03 * index, 1)
             else:
                 item.value = bool(index) if kind == 'BOOLEAN' else index
+    mesh.normals_split_custom_set([(0.1, 0.2, 1)] * len(mesh.loops))
     bpy.context.view_layer.update()
     bpy.context.view_layer.objects.active = value
     value.select_set(True)
@@ -89,14 +90,14 @@ with tempfile.TemporaryDirectory() as folder:
             'lease_id': lease, **extra}})
 
     def refused(**extra):
-        before_ids = ids()
+        before_ids, before_case = ids(), snapshot(value)
         try:
             extract(**extra)
         except ValueError:
             pass
         else:
             raise AssertionError('Invalid extraction was accepted')
-        assert ids() == before_ids and snapshot(value) == before
+        assert ids() == before_ids and snapshot(value) == before_case
 
     for selection in ([], [0, 0], [0, 99], [-1], [True], [1.5], [0] * 20001):
         refused(face_indices=selection)
@@ -110,6 +111,14 @@ with tempfile.TemporaryDirectory() as folder:
     value.shape_key_add(name='Basis')
     refused()
     value.shape_key_clear()
+    holder.scale = (2, 1, .5)
+    bpy.context.view_layer.update()
+    refused()
+    holder.scale, value.scale = (1, 1, 1), (0, 2, .5)
+    bpy.context.view_layer.update()
+    refused()
+    value.scale = (-1, 2, .5)
+    bpy.context.view_layer.update()
     before_ids = ids()
     with patch.object(blender_compose, 'info', side_effect=RuntimeError('receipt failure')):
         try:
@@ -120,6 +129,7 @@ with tempfile.TemporaryDirectory() as folder:
             raise AssertionError('Expected receipt failure')
     assert ids() == before_ids and snapshot(value) == before
     result = extract()
+    bpy.context.view_layer.update()
     output = bpy.data.objects[result['name']]
     assert output.data != original_mesh and output.parent is None and not output.vertex_groups
     assert not output.modifiers and output.data.shape_keys is None
@@ -148,6 +158,10 @@ with tempfile.TemporaryDirectory() as folder:
             attribute_values(mesh.attributes[name])[i] for i in maps[domain]], name
     for original, copied in zip(mesh.uv_layers, output.data.uv_layers, strict=True):
         assert [tuple(v.uv) for v in copied.data] == [tuple(original.data[i].uv) for i in corner_map]
+    assert output.data.has_custom_normals
+    assert max((output.data.corner_normals[i].vector - mesh.corner_normals[original].vector).length
+               for i, original in enumerate(corner_map)) < 1e-6
     print(json.dumps({'extract_faces': 'passed', 'source_exact': True, 'triangles': 4,
         'uv_layers': 2, 'custom_attribute_domains': sorted(maps), 'receipt_rollback': True,
-        'invalid_selection_modifier_shape_key_weights_refused': True}))
+        'invalid_selection_modifier_shape_key_weights_refused': True,
+        'sheared_and_singular_transforms_refused': True, 'custom_normals_preserved': True}))

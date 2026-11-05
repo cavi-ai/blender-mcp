@@ -83,7 +83,9 @@ material slots, selected corner UVs and native mesh attributes; the original
 mesh is unchanged. It removes unused geometry without filling boundaries or
 inferring garment regions. The source must have no modifiers, shape keys,
 vertex groups or armature binding. Every index and the new name are checked
-before copying; failure removes only the new output.
+before copying; sheared or singular world transforms are refused. Failure
+removes only the new output. The raw subset is an open, unrigged patch: garment
+thickness, fit, rigging, facial animation and deformation require separate checks.
 
 ```json
 {"action":"extract_faces","name":"Surface","new_name":"GarmentPatch","face_indices":[12,13],"lease_id":"<claim-token>"}

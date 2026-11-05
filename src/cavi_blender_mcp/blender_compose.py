@@ -1,7 +1,10 @@
 """Multi-mesh composition: booleans, joins, splits, mirrors, arrays and shells."""
 
+import math
+
 import bmesh
 import bpy
+from mathutils import Matrix
 
 from .blender_bridge import info, new_name, number, selected, vector
 from .blender_geometry import MAX_TRIANGLES, bake, free_name, loose_parts, source, triangle_count
@@ -185,13 +188,23 @@ def extract_faces(p):
         raise ValueError("face_indices must contain 1 to 20000 unique source polygon indices")
     if value.vertex_groups or value.find_armature() is not None:
         raise ValueError("Face extraction requires an unrigged mesh without vertex groups")
+    world = value.matrix_world.copy()
+    determinant = world.determinant()
+    if (not all(math.isfinite(component) for row in world for component in row)
+            or not math.isfinite(determinant) or determinant == 0):
+        raise ValueError("Face extraction requires a finite nonsingular world transform")
+    ordinary = Matrix.LocRotScale(*world.decompose())
+    if any(not math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-6)
+           for left, right in zip(world, ordinary, strict=True)
+           for a, b in zip(left, right, strict=True)):
+        raise ValueError("Face extraction does not support sheared world transforms")
     mesh, item = None, None
     try:
         mesh = subset(value.data, set(faces), False, copy_data=True)
         mesh.name = label
         item = bpy.data.objects.new(label, mesh)
         (value.users_collection or [bpy.context.scene.collection])[0].objects.link(item)
-        item.matrix_world = value.matrix_world.copy()
+        item.matrix_world = world
         for original, copied in zip(value.material_slots, item.material_slots, strict=True):
             copied.link = original.link
             if original.link == "OBJECT":
