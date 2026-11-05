@@ -6,6 +6,44 @@ from .blender_material_bindings import bind, capture, restore
 from .blender_shader_inputs import inspect
 
 
+def dispose_graph(material, groups):
+    if material is not None:
+        bpy.data.materials.remove(material)
+    if groups:
+        bpy.data.batch_remove(ids=tuple(groups))
+
+
+def clone_graph(source, name=None):
+    material=None
+    groups=[]
+    try:
+        material=source.copy()
+        material.use_fake_user=False
+        mappings={source.node_tree:material.node_tree} if source.node_tree else {}
+        pending=[material.node_tree] if material.node_tree else []
+        while pending:
+            tree=pending.pop()
+            for node in tree.nodes:
+                if node.type!='GROUP' or node.node_tree is None:
+                    continue
+                original=node.node_tree
+                if original not in mappings:
+                    clone=original.copy()
+                    groups.append(clone)
+                    clone.use_fake_user=False
+                    mappings[original]=clone
+                    pending.append(clone)
+                node.node_tree=mappings[original]
+        if name is not None:
+            material.name=name
+            if material.name!=name or material.library is not None:
+                raise RuntimeError('Native copy did not produce the requested local material')
+        return material,groups,mappings
+    except Exception:
+        dispose_graph(material,groups)
+        raise
+
+
 def make_unique(params, find_object):
     with preflight():
         names=params.get('names')
@@ -37,26 +75,7 @@ def make_unique(params, find_object):
     material=None
     groups=[]
     try:
-        material=source.copy()
-        material.name=name
-        material.use_fake_user=False
-        if material.name!=name or material.library is not None:
-            raise RuntimeError('Native copy did not produce the requested local material')
-        mappings={source.node_tree:material.node_tree} if source.node_tree else {}
-        pending=[material.node_tree] if material.node_tree else []
-        while pending:
-            tree=pending.pop()
-            for node in tree.nodes:
-                if node.type!='GROUP' or node.node_tree is None:
-                    continue
-                original=node.node_tree
-                if original not in mappings:
-                    clone=original.copy()
-                    groups.append(clone)
-                    clone.use_fake_user=False
-                    mappings[original]=clone
-                    pending.append(clone)
-                node.node_tree=mappings[original]
+        material,groups,mappings=clone_graph(source,name)
         bind(values,material,slot,{v:mode for v in values})
         rows=[{'source':old.name,'name':new.name} for old,new in mappings.items()
               if old!=source.node_tree]
@@ -68,8 +87,5 @@ def make_unique(params, find_object):
                 'images_shared':True,'actions_shared':True}}
     except Exception:
         restore(saved)
-        if material is not None:
-            bpy.data.materials.remove(material)
-        if groups:
-            bpy.data.batch_remove(ids=tuple(groups))
+        dispose_graph(material,groups)
         raise

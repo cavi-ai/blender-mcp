@@ -325,10 +325,12 @@ Mutating. Binds a PBR material to exact mesh slots.
 
 ## bake
 
-Mutating. Bakes a normal, AO, curvature or lightmap map into a new PNG.
-`bit_depth` accepts 8 or 16 and defaults to 16. Returns actual precision,
-color-space role and canonical normal channels; requires an updated bridge.
-Data maps bypass artistic view transforms; lightmaps use the sRGB transfer.
+Mutating. Bakes geometry maps into a new PNG or an explicit numeric/color/vector
+shader socket into PNG/EXR. `source` selects the material, nested group path,
+node, socket identifier, INPUT/OUTPUT direction and data/color role. PNG defaults
+to 16-bit; shader EXR to 32-bit. Shader bakes preserve the actor and shader UVs
+while rasterizing the chosen 0..1 atlas. Signed/HDR channels require EXR.
+Returns precision, color space, file hash and channel metadata. Requires an updated bridge.
 
 [Guide](../guides/baking.md)
 
