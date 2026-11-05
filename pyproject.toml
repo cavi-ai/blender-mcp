@@ -9,7 +9,7 @@ description = "Local-first MCP tools for Blender scene editing and game asset ex
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.15"
 authors = [{ name = "CAVI AI" }]
 keywords = ["blender", "mcp", "model-context-protocol", "game-assets", "3d"]
 classifiers = [
@@ -20,9 +20,7 @@ classifiers = [
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.15",
   "Topic :: Multimedia :: Graphics :: 3D Modeling",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
@@ -54,5 +52,5 @@ exclude = ["/docs/blender-mcp/v*", "/.tmp", "/.worktrees", "/dist"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"  # Blender 5.2 runs the bundled scripts on Python 3.13.
 extend-exclude = [".tmp", ".worktrees", "docs/blender-mcp/v*"]

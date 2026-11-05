@@ -31,7 +31,7 @@ or [count the assigned materials](examples/material-texture-sets/README.md).
 
 ## Install
 
-Requirements: Python 3.11 or newer, [`uv`](https://docs.astral.sh/uv/), and
+Requirements: Python 3.15 or newer, [`uv`](https://docs.astral.sh/uv/), and
 Blender. Native checks target Blender 5.2.3 LTS.
 
 ```bash

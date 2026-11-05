@@ -2,7 +2,7 @@
 
 ## Setup
 
-Install Python 3.11 or newer, `uv`, Node.js 22 or newer, and Blender 5.2.3 LTS
+Install Python 3.15 or newer, `uv`, Node.js 22 or newer, and Blender 5.2.3 LTS
 for native checks. Then:
 
 ```bash
