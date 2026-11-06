@@ -49,6 +49,20 @@ surface listing and protocol negotiation. `npm run eval:core -- --blender
 /path/to/blender` adds schema, structured output, repeated reads, contention and
 native application cases.
 
+CI runs both modes with Blender 5.2.3 LTS. Native evaluation supplies fixture
+arguments for all six read-only tools and requires readiness of at least 85,
+with full marks for protocol, error honesty, reliability and coverage. Latency
+is excluded from these floors because it depends on the runner. Catalog and
+context floors are 75 and 25: the catalog still has missing parameter descriptions,
+and its roughly 16,000 estimated tokens limit the context score.
+
+CI builds the evaluator directly from `cavi-ai/mcp-eval`'s `main` branch and
+retains Cargo's resolved revision. Local runs use the installed npm evaluator
+by default. Set `MCPEVAL_EXECUTABLE` to use another executable, and
+`MCPEVAL_SOURCE_REVISION` to record its source revision. `evaluator.json` records
+the entry point, version and npm wrapper resolution separately: following the
+wrapper's Git branch does not imply that its release binary was built from that commit.
+
 Native evaluation starts its own factory scene with a private connection and
 disposable workspace. It does not connect to an existing session. Reports stay
 under `.tmp/evals/` and are ignored by Git. The evaluator does not invoke a
