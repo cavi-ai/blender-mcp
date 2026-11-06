@@ -10,7 +10,16 @@ from cavi_mcp_core.server import Server as CoreServer
 from mcp.server.mcpserver import Image
 from mcp.server.mcpserver.exceptions import UnexpectedToolError
 from mcp.types import CallToolResult
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    StrictBool,
+    StrictInt,
+    WithJsonSchema,
+    model_validator,
+)
 
 from .catalog import BlenderServer
 from .client import BridgeClient
@@ -114,6 +123,22 @@ class UVTransform(BaseModel):
     pivot: Vector2 = (0, 0)
 
 
+class UVRegion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    bounds: tuple[Number, Number, Number, Number]
+    texture_resolution: tuple[StrictInt, StrictInt]
+    margin_px: Number
+    allow_overlap: StrictBool = False
+    allow_pinned: StrictBool = False
+
+    @model_validator(mode='after')
+    def valid_region(self):
+        from .uv_regions import region
+
+        region(self.model_dump(mode='json'))
+        return self
+
+
 class BoneSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: Annotated[str, Field(min_length=1, max_length=63)]
@@ -197,8 +222,18 @@ async def scene_info(
     limit: Annotated[StrictInt, Field(ge=1, le=1000, description="Page size")] = 200,
     offset: Annotated[StrictInt, Field(ge=0, description="Page start")] = 0,
     definition: Annotated[StrictBool | None, Field(description='name + true: nested definition/placements')] = None,
+    faces: Annotated[StrictBool | None, Field(description='Source polygon page')] = None,
+    edges: Annotated[StrictBool | None, Field(description='Source edge/seam page')] = None,
 ) -> SceneInfo:
     """Inspect paged scenes or one object's details."""
+    if edges:
+        if name is None or faces or definition:
+            raise ValueError('edges requires a mesh name and cannot be combined with faces or definition')
+        return await run(call, 'inspect_mesh_edges', name=name, limit=limit, offset=offset)
+    if faces:
+        if name is None or definition:
+            raise ValueError('faces requires a mesh name and cannot be combined with definition')
+        return await run(call, 'inspect_mesh_faces', name=name, limit=limit, offset=offset)
     if definition:
         if name is None:
             raise ValueError('definition requires a scene-instance name')
@@ -327,41 +362,41 @@ async def rig_edit(
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
                     "assign_weights", "transfer_weights", "bake", "contact_lock"], Field(description="Action")],
-    name: Annotated[str, Field(description="weights/assign_weights/transfer_weights: mesh; else rig/clip owner; create: new")],
-    location: Annotated[Vector3 | None, Field(description="create: world position")] = None,
-    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="create needs bones")] = None,
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="Skins needs for bind; optional for bake/contact_lock")] = None,
-    max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="weights/transfer_weights: vertex influences")] = None,
-    clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="weights: discard below threshold")] = None,
+    name: Annotated[str, Field(description="weights/assign_weights/transfer_weights: mesh; else rig/clip; create: new")],
+    location: Annotated[Vector3 | None, Field(description="World position")] = None,
+    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="create bones")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; optional for bake/contact_lock")] = None,
+    max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="weights/transfer_weights cap")] = None,
+    clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="weights: drop below value")] = None,
     normalize: Annotated[StrictBool | None, Field(description="weights/assign_weights: normalize")] = None,
-    poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128, description="pose needs transforms")] = None,
-    keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32, description="keyframe: frame/poses required")] = None,
-    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="keyframe/bake/retarget/contact_lock needs clip")] = None,
-    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="pose/clear_pose: timeline frame")] = None,
-    reset: Annotated[StrictBool | None, Field(description="pose: reset first")] = None,
+    poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128, description="Bone poses")] = None,
+    keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32, description="Frame/pose keys")] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="keyframe/bake/retarget/contact_lock: clip")] = None,
+    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="pose/clear_pose frame")] = None,
+    reset: Annotated[StrictBool | None, Field(description="Reset pose first")] = None,
     source: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget: rig; transfer_weights: skin")] = None,
-    source_action: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget/contact_lock needs clip")] = None,
-    mapping: Annotated[dict[str, str] | None, Field(max_length=128, description="retarget: source-to-target bones")] = None,
-    samples: Annotated[StrictInt | None, Field(ge=2, le=256, description="retarget: sample count")] = None,
+    source_action: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget/contact_lock: clip")] = None,
+    mapping: Annotated[dict[str, str] | None, Field(max_length=128, description="Source-to-target bones")] = None,
+    samples: Annotated[StrictInt | None, Field(ge=2, le=256, description="retarget samples")] = None,
     new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="rename_action/bake/transfer_weights/contact_lock: required")] = None,
-    track_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA track; required for nla_edit")] = None,
-    strip_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA strip; required for nla_edit")] = None,
-    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake needs first frame; nla_push: start")] = None,
-    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake needs last frame")] = None,
+    track_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA track; needed by nla_edit")] = None,
+    strip_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA strip; needed by nla_edit")] = None,
+    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake: first frame; nla_push: start")] = None,
+    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake: last frame")] = None,
     frame_step: Annotated[Number | None, Field(gt=0, le=10000, description="bake/contact_lock: frame step")] = None,
-    constraint: Annotated[Constraint | None, Field(description="constraint needs definition")] = None,
-    bone: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint needs bone")] = None,
-    constraint_name: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint needs name")] = None,
+    constraint: Annotated[Constraint | None, Field(description="Constraint spec")] = None,
+    bone: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint: bone")] = None,
+    constraint_name: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint: name")] = None,
     vertex_weights: Annotated[list[VertexWeights] | None,
-                              Field(min_length=1, max_length=100000, description="assign_weights needs vertex/weights")] = None,
+                              Field(min_length=1, max_length=100000, description="assign_weights map")] = None,
     replace: Annotated[StrictBool | None, Field(description="assign_weights: replace")] = None,
-    max_distance_m: Annotated[Number | None, Field(gt=0, description="transfer_weights: projection cap (m)")] = None,
-    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1, description="transfer_weights: discarded weight/vertex")] = None,
-    shape_names: Annotated[list[RigName] | None, Field(max_length=64, description="transfer_weights: shape keys")] = None,
-    calibration: Annotated[RetargetCalibration | None, Field(description="retarget: rest alignment")] = None,
+    max_distance_m: Annotated[Number | None, Field(gt=0, description="transfer_weights radius (m)")] = None,
+    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1, description="transfer_weights weight loss/vertex")] = None,
+    shape_names: Annotated[list[RigName] | None, Field(max_length=64, description="transfer_weights shapes")] = None,
+    calibration: Annotated[RetargetCalibration | None, Field(description="Rest alignment")] = None,
     skinning_mode: Annotated[Literal['preserve', 'linear'] | None, Field(description="bake: source or linear skinning")] = None,
-    foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16, description="contact_lock needs windows")] = None,
-    timing: Annotated[ClipTiming | None, Field(description="bake: output clip timing")] = None,
+    foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16, description="Contact windows")] = None,
+    timing: Annotated[ClipTiming | None, Field(description="bake clip timing")] = None,
     strip_settings: Annotated[NlaStripSettings | None, Field(description="nla_edit: required; nla_push: optional")] = None,
     animation_target: Annotated[Literal['OBJECT', 'SHAPE_KEYS'] | None, Field(description="Object/shape-key owner")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
@@ -629,7 +664,7 @@ async def object_edit(
 async def mesh_edit(
     action: Annotated[Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
     kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="modifier needs type")] = None,
     amount: Annotated[Number | None, Field(
@@ -666,14 +701,21 @@ async def mesh_edit(
     by: Annotated[Literal["loose_parts", "materials"] | None, Field(description="separate: partition rule")] = None,
     new_name: Annotated[ObjectName | None, Field(description="extract_faces needs name")] = None,
     face_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
-                            Field(min_length=1, max_length=20000, description="extract_faces needs 0-based polygon indices")] = None,
+                            Field(min_length=1, max_length=20000, description="Source polygon indices")] = None,
     count: Annotated[StrictInt | None, Field(ge=2, le=1000, description="array needs count")] = None,
     offset: Annotated[Vector3 | Annotated[Number, Field(ge=-1, le=1)] | None,
-                      Field(description="array: translation; solidify: shell offset [-1,1]")] = None,
+                      Field(description="array/extrude_faces: vector; solidify: scalar [-1,1]")] = None,
     thickness: Annotated[Number | None, Field(gt=0, le=100, description="solidify needs thickness")] = None,
     clipping: Annotated[StrictBool | None, Field(description="mirror: clip at plane")] = None,
     uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
+    expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='Source geometry SHA256')] = None,
+    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces: atlas bounds, pixels, gutters')] = None,
+    edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
+                           Field(min_length=1, max_length=20000, description='set_seams: edge indices')] = None,
+    seam: Annotated[StrictBool | None, Field(description='set_seams: seam flag')] = None,
+    unwrap_method: Annotated[Literal['smart', 'angle_based', 'conformal', 'minimum_stretch'] | None,
+                             Field(description='unwrap_faces method; default smart')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -689,7 +731,36 @@ async def mesh_edit(
               "keep_operand": keep_operand, "self_intersection": self_intersection,
               "names": names, "by": by, "new_name": new_name, "face_indices": face_indices,
               "count": count, "offset": offset,
-              "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform}
+              "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
+              'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
+              'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method}
+    if action == 'set_seams':
+        from .mesh_regions import fingerprint, indices
+
+        params = pick(action, values, ['edge_indices', 'seam'], {'expected_mesh_sha256': None})
+        indices(params['edge_indices'], field='edge_indices')
+        if type(params['seam']) is not bool:
+            raise ValueError('seam must be an explicit boolean')
+        fingerprint(params['expected_mesh_sha256'])
+        return await run(call, 'set_seams', lease_id=lease_id, name=name, **params)
+    if action == 'unwrap_faces':
+        from .mesh_regions import fingerprint, indices
+        from .uv_regions import projection
+
+        params = pick(action, values, ['face_indices', 'uv_region'], {'uv_layer': None,
+            'angle_limit_degrees': None, 'expected_mesh_sha256': None, 'unwrap_method': 'smart'})
+        params['unwrap_method'], params['angle_limit_degrees'] = projection(
+            params['unwrap_method'], params['angle_limit_degrees'])
+        indices(params['face_indices'])
+        fingerprint(params['expected_mesh_sha256'])
+        params['uv_region'] = uv_region.model_dump(mode='json')
+        return await run(call, 'unwrap_faces', lease_id=lease_id, name=name, **params)
+    if action == 'extrude_faces':
+        from .mesh_regions import selection
+
+        params = pick(action, values, ['face_indices', 'offset'], {'expected_mesh_sha256': None})
+        selection(params['face_indices'], params['offset'], expected=params['expected_mesh_sha256'])
+        return await run(call, 'extrude_faces', lease_id=lease_id, name=name, **params)
     if action == "modifier":
         operation = "add_modifier"
         params = pick(action, values, ["kind", "amount"], {"apply": False})

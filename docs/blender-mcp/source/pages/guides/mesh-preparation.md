@@ -2,7 +2,7 @@
 
 `mesh_edit` changes one exact mesh in Object Mode with single-user mesh data.
 Every call needs a `lease_id`. Topology-changing actions require their own
-modifier and shape-key preflight; `uv_transform` edits existing UV loops and
+modifier and shape-key preflight; `uv_transform` and `unwrap_faces` edit UV loops and
 retains modifiers, skin weights and shape keys.
 
 For shared meshes, first use `object_edit` `make_single_user` to copy the data
@@ -13,7 +13,10 @@ on the same object without applying transforms or changing scene references.
 | Action | Use |
 | --- | --- |
 | `modifier` | Add bevel, decimate, subdivision or voxel remesh; `apply` bakes it |
+| `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
+| `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |
+| `set_seams` | Set or clear exact source-edge seam flags without changing UVs |
 | `decimate_to` | Collapse to a triangle target or ratio, optionally preserving seams |
 | `remesh_quad` | QuadriFlow to a face target on a manifold mesh |
 | `lod_chain` | Create `<base>_LOD1..n` in `<base>_LODs` |
@@ -41,7 +44,111 @@ Each level reports `target`, `achieved`, `preservation`, `relaxed` and
 decimation when it blocks a target. Results more than 10% over target stay in
 `warnings`.
 
+## Inspect and extrude a face region
+
+Use `scene_info(name="Body", faces=true, offset=0, limit=100)` to page through
+the source mesh's polygon indices, local centers, normals, areas and material
+indices. Modifiers and deformation are not evaluated. Every page reports the
+same `mesh_sha256` for unchanged local geometry and material indices.
+
+```json
+{"action":"extrude_faces","name":"Body","face_indices":[5,6],"offset":[0,0,0.2],"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+`offset` is in mesh-local coordinates. Adjacent faces extrude as one region;
+separate regions remain independent. Object transforms stay unchanged. The
+optional `expected_mesh_sha256` rejects a selection made from changed geometry.
+It does not cover object transforms, UVs or shader graphs.
+
+The edit validates a detached BMesh before replacing the source mesh. It
+preserves existing UV layers, float color attributes, mesh properties and
+object material overrides. Results identify the new `cap_faces`, `side_faces`
+and resulting geometry hash. Use those new cap indices for another extrusion;
+source face indices may change after any topology edit.
+
+New side faces require UV layout and material review. Plan extrusion before
+final unwrap and baking; existing cap/unselected UVs are retained. The tool does
+not automatically pack the new surfaces or detect global self-intersections.
+Run topology and UV checks, then inspect the silhouette before export.
+
+Use `unwrap_faces` with the returned `side_faces` and geometry hash to lay out
+the new surfaces while retaining the cap and unselected UVs.
+
+## Inspect and edit seams
+
+Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect
+source edge indices, vertex endpoints, local center/length, seam flags and
+adjacent face indices. Each edge includes `face_count` and `faces_truncated`;
+adjacency lists contain at most 32 faces. Pages report both `mesh_sha256` and
+`seams_sha256`. Match both across pages used for one selection. Edge, face and
+collection-definition page modes are mutually exclusive.
+Source topology pages handle up to 200,000 vertices/triangles and 600,000 edges.
+
+```json
+{"action":"set_seams","name":"Body","edge_indices":[4,9,12],"seam":true,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The seam state is required: `true` marks only those edges, `false` clears them.
+The edit reports changed edge count and before/after seam hashes. It preserves
+other seams, UVs, geometry, shape keys, weights, materials and scene context.
+It requires a single-user editable mesh in Object Mode and accepts at most
+20,000 unique current edge indices. Invalid indices and stale geometry hashes
+are rejected before editing; partial writes are rolled back. The geometry hash
+does not include seam flags. Reinspect after topology changes.
+
+Use a single-user base mesh in Object Mode without modifiers or shape keys.
+Custom split normals must be cleared deliberately on a working copy before
+changing topology. Invalid indices, stale hashes, zero/degenerate offsets and
+regions without a boundary are rejected before changing the object.
+
 ## UVs
+
+### Unwrap selected faces
+
+`unwrap_faces` takes current `face_indices`, an existing `uv_layer` (default UV0),
+and a required `uv_region` with explicit bounds, texture width/height and pixel
+padding. For example, reserve a clear rectangle for new side faces:
+
+```json
+{"action":"unwrap_faces","name":"Body","face_indices":[7,8,9,10],"uv_layer":"BakeAtlas","uv_region":{"bounds":[0.55,0.55,0.98,0.98],"texture_resolution":[2048,1024],"margin_px":8},"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The native solver runs in a private background Blender process with selected
+base geometry, accounting for object scale, rotation and scene units. It uses
+Smart UV Project (`unwrap_method="smart"`, `angle_limit_degrees` default 66), packs islands, and scales
+uniformly in pixels. Rectangular textures keep their pixel aspect. Bounds can
+target an explicit UDIM region; they do not imply tile creation or material setup.
+
+For seam-directed charts, select `unwrap_method="conformal"`, `"angle_based"`
+or `"minimum_stretch"` and omit `angle_limit_degrees`. The worker receives the
+seams of the selected source faces and preserves their cuts while solving the
+surface. Selection boundaries also bound the working surface. The result
+reports the exact method, `source_seams_sha256` and selected seam count. Native
+failure never falls back to Smart UV Project. The source seam state is checked
+again before UV writeback. Unwrap does not change the source seam flags.
+
+By default, unselected UV triangles must leave the entire rectangle clear.
+Selected pinned UVs are refused. Set `uv_region.allow_overlap=true` only for
+deliberate reuse of an occupied region, and `allow_pinned=true` only when the
+selected pinned coordinates should move. Pin flags remain intact. These overrides
+do not disable overlap or gutter checks among the new islands. Padding applies
+between islands and at the region border; choose it for the final resolution
+and mip usage. Density matching with the retained layout requires a separate check.
+
+Only selected corner coordinates in the chosen layer are written. Other layers,
+unselected UVs, colors, materials, transforms, selection, geometry, skin weights
+and shape keys stay intact. The source hash and all UV coordinates are checked
+again before writeback. The result reports analytic overlap, degeneracy and
+pixel-padding measurements on Blender's stored float precision. Partial writes
+are rolled back. Inspect the actual material before accepting the layout.
+
+The action requires a single-user editable mesh in Object Mode. It handles at
+most 60,000 selected loops and 20,000 selected triangles, with 200,000 source
+vertices/triangles. The worker has a 45-second limit and removes its scratch data.
+It does not evaluate modifiers or deformations; use the intended rest or baked
+working surface. It does not save a project, bake textures or change seams.
+
+### Whole-layer preparation and placement
 
 `unwrap` uses Smart UV Project then packing with `margin_px` (default 4) between
 islands at `texture_resolution` (default 1024); `island_margin` instead sets the

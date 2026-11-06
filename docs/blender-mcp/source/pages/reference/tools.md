@@ -3,6 +3,12 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`scene_info` with `faces=true` pages source polygon indices and local geometry.
+With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.
+`mesh_edit` with `extrude_faces` extrudes a declared region using `face_indices`
+and a local `offset`; optional `expected_mesh_sha256` guards against stale
+geometry. See [face-region modeling](../guides/mesh-preparation.md#inspect-and-extrude-a-face-region).
+
 `render_preview` and `review_sheet` return a PNG image block plus structured
 `path` and `mime_type` (`image/png`) fields. The receipt identifies the file written
 in the session workspace; image blocks remain available to visual clients.
@@ -293,7 +299,8 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `extract_faces`, `mirror`, `array`, `solidify`, `uv_transform`.
+`join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `set_seams`, `mirror`,
+`array`, `solidify`, `uv_transform`.
 
 `array` requires a three-component translation `offset`. `solidify` accepts a
 scalar `offset` from -1 to 1 (default -1) to position the shell through its thickness.
@@ -307,6 +314,23 @@ original. Modifiers, shape keys and rigged sources are refused.
 optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an
 existing layer (default UV0). It preserves topology, skin and shape keys and
 reports affected faces, materials and UV bounds. No implicit chart expansion.
+
+`unwrap_faces` takes `face_indices`, an existing `uv_layer` (default UV0) and
+`uv_region` with required `bounds` `[min_u,min_v,max_u,max_v]`,
+`texture_resolution` `[width,height]` and `margin_px`. Optional
+`expected_mesh_sha256` rejects stale geometry. It packs selected faces into
+the declared rectangle and preserves other UVs and mesh data. The region must
+be clear of unselected triangles, and selected pins are protected, unless
+explicit `allow_overlap` or `allow_pinned` flags in `uv_region` override those
+checks. Analytic overlap and pixel-gutter checks still apply to the new islands.
+
+`unwrap_method` defaults to `smart`; `conformal`, `angle_based` and
+`minimum_stretch` use source seam cuts. `angle_limit_degrees` applies only to
+`smart`. No automatic fallback changes the requested method.
+
+`set_seams` takes unique `edge_indices` and required boolean `seam` plus optional
+`expected_mesh_sha256`. Discover source edges through `scene_info(edges=true)`.
+It updates only selected seam flags, preserving UVs and other mesh data.
 
 [Guide](../guides/mesh-preparation.md)
 
