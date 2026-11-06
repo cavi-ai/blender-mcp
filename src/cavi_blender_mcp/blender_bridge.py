@@ -974,6 +974,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation in {'inspect_mesh_faces', 'extrude_faces'}:
+        from .blender_mesh_regions import extrude_faces, inspect_faces
+
+        return (inspect_faces if operation == 'inspect_mesh_faces' else extrude_faces)(p)
     if operation == 'open_project':
         from .blender_project import open_project
 

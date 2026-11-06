@@ -3,6 +3,8 @@
 OPERATIONS = frozenset(
     {
         "scene_info",
+        "inspect_mesh_faces",
+        "extrude_faces",
         "scene_authoring",
         "object_info",
         "inspect_mesh_quality",
@@ -102,6 +104,7 @@ OPERATIONS = frozenset(
 )
 LEASE_FREE = frozenset(
     {
+        "inspect_mesh_faces",
         "inspect_material_nodes",
         "scene_info",
         "object_info",

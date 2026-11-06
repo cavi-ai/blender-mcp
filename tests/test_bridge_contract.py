@@ -10,7 +10,7 @@ class BridgeContractTests(unittest.TestCase):
         self.assertEqual(before, expected_bridge())
         from pathlib import Path
         read=Path.read_bytes
-        for name in ('blender_scene.py', 'skin_projection.py', 'preview_settings.py', 'preview_studio.py'):
+        for name in ('blender_scene.py', 'skin_projection.py', 'preview_settings.py', 'preview_studio.py', 'mesh_regions.py'):
             def changed(path, name=name):
                 return read(path)+(b'\n' if path.name==name else b'')
             with self.subTest(name=name), patch.object(Path,'read_bytes',changed):

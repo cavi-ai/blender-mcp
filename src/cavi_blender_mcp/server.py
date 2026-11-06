@@ -185,10 +185,16 @@ async def scene_info(
     limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 200,
     offset: Annotated[StrictInt, Field(ge=0)] = 0,
     definition: StrictBool | None = None,
+    faces: StrictBool | None = None,
 ) -> SceneInfo:
     """Inspect the scene or one object. With name and definition=true, page through a
     collection instance's nested source objects and report its shared scene placements.
+    faces=true pages source mesh polygons with local centers/normals and a geometry fingerprint.
     """
+    if faces:
+        if name is None or definition:
+            raise ValueError('faces requires a mesh name and cannot be combined with definition')
+        return await run(call, 'inspect_mesh_faces', name=name, limit=limit, offset=offset)
     if definition:
         if name is None:
             raise ValueError('definition requires a scene-instance name')
@@ -672,7 +678,7 @@ async def object_edit(
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "mirror", "array", "solidify", "uv_transform"],
+                    "join", "separate", "extract_faces", "extrude_faces", "mirror", "array", "solidify", "uv_transform"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -716,6 +722,7 @@ async def mesh_edit(
     clipping: StrictBool | None = None,
     uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
+    expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -731,7 +738,14 @@ async def mesh_edit(
               "keep_operand": keep_operand, "self_intersection": self_intersection,
               "names": names, "by": by, "new_name": new_name, "face_indices": face_indices,
               "count": count, "offset": offset,
-              "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform}
+              "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
+              'expected_mesh_sha256': expected_mesh_sha256}
+    if action == 'extrude_faces':
+        from .mesh_regions import selection
+
+        params = pick(action, values, ['face_indices', 'offset'], {'expected_mesh_sha256': None})
+        selection(params['face_indices'], params['offset'], expected=params['expected_mesh_sha256'])
+        return await run(call, 'extrude_faces', lease_id=lease_id, name=name, **params)
     if action == "modifier":
         operation = "add_modifier"
         params = pick(action, values, ["kind", "amount"], {"apply": False})

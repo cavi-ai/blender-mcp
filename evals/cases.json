@@ -1,5 +1,29 @@
 [
   {
+    "id": "face-page-requires-name",
+    "tool": "scene_info",
+    "arguments": {"faces": true},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "faces requires a mesh name"
+  },
+  {
+    "id": "extrude-zero-offset",
+    "tool": "mesh_edit",
+    "arguments": {"action": "extrude_faces", "name": "EvalProp", "face_indices": [0], "offset": [0,0,0]},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "nonzero finite"
+  },
+  {
+    "id": "extrude-negative-face",
+    "tool": "mesh_edit",
+    "arguments": {"action": "extrude_faces", "name": "EvalProp", "face_indices": [-1], "offset": [0,0,1]},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "validation"
+  },
+  {
     "id": "project-open-invalid-hash",
     "tool": "asset_io",
     "arguments": {"action": "open", "path": "source.blend", "expected_sha256": "bad"},

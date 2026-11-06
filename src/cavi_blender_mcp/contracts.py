@@ -21,6 +21,10 @@ class SceneRenderSettings(Result):
 
 
 class SceneInfo(Result):
+    scope: str | None = None
+    mesh: str | None = None
+    mesh_sha256: str | None = None
+    faces: list[dict[str, Any]] | None = None
     render_settings: SceneRenderSettings | None = None
     bridge: dict[str, Any] | None = None
     source_state: dict[str, Any] | None = None
@@ -275,6 +279,7 @@ class ProceduralAssetResult(Result):
 
 
 class MeshEditResult(ObjectFields):
+    extrusion: Record | None = None
     nullable_shape_fields = frozenset(
         {"parent", "symmetry_axis", "density_before", "density_after", "shape_key_action"}
     )

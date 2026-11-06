@@ -13,6 +13,7 @@ on the same object without applying transforms or changing scene references.
 | Action | Use |
 | --- | --- |
 | `modifier` | Add bevel, decimate, subdivision or voxel remesh; `apply` bakes it |
+| `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
 | `decimate_to` | Collapse to a triangle target or ratio, optionally preserving seams |
 | `remesh_quad` | QuadriFlow to a face target on a manifold mesh |
@@ -40,6 +41,38 @@ Each level reports `target`, `achieved`, `preservation`, `relaxed` and
 `warnings`. Seam preservation relaxes from seams to unweighted seams to plain
 decimation when it blocks a target. Results more than 10% over target stay in
 `warnings`.
+
+## Inspect and extrude a face region
+
+Use `scene_info(name="Body", faces=true, offset=0, limit=100)` to page through
+the source mesh's polygon indices, local centers, normals, areas and material
+indices. Modifiers and deformation are not evaluated. Every page reports the
+same `mesh_sha256` for unchanged local geometry and material indices.
+
+```json
+{"action":"extrude_faces","name":"Body","face_indices":[5,6],"offset":[0,0,0.2],"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+`offset` is in mesh-local coordinates. Adjacent faces extrude as one region;
+separate regions remain independent. Object transforms stay unchanged. The
+optional `expected_mesh_sha256` rejects a selection made from changed geometry.
+It does not cover object transforms, UVs or shader graphs.
+
+The edit validates a detached BMesh before replacing the source mesh. It
+preserves existing UV layers, float color attributes, mesh properties and
+object material overrides. Results identify the new `cap_faces`, `side_faces`
+and resulting geometry hash. Use those new cap indices for another extrusion;
+source face indices may change after any topology edit.
+
+New side faces require UV layout and material review. Plan extrusion before
+final unwrap and baking; existing cap/unselected UVs are retained. The tool does
+not automatically pack the new surfaces or detect global self-intersections.
+Run topology and UV checks, then inspect the silhouette before export.
+
+Use a single-user base mesh in Object Mode without modifiers or shape keys.
+Custom split normals must be cleared deliberately on a working copy before
+changing topology. Invalid indices, stale hashes, zero/degenerate offsets and
+regions without a boundary are rejected before changing the object.
 
 ## UVs
 
