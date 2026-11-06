@@ -9,6 +9,37 @@ import bpy
 runpy.run_path(str(Path(__file__).with_name('uv_density_fixture.py')))
 root = Path(os.environ['CAVI_BLENDER_WORKSPACE'])
 source = bpy.data.objects['TileGrid']
+if os.environ.get('CAVI_VERTEX_FIXTURE_DETACHED') == '1':
+    old = source.data
+    points = [tuple(v.co) for v in old.vertices]
+    polygons = [tuple(f.vertices) for f in old.polygons]
+    key_data = [(k.name,k.value,[tuple(p.co) for p in k.data]) for k in old.shape_keys.key_blocks]
+    mesh = bpy.data.meshes.new('ConnectedAndDetached')
+    mesh.from_pydata(points+points[:4],[],polygons+[(6,7,8,9)])
+    for material in old.materials:
+        mesh.materials.append(material)
+    for i,face in enumerate(mesh.polygons):
+        face.material_index = old.polygons[i if i < 2 else 0].material_index
+    for layer in old.uv_layers:
+        copy = mesh.uv_layers.new(name=layer.name)
+        rows = [(tuple(p.uv),p.pin_uv) for p in layer.data]
+        for row,(uv,pin) in zip(copy.data,rows+rows[:4],strict=True):
+            row.uv,row.pin_uv = uv,pin
+        copy.active_render = layer.active_render
+    mesh.uv_layers.active_index = old.uv_layers.active_index
+    color = mesh.color_attributes.new(name='Tint',type='FLOAT_COLOR',domain='CORNER')
+    rows = [tuple(p.color) for p in old.color_attributes['Tint'].data]
+    for row,value in zip(color.data,rows+rows[:4],strict=True):
+        row.color = value
+    source.data = mesh
+    for name,value,rows in key_data:
+        key = source.shape_key_add(name=name,from_mix=False)
+        for point,co in zip(key.data,rows+rows[:4],strict=True):
+            point.co = co
+        key.value = value
+    group = source.vertex_groups.get('Root') or source.vertex_groups.new(name='Root')
+    group.add(list(range(10)),.8,'REPLACE')
+    bpy.data.meshes.remove(old)
 lift = source.data.shape_keys.key_blocks['Lift']
 detail = source.shape_key_add(name='Detail', from_mix=False)
 detail.relative_key = lift

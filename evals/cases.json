@@ -1,5 +1,15 @@
 [
   {
+    "id":"vertex-falloff-needs-positive-radius","tool":"mesh_edit",
+    "arguments":{"action":"move_vertices","name":"EvalProp","vertex_indices":[0],"offset":[0,0,1],"amount":0},
+    "kind":"invalid","modes":["protocol","native"],"error":"finite and positive in metres"
+  },
+  {
+    "id":"vertex-falloff-rejects-negative-radius","tool":"mesh_edit",
+    "arguments":{"action":"move_vertices","name":"EvalProp","vertex_indices":[0],"offset":[0,0,1],"amount":-1},
+    "kind":"invalid","modes":["protocol","native"],"error":"finite and positive in metres"
+  },
+  {
     "id": "vertex-page-requires-name",
     "tool": "scene_info", "arguments": {"vertices": true},
     "kind": "invalid", "modes": ["protocol", "native"],

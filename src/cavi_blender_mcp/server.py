@@ -678,8 +678,8 @@ async def mesh_edit(
     name: Annotated[ObjectName, Field(description="Mesh")],
     kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="Modifier type")] = None,
     amount: Annotated[Number | None, Field(
-        description="Bevel width (0,100], decimate ratio (0,1], subdivision 1-3, voxel size "
-        "[0.005,1].")] = None,
+        description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1]; "
+        "move_vertices radius (m).")] = None,
     apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
     angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="unwrap: split angle")] = None,
     island_margin: Annotated[Number | None, Field(ge=0, le=0.5, description="unwrap: island margin")] = None,
@@ -749,8 +749,13 @@ async def mesh_edit(
               'vertex_indices': vertex_indices}
     if action == 'move_vertices':
         from .mesh_regions import selection
+        from .vertex_edit import radius_m
 
-        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None})
+        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None,'amount': None})
+        if params['amount'] is not None:
+            params['amount'] = radius_m(params['amount'])
+        else:
+            params.pop('amount')
         selection(params['vertex_indices'], params['offset'], expected=params['expected_mesh_sha256'],
                   field='vertex_indices')
         return await run(call, 'move_vertices', lease_id=lease_id, name=name, **params)

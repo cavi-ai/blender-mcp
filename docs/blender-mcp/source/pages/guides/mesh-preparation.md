@@ -99,6 +99,23 @@ before assignment and native write/readback failures restore captured points.
 Inspect texture stretch, normals, intersections and real poses after editing,
 then save/reopen the source before export.
 
+For proportional editing, pass `amount` as a positive radius in metres.
+`vertex_indices` then selects full-weight seeds. Smoothstep falloff follows
+shortest source-edge paths using object world scale and scene units. Nearby
+disconnected surfaces stay untouched; UV seams and material boundaries do not
+split the graph. Edge layout affects this source-space metric.
+
+```json
+{"action":"move_vertices","name":"Body","vertex_indices":[12],"offset":[0,0,0.025],"amount":0.05,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The receipt includes all affected indices plus `falloff` with seed indices,
+radius, world metric and up to 64 weight samples (`weights_truncated` is explicit).
+Each corresponding shape-key point receives the same weighted offset. Omitting
+`amount` retains the declared-point translation. Proportional planning handles
+up to 500,000 source vertices and 1,500,000 edges, with the existing affected-point
+budgets. Excessive selections fail before assignment; no radius is silently reduced.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect
