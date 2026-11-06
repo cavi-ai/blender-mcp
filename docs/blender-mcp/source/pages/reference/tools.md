@@ -3,6 +3,10 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`render_preview` and `review_sheet` return a PNG image block plus structured
+`path` and `mime_type` (`image/png`) fields. The receipt identifies the file written
+in the session workspace; image blocks remain available to visual clients.
+
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export and save do not.
@@ -290,6 +294,9 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
 `join`, `separate`, `extract_faces`, `mirror`, `array`, `solidify`, `uv_transform`.
+
+`array` requires a three-component translation `offset`. `solidify` accepts a
+scalar `offset` from -1 to 1 (default -1) to position the shell through its thickness.
 
 `extract_faces` takes a unique `new_name` and 1–20,000 unique `face_indices`.
 It copies those source polygons to an independent unrigged surface, retaining

@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -89,8 +91,11 @@ class SurfaceTests(unittest.TestCase):
             asyncio.run(invalid())
 
     def test_render_preview_needs_no_lease(self):
-        calls = self.capture()
-        asyncio.run(server.render_preview("x.png", resolution=64, orthographic=True))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'x.png'
+            path.write_bytes(b'\x89PNG\r\n\x1a\n')
+            calls = self.capture({'path': str(path)})
+            asyncio.run(server.render_preview("x.png", resolution=64, orthographic=True))
         operation, params = calls[0]
         self.assertEqual(operation, "render_preview")
         self.assertNotIn("lease_id", params)

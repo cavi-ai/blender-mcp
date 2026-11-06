@@ -1221,7 +1221,14 @@
     "image": true,
     "files": [
       "preview.png"
-    ]
+    ],
+    "required": [
+      "/path",
+      "/mime_type"
+    ],
+    "equals": {
+      "/mime_type": "image/png"
+    }
   },
   {
     "id": "preview-orthographic",
@@ -1241,7 +1248,14 @@
     "image": true,
     "files": [
       "ortho.png"
-    ]
+    ],
+    "required": [
+      "/path",
+      "/mime_type"
+    ],
+    "equals": {
+      "/mime_type": "image/png"
+    }
   },
   {
     "id": "preview-resolution",
@@ -2044,12 +2058,17 @@
     "id": "material-uv-layer-too-long",
     "tool": "assign_material",
     "arguments": {
-      "names": ["MaterialTarget"],
+      "names": [
+        "MaterialTarget"
+      ],
       "material_name": "InvalidUV",
       "uv_layer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     },
     "kind": "invalid",
-    "modes": ["protocol", "native"],
+    "modes": [
+      "protocol",
+      "native"
+    ],
     "error": "at most 63"
   },
   {
@@ -2088,7 +2107,14 @@
     "image": true,
     "files": [
       "lit-preview.png"
-    ]
+    ],
+    "required": [
+      "/path",
+      "/mime_type"
+    ],
+    "equals": {
+      "/mime_type": "image/png"
+    }
   },
   {
     "id": "lit-preview-over-budget",
@@ -3182,7 +3208,14 @@
     "image": true,
     "files": [
       "sheet.png"
-    ]
+    ],
+    "required": [
+      "/path",
+      "/mime_type"
+    ],
+    "equals": {
+      "/mime_type": "image/png"
+    }
   },
   {
     "id": "review-sheet-heatmap",
@@ -3207,7 +3240,14 @@
     "image": true,
     "files": [
       "heat.png"
-    ]
+    ],
+    "required": [
+      "/path",
+      "/mime_type"
+    ],
+    "equals": {
+      "/mime_type": "image/png"
+    }
   },
   {
     "id": "review-sheet-missing-path",
@@ -3689,7 +3729,8 @@
     "arguments": {
       "action": "solidify",
       "name": "CMP_Plane",
-      "thickness": 0.1
+      "thickness": 0.1,
+      "offset": 0.5
     },
     "kind": "success",
     "modes": [
@@ -3697,7 +3738,26 @@
     ],
     "required": [
       "/triangles"
-    ]
+    ],
+    "equals": {
+      "/offset": 0.5
+    }
+  },
+  {
+    "id": "solidify-offset-range",
+    "tool": "mesh_edit",
+    "arguments": {
+      "action": "solidify",
+      "name": "CMP_Plane",
+      "thickness": 0.1,
+      "offset": 2
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
   },
   {
     "id": "duplicate-success",

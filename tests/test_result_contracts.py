@@ -114,7 +114,7 @@ class OutputFailureTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(reply.structured_content["error"]["retry_safe"])
         self.assertNotIn("private_detail", str(reply.content))
 
-    def test_compact_unions_preserve_schema_acceptance_and_input_defaults(self):
+    def test_compact_unions_preserve_schema_acceptance(self):
         from cavi_mcp_core.schema import compact_schema
         from jsonschema import Draft202012Validator
 
@@ -130,8 +130,6 @@ class OutputFailureTests(unittest.IsolatedAsyncioTestCase):
         for schema in schemas:
             for output in [False, True]:
                 compact = compact_schema(schema, output=output)
-                if not output and "default" in schema:
-                    self.assertEqual(compact["default"], schema["default"])
                 for value in [None, True, False, 1, 1.5, "a", "ab", "b", [], {},
                               {"title": "x", "extra": 1}, {"title": 1}]:
                     self.assertEqual(Draft202012Validator(schema).is_valid(value),

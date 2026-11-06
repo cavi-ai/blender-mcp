@@ -50,11 +50,9 @@ surface listing and protocol negotiation. `npm run eval:core -- --blender
 native application cases.
 
 CI runs both modes with Blender 5.2.3 LTS. Native evaluation supplies fixture
-arguments for all six read-only tools and requires readiness of at least 85,
-with full marks for protocol, error honesty, reliability and coverage. Latency
-is excluded from these floors because it depends on the runner. Catalog and
-context floors are 75 and 25: the catalog still has missing parameter descriptions,
-and its roughly 16,000 estimated tokens limit the context score.
+arguments for all six read-only tools and enforces catalog, protocol, error,
+reliability and coverage checks. Catalog budgets bound discovery costs. Latency
+is excluded from readiness floors because it depends on the runner.
 
 CI builds the evaluator directly from `cavi-ai/mcp-eval`'s `main` branch and
 retains Cargo's resolved revision. Local runs use the installed npm evaluator
