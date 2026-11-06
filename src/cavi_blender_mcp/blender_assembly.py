@@ -90,12 +90,15 @@ def export(params):
         raise ValueError('textures must be boolean')
     if textures and suffix != '.fbx':
         raise ValueError('Texture sidecars apply to FBX; GLB embeds its supported images')
+    triangulate = params.get('triangulate', False)
+    if type(triangulate) is not bool or (triangulate and suffix != '.fbx'):
+        raise ValueError('triangulate must be boolean and applies only to FBX exports')
     with output_file(path_text, {'.glb', '.fbx'}) as path, evaluated_meshes(params['names']) as (objects, report):
         directory = sidecars(path) if textures else None
         try:
             with prepared_images(objects, directory) if textures else nullcontext():
                 uv_result=write(path, objects, objects, preset, False, False, textures=textures,
-                                uv_layer=params.get('uv_layer'))
+                                uv_layer=params.get('uv_layer'), triangulate=triangulate)
             files = texture_receipt(directory) if directory else []
         except Exception:
             if directory:
