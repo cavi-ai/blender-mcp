@@ -8,6 +8,8 @@ import anyio
 from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES
 from cavi_mcp_core.server import Server as CoreServer
 from mcp.server.mcpserver import Image
+from mcp.server.mcpserver.exceptions import UnexpectedToolError
+from mcp.types import CallToolResult
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -24,6 +26,7 @@ from .client import BridgeClient
 from .contracts import (
     AssetLibraryResult,
     AssetResult,
+    ImageReceipt,
     LevelEditResult,
     MapBakeResult,
     MaterialAssignment,
@@ -79,7 +82,7 @@ def _vector_schema(size):
 Vector2 = Annotated[tuple[Number, Number], _vector_schema(2)]
 Vector3 = Annotated[tuple[Number, Number, Number], _vector_schema(3)]
 RGBA = Annotated[tuple[Number, Number, Number, Number], _vector_schema(4)]
-ObjectName = Annotated[str, Field(description="scene_info name.")]
+ObjectName = str
 LeaseId = str | None
 MUTATING = DESTRUCTIVE
 ADDITIVE = WRITES
@@ -189,6 +192,15 @@ async def run(function, *args, **kwargs):
     return await anyio.to_thread.run_sync(partial(function, *args, **kwargs))
 
 
+def png_result(path):
+    try:
+        content = Image(path=path).to_image_content()
+    except (OSError, ValueError, TypeError) as exc:
+        raise UnexpectedToolError('Rendered PNG result could not be encoded') from exc
+    return CallToolResult(content=[content],
+                          structured_content={'path': path, 'mime_type': 'image/png'})
+
+
 def pick(action, values, required=(), defaults=None):
     """Keep only parameters used by the action; refuse unrelated or missing ones."""
     defaults = defaults or {}
@@ -206,18 +218,14 @@ def pick(action, values, required=(), defaults=None):
 
 @mcp.tool(annotations=READ_ONLY)
 async def scene_info(
-    name: Annotated[str | None, Field(description="Return only this object's details.")] = None,
-    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 200,
-    offset: Annotated[StrictInt, Field(ge=0)] = 0,
-    definition: StrictBool | None = None,
-    faces: StrictBool | None = None,
-    edges: StrictBool | None = None,
+    name: Annotated[str | None, Field(description="Only this object")] = None,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000, description="Page size")] = 200,
+    offset: Annotated[StrictInt, Field(ge=0, description="Page start")] = 0,
+    definition: Annotated[StrictBool | None, Field(description='name + true: nested definition/placements')] = None,
+    faces: Annotated[StrictBool | None, Field(description='Source polygon page')] = None,
+    edges: Annotated[StrictBool | None, Field(description='Source edge/seam page')] = None,
 ) -> SceneInfo:
-    """Inspect the scene or one object. With name and definition=true, page through a
-    collection instance's nested source objects and report its shared scene placements.
-    faces=true pages source mesh polygons with local centers/normals and a geometry fingerprint.
-    edges=true pages source edges, adjacency and seam flags.
-    """
+    """Inspect paged scenes or one object's details."""
     if edges:
         if name is None or faces or definition:
             raise ValueError('edges requires a mesh name and cannot be combined with faces or definition')
@@ -237,20 +245,17 @@ async def scene_info(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_mesh_quality(
-    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
-    texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
-                              Annotated[StrictInt, Field(ge=1, le=4096)]] = (1024, 1024),
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    checks: Annotated[list[Check] | None, Field(max_length=6)] = None,
-    naming: NamingRules | None = None,
-    lightmap_uv: Annotated[str, Field(min_length=1, max_length=63)] = "UVMap_Lightmap",
-    lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096)] = 64,
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
+    texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
+                              Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Texture pixels")] = (1024, 1024),
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    checks: Annotated[list[Check] | None, Field(max_length=6, description="Checks; empty means all")] = None,
+    naming: Annotated[NamingRules | None, Field(description="Naming rules")] = None,
+    lightmap_uv: Annotated[str, Field(min_length=1, max_length=63, description="Lightmap UVs")] = "UVMap_Lightmap",
+    lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096, description="Lightmap pixels")] = 64,
 ) -> MeshQuality:
-    """Measure static mesh budgets, texel density, UV stretch and material bindings.
-
-    Uses the render-active UV layer unless named. Refuses modifiers, rigs and shape keys.
-    The materials check reports PBR map bindings, color spaces, packing and graph issues.
-    """
+    """Check static mesh budgets, texel density, UV stretch and PBR color spaces/packing/graphs.
+    Reject modifiers/rigs/shape keys. Default render-active UVs."""
     return await run(call, "inspect_mesh_quality", names=names,
                      texture_resolution=texture_resolution, uv_layer=uv_layer,
                      checks=checks or [],
@@ -260,22 +265,17 @@ async def inspect_mesh_quality(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_uv_layout(
-    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
-    texture_resolution: tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
-                              Annotated[StrictInt, Field(ge=1, le=16384)]] | None = None,
-    padding_pixels: Annotated[Number | None, Field(ge=0, le=256)] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000)] = None,
-    material: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    udim_image: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
+    texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
+                              Annotated[StrictInt, Field(ge=1, le=16384)]] | None, Field(description="Texture pixels")] = None,
+    padding_pixels: Annotated[Number | None, Field(ge=0, le=256, description="Gutter; needs texture_resolution")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='UV map; default UV0')] = None,
+    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000, description='Triangle-pair cap; default 50/triangle')] = None,
+    material: Annotated[str | None, Field(min_length=1, max_length=63, description="Only this material")] = None,
+    udim_image: Annotated[str | None, Field(min_length=1, max_length=63, description='UDIM coverage; excludes shader transforms/unique-tile size/padding')] = None,
 ) -> UVLayout:
-    """Source UVs, max 20,000 triangles; layer index 0 unless named. material filters faces.
-    texture_resolution + padding_pixels: unique 0..1 overlaps and gutters.
-    udim_image: coverage of native tiles by source UVs; excludes shader vector transforms.
-    comparison_budget bounds candidates, 50 per inspected triangle unless given.
-    Incomplete work cannot pass. No geometry,
-    selection or image edits; modifiers are not evaluated.
-    """
+    """Inspect source UV overlaps/gutters or UDIM coverage, up to 20,000 triangles.
+    No modifier evaluation; incomplete work cannot pass."""
     if udim_image is not None:
         if texture_resolution is not None or padding_pixels is not None:
             raise ValueError('UDIM coverage does not take texture_resolution or padding_pixels')
@@ -290,28 +290,19 @@ async def inspect_uv_layout(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_rig(
-    armature: ObjectName,
-    meshes: Annotated[list[ObjectName], Field(min_length=1, max_length=8)],
-    max_influences: Annotated[StrictInt, Field(ge=1, le=32)] = 4,
-    action: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+    armature: Annotated[ObjectName, Field(description="Target armature")],
+    meshes: Annotated[list[ObjectName], Field(min_length=1, max_length=8, description='Skins: one vertex-group modifier bound to armature')],
+    max_influences: Annotated[StrictInt, Field(ge=1, le=32, description="Weights per vertex")] = 4,
+    action: Annotated[str | None, Field(min_length=1, max_length=63, description="Clip; default active")] = None,
     checks: Annotated[list[Literal["root_motion", "loop", "deformation"]] | None,
-                      Field(max_length=3)] = None,
-    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 8,
-    contacts: Annotated[list[ContactWindow] | None, Field(min_length=1, max_length=16)] = None,
-    contact_reference: ContactReference | None = None,
-    contact_frame_offset: Number = 0,
-    contact_frame_scale: Annotated[Number, Field(gt=0)] = 1,
+                      Field(max_length=3, description="Clip checks")] = None,
+    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Clip samples")] = 8,
+    contacts: Annotated[list[ContactWindow] | None, Field(min_length=1, max_length=16, description='Markers/windows: XY drift/absolute Z error (m)')] = None,
+    contact_reference: Annotated[ContactReference | None, Field(description='Source rig/clip: marker offsets across rest axes')] = None,
+    contact_frame_offset: Annotated[Number, Field(description="Candidate frame shift")] = 0,
+    contact_frame_scale: Annotated[Number, Field(gt=0, description='Candidate frame=source*scale+ contact_frame_offset')] = 1,
 ) -> RigInspection:
-    """Inspect skin weights, rest bones and linked clips without changing action or pose.
-
-    Exact meshes must each have one vertex-group armature modifier bound to the rig.
-    Influence limit is a caller-selected target, not a universal engine requirement.
-    checks: root_motion, loop and deformation sample the named or active action.
-    contacts: declared bone-local markers and frame windows measure horizontal drift
-    and absolute height error against a world-Z ground plane in metres.
-    contact_reference: source rig/action maps marker offsets across fixed rest-axis
-    changes. Candidate time = source time * contact_frame_scale + contact_frame_offset.
-    """
+    """Inspect skin weights/rest bones/linked clips."""
     arguments = {'armature': armature, 'meshes': meshes, 'max_influences': max_influences,
                  'action': action, 'checks': checks or [], 'samples': samples}
     if contacts is not None:
@@ -327,20 +318,17 @@ async def inspect_rig(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_skin_clearance(
-    body: ObjectName,
-    garments: Annotated[list[ObjectName], Field(min_length=1, max_length=8)],
-    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
-    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
-    min_clearance_m: Annotated[Number, Field(ge=0)],
-    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
-    surface_samples: Literal["vertices", "vertices_and_centres"] = "vertices_and_centres",
-    max_queries: Annotated[StrictInt, Field(ge=1, le=1000000)] = 1000000,
+    body: Annotated[ObjectName, Field(description="Closed body mesh")],
+    garments: Annotated[list[ObjectName], Field(min_length=1, max_length=8, description="Meshes distinct from body")],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="Start frame")],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="End frame")],
+    min_clearance_m: Annotated[Number, Field(ge=0, description="Minimum signed gap (m)")],
+    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Frame samples")] = 9,
+    surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Garment samples")] = "vertices_and_centres",
+    max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
 ) -> SkinClearance:
-    """Sample signed garment gaps against closed evaluated body components, restoring the frame.
-
-    Probes vertices and optionally triangle centres in metres. Ambiguous classification,
-    open bodies and exhausted query budgets cannot pass. Does not certify continuous collision.
-    """
+    """Sample signed garment gaps (m) against closed body components; restore frame.
+    Open/ambiguous bodies or exhausted budgets cannot pass; sampling cannot certify continuous collision."""
     return await run(call, "inspect_skin_clearance", body=body, garments=garments,
         start_frame=start_frame, end_frame=end_frame, min_clearance_m=min_clearance_m,
         samples=samples, surface_samples=surface_samples, max_queries=max_queries)
@@ -348,25 +336,19 @@ async def inspect_skin_clearance(
 
 @mcp.tool(annotations=READ_ONLY)
 async def compare_rig_motion(
-    source: ObjectName,
-    candidate: ObjectName,
-    meshes: Annotated[list[MotionSkinPair], Field(min_length=1, max_length=8)],
-    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
-    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
-    max_error_m: Annotated[Number, Field(ge=0)],
-    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
-    space: Literal["world", "start_root"] = "world",
-    vertex_match: Literal["index", "point_set"] = "index",
-    candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000)] = 0,
-    candidate_frame_scale: Annotated[Number, Field(gt=0)] = 1,
+    source: Annotated[ObjectName, Field(description="Source armature")],
+    candidate: Annotated[ObjectName, Field(description="Candidate armature")],
+    meshes: Annotated[list[MotionSkinPair], Field(min_length=1, max_length=8, description="Source/candidate skin pairs")],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="Start frame")],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="End frame")],
+    max_error_m: Annotated[Number, Field(ge=0, description="Position error cap (m)")],
+    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Timeline samples")] = 9,
+    space: Annotated[Literal["world", "start_root"], Field(description="World/start-root-relative positions")] = "world",
+    vertex_match: Annotated[Literal["index", "point_set"], Field(description='index: same vertex order; point_set: bidirectional nearest points, unpaired')] = "index",
+    candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000, description="Candidate frame shift")] = 0,
+    candidate_frame_scale: Annotated[Number, Field(gt=0, description='Candidate frame=source*scale+ candidate_frame_offset')] = 1,
 ) -> RigMotionComparison:
-    """Compare evaluated skin positions and matching bone heads on the current timeline.
-
-    Index matching is for unchanged vertex order. Bidirectional point sets allow export seam
-    splits; they do not establish vertex correspondence. start_root removes only initial rig
-    placement. Candidate time = source time * candidate_frame_scale + candidate_frame_offset.
-    Restores frame and subframe; no edits.
-    """
+    """Compare evaluated skin positions/matching bone heads over time; restore frame/subframe."""
     options = {'candidate_frame_scale': candidate_frame_scale} if candidate_frame_scale != 1 else {}
     return await run(call, "compare_rig_motion", source=source, candidate=candidate,
         meshes=[pair.model_dump() for pair in meshes], start_frame=start_frame, end_frame=end_frame,
@@ -376,50 +358,50 @@ async def compare_rig_motion(
 
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
-    action: Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
+    action: Annotated[Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
-                    "assign_weights", "transfer_weights", "bake", "contact_lock"],
-    name: str,
-    location: Vector3 | None = None,
-    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128)] = None,
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=16)] = None,
-    max_influences: Annotated[StrictInt | None, Field(ge=1, le=32)] = None,
-    clean_threshold: Annotated[Number | None, Field(ge=0, le=1)] = None,
-    normalize: StrictBool | None = None,
-    poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128)] = None,
-    keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32)] = None,
-    action_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
-    reset: StrictBool | None = None,
-    source: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    source_action: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    mapping: Annotated[dict[str, str] | None, Field(max_length=128)] = None,
-    samples: Annotated[StrictInt | None, Field(ge=2, le=256)] = None,
-    new_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    track_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    strip_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
-    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000)] = None,
-    frame_step: Annotated[Number | None, Field(gt=0, le=10000)] = None,
-    constraint: Constraint | None = None,
-    bone: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    constraint_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+                    "assign_weights", "transfer_weights", "bake", "contact_lock"], Field(description="Action")],
+    name: Annotated[str, Field(description="weights/assign_weights/transfer_weights: mesh; else rig/clip owner; create: new")],
+    location: Annotated[Vector3 | None, Field(description="create: world position")] = None,
+    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="create needs bones")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="Skins needs for bind; optional for bake/contact_lock")] = None,
+    max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="weights/transfer_weights: vertex influences")] = None,
+    clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="weights: discard below threshold")] = None,
+    normalize: Annotated[StrictBool | None, Field(description="weights/assign_weights: normalize")] = None,
+    poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128, description="pose needs transforms")] = None,
+    keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32, description="keyframe: frame/poses required")] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="keyframe/bake/retarget/contact_lock needs clip")] = None,
+    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="pose/clear_pose: timeline frame")] = None,
+    reset: Annotated[StrictBool | None, Field(description="pose: reset first")] = None,
+    source: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget: rig; transfer_weights: skin")] = None,
+    source_action: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget/contact_lock needs clip")] = None,
+    mapping: Annotated[dict[str, str] | None, Field(max_length=128, description="retarget: source-to-target bones")] = None,
+    samples: Annotated[StrictInt | None, Field(ge=2, le=256, description="retarget: sample count")] = None,
+    new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="rename_action/bake/transfer_weights/contact_lock: required")] = None,
+    track_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA track; required for nla_edit")] = None,
+    strip_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA strip; required for nla_edit")] = None,
+    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake needs first frame; nla_push: start")] = None,
+    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake needs last frame")] = None,
+    frame_step: Annotated[Number | None, Field(gt=0, le=10000, description="bake/contact_lock: frame step")] = None,
+    constraint: Annotated[Constraint | None, Field(description="constraint needs definition")] = None,
+    bone: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint needs bone")] = None,
+    constraint_name: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint needs name")] = None,
     vertex_weights: Annotated[list[VertexWeights] | None,
-                              Field(min_length=1, max_length=100000)] = None,
-    replace: StrictBool | None = None,
-    max_distance_m: Annotated[Number | None, Field(gt=0)] = None,
-    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1)] = None,
-    shape_names: Annotated[list[RigName] | None, Field(max_length=64)] = None,
-    calibration: RetargetCalibration | None = None,
-    skinning_mode: Literal['preserve', 'linear'] | None = None,
-    foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16)] = None,
-    timing: ClipTiming | None = None,
-    strip_settings: NlaStripSettings | None = None,
-    animation_target: Literal['OBJECT', 'SHAPE_KEYS'] | None = None,
-    lease_id: LeaseId = None,
+                              Field(min_length=1, max_length=100000, description="assign_weights needs vertex/weights")] = None,
+    replace: Annotated[StrictBool | None, Field(description="assign_weights: replace")] = None,
+    max_distance_m: Annotated[Number | None, Field(gt=0, description="transfer_weights: projection cap (m)")] = None,
+    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1, description="transfer_weights: discarded weight/vertex")] = None,
+    shape_names: Annotated[list[RigName] | None, Field(max_length=64, description="transfer_weights: shape keys")] = None,
+    calibration: Annotated[RetargetCalibration | None, Field(description="retarget: rest alignment")] = None,
+    skinning_mode: Annotated[Literal['preserve', 'linear'] | None, Field(description="bake: source or linear skinning")] = None,
+    foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16, description="contact_lock needs windows")] = None,
+    timing: Annotated[ClipTiming | None, Field(description="bake: output clip timing")] = None,
+    strip_settings: Annotated[NlaStripSettings | None, Field(description="nla_edit: required; nla_push: optional")] = None,
+    animation_target: Annotated[Literal['OBJECT', 'SHAPE_KEYS'] | None, Field(description="Object/shape-key owner")] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> RigEditResult:
-    """Edit rigs."""
+    """Edit rigs, skin weights and animation clips."""
     values = {"location": location, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
@@ -529,20 +511,14 @@ async def rig_edit(
 
 @mcp.tool(annotations=MUTATING)
 async def scene_edit(
-    action: Literal['camera', 'light', 'world', 'render'],
-    camera: CameraSpec | None = None,
-    light: LightSpec | None = None,
-    world: WorldSpec | None = None,
-    render: RenderSpec | None = None,
-    lease_id: LeaseId = None,
+    action: Annotated[Literal['camera', 'light', 'world', 'render'], Field(description="Action")],
+    camera: Annotated[CameraSpec | None, Field(description='camera: create/update named camera')] = None,
+    light: Annotated[LightSpec | None, Field(description='light: create/update named light')] = None,
+    world: Annotated[WorldSpec | None, Field(description='world: color/HDRI; updates require managed graphs')] = None,
+    render: Annotated[RenderSpec | None, Field(description='render: persistent; PNG/TIFF default 16-bit, EXR 16/32; enabled Cycles GPU')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> SceneEditResult:
-    """Author persistent camera/light definitions, a managed color/HDRI world, or
-    render the actual scene through its named camera. Existing camera/light names
-    update in place; worlds update only graphs this tool authored. Render settings
-    persist for saved-project reproducibility. PNG/TIFF default to 16-bit, EXR
-    supports 16/32-bit. max_pixels is caller-configurable; samples bound work and
-    cycles_time_limit caps Cycles sampling. GPU uses configured enabled Cycles devices.
-    Existing render_preview remains a separate quick-preview path."""
+    """Author persistent cameras/lights/managed worlds; render via a named camera."""
     definitions = {'camera': camera, 'light': light, 'world': world, 'render': render}
     params = pick(action, definitions, [action])
     return await run(call, 'scene_authoring', lease_id=lease_id, action=action,
@@ -551,22 +527,18 @@ async def scene_edit(
 
 @mcp.tool(annotations=ADDITIVE)
 async def render_preview(
-    path: Annotated[str, Field(description="New workspace .png path.")],
-    resolution: Annotated[StrictInt, Field(description="Square size, 64-2048 px.")] = 512,
+    path: Annotated[str, Field(description="New workspace PNG")],
+    resolution: Annotated[StrictInt, Field(description="Square size, 64-2048 px")] = 512,
     names: Annotated[list[str] | None, Field(min_length=1, max_length=1000,
-                                             description="Meshes to isolate.")] = None,
-    direction: Annotated[Vector3, Field(description="Camera direction from center.")] = (
+                                             description="Meshes to isolate")] = None,
+    direction: Annotated[Vector3, Field(description="Camera direction from center")] = (
         1.5, -2, 1.4),
-    color_mode: Literal["material", "vertex"] = "material",
-    renderer: Literal["workbench", "eevee"] = "workbench",
-    orthographic: StrictBool = False,
-    settings: PreviewSettings | None = None,
-) -> Image:
-    """Render a PNG preview; restores scene state. No lease needed. Eevee max 1024 px.
-
-    settings selects temporary display controls, compositing and PNG depth; omission
-    preserves scene settings. Enabled curves/white balance reuse the scene's controls.
-    """
+    color_mode: Annotated[Literal["material", "vertex"], Field(description="Material/vertex colors")] = "material",
+    renderer: Annotated[Literal["workbench", "eevee"], Field(description="Preview engine")] = "workbench",
+    orthographic: Annotated[StrictBool, Field(description="Orthographic projection")] = False,
+    settings: Annotated[PreviewSettings | None, Field(description="Temporary display/compositing/PNG depth; omitted keeps scene controls; enabled curves/white balance reuse them")] = None,
+) -> ImageReceipt:
+    """Render PNG; restore scene. Lease-free; Eevee max 1024 px."""
     options = {} if settings is None else {'settings': settings.model_dump()}
     result = await run(
         call,
@@ -580,25 +552,21 @@ async def render_preview(
         orthographic=orthographic,
         **options,
     )
-    return Image(path=result["path"])
+    return png_result(result["path"])
 
 
 @mcp.tool(annotations=ADDITIVE)
 async def session_control(
-    action: Literal["inspect", "claim", "renew", "release", "break"],
-    owner: Annotated[str | None, Field(max_length=128)] = None,
+    action: Annotated[Literal["inspect", "claim", "renew", "release", "break"], Field(description="Action")],
+    owner: Annotated[str | None, Field(max_length=128, description="claim needs owner label")] = None,
     expected_project: Annotated[
-        str | None, Field(description="Exact project_id from inspect.")
+        str | None, Field(description="Inspected project_id")
     ] = None,
-    lease_id: Annotated[str | None, Field(max_length=128)] = None,
-    ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600)] = 600,
+    lease_id: Annotated[str | None, Field(max_length=128, description="renew/release: current lease")] = None,
+    ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600, description="Lease seconds")] = 600,
 ) -> Ownership:
-    """Inspect ownership or claim, renew, release or break an edit lease.
-
-    Claim returns a private lease_id; pass it on every edit. Break needs expected_project
-    and a lease unused for 300 s. Expiry, release and break never save, close or discard
-    a project.
-    """
+    """Manage edit leases. Claim returns private lease_id. Break needs expected_project + 300 s idle.
+    Expiry/release/break never save/close/discard projects."""
     return await run(
         call,
         "session_control",
@@ -612,56 +580,43 @@ async def session_control(
 
 @mcp.tool(annotations=MUTATING)
 async def object_edit(
-    action: Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
+    action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
                     "duplicate", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
-                    "shape_key_value", "shape_key_keyframe", "shape_key_remove"],
-    name: Annotated[str, Field(description="Object name; new and unique for create_*.")],
-    kind: Literal["cube", "sphere", "cylinder", "cone", "plane"] | None = None,
-    location: Vector3 | None = None,
-    rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler.")] = None,
-    scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors.")] = None,
-    vertices: Annotated[list[Vector3] | None, Field(min_length=3, max_length=10000)] = None,
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove"], Field(description="Action")],
+    name: Annotated[str, Field(description="Object; unique for create_*")],
+    kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
+    location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
+    rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler angles")] = None,
+    scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors")] = None,
+    vertices: Annotated[list[Vector3] | None, Field(min_length=3, max_length=10000, description="create_mesh needs vertices")] = None,
     faces: Annotated[
         list[Annotated[list[StrictInt], Field(min_length=3, max_length=64)]] | None,
-        Field(min_length=1, max_length=20000, description="Zero-based, outward winding."),
+        Field(min_length=1, max_length=20000, description="Zero-based, outward winding"),
     ] = None,
-    rgba: Annotated[RGBA | None, Field(description="Components 0-1.")] = None,
-    slot: Annotated[StrictInt | None, Field(ge=0, le=31)] = None,
-    smooth: StrictBool | None = None,
+    rgba: Annotated[RGBA | None, Field(description="RGBA in [0,1]")] = None,
+    slot: Annotated[StrictInt | None, Field(ge=0, le=31, description="Slot")] = None,
+    smooth: Annotated[StrictBool | None, Field(description="shade: smooth; default false")] = None,
     components: Annotated[list[Literal["location", "rotation", "scale"]] | None,
-                          Field(min_length=1, max_length=3)] = None,
-    make_single_user: StrictBool | None = None,
-    origin: Literal["bounds_bottom_center", "bounds_center", "world_origin", "point"] | None = None,
-    grid: Annotated[Number | None, Field(ge=0.001, le=100)] = None,
-    new_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    count: Annotated[StrictInt | None, Field(ge=1, le=256)] = None,
-    offset: Vector3 | None = None,
-    linked: StrictBool | None = None,
-    create: StrictBool | None = None,
-    value: Annotated[Number | None, Field(ge=0, le=1)] = None,
-    keyframes: Annotated[list[ShapeKeyframe] | None, Field(min_length=1, max_length=32)] = None,
-    action_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    source: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
+                          Field(min_length=1, max_length=3, description="apply_transforms: default rotation/scale")] = None,
+    make_single_user: Annotated[StrictBool | None, Field(description="apply_transforms: copy shared mesh; default false")] = None,
+    origin: Annotated[Literal["bounds_bottom_center", "bounds_center", "world_origin", "point"] | None, Field(description="set_origin: default bounds_bottom_center; point needs location")] = None,
+    grid: Annotated[Number | None, Field(ge=0.001, le=100, description="snap_to_grid needs spacing (scene units)")] = None,
+    new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_*: key; parent: parent; move_to_collection: collection; else output name")] = None,
+    count: Annotated[StrictInt | None, Field(ge=1, le=256, description="duplicate: copies; default 1")] = None,
+    offset: Annotated[Vector3 | None, Field(description="Copy translation; duplicate default [0,0,0]")] = None,
+    linked: Annotated[StrictBool | None, Field(description="duplicate: linked; default false")] = None,
+    create: Annotated[StrictBool | None, Field(description="move_to_collection: create missing; default true")] = None,
+    value: Annotated[Number | None, Field(ge=0, le=1, description="Shape-key value; add default 0")] = None,
+    keyframes: Annotated[list[ShapeKeyframe] | None, Field(min_length=1, max_length=32, description="shape_key_keyframe needs frame/value pairs")] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_keyframe needs clip")] = None,
+    source: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_add: source mesh")] = None,
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
-                       Field(max_length=10000)] = None,
-    lease_id: LeaseId = None,
+                       Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ObjectEditResult:
-    """Create or edit one object. Params per action:
-    create_primitive: kind, location; create_mesh: vertices, faces;
-    transform: location, rotation_degrees, scale; set_color: rgba, slot=0; shade: smooth=false;
-    apply_transforms: components=[rotation,scale], make_single_user=false;
-    set_origin: origin=bounds_bottom_center (point: world location); snap_to_grid: grid;
-    rename: new_name; add_socket: new_name, local location, rotation_degrees;
-    duplicate: new_name, count=1, offset=(0,0,0), linked=false;
-    make_unique: new_name (independent collection definition for this instance);
-    make_single_user: no extra params; copy shared mesh data, keep the object;
-    parent: new_name (parent); unparent: no extra params;
-    move_to_collection: new_name (collection), create=true;
-    shape_key_add: new_name, value=0, offsets, source; shape_key_value: new_name, value;
-    shape_key_keyframe: new_name, action_name, keyframes=[{frame, value}];
-    shape_key_remove: new_name.
-    """
+    """Create/edit a leased object; refuse unrelated parameters. make_unique branches collection definitions;
+    make_single_user copies shared mesh data."""
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
@@ -707,60 +662,62 @@ async def object_edit(
 
 @mcp.tool(annotations=MUTATING)
 async def mesh_edit(
-    action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
+    action: Annotated[Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "mirror", "array", "solidify", "uv_transform"],
-    name: ObjectName,
-    kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
+    name: Annotated[ObjectName, Field(description="Mesh")],
+    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="modifier needs type")] = None,
     amount: Annotated[Number | None, Field(
         description="Bevel width (0,100], decimate ratio (0,1], subdivision 1-3, voxel size "
         "[0.005,1].")] = None,
-    apply: Annotated[StrictBool | None, Field(description="Bake; needs no modifiers.")] = None,
-    angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89)] = None,
-    island_margin: Annotated[Number | None, Field(ge=0, le=0.5)] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    target_triangles: Annotated[StrictInt | None, Field(ge=4, le=500000)] = None,
-    target_faces: Annotated[StrictInt | None, Field(ge=16, le=100000)] = None,
-    symmetry_axis: Literal["X", "Y", "Z"] | None = None,
-    preserve: Annotated[list[Preserve] | None, Field(max_length=3)] = None,
+    apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
+    angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="unwrap: split angle")] = None,
+    island_margin: Annotated[Number | None, Field(ge=0, le=0.5, description="unwrap: island margin")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    target_triangles: Annotated[StrictInt | None, Field(ge=4, le=500000, description="decimate_to: triangle cap, excludes amount")] = None,
+    target_faces: Annotated[StrictInt | None, Field(ge=16, le=100000, description="remesh_quad needs face cap")] = None,
+    symmetry_axis: Annotated[Literal["X", "Y", "Z"] | None, Field(description="decimate_to/lod_chain/mirror: axis")] = None,
+    preserve: Annotated[list[Preserve] | None, Field(max_length=3, description="decimate/LOD: seams; remesh: sharp/boundary")] = None,
     ratios: Annotated[list[Annotated[Number, Field(gt=0, lt=1)]] | None,
-                      Field(min_length=1, max_length=6)] = None,
+                      Field(min_length=1, max_length=6, description="lod_chain: ratios, excludes triangle_targets")] = None,
     triangle_targets: Annotated[list[Annotated[StrictInt, Field(ge=4)]] | None,
-                                Field(min_length=1, max_length=6)] = None,
-    rename_source: StrictBool | None = None,
-    lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096)] = None,
-    margin_px: Annotated[Number | None, Field(ge=0, le=64)] = None,
-    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000)] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096)] = None,
-    pack: StrictBool | None = None,
-    shape: Literal["convex", "box", "sphere"] | None = None,
-    max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255)] = None,
-    merge_distance: Annotated[Number | None, Field(ge=0, le=1)] = None,
-    steps: Annotated[list[Step] | None, Field(max_length=5)] = None,
-    operand: Annotated[str | None, Field(description="Exact boolean operand mesh.")] = None,
-    operation: Literal["union", "difference", "intersect"] | None = None,
-    solver: Literal["exact", "fast"] | None = None,
-    keep_operand: StrictBool | None = None,
-    self_intersection: StrictBool | None = None,
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
-    by: Literal["loose_parts", "materials"] | None = None,
-    new_name: ObjectName | None = None,
+                                Field(min_length=1, max_length=6, description="lod_chain: triangle caps, excludes ratios")] = None,
+    rename_source: Annotated[StrictBool | None, Field(description="lod_chain: suffix source LOD0")] = None,
+    lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="lightmap_uv: atlas pixels")] = None,
+    margin_px: Annotated[Number | None, Field(ge=0, le=64, description="lightmap_uv: padding pixels")] = None,
+    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density needs target pixels/metre")] = None,
+    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
+    pack: Annotated[StrictBool | None, Field(description="texel_density: pack after scaling")] = None,
+    shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="collision: proxy shape")] = None,
+    max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255, description="collision: hull vertex cap")] = None,
+    merge_distance: Annotated[Number | None, Field(ge=0, le=1, description="cleanup: merge radius (scene units)")] = None,
+    steps: Annotated[list[Step] | None, Field(max_length=5, description="cleanup: ordered steps")] = None,
+    operand: Annotated[str | None, Field(description="Operand mesh name")] = None,
+    operation: Annotated[Literal["union", "difference", "intersect"] | None, Field(description="boolean needs operation")] = None,
+    solver: Annotated[Literal["exact", "fast"] | None, Field(description="boolean: mesh solver")] = None,
+    keep_operand: Annotated[StrictBool | None, Field(description="boolean: keep operand")] = None,
+    self_intersection: Annotated[StrictBool | None, Field(description="boolean: self-intersection handling")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="join needs meshes")] = None,
+    by: Annotated[Literal["loose_parts", "materials"] | None, Field(description="separate: partition rule")] = None,
+    new_name: Annotated[ObjectName | None, Field(description="extract_faces needs name")] = None,
     face_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
-                            Field(min_length=1, max_length=20000)] = None,
-    count: Annotated[StrictInt | None, Field(ge=2, le=1000)] = None,
-    offset: Vector3 | None = None,
-    thickness: Annotated[Number | None, Field(gt=0, le=100)] = None,
-    clipping: StrictBool | None = None,
-    uv_transform: UVTransform | None = None,
-    lease_id: LeaseId = None,
-    expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
-    uv_region: UVRegion | None = None,
+                            Field(min_length=1, max_length=20000, description="Current source polygon indices")] = None,
+    count: Annotated[StrictInt | None, Field(ge=2, le=1000, description="array needs count")] = None,
+    offset: Annotated[Vector3 | Annotated[Number, Field(ge=-1, le=1)] | None,
+                      Field(description="array/extrude_faces: translation; solidify: shell offset [-1,1]")] = None,
+    thickness: Annotated[Number | None, Field(gt=0, le=100, description="solidify needs thickness")] = None,
+    clipping: Annotated[StrictBool | None, Field(description="mirror: clip at plane")] = None,
+    uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
+    expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='Inspected source geometry hash')] = None,
+    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces: destination and pixel gutters')] = None,
     edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
-                           Field(min_length=1, max_length=20000)] = None,
-    seam: StrictBool | None = None,
-    unwrap_method: Literal['smart', 'angle_based', 'conformal', 'minimum_stretch'] | None = None,
+                           Field(min_length=1, max_length=20000, description='set_seams: source edge indices')] = None,
+    seam: Annotated[StrictBool | None, Field(description='set_seams: mark true or clear false')] = None,
+    unwrap_method: Annotated[Literal['smart', 'angle_based', 'conformal', 'minimum_stretch'] | None,
+                             Field(description='unwrap_faces: projection; default smart')] = None,
 ) -> MeshEditResult:
-    """Edit a leased mesh."""
+    """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
               "angle_limit_degrees": angle_limit_degrees, "island_margin": island_margin,
               "uv_layer": uv_layer, "target_triangles": target_triangles,
@@ -880,47 +837,41 @@ def preserved(values, allowed):
 
 @mcp.tool(annotations=MUTATING)
 async def assign_material(
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=32)] = None,
-    material_name: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    base_color_texture: Annotated[str | None, Field(description="Workspace sRGB image.")] = None,
-    base_color: RGBA | None = None,
-    roughness: Number | None = None,
-    metallic: Number | None = None,
-    roughness_texture: str | None = None,
-    metallic_texture: str | None = None,
-    normal_texture: str | None = None,
-    normal_strength: Number | None = None,
-    emission_texture: str | None = None,
-    emission_strength: Number | None = None,
-    alpha_texture: str | None = None,
-    alpha_mode: Literal["opaque", "clip", "blend"] | None = None,
-    uv_scale: Vector2 | None = None,
-    uv_offset: Vector2 | None = None,
-    uv_rotation_degrees: Number | None = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=32, description="assign needs meshes")] = None,
+    material_name: Annotated[str | None, Field(min_length=1, max_length=63, description="make_unique: new; assign: new unless update_existing; else existing")] = None,
+    base_color_texture: Annotated[str | None, Field(description="Workspace sRGB image")] = None,
+    base_color: Annotated[RGBA | None, Field(description="assign: sRGB RGBA")] = None,
+    roughness: Annotated[Number | None, Field(description="assign: roughness")] = None,
+    metallic: Annotated[Number | None, Field(description="assign: metallic")] = None,
+    roughness_texture: Annotated[str | None, Field(description="assign: Non-Color image")] = None,
+    metallic_texture: Annotated[str | None, Field(description="assign: Non-Color image")] = None,
+    normal_texture: Annotated[str | None, Field(description="assign: Non-Color image")] = None,
+    normal_strength: Annotated[Number | None, Field(description="assign: normal scale")] = None,
+    emission_texture: Annotated[str | None, Field(description="assign: sRGB image")] = None,
+    emission_strength: Annotated[Number | None, Field(description="assign: emission scale")] = None,
+    alpha_texture: Annotated[str | None, Field(description="assign: Non-Color image")] = None,
+    alpha_mode: Annotated[Literal["opaque", "clip", "blend"] | None, Field(description="assign: transparency")] = None,
+    uv_scale: Annotated[Vector2 | None, Field(description="assign: UV scale")] = None,
+    uv_offset: Annotated[Vector2 | None, Field(description="assign: UV translation")] = None,
+    uv_rotation_degrees: Annotated[Number | None, Field(description="assign: UV rotation")] = None,
     uv_layer: Annotated[str | None, Field(max_length=63,
-        description="Named mesh UV for textures and normal tangents; empty selects render-active UVs.")] = None,
-    update_existing: StrictBool | None = None,
-    slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
-    lease_id: LeaseId = None,
-    instance: str | None = None,
-    link_mode: Literal['DATA', 'OBJECT'] | None = None,
-    action: Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique'] = 'assign',
-    group_path: list[str] | None = None,
-    node: str | None = None,
-    inputs: dict[str, JsonValue] | None = None,
-    outputs: dict[str, JsonValue] | None = None,
-    image: ShaderImage | None = None,
-    offset: Annotated[StrictInt | None, Field(ge=0)] = None,
-    limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
+        description='Sampling/tangent UVs; empty: render-active; keep UV flags')] = None,
+    update_existing: Annotated[StrictBool | None, Field(description="assign: update managed material")] = None,
+    slot: Annotated[StrictInt, Field(ge=0, le=31, description="Slot")] = 0,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
+    instance: Annotated[str | None, Field(description="Scene collection instance")] = None,
+    link_mode: Annotated[Literal['DATA', 'OBJECT'] | None, Field(description='DATA/OBJECT binding; OBJECT shares geometry')] = None,
+    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
+    group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
+    node: Annotated[str | None, Field(description="Exact node")] = None,
+    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value map")] = None,
+    outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
+    image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
+    offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first node")] = None,
+    limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="inspect: node cap")] = None,
 ) -> MaterialAssignment:
-    """assign: names, material_name; color/emission sRGB, data Non-Color.
-    instance scopes kit meshes; OBJECT shares geometry.
-    uv_layer selects named sampling and normal tangents without changing mesh UV flags.
-    inspect: group_path, node, offset/limit; read-only.
-    set_inputs: node, inputs/outputs socket IDs; linear, links kept, shared users
-    affected, config detached. set_image: node, image(path,color_space,alpha_mode,tiles); packed.
-    make_unique: names, new material_name; copy groups, share images/actions.
-    """
+    """Assign PBR or inspect/edit shader sockets.
+    Socket edits keep links, affect shared users and detach tool configuration."""
     if material_name is None:
         raise ValueError('material_name is required')
     shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
@@ -989,27 +940,23 @@ class ShaderBakeSource(BaseModel):
 
 @mcp.tool(annotations=MUTATING)
 async def bake(
-    map: Literal["normal", "ao", "curvature", "lightmap", "shader"],
-    name: ObjectName,
-    path: Annotated[str, Field(description="New workspace PNG; shader also accepts EXR.")],
-    high: Annotated[list[str] | None, Field(min_length=1, max_length=64)] = None,
-    resolution: Annotated[StrictInt, Field(ge=64, le=4096)] = 1024,
-    samples: Annotated[StrictInt, Field(ge=1, le=256)] = 16,
-    margin: Annotated[StrictInt, Field(ge=0, le=64)] = 4,
-    bit_depth: Literal[8, 16, 32] | None = None,
-    cage_extrusion: Annotated[Number | None, Field(ge=0, le=1)] = None,
-    max_ray_distance: Annotated[Number | None, Field(ge=0, le=10)] = None,
-    normal_space: Literal["tangent", "object"] | None = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    isolate: StrictBool = True,
-    source: ShaderBakeSource | None = None,
-    lease_id: LeaseId = None,
+    map: Annotated[Literal["normal", "ao", "curvature", "lightmap", "shader"], Field(description="Map; shader needs source")],
+    name: Annotated[ObjectName, Field(description="Mesh")],
+    path: Annotated[str, Field(description="New workspace PNG; shader allows EXR")],
+    high: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="normal/AO sources")] = None,
+    resolution: Annotated[StrictInt, Field(ge=64, le=4096, description="Image pixels")] = 1024,
+    samples: Annotated[StrictInt, Field(ge=1, le=256, description="Samples/pixel")] = 16,
+    margin: Annotated[StrictInt, Field(ge=0, le=64, description="Gutter pixels")] = 4,
+    bit_depth: Annotated[Literal[8, 16, 32] | None, Field(description='PNG 8/16, default 16; shader EXR 16/32, default 32')] = None,
+    cage_extrusion: Annotated[Number | None, Field(ge=0, le=1, description="Cage distance")] = None,
+    max_ray_distance: Annotated[Number | None, Field(ge=0, le=10, description="Projection ray cap")] = None,
+    normal_space: Annotated[Literal["tangent", "object"] | None, Field(description="Normal space")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    isolate: Annotated[StrictBool, Field(description="Isolate bake objects")] = True,
+    source: Annotated[ShaderBakeSource | None, Field(description='shader: socket IDs/UV atlas; raw-data/sRGB-color PNG; signed/HDR needs EXR, alpha its own socket')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> MapBakeResult:
-    """Bake geometry or an explicit shader socket. PNG defaults to 16-bit; shader EXR to 32-bit.
-
-    high: normal/AO projection. Shader uses source socket identifiers and a target UV atlas;
-    data is raw, color PNG is sRGB. Signed/HDR samples require EXR. Alpha needs a separate socket.
-    """
+    """Bake geometry maps/shader socket to a new image."""
     if map == 'shader':
         if source is None:
             raise ValueError('shader requires source')
@@ -1042,32 +989,28 @@ async def bake(
 
 @mcp.tool(annotations=MUTATING)
 async def asset_io(
-    action: Literal["import", "export", "save", "generate", "open"],
-    path: Annotated[str, Field(description="Workspace path; existing file for import/open, new otherwise.")],
-    name: Annotated[str | None, Field(min_length=1, max_length=58)] = None,
-    names: Annotated[list[str] | None, Field(max_length=1000)] = None,
-    preserve_instances: StrictBool | None = None,
-    include_empties: StrictBool | None = None,
-    image: str | None = None,
-    resolution: Annotated[StrictInt | None, Field(ge=64, le=192)] = None,
-    lods: StrictBool | None = None,
-    collision: StrictBool | None = None,
-    animations: StrictBool | None = None,
-    baked_animation: StrictBool | None = None,
-    assembly: StrictBool | None = None,
-    animation_sample_step: Annotated[Number | None, Field(gt=0)] = None,
-    textures: StrictBool | None = None,
-    bake_pair: BakePair | None = None,
-    axis: Literal["unity", "unreal", "godot"] | None = None,
-    uv_layer: Annotated[str | None, Field(min_length=1,max_length=63)] = None,
-    lease_id: LeaseId = None,
-    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
+    action: Annotated[Literal["import", "export", "save", "generate", "open"], Field(description="Action")],
+    path: Annotated[str, Field(description="Workspace path: existing for import/open, else new")],
+    name: Annotated[str | None, Field(min_length=1, max_length=58, description="import needs name prefix")] = None,
+    names: Annotated[list[str] | None, Field(max_length=1000, description="export needs objects unless bake_pair")] = None,
+    preserve_instances: Annotated[StrictBool | None, Field(description="export: keep supported instancing")] = None,
+    include_empties: Annotated[StrictBool | None, Field(description="export: empties")] = None,
+    image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
+    resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
+    lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
+    collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
+    animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
+    baked_animation: Annotated[StrictBool | None, Field(description="export: baked animation")] = None,
+    assembly: Annotated[StrictBool | None, Field(description="export: evaluate static instances")] = None,
+    animation_sample_step: Annotated[Number | None, Field(gt=0, description="export: frame interval")] = None,
+    textures: Annotated[StrictBool | None, Field(description="export: write texture sidecars")] = None,
+    bake_pair: Annotated[BakePair | None, Field(description='export: low/high pair or names; writes <stem>_low.fbx/<stem>_high.fbx')] = None,
+    axis: Annotated[Literal["unity", "unreal", "godot"] | None, Field(description='export: axis preset; default unity')] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1,max_length=63, description='export: UV0 (FBX/GLB)/st (USD), via temporary data')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
+    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='open: optional target SHA-256')] = None,
 ) -> AssetResult:
-    """Import/export meshes or save/open .blend. Open requires clean source;
-    expected_sha256 pins its bytes. File UI/scripts are disabled.
-    uv_layer selects UV0 (USD st); bake_pair exports low/high FBX.
-    generate creates a GLB from image without a lease; resolution applies to TripoSR.
-    """
+    """Import/export meshes; save/open projects. Open needs clean source, disables file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
@@ -1122,19 +1065,17 @@ async def asset_io(
 
 @mcp.tool(annotations=ADDITIVE)
 async def asset_library(
-    action: Literal['inspect', 'append'],
-    path: str,
-    kind: Literal['objects', 'collections', 'materials', 'node_groups'] = 'collections',
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=256)] = None,
-    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
-    offset: Annotated[StrictInt | None, Field(ge=0)] = None,
-    limit: Annotated[StrictInt | None, Field(ge=1, le=1000)] = None,
-    instance_collections: StrictBool | None = None,
-    lease_id: LeaseId = None,
+    action: Annotated[Literal['inspect', 'append'], Field(description="Action")],
+    path: Annotated[str, Field(description="Workspace .blend path")],
+    kind: Annotated[Literal['objects', 'collections', 'materials', 'node_groups'], Field(description="Native asset type")] = 'collections',
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=256, description="append needs source names")] = None,
+    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description="append needs inspected hash")] = None,
+    offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first asset")] = None,
+    limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="Page size")] = None,
+    instance_collections: Annotated[StrictBool | None, Field(description='append: shared-definition empties; only collections')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> AssetLibraryResult:
-    """Inspect .blend names or append editable native assets. Append instance_collections=true
-    creates placement empties sharing imported collection definitions (kind=collections only).
-    """
+    """Inspect .blend assets; append independent editable IDs."""
     values = {'names': names, 'expected_sha256': expected_sha256, 'offset': offset, 'limit': limit,
               'instance_collections': instance_collections}
     if action == 'inspect':
@@ -1152,19 +1093,16 @@ async def asset_library(
 
 @mcp.tool(annotations=MUTATING)
 async def geometry_nodes(
-    action: Literal['inspect', 'set_inputs', 'bake_copy'],
-    name: str,
-    modifier: str | None = None,
-    inputs: dict[str, JsonValue] | None = None,
-    attributes: dict[str, str | None] | None = None,
-    new_name: str | None = None,
-    instance: str | None = None,
-    lease_id: LeaseId = None,
+    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy'], Field(description="Action")],
+    name: Annotated[str, Field(description="Mesh")],
+    modifier: Annotated[str | None, Field(description="Geometry Nodes modifier")] = None,
+    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs needs ID/value map")] = None,
+    attributes: Annotated[dict[str, str | None] | None, Field(description="set_inputs: ID/attribute map; null disables")] = None,
+    new_name: Annotated[str | None, Field(description="bake_copy needs output name")] = None,
+    instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit exposed inputs or snapshot an evaluated mesh. For inspect/set_inputs,
-    instance names a scene collection instance containing the source object; edits affect
-    its shared definition. Use scene_info definition=true to find exact member names.
-    """
+    """Inspect/edit Geometry Nodes or snapshot mesh. scene_info definition=true lists exact instance members."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
               'instance': instance}
     if action == 'inspect':
@@ -1187,53 +1125,46 @@ async def geometry_nodes(
 
 @mcp.tool(annotations=ADDITIVE)
 async def review_sheet(
-    path: Annotated[str, Field(description="New workspace .png path.")],
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=1000)] = None,
-    views: Annotated[list[View] | None, Field(min_length=1, max_length=6)] = None,
-    mode: Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"] = "shaded",
-    resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width.")] = 1024,
-    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000)] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096)] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-) -> Image:
-    """Render a multi-view PNG contact sheet; no lease. Heatmap: blue < target_px_per_m=512
-    (green) < red."""
+    path: Annotated[str, Field(description="New workspace PNG")],
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=1000, description="Scene objects")] = None,
+    views: Annotated[list[View] | None, Field(min_length=1, max_length=6, description="Views; omitted uses defaults")] = None,
+    mode: Annotated[Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"], Field(description="Shading/diagnostic mode")] = "shaded",
+    resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width")] = 1024,
+    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_heatmap: target density; default 512")] = None,
+    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+) -> ImageReceipt:
+    """Render a multi-view PNG; no lease. Heatmap: blue < target_px_per_m=512 (green) < red."""
     result = await run(call, "review_sheet", path=path, names=names, views=views, mode=mode,
                        resolution=resolution, target_px_per_m=target_px_per_m,
                        texture_resolution=texture_resolution, uv_layer=uv_layer)
-    return Image(path=result["path"])
+    return png_result(result["path"])
 
 
 @mcp.tool(annotations=MUTATING)
 async def level_edit(
-    action: Literal["terrain", "place", "snap"],
+    action: Annotated[Literal["terrain", "place", "snap"], Field(description="Action")],
     name: Annotated[str | None, Field(min_length=1, max_length=63,
-                                      description="New terrain object name.")] = None,
+                                      description="New terrain object")] = None,
     image: Annotated[str | None, Field(max_length=1024,
-                                       description="Workspace PNG/JPEG heightmap.")] = None,
-    size: Vector2 | None = None,
-    height: Annotated[Number | None, Field(ge=0.01, le=1000)] = None,
-    resolution: Annotated[StrictInt | None, Field(ge=2, le=501)] = None,
-    location: Vector3 | None = None,
-    seed: Annotated[StrictInt | None, Field(ge=0, le=1000000)] = None,
-    octaves: Annotated[StrictInt | None, Field(ge=1, le=8)] = None,
-    frequency: Annotated[Number | None, Field(ge=1, le=64)] = None,
+                                       description="Workspace PNG/JPEG heightmap")] = None,
+    size: Annotated[Vector2 | None, Field(description='terrain: XY extent; default [100,100]')] = None,
+    height: Annotated[Number | None, Field(ge=0.01, le=1000, description='terrain: height range; default 10')] = None,
+    resolution: Annotated[StrictInt | None, Field(ge=2, le=501, description='terrain: vertices/side; default 128')] = None,
+    location: Annotated[Vector3 | None, Field(description='terrain: world position; default [0,0,0]')] = None,
+    seed: Annotated[StrictInt | None, Field(ge=0, le=1000000, description="terrain: noise seed")] = None,
+    octaves: Annotated[StrictInt | None, Field(ge=1, le=8, description="terrain: noise layers")] = None,
+    frequency: Annotated[Number | None, Field(ge=1, le=64, description="terrain: noise frequency")] = None,
     placements: Annotated[list[Placement] | None,
-                          Field(min_length=1, max_length=256)] = None,
-    collection: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    names: Annotated[list[ObjectName] | None, Field(min_length=1, max_length=256)] = None,
-    terrain: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
-    offset: Annotated[Number | None, Field(ge=-1000, le=1000)] = None,
-    align_to_normal: StrictBool | None = None,
-    lease_id: LeaseId = None,
+                          Field(min_length=1, max_length=256, description="place needs object transforms")] = None,
+    collection: Annotated[str | None, Field(min_length=1, max_length=63, description="Collection")] = None,
+    names: Annotated[list[ObjectName] | None, Field(min_length=1, max_length=256, description="Scene objects")] = None,
+    terrain: Annotated[str | None, Field(min_length=1, max_length=63, description="snap needs terrain")] = None,
+    offset: Annotated[Number | None, Field(ge=-1000, le=1000, description="snap: height above surface")] = None,
+    align_to_normal: Annotated[StrictBool | None, Field(description='snap: align normals; default false')] = None,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> LevelEditResult:
-    """Build a terrain mesh or assemble objects in a level.
-
-    terrain: name, image or noise seed/octaves/frequency, size=(100,100),
-    height=10, resolution=128, location; place: placements=[{source, name, location,
-    rotation_degrees, scale, linked}], collection; snap: names, terrain, offset,
-    align_to_normal=false.
-    """
+    """Build terrain; place/snap objects on terrain."""
     values = {"name": name, "image": image, "size": size, "height": height,
               "resolution": resolution, "location": location, "seed": seed,
               "octaves": octaves, "frequency": frequency, "placements": placements,
@@ -1258,17 +1189,17 @@ async def level_edit(
 
 @mcp.tool(annotations=MUTATING)
 async def scatter(
-    name: ObjectName,
-    collection: Annotated[str, Field(min_length=1, max_length=63)],
-    density: Annotated[Number, Field(gt=0, le=10000, description="Points per square metre.")],
-    seed: Annotated[StrictInt, Field(ge=0, le=1000000)] = 0,
-    min_distance: Annotated[Number, Field(ge=0, le=1000)] = 0,
-    scale_range: tuple[Number, Number] = (1, 1),
-    rotation_jitter_degrees: Annotated[Number, Field(ge=0, le=360)] = 360,
-    realize: StrictBool = False,
-    lease_id: LeaseId = None,
+    name: Annotated[ObjectName, Field(description="Scatter surface mesh")],
+    collection: Annotated[str, Field(min_length=1, max_length=63, description="Collection")],
+    density: Annotated[Number, Field(gt=0, le=10000, description="Points/m²")],
+    seed: Annotated[StrictInt, Field(ge=0, le=1000000, description="Distribution seed")] = 0,
+    min_distance: Annotated[Number, Field(ge=0, le=1000, description="Spacing (scene units)")] = 0,
+    scale_range: Annotated[tuple[Number, Number], Field(description="Scale bounds")] = (1, 1),
+    rotation_jitter_degrees: Annotated[Number, Field(ge=0, le=360, description="Rotation jitter cap")] = 360,
+    realize: Annotated[StrictBool, Field(description="Realize instances")] = False,
+    lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ScatterResult:
-    """Add a fixed Geometry Nodes modifier instancing a collection over the mesh surface."""
+    """Scatter collection instances on mesh with fixed Geometry Nodes."""
     return await run(call, "scatter", lease_id=lease_id, name=name, collection=collection,
                      density=density, seed=seed, min_distance=min_distance,
                      scale_range=scale_range, rotation_jitter_degrees=rotation_jitter_degrees,

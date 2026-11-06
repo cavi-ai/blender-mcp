@@ -9,6 +9,10 @@ With `edges=true`, it reports source edge endpoints, adjacent faces and seam fla
 and a local `offset`; optional `expected_mesh_sha256` guards against stale
 geometry. See [face-region modeling](../guides/mesh-preparation.md#inspect-and-extrude-a-face-region).
 
+`render_preview` and `review_sheet` return a PNG image block plus structured
+`path` and `mime_type` (`image/png`) fields. The receipt identifies the file written
+in the session workspace; image blocks remain available to visual clients.
+
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export, save and open do not.
@@ -297,6 +301,9 @@ Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
 `join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `set_seams`, `mirror`,
 `array`, `solidify`, `uv_transform`.
+
+`array` requires a three-component translation `offset`. `solidify` accepts a
+scalar `offset` from -1 to 1 (default -1) to position the shell through its thickness.
 
 `extract_faces` takes a unique `new_name` and 1–20,000 unique `face_indices`.
 It copies those source polygons to an independent unrigged surface, retaining

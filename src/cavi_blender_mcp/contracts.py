@@ -6,6 +6,11 @@ from cavi_mcp_core.contracts import Result, VariantResult
 from pydantic import model_validator
 
 
+class ImageReceipt(Result):
+    path: str
+    mime_type: Literal['image/png']
+
+
 class SceneRenderSettings(Result):
     display_device: str
     view_transform: str
