@@ -8,6 +8,6 @@
     "eval:core": "uv run --locked python evals/run.py native"
   },
   "devDependencies": {
-    "@cavi-ai/mcp-eval": "0.8.0"
+    "@cavi-ai/mcp-eval": "github:cavi-ai/mcp-eval#main"
   }
 }

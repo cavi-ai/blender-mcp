@@ -199,7 +199,7 @@ See the [security model](docs/blender-mcp/source/pages/security/model.md) and
 uv sync --locked --dev
 uv run --locked python -m unittest discover -s tests
 uv run --locked ruff check .
-npm ci
+npm install
 npm run eval:protocol
 ```
 
