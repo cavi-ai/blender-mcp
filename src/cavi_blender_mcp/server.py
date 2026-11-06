@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 import anyio
 from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES
+from cavi_mcp_core.server import Server as CoreServer
 from mcp.server.mcpserver import Image
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, WithJsonSchema
 
@@ -46,6 +47,8 @@ from .rig_models import (
 )
 from .rig_models import Name as RigName
 from .scene_models import CameraSpec, LightSpec, PreviewSettings, RenderSpec, WorldSpec
+
+Server = CoreServer
 
 mcp = BlenderServer(
     "cavi-blender-mcp",
