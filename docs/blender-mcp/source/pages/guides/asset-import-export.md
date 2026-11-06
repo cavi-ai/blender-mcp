@@ -1,6 +1,6 @@
 # Import and export assets
 
-`asset_io` moves assets in or out of the Blender session. Import, export and save
+`asset_io` moves assets in or out of the Blender session. Import, export, save and open
 need a `lease_id`. Generation does not.
 
 ## Import
@@ -124,6 +124,29 @@ name-matched baking in tools such as Substance Designer, then restored.
 
 `save` writes a new `.blend` inside the workspace and does not overwrite an
 existing file.
+
+## Open a saved project
+
+```json
+{"action":"open","path":"projects/scene.blend","expected_sha256":"<source-sha256>","lease_id":"<lease_id>"}
+```
+
+`open` loads an existing workspace `.blend` into the connected Blender process.
+The optional `expected_sha256` checks its saved bytes before loading; the result
+reports the loaded path, SHA-256, byte count and project ID. Opening the same
+clean source returns `opened=false` without reloading.
+
+Unsaved Blender edits, tracked MCP mutations, an unknown current saved-source
+identity or a current source changed on disk prevent loading. Save the current
+work to a new `.blend` first. Tracking is conservative after failed mutations;
+successful exports and texture bakes do not mark the source as edited. Direct
+scripts and human edits outside the MCP still depend on Blender's own dirty flag.
+
+Loading disables embedded scripts and keeps the existing UI layout. The bridge
+and lease binding survive a successful load. Inspect ownership and source state
+afterward; loading does not extend the lease expiry. A failure after loading
+begins has an uncertain outcome: inspect the current session before proceeding,
+and do not replay the open automatically.
 
 ## Generate
 

@@ -38,6 +38,7 @@ from .operations import (
     LEASE_FREE,
     MAX_REQUEST_BYTES,
     MAX_TIMEOUT,
+    SOURCE_PRESERVING,
 )
 from .paths import destination, environment_path
 from .presets import AXIS_PRESETS
@@ -539,7 +540,16 @@ def dispatch(operation, p):
         return _dispatch(operation, params)
     params = dict(p)
     with _lease.edit(params.pop("lease_id", None), project_identity):
-        return _dispatch(operation, params)
+        try:
+            result = _dispatch(operation, params)
+        except PreflightRejected:
+            raise
+        except Exception:
+            _loaded_source.mark_changed()
+            raise
+        if operation not in SOURCE_PRESERVING:
+            _loaded_source.mark_changed()
+        return result
 
 
 def new_name(name):
@@ -946,7 +956,7 @@ def runtime(operation, p):
         "file": bpy.data.filepath,
         "workspace": str(_workspace),
         "object_count": len(bpy.context.scene.objects),
-        "dirty": bpy.data.is_dirty,
+        "dirty": _loaded_source.inspect(bpy.data.filepath, bpy.data.is_dirty)['dirty'],
         "background": bpy.app.background,
     }
 
@@ -961,6 +971,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'open_project':
+        from .blender_project import open_project
+
+        return open_project(p, _workspace, _loaded_source, project_identity)
     if operation=='make_material_unique':
         from .blender_material_variants import make_unique as copy_material
 

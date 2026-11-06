@@ -957,10 +957,10 @@ async def bake(
                      **params)
 
 
-@mcp.tool(annotations=ADDITIVE)
+@mcp.tool(annotations=MUTATING)
 async def asset_io(
-    action: Literal["import", "export", "save", "generate"],
-    path: Annotated[str, Field(description="Workspace path; new file except for import.")],
+    action: Literal["import", "export", "save", "generate", "open"],
+    path: Annotated[str, Field(description="Workspace path; existing file for import/open, new otherwise.")],
     name: Annotated[str | None, Field(min_length=1, max_length=58)] = None,
     names: Annotated[list[str] | None, Field(max_length=1000)] = None,
     preserve_instances: StrictBool | None = None,
@@ -978,21 +978,22 @@ async def asset_io(
     axis: Literal["unity", "unreal", "godot"] | None = None,
     uv_layer: Annotated[str | None, Field(min_length=1,max_length=63)] = None,
     lease_id: LeaseId = None,
+    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
 ) -> AssetResult:
-    """Import GLB/FBX/OBJ/USD with a new name prefix; save a new .blend; export names to FBX/GLB/USD.
-    uv_layer selects UV0 for FBX/GLB or st for USD on temporary mesh data.
-    assembly exports evaluated static collection instances to FBX/GLB.
-    bake_pair alone writes <stem>_low.fbx and <stem>_high.fbx.
-    textures writes FBX/USD sidecars; axis defaults to unity.
-    generate uses image and new GLB path with the configured local provider, without a lease;
-    resolution applies only to TripoSR (default 128).
+    """Import/export meshes or save/open .blend. Open requires clean source;
+    expected_sha256 pins its bytes. File UI/scripts are disabled.
+    uv_layer selects UV0 (USD st); bake_pair exports low/high FBX.
+    generate creates a GLB from image without a lease; resolution applies to TripoSR.
     """
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
-              'assembly': assembly,'uv_layer':uv_layer}
+              'assembly': assembly,'uv_layer':uv_layer,'expected_sha256':expected_sha256}
+    if action == 'open':
+        params = pick(action, values, (), {'expected_sha256': None})
+        return await run(call, 'open_project', lease_id=lease_id, path=path, **params)
     if action == 'export' and assembly is True:
         values.pop('assembly')
         params = pick(action, values, ['names'], {'axis': None, 'textures': False,'uv_layer':None})
