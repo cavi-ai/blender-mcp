@@ -8,6 +8,17 @@ from cavi_blender_mcp.source_identity import LoadedSource
 
 
 class SourceIdentityTests(unittest.TestCase):
+    def test_bridge_changes_stay_dirty_until_a_save_or_load_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'source.blend'
+            path.write_bytes(b'original')
+            loaded = LoadedSource()
+            loaded.capture(path)
+            loaded.mark_changed()
+            self.assertTrue(loaded.inspect(path, False)['dirty'])
+            loaded.capture(path)
+            self.assertFalse(loaded.inspect(path, False)['dirty'])
+
     def test_same_size_disk_replacement_does_not_relabel_loaded_content(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'source.blend'

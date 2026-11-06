@@ -1,5 +1,21 @@
 [
   {
+    "id": "project-open-invalid-hash",
+    "tool": "asset_io",
+    "arguments": {"action": "open", "path": "source.blend", "expected_sha256": "bad"},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "validation"
+  },
+  {
+    "id": "project-open-inapplicable-options",
+    "tool": "asset_io",
+    "arguments": {"action": "open", "path": "source.blend", "names": ["Cube"]},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "does not accept: names"
+  },
+  {
     "id": "extract-faces-empty",
     "tool": "mesh_edit",
     "arguments": {

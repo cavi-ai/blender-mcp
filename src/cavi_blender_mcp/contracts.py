@@ -80,6 +80,9 @@ class Ownership(Result):
 
 
 class AssetResult(Result):
+    sha256: str | None = None
+    project_id: str | None = None
+    opened: bool | None = None
     uv_maps: list[dict[str,Any]] | None = None
     path: str | None = None
     bytes: int | None = None

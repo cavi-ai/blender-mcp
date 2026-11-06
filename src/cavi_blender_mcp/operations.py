@@ -42,6 +42,7 @@ OPERATIONS = frozenset(
         "export_mesh",
         "export_instances",
         "save_project",
+        "open_project",
         "render_preview",
         "runtime_status",
         "runtime_restart",
@@ -120,6 +121,13 @@ LEASE_FREE = frozenset(
     }
 )
 SERVER_LEASE_FREE = LEASE_FREE | {"session_control"}
+# File-output operations restore temporary scene edits on success. Unknown
+# failures still invalidate cleanliness because restoration may be incomplete.
+SOURCE_PRESERVING = frozenset({
+    'save_project', 'open_project', 'runtime_restart',
+    'export_mesh', 'export_instances', 'export_asset', 'export_assembly',
+    'export_uv_asset', 'export_uv_assembly', 'bake_map', 'bake_png', 'bake_shader',
+})
 SLOW_OPERATIONS = frozenset(
     {
         "export_uv_assembly",
@@ -143,6 +151,7 @@ SLOW_OPERATIONS = frozenset(
         "add_modifier",
         "render_preview",
         "save_project",
+        "open_project",
         "decimate_to",
         "lightmap_uv",
         "texel_density",
