@@ -1,5 +1,21 @@
 [
   {
+    "id": "uv-chart-page-requires-faces",
+    "tool": "scene_info",
+    "arguments": {"name": "EvalProp", "uv_layer": "UVMap"},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "uv_layer requires a named source-face page"
+  },
+  {
+    "id": "uv-chart-page-rejects-edges",
+    "tool": "scene_info",
+    "arguments": {"name": "EvalProp", "uv_layer": "UVMap", "faces": true, "edges": true},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "uv_layer requires a named source-face page"
+  },
+  {
     "id": "density-transform-requires-region",
     "tool": "mesh_edit",
     "arguments": {"action": "uv_transform", "name": "EvalProp", "uv_transform": {"faces": [0]}, "target_px_per_m": 512},

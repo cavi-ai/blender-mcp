@@ -103,6 +103,34 @@ regions without a boundary are rejected before changing the object.
 
 ## UVs
 
+### Identify complete source charts
+
+Add an existing `uv_layer` to a source-face page:
+
+```json
+{"name":"Body","faces":true,"uv_layer":"BakeAtlas","limit":100,"offset":0}
+```
+
+The `uv` metadata reports the layer, chart count and `sha256` for its native
+coordinates and pins. Each face adds `uv.chart`, `uv.chart_faces`, UV bounds and
+pinned-loop count. A chart ID is its smallest source polygon index. Page the
+whole source and group matching IDs to select every face in a chart; compare
+both `mesh_sha256` and `uv.sha256` across pages before combining them.
+The hashes detect mixed inspection state; they do not lock subsequent UV edits.
+
+Connectivity follows shared source edges whose loop UV coordinates match exactly.
+Disconnected stacked surfaces remain separate. Material boundaries and seam flags
+do not split continuous coordinates. Membership includes finite degenerate charts;
+it does not prove UV quality. This opt-in analysis handles 20,000 source triangles
+and 60,000 loops, requires finite coordinates, and never evaluates modifiers.
+Ordinary face pages without `uv_layer` keep their existing behavior.
+
+`inspect_uv_layout` adds exact object, polygon and source-triangle identities to
+each overlap/gutter example's `sources`. These identities refer to the original
+mesh even after material filtering; objects report corresponding mesh/UV hashes.
+The existing bounded examples and completeness flag still apply. Use whole-chart
+membership when choosing the correction, then re-inspect the intended texture set.
+
 ### Unwrap selected faces
 
 `unwrap_faces` takes current `face_indices`, an existing `uv_layer` (default UV0),

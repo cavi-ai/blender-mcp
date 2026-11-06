@@ -49,11 +49,19 @@ def page_source(p):
 def inspect_faces(p):
     value, limit, offset = page_source(p)
     mesh = value.data
-    return {'name': value.name, 'type': 'MESH', 'mesh': mesh.name, 'scope': 'source_mesh_faces',
+    page = mesh.polygons[offset:offset+limit]
+    result = {'name': value.name, 'type': 'MESH', 'mesh': mesh.name, 'scope': 'source_mesh_faces',
             'mesh_sha256': mesh_digest(mesh), 'total': len(mesh.polygons), 'offset': offset, 'limit': limit,
             'faces': [{'index': f.index, 'center_local': list(f.center), 'normal_local': list(f.normal),
                        'area_local': f.area, 'vertices': list(f.vertices), 'material_index': f.material_index,
-                       'smooth': f.use_smooth} for f in mesh.polygons[offset:offset+limit]]}
+                       'smooth': f.use_smooth} for f in page]}
+    if p.get('uv_layer') is not None:
+        from .blender_uv_charts import face_page
+
+        result['uv'], rows = face_page(mesh, p['uv_layer'], page)
+        for face in result['faces']:
+            face['uv'] = rows[face['index']]
+    return result
 
 
 def region_boundaries(faces):
