@@ -2,6 +2,20 @@
 import math
 
 
+def projection(method, angle):
+    method = 'smart' if method is None else method
+    if method not in ('smart', 'angle_based', 'conformal', 'minimum_stretch'):
+        raise ValueError('Unknown unwrap_method')
+    if method != 'smart':
+        if angle is not None:
+            raise ValueError('angle_limit_degrees applies only to smart projection')
+        return method, None
+    angle = 66 if angle is None else angle
+    if type(angle) not in (int, float) or not math.isfinite(angle) or not 1 <= angle <= 89:
+        raise ValueError('angle_limit_degrees must be finite from 1 to 89')
+    return method, angle
+
+
 def region(value):
     if not isinstance(value, dict) or set(value) - {'bounds', 'texture_resolution', 'margin_px', 'allow_overlap', 'allow_pinned'}:
         raise ValueError('Expected UV region bounds, texture_resolution and margin_px')

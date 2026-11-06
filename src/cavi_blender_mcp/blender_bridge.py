@@ -974,6 +974,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation in {'inspect_mesh_edges', 'set_seams'}:
+        from .blender_mesh_seams import inspect_edges, set_seams
+
+        return (inspect_edges if operation == 'inspect_mesh_edges' else set_seams)(p)
     if operation == 'unwrap_faces':
         from .blender_uv_regions import unwrap_faces
 

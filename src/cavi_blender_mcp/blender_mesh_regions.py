@@ -31,16 +31,24 @@ def mesh_digest(mesh):
     return digest.hexdigest()
 
 
-def inspect_faces(p):
+def page_source(p):
     value = obj(p.get('name'), mesh=True)
     mesh = value.data
     limit, offset = p.get('limit', 200), p.get('offset', 0)
     if type(limit) is not int or not 1 <= limit <= 1000 or type(offset) is not int or offset < 0:
-        raise ValueError('Face pagination requires limit 1..1000 and a nonnegative offset')
+        raise ValueError('Mesh pagination requires limit 1..1000 and a nonnegative offset')
     if bpy.context.mode != 'OBJECT':
-        raise ValueError('Inspect source faces in Object Mode')
+        raise ValueError('Inspect source topology in Object Mode')
     if len(mesh.vertices) > MAX_TRIANGLES or sum(max(0, len(f.vertices)-2) for f in mesh.polygons) > MAX_TRIANGLES:
         raise ValueError(f'Inspect at most {MAX_TRIANGLES} vertices and source triangles')
+    if len(mesh.edges) > 3*MAX_TRIANGLES:
+        raise ValueError(f'Inspect at most {3*MAX_TRIANGLES} source edges')
+    return value, limit, offset
+
+
+def inspect_faces(p):
+    value, limit, offset = page_source(p)
+    mesh = value.data
     return {'name': value.name, 'type': 'MESH', 'mesh': mesh.name, 'scope': 'source_mesh_faces',
             'mesh_sha256': mesh_digest(mesh), 'total': len(mesh.polygons), 'offset': offset, 'limit': limit,
             'faces': [{'index': f.index, 'center_local': list(f.center), 'normal_local': list(f.normal),

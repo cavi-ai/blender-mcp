@@ -4,6 +4,7 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info` with `faces=true` pages source polygon indices and local geometry.
+With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.
 `mesh_edit` with `extrude_faces` extrudes a declared region using `face_indices`
 and a local `offset`; optional `expected_mesh_sha256` guards against stale
 geometry. See [face-region modeling](../guides/mesh-preparation.md#inspect-and-extrude-a-face-region).
@@ -294,7 +295,7 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `mirror`,
+`join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `set_seams`, `mirror`,
 `array`, `solidify`, `uv_transform`.
 
 `extract_faces` takes a unique `new_name` and 1–20,000 unique `face_indices`.
@@ -315,6 +316,14 @@ the declared rectangle and preserves other UVs and mesh data. The region must
 be clear of unselected triangles, and selected pins are protected, unless
 explicit `allow_overlap` or `allow_pinned` flags in `uv_region` override those
 checks. Analytic overlap and pixel-gutter checks still apply to the new islands.
+
+`unwrap_method` defaults to `smart`; `conformal`, `angle_based` and
+`minimum_stretch` use source seam cuts. `angle_limit_degrees` applies only to
+`smart`. No automatic fallback changes the requested method.
+
+`set_seams` takes unique `edge_indices` and required boolean `seam` plus optional
+`expected_mesh_sha256`. Discover source edges through `scene_info(edges=true)`.
+It updates only selected seam flags, preserving UVs and other mesh data.
 
 [Guide](../guides/mesh-preparation.md)
 

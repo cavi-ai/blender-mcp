@@ -3,11 +3,11 @@ import math
 import re
 
 
-def indices(faces, face_count=None):
+def indices(faces, face_count=None, field='face_indices'):
     if (not isinstance(faces, list) or not 1 <= len(faces) <= 20000
             or any(type(i) is not int or i < 0 or (face_count is not None and i >= face_count) for i in faces)
             or len(set(faces)) != len(faces)):
-        raise ValueError('face_indices must contain 1 to 20000 unique current polygon indices')
+        raise ValueError(f'{field} must contain 1 to 20000 unique current indices')
     return faces
 
 

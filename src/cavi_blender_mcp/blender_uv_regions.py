@@ -3,11 +3,12 @@ import math
 
 import bpy
 
-from .blender_bridge import _workspace, editable_mesh, info, number
+from .blender_bridge import _workspace, editable_mesh, info
 from .blender_errors import preflight
 from .blender_mesh_regions import mesh_digest
+from .blender_mesh_seams import seam_digest
 from .mesh_regions import fingerprint, indices
-from .uv_regions import quality, region, reservation
+from .uv_regions import projection, quality, region, reservation
 from .uv_worker import solve
 
 
@@ -37,6 +38,8 @@ def geometry(value, faces):
     if not 1 <= len(triangles) <= 20000:
         raise ValueError('Unwrap 1..20000 selected source triangles')
     return loops, {'vertices': points, 'faces': [[vertex_map[v] for v in p.vertices] for p in polygons],
+        'seams': [[vertex_map[v] for v in mesh.edges[i].vertices]
+                  for i in sorted({mesh.loops[i].edge_index for i in loops}) if mesh.edges[i].use_seam],
         'triangles': [[loop_map[i] for i in t.loops] for t in triangles],
         'triangle_vertices': [[vertex_map[i] for i in t.vertices] for t in triangles]}
 
@@ -51,7 +54,8 @@ def unwrap_faces(p):
         fingerprint(p.get('expected_mesh_sha256'), digest)
         faces = indices(p.get('face_indices'), len(mesh.polygons))
         spec = region(p.get('uv_region'))
-        angle = number(p.get('angle_limit_degrees', 66), 1, 89, 'angle_limit_degrees')
+        method, angle = projection(p.get('unwrap_method'), p.get('angle_limit_degrees'))
+        seams = seam_digest(mesh)
         name = p.get('uv_layer')
         layer = mesh.uv_layers.get(name) if name is not None else (mesh.uv_layers[0] if mesh.uv_layers else None)
         if layer is None:
@@ -65,16 +69,18 @@ def unwrap_faces(p):
         selected = set(faces)
         reserved = reservation(([before[i] for i in t.loops] for t in mesh.loop_triangles
                                 if t.polygon_index not in selected), spec)
-        output = solve(bpy.app.binary_path, _workspace, {**request, 'region': spec, 'angle': angle})
+        output = solve(bpy.app.binary_path, _workspace, {**request, 'region': spec, 'angle': angle, 'method': method})
+        if output.get('unwrap_method') != method:
+            raise ValueError('UV worker used a different projection method')
         rows = output.get('uv')
         if not isinstance(rows, list) or len(rows) != len(loops):
             raise ValueError('UV worker returned a different loop count')
         rows, measured = quality(rows, request['triangles'], request['triangle_vertices'], spec)
         if not measured['passed']:
             raise ValueError('Native UVs do not satisfy the requested region and pixel padding')
-        if (value.data != mesh or mesh_digest(mesh) != digest
+        if (value.data != mesh or mesh_digest(mesh) != digest or seam_digest(mesh) != seams
                 or [tuple(row.uv) for row in layer.data] != before):
-            raise ValueError('Source geometry or UVs changed while solving; inspect before trying again')
+            raise ValueError('Source geometry, seams or UVs changed while solving; inspect before trying again')
     try:
         for index, uv in zip(loops, rows, strict=True):
             layer.data[index].uv = uv
@@ -84,6 +90,8 @@ def unwrap_faces(p):
             raise RuntimeError('Native UV writeback differs from the verified coordinates')
         return {**info(value), 'uv_layer': layer.name, 'face_unwrap': {'faces': faces, 'loops': len(loops),
             'region': spec, 'quality': measured, 'reservation': reserved, 'mesh_sha256': digest,
+            'unwrap_method': method, 'source_seams_sha256': seams,
+            'selected_seams': len(request['seams']),
             'geometry_scope': 'unevaluated_world_linear', 'scale': 'uniform_pixels',
             'scope': 'selected_source_faces', 'worker_version': output.get('blender')}}
     except Exception:

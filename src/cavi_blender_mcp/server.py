@@ -211,11 +211,17 @@ async def scene_info(
     offset: Annotated[StrictInt, Field(ge=0)] = 0,
     definition: StrictBool | None = None,
     faces: StrictBool | None = None,
+    edges: StrictBool | None = None,
 ) -> SceneInfo:
     """Inspect the scene or one object. With name and definition=true, page through a
     collection instance's nested source objects and report its shared scene placements.
     faces=true pages source mesh polygons with local centers/normals and a geometry fingerprint.
+    edges=true pages source edges, adjacency and seam flags.
     """
+    if edges:
+        if name is None or faces or definition:
+            raise ValueError('edges requires a mesh name and cannot be combined with faces or definition')
+        return await run(call, 'inspect_mesh_edges', name=name, limit=limit, offset=offset)
     if faces:
         if name is None or definition:
             raise ValueError('faces requires a mesh name and cannot be combined with definition')
@@ -703,7 +709,7 @@ async def object_edit(
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "mirror", "array", "solidify", "uv_transform"],
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "mirror", "array", "solidify", "uv_transform"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -749,6 +755,10 @@ async def mesh_edit(
     lease_id: LeaseId = None,
     expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
     uv_region: UVRegion | None = None,
+    edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
+                           Field(min_length=1, max_length=20000)] = None,
+    seam: StrictBool | None = None,
+    unwrap_method: Literal['smart', 'angle_based', 'conformal', 'minimum_stretch'] | None = None,
 ) -> MeshEditResult:
     """Edit a leased mesh."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -765,12 +775,25 @@ async def mesh_edit(
               "names": names, "by": by, "new_name": new_name, "face_indices": face_indices,
               "count": count, "offset": offset,
               "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
-              'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region}
-    if action == 'unwrap_faces':
+              'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
+              'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method}
+    if action == 'set_seams':
         from .mesh_regions import fingerprint, indices
 
+        params = pick(action, values, ['edge_indices', 'seam'], {'expected_mesh_sha256': None})
+        indices(params['edge_indices'], field='edge_indices')
+        if type(params['seam']) is not bool:
+            raise ValueError('seam must be an explicit boolean')
+        fingerprint(params['expected_mesh_sha256'])
+        return await run(call, 'set_seams', lease_id=lease_id, name=name, **params)
+    if action == 'unwrap_faces':
+        from .mesh_regions import fingerprint, indices
+        from .uv_regions import projection
+
         params = pick(action, values, ['face_indices', 'uv_region'], {'uv_layer': None,
-            'angle_limit_degrees': 66, 'expected_mesh_sha256': None})
+            'angle_limit_degrees': None, 'expected_mesh_sha256': None, 'unwrap_method': 'smart'})
+        params['unwrap_method'], params['angle_limit_degrees'] = projection(
+            params['unwrap_method'], params['angle_limit_degrees'])
         indices(params['face_indices'])
         fingerprint(params['expected_mesh_sha256'])
         params['uv_region'] = uv_region.model_dump(mode='json')

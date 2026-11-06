@@ -16,6 +16,7 @@ on the same object without applying transforms or changing scene references.
 | `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
 | `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |
+| `set_seams` | Set or clear exact source-edge seam flags without changing UVs |
 | `decimate_to` | Collapse to a triangle target or ratio, optionally preserving seams |
 | `remesh_quad` | QuadriFlow to a face target on a manifold mesh |
 | `lod_chain` | Create `<base>_LOD1..n` in `<base>_LODs` |
@@ -73,6 +74,28 @@ Run topology and UV checks, then inspect the silhouette before export.
 Use `unwrap_faces` with the returned `side_faces` and geometry hash to lay out
 the new surfaces while retaining the cap and unselected UVs.
 
+## Inspect and edit seams
+
+Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect
+source edge indices, vertex endpoints, local center/length, seam flags and
+adjacent face indices. Each edge includes `face_count` and `faces_truncated`;
+adjacency lists contain at most 32 faces. Pages report both `mesh_sha256` and
+`seams_sha256`. Match both across pages used for one selection. Edge, face and
+collection-definition page modes are mutually exclusive.
+Source topology pages handle up to 200,000 vertices/triangles and 600,000 edges.
+
+```json
+{"action":"set_seams","name":"Body","edge_indices":[4,9,12],"seam":true,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The seam state is required: `true` marks only those edges, `false` clears them.
+The edit reports changed edge count and before/after seam hashes. It preserves
+other seams, UVs, geometry, shape keys, weights, materials and scene context.
+It requires a single-user editable mesh in Object Mode and accepts at most
+20,000 unique current edge indices. Invalid indices and stale geometry hashes
+are rejected before editing; partial writes are rolled back. The geometry hash
+does not include seam flags. Reinspect after topology changes.
+
 Use a single-user base mesh in Object Mode without modifiers or shape keys.
 Custom split normals must be cleared deliberately on a working copy before
 changing topology. Invalid indices, stale hashes, zero/degenerate offsets and
@@ -92,9 +115,17 @@ padding. For example, reserve a clear rectangle for new side faces:
 
 The native solver runs in a private background Blender process with selected
 base geometry, accounting for object scale, rotation and scene units. It uses
-Smart UV Project (`angle_limit_degrees`, default 66), packs islands, and scales
+Smart UV Project (`unwrap_method="smart"`, `angle_limit_degrees` default 66), packs islands, and scales
 uniformly in pixels. Rectangular textures keep their pixel aspect. Bounds can
 target an explicit UDIM region; they do not imply tile creation or material setup.
+
+For seam-directed charts, select `unwrap_method="conformal"`, `"angle_based"`
+or `"minimum_stretch"` and omit `angle_limit_degrees`. The worker receives the
+seams of the selected source faces and preserves their cuts while solving the
+surface. Selection boundaries also bound the working surface. The result
+reports the exact method, `source_seams_sha256` and selected seam count. Native
+failure never falls back to Smart UV Project. The source seam state is checked
+again before UV writeback. Unwrap does not change the source seam flags.
 
 By default, unselected UV triangles must leave the entire rectangle clear.
 Selected pinned UVs are refused. Set `uv_region.allow_overlap=true` only for

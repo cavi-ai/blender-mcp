@@ -11,14 +11,24 @@ import bpy
 
 def solve(request):
     from cavi_blender_mcp.blender_geometry import PACK
-    from cavi_blender_mcp.uv_regions import frame, map_uv, quality, region
+    from cavi_blender_mcp.uv_regions import frame, map_uv, projection, quality, region
 
     spec = region(request['region'])
+    method, angle = projection(request.get('method'), request.get('angle'))
     mesh = bpy.data.meshes.new('UVRegion')
     mesh.from_pydata(request['vertices'], [], request['faces'])
     mesh.update()
     if [list(f.vertices) for f in mesh.polygons] != request['faces']:
         raise ValueError('Native mesh changed face-loop ordering')
+    seams = {tuple(sorted(pair)) for pair in request['seams']}
+    matched = set()
+    for edge in mesh.edges:
+        key = tuple(sorted(edge.vertices))
+        if key in seams:
+            edge.use_seam = True
+            matched.add(key)
+    if matched != seams:
+        raise ValueError('Native mesh did not preserve the selected seam edges')
     mesh.uv_layers.new(name='UVRegion')
     value = bpy.data.objects.new('UVRegion', mesh)
     bpy.context.scene.collection.objects.link(value)
@@ -28,8 +38,13 @@ def solve(request):
     bpy.context.view_layer.objects.active = value
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
-    if 'FINISHED' not in bpy.ops.uv.smart_project(angle_limit=math.radians(request['angle']),
-            island_margin=0, correct_aspect=False, scale_to_bounds=False, rotate_method='AXIS_ALIGNED'):
+    if method == 'smart':
+        projected = bpy.ops.uv.smart_project(angle_limit=math.radians(angle),
+            island_margin=0, correct_aspect=False, scale_to_bounds=False, rotate_method='AXIS_ALIGNED')
+    else:
+        projected = bpy.ops.uv.unwrap(method=method.upper(), fill_holes=False, correct_aspect=False,
+            use_subsurf_data=False, margin=0)
+    if 'FINISHED' not in projected:
         raise RuntimeError('Native UV projection failed')
     _, scale = frame(spec)
     margin = min(.49, spec['margin_px']/scale*1.25)
@@ -42,7 +57,8 @@ def solve(request):
         rows = [tuple(item.uv) for item in mesh.uv_layers['UVRegion'].data]
         rows, report = quality(map_uv(rows, spec), request['triangles'], request['triangle_vertices'], spec)
         if report['passed']:
-            return {'uv': rows, 'quality': report, 'attempts': attempt+1, 'blender': bpy.app.version_string}
+            return {'uv': rows, 'quality': report, 'attempts': attempt+1, 'blender': bpy.app.version_string,
+                    'unwrap_method': method}
         margin = min(.49, max(margin*1.5, .001))
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')

@@ -1,5 +1,45 @@
 [
   {
+    "id": "edge-page-requires-name",
+    "tool": "scene_info",
+    "arguments": {"edges": true},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "edges requires a mesh name"
+  },
+  {
+    "id": "edge-page-conflicting-mode",
+    "tool": "scene_info",
+    "arguments": {"name": "EvalProp", "edges": true, "faces": true},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "cannot be combined"
+  },
+  {
+    "id": "seam-edit-requires-state",
+    "tool": "mesh_edit",
+    "arguments": {"action": "set_seams", "name": "EvalProp", "edge_indices": [0]},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "requires: seam"
+  },
+  {
+    "id": "seam-edit-duplicate-edges",
+    "tool": "mesh_edit",
+    "arguments": {"action": "set_seams", "name": "EvalProp", "edge_indices": [0,0], "seam": true},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "edge_indices must contain"
+  },
+  {
+    "id": "seam-projection-unused-angle",
+    "tool": "mesh_edit",
+    "arguments": {"action": "unwrap_faces", "name": "EvalProp", "face_indices": [0], "unwrap_method": "conformal", "angle_limit_degrees": 66, "uv_region": {"bounds": [0,0,1,1], "texture_resolution": [2048,1024], "margin_px": 8}},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "angle_limit_degrees applies only"
+  },
+  {
     "id": "unwrap-faces-missing-region",
     "tool": "mesh_edit",
     "arguments": {"action": "unwrap_faces", "name": "EvalProp", "face_indices": [0]},
