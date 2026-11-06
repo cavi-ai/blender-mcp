@@ -7,6 +7,8 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+- Add opt-in FBX triangulation on exporter copies without changing source meshes.
+
 - Require Python 3.15 or newer; CI, documentation and PyPI publishing run Python 3.15.
 - Branch authored materials and nested shader groups onto selected mesh slots.
 - Preserve shared geometry with object bindings and retain external image/action references.

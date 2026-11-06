@@ -1,5 +1,79 @@
 [
   {
+    "id": "fbx-triangulate-invalid-type",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "asset.fbx",
+      "names": [
+        "Cube"
+      ],
+      "triangulate": "true"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "validation"
+  },
+  {
+    "id": "fbx-triangulate-wrong-format",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "asset.glb",
+      "names": [
+        "Cube"
+      ],
+      "triangulate": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "triangulate applies only to FBX"
+  },
+  {
+    "id": "fbx-triangulate-wrong-action",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "save",
+      "path": "scene.blend",
+      "triangulate": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: triangulate"
+  },
+  {
+    "id": "fbx-triangulate-bake-pair",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "export",
+      "path": "pair.fbx",
+      "bake_pair": {
+        "low": [
+          "Low"
+        ],
+        "high": [
+          "High"
+        ]
+      },
+      "triangulate": true
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "does not accept: triangulate"
+  },
+  {
     "id": "edge-page-requires-name",
     "tool": "scene_info",
     "arguments": {"edges": true},

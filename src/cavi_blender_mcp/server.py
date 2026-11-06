@@ -1004,26 +1004,32 @@ async def asset_io(
     assembly: Annotated[StrictBool | None, Field(description="export: evaluate static instances")] = None,
     animation_sample_step: Annotated[Number | None, Field(gt=0, description="export: frame interval")] = None,
     textures: Annotated[StrictBool | None, Field(description="export: write texture sidecars")] = None,
-    bake_pair: Annotated[BakePair | None, Field(description='export: low/high pair or names; writes <stem>_low.fbx/<stem>_high.fbx')] = None,
-    axis: Annotated[Literal["unity", "unreal", "godot"] | None, Field(description='export: axis preset; default unity')] = None,
+    triangulate: Annotated[StrictBool | None, Field(description="FBX: triangulate")] = None,
+    bake_pair: Annotated[BakePair | None, Field(description='export: <stem>_low.fbx/<stem>_high.fbx')] = None,
+    axis: Annotated[Literal["unity", "unreal", "godot"] | None, Field(description='export: axes (default unity)')] = None,
     uv_layer: Annotated[str | None, Field(min_length=1,max_length=63, description='export: UV0 (FBX/GLB)/st (USD), via temporary data')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
     expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='open: optional target SHA-256')] = None,
 ) -> AssetResult:
-    """Import/export meshes; save/open projects. Open needs clean source, disables file UI/scripts. Only generate is lease-free."""
+    """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
-              'assembly': assembly,'uv_layer':uv_layer,'expected_sha256':expected_sha256}
+              'assembly': assembly,'uv_layer':uv_layer,'expected_sha256':expected_sha256,
+              'triangulate': triangulate}
+    if action == 'export' and triangulate is not None and Path(path).suffix.lower() != '.fbx':
+        raise ValueError('triangulate applies only to FBX exports')
     if action == 'open':
         params = pick(action, values, (), {'expected_sha256': None})
         return await run(call, 'open_project', lease_id=lease_id, path=path, **params)
     if action == 'export' and assembly is True:
         values.pop('assembly')
-        params = pick(action, values, ['names'], {'axis': None, 'textures': False,'uv_layer':None})
+        params = pick(action, values, ['names'], {'axis': None, 'textures': False,'uv_layer':None,
+                                                'triangulate': False})
         if params['uv_layer'] is None:params.pop('uv_layer')
+        if not params['triangulate']:params.pop('triangulate')
         return await run(call, 'export_uv_assembly' if uv_layer is not None else 'export_assembly', path=path, lease_id=lease_id, **params)
     if action == 'export' and assembly is False:
         values.pop('assembly')
@@ -1048,15 +1054,16 @@ async def asset_io(
     params = pick(action, values, ["names"], {"preserve_instances": False,
                                               "include_empties": False, "lods": False,
                                               "collision": False, "animations": False,
-                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None,'uv_layer':None})
+                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None,'uv_layer':None,
+                                              'triangulate': False})
     if params['uv_layer'] is None:params.pop('uv_layer')
     else:
         return await run(call,'export_uv_asset',lease_id=lease_id,path=path,**params)
     if (params["lods"] or params["collision"] or params["animations"]
-            or params["textures"] or params["axis"] or params["baked_animation"] or params["animation_sample_step"] is not None
+            or params["textures"] or params["axis"] or params["baked_animation"] or params["triangulate"] or params["animation_sample_step"] is not None
             or path.lower().endswith((".usd", ".usda", ".usdc"))):
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    for key in ("lods", "collision", "animations", "textures", "axis", "baked_animation", "animation_sample_step"):
+    for key in ("lods", "collision", "animations", "textures", "axis", "baked_animation", "animation_sample_step", "triangulate"):
         params.pop(key)
     # A distinct bridge operation makes older bridges fail before writing a file.
     operation = "export_instances" if params["preserve_instances"] else "export_mesh"

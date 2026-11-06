@@ -65,6 +65,10 @@ Formats are `.fbx`, `.glb`, `.usd`, `.usda` and `.usdc`.
   `<stem>.fbm` directory beside the export and returns a texture receipt. An
   existing sidecar directory is refused. USD writes relative texture paths. GLB
   embeds packed textures.
+- `triangulate=true` converts faces to triangles on temporary FBX exporter
+  meshes. It supports static, animated and assembly exports, including named
+  UV maps, while retaining source topology. It defaults to false and does not
+  apply to other formats or `bake_pair` exports.
 - GLB and USD exports include shape keys/morph targets and shape-key animation.
   FBX shape-key animation remains out of scope.
 
