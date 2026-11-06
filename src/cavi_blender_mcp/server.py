@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import anyio
-from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES, Server
+from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES
 from mcp.server.mcpserver import Image
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, WithJsonSchema
 
+from .catalog import BlenderServer
 from .client import BridgeClient
 from .contracts import (
     AssetLibraryResult,
@@ -44,9 +45,9 @@ from .rig_models import (
     VertexWeights,
 )
 from .rig_models import Name as RigName
-from .scene_models import CameraSpec, LightSpec, RenderSpec, WorldSpec
+from .scene_models import CameraSpec, LightSpec, PreviewSettings, RenderSpec, WorldSpec
 
-mcp = Server(
+mcp = BlenderServer(
     "cavi-blender-mcp",
     package="cavi-blender-mcp",
     instructions=(
@@ -519,8 +520,14 @@ async def render_preview(
     color_mode: Literal["material", "vertex"] = "material",
     renderer: Literal["workbench", "eevee"] = "workbench",
     orthographic: StrictBool = False,
+    settings: PreviewSettings | None = None,
 ) -> Image:
-    """Render a PNG preview; restores scene state. No lease needed. Eevee max 1024 px."""
+    """Render a PNG preview; restores scene state. No lease needed. Eevee max 1024 px.
+
+    settings selects temporary display controls, compositing and PNG depth; omission
+    preserves scene settings. Enabled curves/white balance reuse the scene's controls.
+    """
+    options = {} if settings is None else {'settings': settings.model_dump()}
     result = await run(
         call,
         "render_preview",
@@ -531,6 +538,7 @@ async def render_preview(
         color_mode=color_mode,
         renderer=renderer,
         orthographic=orthographic,
+        **options,
     )
     return Image(path=result["path"])
 
