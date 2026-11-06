@@ -1,5 +1,35 @@
 [
   {
+    "id": "vertex-page-requires-name",
+    "tool": "scene_info", "arguments": {"vertices": true},
+    "kind": "invalid", "modes": ["protocol", "native"],
+    "error": "vertices requires a mesh name"
+  },
+  {
+    "id": "vertex-page-excludes-faces",
+    "tool": "scene_info", "arguments": {"name":"EvalProp","vertices":true,"faces":true},
+    "kind": "invalid", "modes": ["protocol", "native"],
+    "error": "vertices requires a mesh name"
+  },
+  {
+    "id": "move-vertices-needs-selection",
+    "tool": "mesh_edit", "arguments": {"action":"move_vertices","name":"EvalProp","offset":[0,0,1]},
+    "kind": "invalid", "modes": ["protocol", "native"],
+    "error": "requires: vertex_indices"
+  },
+  {
+    "id": "move-vertices-rejects-duplicates",
+    "tool": "mesh_edit", "arguments": {"action":"move_vertices","name":"EvalProp","vertex_indices":[0,0],"offset":[0,0,1]},
+    "kind": "invalid", "modes": ["protocol", "native"],
+    "error": "unique current indices"
+  },
+  {
+    "id": "move-vertices-needs-nonzero-offset",
+    "tool": "mesh_edit", "arguments": {"action":"move_vertices","name":"EvalProp","vertex_indices":[0],"offset":[0,0,0]},
+    "kind": "invalid", "modes": ["protocol", "native"],
+    "error": "nonzero finite local-space vector"
+  },
+  {
     "id": "uv-chart-page-requires-faces",
     "tool": "scene_info",
     "arguments": {"name": "EvalProp", "uv_layer": "UVMap"},

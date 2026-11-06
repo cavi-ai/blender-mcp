@@ -31,6 +31,7 @@ class SceneInfo(Result):
     mesh_sha256: str | None = None
     seams_sha256: str | None = None
     faces: list[dict[str, Any]] | None = None
+    vertices: list[dict[str, Any]] | None = None
     uv: dict[str, Any] | None = None
     edges: list[dict[str, Any]] | None = None
     render_settings: SceneRenderSettings | None = None
@@ -287,6 +288,7 @@ class ProceduralAssetResult(Result):
 
 
 class MeshEditResult(ObjectFields):
+    vertex_edit: Record | None = None
     seam_edit: Record | None = None
     face_unwrap: Record | None = None
     extrusion: Record | None = None

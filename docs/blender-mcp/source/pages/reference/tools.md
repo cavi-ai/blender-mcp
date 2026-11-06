@@ -4,6 +4,8 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info` with `faces=true` pages source polygon indices and local geometry.
+With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
+`mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
 Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;
 match mesh and UV hashes across pages before collecting a whole-chart selection.
 With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.

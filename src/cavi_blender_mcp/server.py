@@ -225,8 +225,13 @@ async def scene_info(
     faces: Annotated[StrictBool | None, Field(description='Source polygons')] = None,
     edges: Annotated[StrictBool | None, Field(description='Source edges/seams')] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='faces: UV charts')] = None,
+    vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
 ) -> SceneInfo:
     """Inspect paged objects and source topology."""
+    if vertices:
+        if name is None or faces or edges or definition or uv_layer is not None:
+            raise ValueError('vertices requires a mesh name and excludes other page modes')
+        return await run(call, 'inspect_mesh_vertices', name=name, limit=limit, offset=offset)
     if uv_layer is not None and (not faces or edges or definition or name is None):
         raise ValueError('uv_layer requires a named source-face page')
     if edges:
@@ -333,8 +338,8 @@ async def inspect_skin_clearance(
     surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Garment samples")] = "vertices_and_centres",
     max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
 ) -> SkinClearance:
-    """Sample signed garment gaps (m) against closed body components; restore frame.
-    Open/ambiguous bodies or exhausted budgets cannot pass; sampling cannot certify continuous collision."""
+    """Sample signed garment gaps (m); restore frame. Requires closed unambiguous bodies and complete budgets.
+    Sampling cannot certify continuous collision."""
     return await run(call, "inspect_skin_clearance", body=body, garments=garments,
         start_frame=start_frame, end_frame=end_frame, min_clearance_m=min_clearance_m,
         samples=samples, surface_samples=surface_samples, max_queries=max_queries)
@@ -354,7 +359,7 @@ async def compare_rig_motion(
     candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000, description="Candidate frame shift")] = 0,
     candidate_frame_scale: Annotated[Number, Field(gt=0, description='Candidate frame=source*scale+ candidate_frame_offset')] = 1,
 ) -> RigMotionComparison:
-    """Compare evaluated skin positions/matching bone heads over time; restore frame/subframe."""
+    """Compare evaluated skin/bone motion; restore frame/subframe."""
     options = {'candidate_frame_scale': candidate_frame_scale} if candidate_frame_scale != 1 else {}
     return await run(call, "compare_rig_motion", source=source, candidate=candidate,
         meshes=[pair.model_dump() for pair in meshes], start_frame=start_frame, end_frame=end_frame,
@@ -524,7 +529,7 @@ async def scene_edit(
     render: Annotated[RenderSpec | None, Field(description='render: persistent; PNG/TIFF default 16-bit, EXR 16/32; enabled Cycles GPU')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> SceneEditResult:
-    """Author persistent cameras/lights/managed worlds; render via a named camera."""
+    """Author cameras/lights/managed worlds; render named cameras."""
     definitions = {'camera': camera, 'light': light, 'world': world, 'render': render}
     params = pick(action, definitions, [action])
     return await run(call, 'scene_authoring', lease_id=lease_id, action=action,
@@ -571,8 +576,8 @@ async def session_control(
     lease_id: Annotated[str | None, Field(max_length=128, description="renew/release: current lease")] = None,
     ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600, description="Lease seconds")] = 600,
 ) -> Ownership:
-    """Manage edit leases. Claim returns private lease_id. Break needs expected_project + 300 s idle.
-    Expiry/release/break never save/close/discard projects."""
+    """Manage edit leases; claim returns lease_id. Break requires expected_project and 300s idle.
+    Lease changes never save/close/discard projects."""
     return await run(
         call,
         "session_control",
@@ -621,8 +626,7 @@ async def object_edit(
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ObjectEditResult:
-    """Create/edit a leased object; refuse unrelated parameters. make_unique branches collection definitions;
-    make_single_user copies shared mesh data."""
+    """Edit objects; make_unique copies definitions, make_single_user copies shared mesh data."""
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
@@ -670,7 +674,7 @@ async def object_edit(
 async def mesh_edit(
     action: Annotated[Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
     kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="modifier needs type")] = None,
     amount: Annotated[Number | None, Field(
@@ -710,7 +714,7 @@ async def mesh_edit(
                             Field(min_length=1, max_length=20000, description="Source polygon indices")] = None,
     count: Annotated[StrictInt | None, Field(ge=2, le=1000, description="array needs count")] = None,
     offset: Annotated[Vector3 | Annotated[Number, Field(ge=-1, le=1)] | None,
-                      Field(description="array/extrude_faces: vector; solidify: scalar [-1,1]")] = None,
+                      Field(description="Vector; solidify: scalar [-1,1]")] = None,
     thickness: Annotated[Number | None, Field(gt=0, le=100, description="solidify needs thickness")] = None,
     clipping: Annotated[StrictBool | None, Field(description="mirror: clip at plane")] = None,
     uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
@@ -722,6 +726,8 @@ async def mesh_edit(
     seam: Annotated[StrictBool | None, Field(description='set_seams: seam flag')] = None,
     unwrap_method: Annotated[Literal['smart', 'angle_based', 'conformal', 'minimum_stretch'] | None,
                              Field(description='unwrap_faces method; default smart')] = None,
+    vertex_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
+                             Field(min_length=1, max_length=20000, description='Source vertices')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -739,7 +745,15 @@ async def mesh_edit(
               "count": count, "offset": offset,
               "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
-              'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method}
+              'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
+              'vertex_indices': vertex_indices}
+    if action == 'move_vertices':
+        from .mesh_regions import selection
+
+        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None})
+        selection(params['vertex_indices'], params['offset'], expected=params['expected_mesh_sha256'],
+                  field='vertex_indices')
+        return await run(call, 'move_vertices', lease_id=lease_id, name=name, **params)
     if action == 'set_seams':
         from .mesh_regions import fingerprint, indices
 
@@ -885,8 +899,8 @@ async def assign_material(
     offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first node")] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="inspect: node cap")] = None,
 ) -> MaterialAssignment:
-    """Assign PBR or inspect/edit shader sockets.
-    Socket edits keep links, affect shared users and detach tool configuration."""
+    """Assign PBR; inspect/edit shader sockets.
+    Socket edits retain links, affect shared users and detach tool configuration."""
     if material_name is None:
         raise ValueError('material_name is required')
     shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
@@ -1124,7 +1138,7 @@ async def geometry_nodes(
     instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit Geometry Nodes or snapshot mesh. scene_info definition=true lists exact instance members."""
+    """Inspect/edit procedural inputs or snapshot meshes; list members with scene_info(definition=true)."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
               'instance': instance}
     if action == 'inspect':
@@ -1221,7 +1235,7 @@ async def scatter(
     realize: Annotated[StrictBool, Field(description="Realize instances")] = False,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ScatterResult:
-    """Scatter collection instances on mesh with fixed Geometry Nodes."""
+    """Scatter collection instances with fixed Geometry Nodes."""
     return await run(call, "scatter", lease_id=lease_id, name=name, collection=collection,
                      density=density, seed=seed, min_distance=min_distance,
                      scale_range=scale_range, rotation_jitter_degrees=rotation_jitter_degrees,
