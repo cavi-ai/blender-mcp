@@ -4,6 +4,10 @@ import math
 import bpy
 
 from .blender_errors import preflight
+from .blender_mesh_regions import mesh_digest
+from .mesh_regions import fingerprint
+from .uv_density import measure, options, review
+from .uv_regions import reservation
 
 
 def pair(value, label):
@@ -56,6 +60,28 @@ def transform(params, editable_mesh, info):
         if sum(p.loop_total for p in polygons) > 60000:
             raise ValueError('Selected faces exceed 60000 UV loops')
         before = [(i, tuple(layer.data[i].uv)) for p in polygons for i in p.loop_indices]
+        density_target = params.get('target_px_per_m')
+        destination = options(density_target, params.get('uv_region'), scale)
+        digest = mesh_digest(mesh) if destination or params.get('expected_mesh_sha256') else None
+        fingerprint(params.get('expected_mesh_sha256'), digest)
+        density = None
+        if destination:
+            from .blender_uv_regions import geometry
+
+            loops, surface = geometry(value, faces)
+            if loops != [i for i, _ in before]:
+                raise ValueError('Source UV loop order changed before density matching')
+            if not destination['allow_pinned'] and any(layer.data[i].pin_uv for i in loops):
+                raise ValueError('Selected UVs are pinned; unlock them or set allow_pinned explicitly')
+            selected = set(faces)
+            reserved = reservation(([tuple(layer.data[i].uv) for i in tri.loops]
+                for tri in mesh.loop_triangles if tri.polygon_index not in selected), destination)
+            measured = measure(surface, [uv for _, uv in before], destination['texture_resolution'])
+            factor = density_target/measured['density_area_weighted']
+            scale = (factor, factor)
+            density = {'before': measured, 'target_px_per_m': density_target, 'region': destination,
+                'reservation': reserved, 'mesh_sha256': digest,
+                'geometry_scope': 'unevaluated_world_linear', 'aggregate': 'area_weighted_rms'}
         cosine, sine = math.cos(math.radians(angle)), math.sin(math.radians(angle))
         after = []
         for index, uv in before:
@@ -64,6 +90,9 @@ def transform(params, editable_mesh, info):
             target = (pivot[0]+cosine*x-sine*y+offset[0],
                       pivot[1]+sine*x+cosine*y+offset[1])
             after.append((index, tuple(pair(target, 'transformed UV'))))
+        if density is not None:
+            rows, checked = review(surface, [uv for _, uv in after], destination, params['target_px_per_m'])
+            after = [(index, tuple(uv)) for (index, _), uv in zip(after, rows, strict=True)]
         materials = list(dict.fromkeys(
             value.material_slots[p.material_index].material.name
             if p.material_index < len(value.material_slots) and value.material_slots[p.material_index].material
@@ -76,10 +105,16 @@ def transform(params, editable_mesh, info):
                for (_,uv),(_,target) in zip(actual,after,strict=True)
                for a,b in zip(uv,target,strict=True)):
             raise RuntimeError('Native UV readback differs from the requested transform')
-        return {**info(value), 'uv_layer':layer.name, 'uv_transform':{
+        if density is not None:
+            _, checked = review(surface, [uv for _, uv in actual], destination, params['target_px_per_m'])
+            density.update(checked)
+        result = {**info(value), 'uv_layer':layer.name, 'uv_transform':{
             'faces':faces, 'loops':len(after), 'materials':materials,
             'bounds_before':bounds(before), 'bounds_after':bounds(actual),
             'offset':list(offset), 'scale':list(scale), 'rotation_degrees':angle, 'pivot':list(pivot)}}
+        if density is not None:
+            result['uv_transform']['density'] = density
+        return result
     except Exception:
         # Restore independently of the write helper, including a partial write failure.
         for index, uv in before:

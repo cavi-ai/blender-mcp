@@ -685,7 +685,7 @@ async def mesh_edit(
     rename_source: Annotated[StrictBool | None, Field(description="lod_chain: suffix source LOD0")] = None,
     lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="lightmap_uv: atlas pixels")] = None,
     margin_px: Annotated[Number | None, Field(ge=0, le=64, description="lightmap_uv: padding pixels")] = None,
-    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density needs target pixels/metre")] = None,
+    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density/uv_transform: pixels/metre")] = None,
     texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
     pack: Annotated[StrictBool | None, Field(description="texel_density: pack after scaling")] = None,
     shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="collision: proxy shape")] = None,
@@ -710,7 +710,7 @@ async def mesh_edit(
     uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
     expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='Source geometry SHA256')] = None,
-    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces: atlas bounds, pixels, gutters')] = None,
+    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces/UV density: region and gutters')] = None,
     edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
                            Field(min_length=1, max_length=20000, description='set_seams: edge indices')] = None,
     seam: Annotated[StrictBool | None, Field(description='set_seams: seam flag')] = None,
@@ -791,8 +791,17 @@ async def mesh_edit(
         params = pick(action, values, ["target_px_per_m"], {
             "texture_resolution": 1024, "uv_layer": None, "pack": False})
     elif action == 'uv_transform':
+        from .mesh_regions import fingerprint
+        from .uv_density import options
+
         operation = 'transform_uv'
-        params = pick(action, values, ['uv_transform'], {'uv_layer':None})
+        params = pick(action, values, ['uv_transform'], {'uv_layer': None,
+            'target_px_per_m': None, 'uv_region': None, 'expected_mesh_sha256': None})
+        destination = params['uv_region'].model_dump(mode='json') if params['uv_region'] else None
+        options(params['target_px_per_m'], destination, params['uv_transform'].scale)
+        fingerprint(params['expected_mesh_sha256'])
+        params['uv_region'] = destination
+        params = {k: v for k, v in params.items() if v is not None or k == 'uv_layer'}
         params['transform'] = params.pop('uv_transform').model_dump()
     elif action == "boolean":
         operation = "boolean_mesh"

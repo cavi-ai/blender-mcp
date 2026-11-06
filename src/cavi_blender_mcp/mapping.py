@@ -12,8 +12,8 @@ def measure_triangle(points, uv, resolution):
     coordinates += [component for point in (uv or []) for component in point]
     if any(not math.isfinite(value) or abs(value) > 1e6 for value in coordinates):
         raise ValueError("Coordinates must be bounded and finite")
-    if len(resolution) != 2 or any(type(v) is not int or not 1 <= v <= 4096 for v in resolution):
-        raise ValueError("Texture dimensions must be integers from 1 to 4096")
+    if len(resolution) != 2 or any(type(v) is not int or not 1 <= v <= 16384 for v in resolution):
+        raise ValueError("Texture dimensions must be integers from 1 to 16384")
     a, b = ([points[index][axis] - points[0][axis] for axis in range(3)] for index in (1, 2))
     cross = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
     double_area = math.sqrt(sum(value * value for value in cross))
