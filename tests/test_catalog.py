@@ -43,7 +43,7 @@ class CatalogTests(unittest.TestCase):
         def write_value() -> str:
             return 'value'
 
-        @server.tool(annotations=ToolAnnotations(destructive_hint=True))
+        @server.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True))
         def destructive_value() -> str:
             return 'value'
 
@@ -51,13 +51,12 @@ class CatalogTests(unittest.TestCase):
         read = tools['read_value'].annotations.model_dump(by_alias=True, exclude_none=True)
         write = tools['write_value'].annotations.model_dump(by_alias=True, exclude_none=True)
         self.assertEqual(read, {'readOnlyHint': True, 'openWorldHint': False, 'title': 'Read value'})
-        self.assertEqual(write, {'destructiveHint': False, 'openWorldHint': False})
+        self.assertEqual(write, {'readOnlyHint': False, 'destructiveHint': False, 'openWorldHint': False})
         # Absent hints retain MCP's documented defaults; explicit nondefaults stay visible.
         self.assertFalse(write.get('readOnlyHint', False))
         self.assertFalse(write.get('idempotentHint', False))
         self.assertFalse(write.get('destructiveHint', True))
-        destructive = tools['destructive_value'].annotations.model_dump(by_alias=True, exclude_none=True)
-        self.assertTrue(destructive.get('destructiveHint', True))
+        self.assertIs(tools['destructive_value'].annotations.destructive_hint, True)
 
     def test_discovery_preserves_literal_default_fields_in_output_constraints(self):
         class Receipt(BaseModel):
