@@ -8,6 +8,8 @@ With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
 `mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
 Its optional `amount` enables physical proportional falloff along connected source
 edges; `vertex_edit.falloff` records the metric and sampled weights.
+Optional `symmetry_axis` plus `symmetry_tolerance_m` reflect displacements to
+unique reciprocal source counterparts; `vertex_edit.symmetry` reports pairing.
 Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;
 match mesh and UV hashes across pages before collecting a whole-chart selection.
 With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.

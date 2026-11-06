@@ -686,7 +686,7 @@ async def mesh_edit(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
     target_triangles: Annotated[StrictInt | None, Field(ge=4, le=500000, description="decimate_to: triangle cap, excludes amount")] = None,
     target_faces: Annotated[StrictInt | None, Field(ge=16, le=100000, description="remesh_quad needs face cap")] = None,
-    symmetry_axis: Annotated[Literal["X", "Y", "Z"] | None, Field(description="decimate_to/lod_chain/mirror: axis")] = None,
+    symmetry_axis: Annotated[Literal["X", "Y", "Z"] | None, Field(description="Symmetry axis")] = None,
     preserve: Annotated[list[Preserve] | None, Field(max_length=3, description="decimate/LOD: seams; remesh: sharp/boundary")] = None,
     ratios: Annotated[list[Annotated[Number, Field(gt=0, lt=1)]] | None,
                       Field(min_length=1, max_length=6, description="lod_chain: ratios, excludes triangle_targets")] = None,
@@ -728,6 +728,7 @@ async def mesh_edit(
                              Field(description='unwrap_faces method; default smart')] = None,
     vertex_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
                              Field(min_length=1, max_length=20000, description='Source vertices')] = None,
+    symmetry_tolerance_m: Annotated[Number | None, Field(gt=0, description='move_vertices: symmetry match tolerance (m)')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -746,12 +747,20 @@ async def mesh_edit(
               "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
-              'vertex_indices': vertex_indices}
+              'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m}
     if action == 'move_vertices':
         from .mesh_regions import selection
         from .vertex_edit import radius_m
 
-        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None,'amount': None})
+        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None,'amount': None,
+            'symmetry_axis':None,'symmetry_tolerance_m':None})
+        if (symmetry_axis is None) != (symmetry_tolerance_m is None):
+            raise ValueError('move_vertices symmetry requires both axis and tolerance in metres')
+        for field in ('symmetry_axis','symmetry_tolerance_m'):
+            if params[field] is None:
+                params.pop(field)
+        if symmetry_tolerance_m is not None:
+            params['symmetry_tolerance_m'] = radius_m(symmetry_tolerance_m)
         if params['amount'] is not None:
             params['amount'] = radius_m(params['amount'])
         else:

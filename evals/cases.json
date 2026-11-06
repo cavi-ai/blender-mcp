@@ -1,4 +1,7 @@
 [
+  {"id": "vertex-symmetry-missing-tolerance", "tool": "mesh_edit", "arguments": {"action": "move_vertices", "name": "EvalProp", "vertex_indices": [0], "offset": [0, 0, 1], "symmetry_axis": "X"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "both axis and tolerance"},
+  {"id": "vertex-symmetry-missing-axis", "tool": "mesh_edit", "arguments": {"action": "move_vertices", "name": "EvalProp", "vertex_indices": [0], "offset": [0, 0, 1], "symmetry_tolerance_m": 0.001}, "kind": "invalid", "modes": ["protocol", "native"], "error": "both axis and tolerance"},
+  {"id": "vertex-symmetry-zero-tolerance", "tool": "mesh_edit", "arguments": {"action": "move_vertices", "name": "EvalProp", "vertex_indices": [0], "offset": [0, 0, 1], "symmetry_axis": "X", "symmetry_tolerance_m": 0}, "kind": "invalid", "modes": ["protocol", "native"], "error": "greater than 0"},
   {
     "id":"vertex-falloff-needs-positive-radius","tool":"mesh_edit",
     "arguments":{"action":"move_vertices","name":"EvalProp","vertex_indices":[0],"offset":[0,0,1],"amount":0},

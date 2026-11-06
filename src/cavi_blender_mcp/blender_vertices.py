@@ -5,7 +5,7 @@ from .blender_bridge import editable_mesh, info
 from .blender_errors import preflight
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import selection
-from .vertex_edit import geodesic_weights, radius_m, translated
+from .vertex_edit import displaced, geodesic_weights, radius_m, symmetric_offsets, translated
 
 
 def inspect(p):
@@ -26,23 +26,35 @@ def move(p):
         if keys is not None and (not keys.is_editable or keys.users > 1):
             raise ValueError('Vertex editing requires independent editable shape-key data')
         radius = radius_m(p['amount']) if p.get('amount') is not None else None
-        if radius is not None:
+        symmetric = p.get('symmetry_axis') is not None
+        if symmetric != (p.get('symmetry_tolerance_m') is not None):
+            raise ValueError('Symmetric vertex editing requires both axis and tolerance in metres')
+        if radius is not None or symmetric:
             bpy.context.view_layer.update()
         digest = mesh_digest(mesh)
         selected, offset = selection(p.get('vertex_indices'), p.get('offset'), len(mesh.vertices),
             p.get('expected_mesh_sha256'), digest, field='vertex_indices')
-        falloff, weights = None, None
-        if radius is not None:
+        falloff, weights, symmetry, vectors = None, None, None, None
+        if radius is not None or symmetric:
             linear = [list(row) for row in value.matrix_world.to_3x3()]
             unit = bpy.context.scene.unit_settings.scale_length
             seeds = selected
-            affected = geodesic_weights([tuple(v.co) for v in mesh.vertices],
-                (tuple(e.vertices) for e in mesh.edges),seeds,radius,linear=linear,unit_m=unit)
+            positions = [tuple(v.co) for v in mesh.vertices]
+            edges = (tuple(e.vertices) for e in mesh.edges)
+            if symmetric:
+                vectors,symmetry,influence = symmetric_offsets(positions,edges,seeds,offset,
+                    p['symmetry_axis'],p['symmetry_tolerance_m'],radius=radius,linear=linear,unit_m=unit)
+                affected = list(influence.items())
+            else:
+                affected = geodesic_weights(positions,edges,seeds,radius,linear=linear,unit_m=unit)
             selected,weights = [i for i,_ in affected],[w for _,w in affected]
-            falloff = {'mode':'source_edge_geodesic_smoothstep','radius_m':radius,
-                'seed_indices':seeds,'scene_unit_meters':unit,'world_linear':linear,
-                'weight_samples':[{'index':i,'weight':w} for i,w in affected[:64]],
-                'weights_truncated':len(affected) > 64}
+            if radius is not None:
+                falloff = {'mode':'source_edge_geodesic_smoothstep','radius_m':radius,
+                    'seed_indices':seeds,'scene_unit_meters':unit,'world_linear':linear,
+                    'weight_samples':[{'index':i,'weight':w} for i,w in affected[:64]],
+                    'weights_truncated':len(affected) > 64}
+            if symmetry is not None:
+                symmetry.update(scene_unit_meters=unit,world_linear=linear)
         blocks = list(keys.key_blocks) if keys else []
         if len(selected)*(len(blocks)+1) > 1000000:
             raise ValueError('Vertex edit exceeds 1000000 mesh and shape-key points; use smaller selections')
@@ -50,7 +62,8 @@ def move(p):
         if any(len(layer) != len(mesh.vertices) for layer in layers):
             raise ValueError('Shape-key topology does not match the mesh')
         before = [[tuple(layer[i].co) for i in selected] for layer in layers]
-        targets = [translated(rows, offset,weights=weights) for rows in before]
+        targets = [displaced(rows,[vectors[i] for i in selected]) if symmetric else
+                   translated(rows,offset,weights=weights) for rows in before]
 
     def update():
         mesh.update()
@@ -78,6 +91,8 @@ def move(p):
             'mesh_sha256_before': digest, 'mesh_sha256_after': mesh_digest(mesh)}
         if falloff is not None:
             report['falloff'] = falloff
+        if symmetry is not None:
+            report['symmetry'] = symmetry
         return {**info(value), 'vertex_edit':report}
     except Exception:
         for layer, rows in zip(layers, before, strict=True):

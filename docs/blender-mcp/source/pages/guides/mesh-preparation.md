@@ -116,6 +116,33 @@ Each corresponding shape-key point receives the same weighted offset. Omitting
 up to 500,000 source vertices and 1,500,000 edges, with the existing affected-point
 budgets. Excessive selections fail before assignment; no radius is silently reduced.
 
+### Paired symmetry
+
+Supply both `symmetry_axis` (`X`, `Y` or `Z`) and a positive
+`symmetry_tolerance_m` to reflect displacement across the corresponding local
+origin plane. The vector remains object-local. Matching compares reflected base
+positions in world metres, including parent/object linear transforms and scene
+units. It requires unique reciprocal matches; missing or ambiguous counterparts
+reject the whole edit before writing.
+
+```json
+{"action":"move_vertices","name":"Body","vertex_indices":[12],"offset":[0.01,0,0.025],"amount":0.05,"symmetry_axis":"X","symmetry_tolerance_m":0.00001,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+Seeds must occupy one side or the center band. Proportional paths remain on
+that hemisphere, then mirror the weighted displacement. Center-only seeds use
+the positive hemisphere. Center points (axis coordinate scaled into metres
+within half the tolerance) receive only tangential displacement. This preserves
+existing base asymmetry and each shape key's offsets; it does not symmetrize
+expressions or weights. Inspect the origin and the actual left/right poses.
+
+`vertex_edit.symmetry` reports the axis, tolerance, metric, source side, maximum
+matching error and up to 64 source/partner pairs with explicit truncation.
+Affected-point budgets include both sides. Matching is limited to 2,000,000
+spatial candidate comparisons. Coincident split vertices are ambiguous;
+disconnected geometry can be a valid mirrored counterpart. Omit both symmetry
+arguments for the existing point/proportional workflows.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect
