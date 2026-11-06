@@ -127,4 +127,6 @@ class OpenSurfaceTests(unittest.TestCase):
         self.assertNotIn('open_project', LEASE_FREE)
         self.assertEqual(operation_timeout('owned_edit', {'operation': 'open_project'}), SLOW_TIMEOUT)
         tool = next(t for t in asyncio.run(server.mcp.list_tools()) if t.name == 'asset_io')
-        self.assertTrue(tool.annotations.destructive_hint)
+        # MCP defines an omitted destructiveHint as true.
+        hints = tool.annotations.model_dump(by_alias=True, exclude_none=True)
+        self.assertTrue(hints.get('destructiveHint', True))

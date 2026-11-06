@@ -9,6 +9,56 @@ from cavi_blender_mcp.catalog import BlenderServer, omit_null_defaults
 
 
 class CatalogTests(unittest.TestCase):
+    def test_named_references_shorten_without_rewriting_literal_data(self):
+        from cavi_blender_mcp.catalog import short_references
+
+        pointer = '#/$defs/Long~1RecursiveNode'
+        source = {'$defs': {'Long/RecursiveNode': {'anyOf': [
+            {'type': 'integer'}, {'type': 'array', 'items': {'$ref': pointer}}]}},
+            '$ref': pointer, 'default': {'$ref': pointer}}
+        compact = short_references(source)
+        self.assertLess(len(compact['$ref']), len(pointer))
+        self.assertEqual(compact['default'], {'$ref': pointer})
+        self.assertEqual(source['$ref'], pointer)
+        for value in (1, [1, [2]], True, 'bad', [None]):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),
+                             Draft202012Validator(compact).is_valid(value))
+        scoped = {**source, '$id': 'https://example.test/schema'}
+        self.assertEqual(short_references(scoped), scoped)
+        encoded = {'$defs': {'Node': {'type': 'integer'}}, '$ref': '#/$defs/%4Eode'}
+        self.assertEqual(short_references(encoded), encoded)
+
+    def test_discovery_omits_default_and_inapplicable_hints_only(self):
+        from mcp.types import ToolAnnotations
+
+        server = BlenderServer('hints-fixture', version='1')
+
+        @server.tool(annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False,
+            idempotent_hint=True, open_world_hint=False, title='Read value'))
+        def read_value() -> str:
+            return 'value'
+
+        @server.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False,
+            idempotent_hint=False, open_world_hint=False))
+        def write_value() -> str:
+            return 'value'
+
+        @server.tool(annotations=ToolAnnotations(destructive_hint=True))
+        def destructive_value() -> str:
+            return 'value'
+
+        tools = {t.name: t for t in asyncio.run(server.list_tools())}
+        read = tools['read_value'].annotations.model_dump(by_alias=True, exclude_none=True)
+        write = tools['write_value'].annotations.model_dump(by_alias=True, exclude_none=True)
+        self.assertEqual(read, {'readOnlyHint': True, 'openWorldHint': False, 'title': 'Read value'})
+        self.assertEqual(write, {'destructiveHint': False, 'openWorldHint': False})
+        # Absent hints retain MCP's documented defaults; explicit nondefaults stay visible.
+        self.assertFalse(write.get('readOnlyHint', False))
+        self.assertFalse(write.get('idempotentHint', False))
+        self.assertFalse(write.get('destructiveHint', True))
+        destructive = tools['destructive_value'].annotations.model_dump(by_alias=True, exclude_none=True)
+        self.assertTrue(destructive.get('destructiveHint', True))
+
     def test_discovery_preserves_literal_default_fields_in_output_constraints(self):
         class Receipt(BaseModel):
             payload: Annotated[dict, WithJsonSchema({'type': 'object', 'const': {'default': None}})]
