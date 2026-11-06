@@ -8,7 +8,16 @@ import anyio
 from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES
 from cavi_mcp_core.server import Server as CoreServer
 from mcp.server.mcpserver import Image
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    StrictBool,
+    StrictInt,
+    WithJsonSchema,
+    model_validator,
+)
 
 from .catalog import BlenderServer
 from .client import BridgeClient
@@ -109,6 +118,22 @@ class UVTransform(BaseModel):
     scale: Vector2 = (1, 1)
     rotation_degrees: Number = 0
     pivot: Vector2 = (0, 0)
+
+
+class UVRegion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    bounds: tuple[Number, Number, Number, Number]
+    texture_resolution: tuple[StrictInt, StrictInt]
+    margin_px: Number
+    allow_overlap: StrictBool = False
+    allow_pinned: StrictBool = False
+
+    @model_validator(mode='after')
+    def valid_region(self):
+        from .uv_regions import region
+
+        region(self.model_dump(mode='json'))
+        return self
 
 
 class BoneSpec(BaseModel):
@@ -678,7 +703,7 @@ async def object_edit(
 async def mesh_edit(
     action: Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "extrude_faces", "mirror", "array", "solidify", "uv_transform"],
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "mirror", "array", "solidify", "uv_transform"],
     name: ObjectName,
     kind: Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None = None,
     amount: Annotated[Number | None, Field(
@@ -723,6 +748,7 @@ async def mesh_edit(
     uv_transform: UVTransform | None = None,
     lease_id: LeaseId = None,
     expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None,
+    uv_region: UVRegion | None = None,
 ) -> MeshEditResult:
     """Edit a leased mesh."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -739,7 +765,16 @@ async def mesh_edit(
               "names": names, "by": by, "new_name": new_name, "face_indices": face_indices,
               "count": count, "offset": offset,
               "thickness": thickness, "clipping": clipping, "uv_transform": uv_transform,
-              'expected_mesh_sha256': expected_mesh_sha256}
+              'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region}
+    if action == 'unwrap_faces':
+        from .mesh_regions import fingerprint, indices
+
+        params = pick(action, values, ['face_indices', 'uv_region'], {'uv_layer': None,
+            'angle_limit_degrees': 66, 'expected_mesh_sha256': None})
+        indices(params['face_indices'])
+        fingerprint(params['expected_mesh_sha256'])
+        params['uv_region'] = uv_region.model_dump(mode='json')
+        return await run(call, 'unwrap_faces', lease_id=lease_id, name=name, **params)
     if action == 'extrude_faces':
         from .mesh_regions import selection
 

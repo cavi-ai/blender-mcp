@@ -97,6 +97,8 @@ jobs:
         run: uv run --locked python tests/native_open_project_mcp.py --blender "$(command -v blender)"
       - name: Check face-region modeling
         run: uv run --locked python tests/native_mesh_regions_mcp.py --blender "$(command -v blender)"
+      - name: Check selected-face UV layout
+        run: uv run --locked python tests/native_uv_regions_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

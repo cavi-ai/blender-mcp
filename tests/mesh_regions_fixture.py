@@ -26,8 +26,11 @@ for f in mesh.polygons:
     f.material_index = f.index - 4 if f.index >= 5 else 0
 for label in ('BakeAtlas', 'ArtistUV'):
     layer = mesh.uv_layers.new(name=label)
-    for i, loop in enumerate(layer.data):
-        loop.uv = (i * .013 + .07, i * .017 + .11)
+    for face in mesh.polygons:
+        corners_uv = [(0,0),(1,0),(1,1),(0,1)] if face.loop_total == 4 else [(0,0),(1,0),(0,1)]
+        for index, uv in zip(face.loop_indices, corners_uv, strict=True):
+            layer.data[index].uv = (.04+(face.index % 3)*.12+uv[0]*.07,
+                                   .04+(face.index // 3)*.12+uv[1]*.05)
 mesh.uv_layers.active_index = 1
 mesh.uv_layers['BakeAtlas'].active_render = True
 color = mesh.color_attributes.new(name='ArtistTint', type='FLOAT_COLOR', domain='CORNER')

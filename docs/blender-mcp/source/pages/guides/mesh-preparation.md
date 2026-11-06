@@ -2,7 +2,7 @@
 
 `mesh_edit` changes one exact mesh in Object Mode with single-user mesh data.
 Every call needs a `lease_id`. Topology-changing actions require their own
-modifier and shape-key preflight; `uv_transform` edits existing UV loops and
+modifier and shape-key preflight; `uv_transform` and `unwrap_faces` edit UV loops and
 retains modifiers, skin weights and shape keys.
 
 For shared meshes, first use `object_edit` `make_single_user` to copy the data
@@ -15,6 +15,7 @@ on the same object without applying transforms or changing scene references.
 | `modifier` | Add bevel, decimate, subdivision or voxel remesh; `apply` bakes it |
 | `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
+| `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |
 | `decimate_to` | Collapse to a triangle target or ratio, optionally preserving seams |
 | `remesh_quad` | QuadriFlow to a face target on a manifold mesh |
 | `lod_chain` | Create `<base>_LOD1..n` in `<base>_LODs` |
@@ -69,12 +70,54 @@ final unwrap and baking; existing cap/unselected UVs are retained. The tool does
 not automatically pack the new surfaces or detect global self-intersections.
 Run topology and UV checks, then inspect the silhouette before export.
 
+Use `unwrap_faces` with the returned `side_faces` and geometry hash to lay out
+the new surfaces while retaining the cap and unselected UVs.
+
 Use a single-user base mesh in Object Mode without modifiers or shape keys.
 Custom split normals must be cleared deliberately on a working copy before
 changing topology. Invalid indices, stale hashes, zero/degenerate offsets and
 regions without a boundary are rejected before changing the object.
 
 ## UVs
+
+### Unwrap selected faces
+
+`unwrap_faces` takes current `face_indices`, an existing `uv_layer` (default UV0),
+and a required `uv_region` with explicit bounds, texture width/height and pixel
+padding. For example, reserve a clear rectangle for new side faces:
+
+```json
+{"action":"unwrap_faces","name":"Body","face_indices":[7,8,9,10],"uv_layer":"BakeAtlas","uv_region":{"bounds":[0.55,0.55,0.98,0.98],"texture_resolution":[2048,1024],"margin_px":8},"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The native solver runs in a private background Blender process with selected
+base geometry, accounting for object scale, rotation and scene units. It uses
+Smart UV Project (`angle_limit_degrees`, default 66), packs islands, and scales
+uniformly in pixels. Rectangular textures keep their pixel aspect. Bounds can
+target an explicit UDIM region; they do not imply tile creation or material setup.
+
+By default, unselected UV triangles must leave the entire rectangle clear.
+Selected pinned UVs are refused. Set `uv_region.allow_overlap=true` only for
+deliberate reuse of an occupied region, and `allow_pinned=true` only when the
+selected pinned coordinates should move. Pin flags remain intact. These overrides
+do not disable overlap or gutter checks among the new islands. Padding applies
+between islands and at the region border; choose it for the final resolution
+and mip usage. Density matching with the retained layout requires a separate check.
+
+Only selected corner coordinates in the chosen layer are written. Other layers,
+unselected UVs, colors, materials, transforms, selection, geometry, skin weights
+and shape keys stay intact. The source hash and all UV coordinates are checked
+again before writeback. The result reports analytic overlap, degeneracy and
+pixel-padding measurements on Blender's stored float precision. Partial writes
+are rolled back. Inspect the actual material before accepting the layout.
+
+The action requires a single-user editable mesh in Object Mode. It handles at
+most 60,000 selected loops and 20,000 selected triangles, with 200,000 source
+vertices/triangles. The worker has a 45-second limit and removes its scratch data.
+It does not evaluate modifiers or deformations; use the intended rest or baked
+working surface. It does not save a project, bake textures or change seams.
+
+### Whole-layer preparation and placement
 
 `unwrap` uses Smart UV Project then packing with `margin_px` (default 4) between
 islands at `texture_resolution` (default 1024); `island_margin` instead sets the

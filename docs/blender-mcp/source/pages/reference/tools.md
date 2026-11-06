@@ -294,7 +294,8 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `extract_faces`, `mirror`, `array`, `solidify`, `uv_transform`.
+`join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `mirror`,
+`array`, `solidify`, `uv_transform`.
 
 `extract_faces` takes a unique `new_name` and 1–20,000 unique `face_indices`.
 It copies those source polygons to an independent unrigged surface, retaining
@@ -305,6 +306,15 @@ original. Modifiers, shape keys and rigged sources are refused.
 optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an
 existing layer (default UV0). It preserves topology, skin and shape keys and
 reports affected faces, materials and UV bounds. No implicit chart expansion.
+
+`unwrap_faces` takes `face_indices`, an existing `uv_layer` (default UV0) and
+`uv_region` with required `bounds` `[min_u,min_v,max_u,max_v]`,
+`texture_resolution` `[width,height]` and `margin_px`. Optional
+`expected_mesh_sha256` rejects stale geometry. It packs selected faces into
+the declared rectangle and preserves other UVs and mesh data. The region must
+be clear of unselected triangles, and selected pins are protected, unless
+explicit `allow_overlap` or `allow_pinned` flags in `uv_region` override those
+checks. Analytic overlap and pixel-gutter checks still apply to the new islands.
 
 [Guide](../guides/mesh-preparation.md)
 

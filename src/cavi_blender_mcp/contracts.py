@@ -279,6 +279,7 @@ class ProceduralAssetResult(Result):
 
 
 class MeshEditResult(ObjectFields):
+    face_unwrap: Record | None = None
     extrusion: Record | None = None
     nullable_shape_fields = frozenset(
         {"parent", "symmetry_axis", "density_before", "density_after", "shape_key_action"}

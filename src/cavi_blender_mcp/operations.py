@@ -5,6 +5,7 @@ OPERATIONS = frozenset(
         "scene_info",
         "inspect_mesh_faces",
         "extrude_faces",
+        "unwrap_faces",
         "scene_authoring",
         "object_info",
         "inspect_mesh_quality",
@@ -133,6 +134,7 @@ SOURCE_PRESERVING = frozenset({
 })
 SLOW_OPERATIONS = frozenset(
     {
+        "unwrap_faces",
         "export_uv_assembly",
         "export_uv_asset",
         "make_instance_unique",
