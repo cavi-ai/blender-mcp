@@ -48,6 +48,12 @@ source = "vcs"
 packages = ["src/cavi_blender_mcp"]
 
 [tool.hatch.build.targets.sdist]
+only-include = [
+  "src", "scripts", "tests", "evals", "examples", "docs/blender-mcp/source", ".github",
+  ".gitignore", ".npmrc", "README.md", "CHANGELOG.md", "CONTRIBUTING.md",
+  "CODE_OF_CONDUCT.md", "SECURITY.md", "LICENSE", "pyproject.toml", "uv.lock",
+  "package.json", "requirements-neural.txt", "requirements-triposg.txt",
+]
 exclude = ["/docs/blender-mcp/v*", "/.tmp", "/.worktrees", "/dist"]
 
 [tool.ruff]

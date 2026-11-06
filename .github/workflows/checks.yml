@@ -61,8 +61,38 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - name: Build MCP Eval from main
+        run: |
+          cargo install --locked --git https://github.com/cavi-ai/mcp-eval --branch main \
+            --root "$RUNNER_TEMP/mcp-eval" mcpeval
+          echo "MCPEVAL_EXECUTABLE=$RUNNER_TEMP/mcp-eval/bin/mcpeval" >> "$GITHUB_ENV"
+          python3 - "$RUNNER_TEMP/mcp-eval/.crates2.json" >> "$GITHUB_ENV" <<'PYTHON'
+          import json
+          import re
+          import sys
+          with open(sys.argv[1]) as stream:
+              installed = json.load(stream)["installs"]
+          source = next(key for key in installed if key.startswith("mcpeval "))
+          revision = source.rsplit("#", 1)[1].removesuffix(")")
+          assert re.fullmatch("[0-9a-f]{40}", revision), source
+          print(f"MCPEVAL_SOURCE_REVISION={revision}")
+          PYTHON
+          mkdir -p .tmp/evals/evaluator
+          cp "$RUNNER_TEMP/mcp-eval/.crates2.json" .tmp/evals/evaluator/cargo-install.json
       - run: npm run eval:protocol
+      - name: Install Blender 5.2.3 LTS
+        env:
+          BLENDER_ARCHIVE: blender-5.2.3-linux-x64.tar.xz
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/$BLENDER_ARCHIVE" \
+            "https://mirror.blender.org/release/Blender5.2/$BLENDER_ARCHIVE"
+          echo "78486c018b4443efe5e75ab54c290ed8c15abafd249b862c2c9ce2530a918eec  $RUNNER_TEMP/$BLENDER_ARCHIVE" | sha256sum --check
+          tar -xf "$RUNNER_TEMP/$BLENDER_ARCHIVE" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/blender-5.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Evaluate native Blender
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a npm run eval:core
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -70,6 +100,9 @@ jobs:
           path: |
             .tmp/evals/*/cases.json
             .tmp/evals/*/mcpeval.json
+            .tmp/evals/*/evaluator.json
+            .tmp/evals/evaluator/cargo-install.json
+            .tmp/evals/*/blender.log
           if-no-files-found: error
 
   pin-consumers:

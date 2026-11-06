@@ -171,12 +171,28 @@ def main():
     args = parser.parse_args()
     if args.model_image and (args.mode != "native" or not args.model_image.is_file()):
         parser.error("--model-image requires native mode and an existing image")
-    evaluator = ROOT / "node_modules/.bin/mcpeval"
-    if not evaluator.exists():
-        parser.error("Install the evaluator with npm install first")
+    evaluator = shutil.which(os.environ.get(
+        "MCPEVAL_EXECUTABLE", str(ROOT / "node_modules/.bin/mcpeval")))
+    if not evaluator:
+        parser.error("Evaluator unavailable; install with npm install or set MCPEVAL_EXECUTABLE")
     output_root = ROOT / ".tmp/evals"
     output_root.mkdir(parents=True, exist_ok=True)
     output = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=output_root))
+    version = subprocess.run(
+        [evaluator, "--version"], capture_output=True, text=True, check=True, timeout=30)
+    provenance = {
+        "executable": evaluator,
+        "entrypoint_sha256": hashlib.sha256(Path(evaluator).read_bytes()).hexdigest(),
+        "version": version.stdout.strip(),
+        "source_revision": os.environ.get("MCPEVAL_SOURCE_REVISION"),
+        "npm_dependency": json.loads((ROOT / "package.json").read_text())["devDependencies"][
+            "@cavi-ai/mcp-eval"],
+    }
+    npm_lock = ROOT / "node_modules/.package-lock.json"
+    if npm_lock.is_file():
+        provenance["npm_resolved"] = json.loads(npm_lock.read_text()).get("packages", {}).get(
+            "node_modules/@cavi-ai/mcp-eval", {}).get("resolved")
+    (output / "evaluator.json").write_text(json.dumps(provenance, indent=2) + "\n")
     workspace = output / "workspace"
     workspace.mkdir()
     if args.model_image:
@@ -272,6 +288,14 @@ def main():
         ]
         if args.mode == "protocol":
             command.append("--gate-only")
+        else:
+            command.extend([
+                "--arguments", str(ROOT / "evals/native.arguments.json"),
+                "--min-readiness", "85", "--exclude-latency",
+                "--min-area", "protocol=100", "--min-area", "catalog=75",
+                "--min-area", "context=25", "--min-area", "error-honesty=100",
+                "--min-area", "reliability=100", "--min-area", "coverage=100",
+            ])
         command.extend(["--", sys.executable, "-m", f"cavi_{APP}_mcp.server"])
         with (output / "mcpeval.json").open("w") as stream:
             evaluated = subprocess.run(command, env=env, cwd=ROOT, stdout=stream, check=False)
