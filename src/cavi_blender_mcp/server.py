@@ -218,14 +218,17 @@ def pick(action, values, required=(), defaults=None):
 
 @mcp.tool(annotations=READ_ONLY)
 async def scene_info(
-    name: Annotated[str | None, Field(description="Only this object")] = None,
+    name: Annotated[str | None, Field(description="Object")] = None,
     limit: Annotated[StrictInt, Field(ge=1, le=1000, description="Page size")] = 200,
     offset: Annotated[StrictInt, Field(ge=0, description="Page start")] = 0,
-    definition: Annotated[StrictBool | None, Field(description='name + true: nested definition/placements')] = None,
-    faces: Annotated[StrictBool | None, Field(description='Source polygon page')] = None,
-    edges: Annotated[StrictBool | None, Field(description='Source edge/seam page')] = None,
+    definition: Annotated[StrictBool | None, Field(description='Instance contents')] = None,
+    faces: Annotated[StrictBool | None, Field(description='Source polygons')] = None,
+    edges: Annotated[StrictBool | None, Field(description='Source edges/seams')] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='faces: UV charts')] = None,
 ) -> SceneInfo:
-    """Inspect paged scenes or one object's details."""
+    """Inspect paged objects and source topology."""
+    if uv_layer is not None and (not faces or edges or definition or name is None):
+        raise ValueError('uv_layer requires a named source-face page')
     if edges:
         if name is None or faces or definition:
             raise ValueError('edges requires a mesh name and cannot be combined with faces or definition')
@@ -233,7 +236,10 @@ async def scene_info(
     if faces:
         if name is None or definition:
             raise ValueError('faces requires a mesh name and cannot be combined with definition')
-        return await run(call, 'inspect_mesh_faces', name=name, limit=limit, offset=offset)
+        params = {'name': name, 'limit': limit, 'offset': offset}
+        if uv_layer is not None:
+            params['uv_layer'] = uv_layer
+        return await run(call, 'inspect_mesh_faces', **params)
     if definition:
         if name is None:
             raise ValueError('definition requires a scene-instance name')
@@ -249,13 +255,13 @@ async def inspect_mesh_quality(
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
                               Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Texture pixels")] = (1024, 1024),
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
-    checks: Annotated[list[Check] | None, Field(max_length=6, description="Checks; empty means all")] = None,
+    checks: Annotated[list[Check] | None, Field(max_length=6, description="Empty: all checks")] = None,
     naming: Annotated[NamingRules | None, Field(description="Naming rules")] = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63, description="Lightmap UVs")] = "UVMap_Lightmap",
     lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096, description="Lightmap pixels")] = 64,
 ) -> MeshQuality:
-    """Check static mesh budgets, texel density, UV stretch and PBR color spaces/packing/graphs.
-    Reject modifiers/rigs/shape keys. Default render-active UVs."""
+    """Check static mesh budgets, density/stretch and PBR color spaces/packing/graphs.
+    No modifiers/rigs/shape keys; default render-active UVs."""
     return await run(call, "inspect_mesh_quality", names=names,
                      texture_resolution=texture_resolution, uv_layer=uv_layer,
                      checks=checks or [],
@@ -268,14 +274,14 @@ async def inspect_uv_layout(
     names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
                               Annotated[StrictInt, Field(ge=1, le=16384)]] | None, Field(description="Texture pixels")] = None,
-    padding_pixels: Annotated[Number | None, Field(ge=0, le=256, description="Gutter; needs texture_resolution")] = None,
+    padding_pixels: Annotated[Number | None, Field(ge=0, le=256, description="Gutter; requires resolution")] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='UV map; default UV0')] = None,
-    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000, description='Triangle-pair cap; default 50/triangle')] = None,
-    material: Annotated[str | None, Field(min_length=1, max_length=63, description="Only this material")] = None,
-    udim_image: Annotated[str | None, Field(min_length=1, max_length=63, description='UDIM coverage; excludes shader transforms/unique-tile size/padding')] = None,
+    comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000, description='Pair cap; default 50/triangle')] = None,
+    material: Annotated[str | None, Field(min_length=1, max_length=63, description="Material filter")] = None,
+    udim_image: Annotated[str | None, Field(min_length=1, max_length=63, description='UDIM coverage only; no shader transforms/gutters')] = None,
 ) -> UVLayout:
-    """Inspect source UV overlaps/gutters or UDIM coverage, up to 20,000 triangles.
-    No modifier evaluation; incomplete work cannot pass."""
+    """Source UV overlaps/gutters or UDIM coverage; max 20,000 triangles.
+    Unevaluated; incomplete work fails."""
     if udim_image is not None:
         if texture_resolution is not None or padding_pixels is not None:
             raise ValueError('UDIM coverage does not take texture_resolution or padding_pixels')
@@ -685,7 +691,7 @@ async def mesh_edit(
     rename_source: Annotated[StrictBool | None, Field(description="lod_chain: suffix source LOD0")] = None,
     lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="lightmap_uv: atlas pixels")] = None,
     margin_px: Annotated[Number | None, Field(ge=0, le=64, description="lightmap_uv: padding pixels")] = None,
-    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density needs target pixels/metre")] = None,
+    target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density/uv_transform: pixels/metre")] = None,
     texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
     pack: Annotated[StrictBool | None, Field(description="texel_density: pack after scaling")] = None,
     shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="collision: proxy shape")] = None,
@@ -710,7 +716,7 @@ async def mesh_edit(
     uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
     expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='Source geometry SHA256')] = None,
-    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces: atlas bounds, pixels, gutters')] = None,
+    uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces/UV density: region and gutters')] = None,
     edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
                            Field(min_length=1, max_length=20000, description='set_seams: edge indices')] = None,
     seam: Annotated[StrictBool | None, Field(description='set_seams: seam flag')] = None,
@@ -791,8 +797,17 @@ async def mesh_edit(
         params = pick(action, values, ["target_px_per_m"], {
             "texture_resolution": 1024, "uv_layer": None, "pack": False})
     elif action == 'uv_transform':
+        from .mesh_regions import fingerprint
+        from .uv_density import options
+
         operation = 'transform_uv'
-        params = pick(action, values, ['uv_transform'], {'uv_layer':None})
+        params = pick(action, values, ['uv_transform'], {'uv_layer': None,
+            'target_px_per_m': None, 'uv_region': None, 'expected_mesh_sha256': None})
+        destination = params['uv_region'].model_dump(mode='json') if params['uv_region'] else None
+        options(params['target_px_per_m'], destination, params['uv_transform'].scale)
+        fingerprint(params['expected_mesh_sha256'])
+        params['uv_region'] = destination
+        params = {k: v for k, v in params.items() if v is not None or k == 'uv_layer'}
         params['transform'] = params.pop('uv_transform').model_dump()
     elif action == "boolean":
         operation = "boolean_mesh"

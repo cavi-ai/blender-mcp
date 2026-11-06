@@ -103,6 +103,34 @@ regions without a boundary are rejected before changing the object.
 
 ## UVs
 
+### Identify complete source charts
+
+Add an existing `uv_layer` to a source-face page:
+
+```json
+{"name":"Body","faces":true,"uv_layer":"BakeAtlas","limit":100,"offset":0}
+```
+
+The `uv` metadata reports the layer, chart count and `sha256` for its native
+coordinates and pins. Each face adds `uv.chart`, `uv.chart_faces`, UV bounds and
+pinned-loop count. A chart ID is its smallest source polygon index. Page the
+whole source and group matching IDs to select every face in a chart; compare
+both `mesh_sha256` and `uv.sha256` across pages before combining them.
+The hashes detect mixed inspection state; they do not lock subsequent UV edits.
+
+Connectivity follows shared source edges whose loop UV coordinates match exactly.
+Disconnected stacked surfaces remain separate. Material boundaries and seam flags
+do not split continuous coordinates. Membership includes finite degenerate charts;
+it does not prove UV quality. This opt-in analysis handles 20,000 source triangles
+and 60,000 loops, requires finite coordinates, and never evaluates modifiers.
+Ordinary face pages without `uv_layer` keep their existing behavior.
+
+`inspect_uv_layout` adds exact object, polygon and source-triangle identities to
+each overlap/gutter example's `sources`. These identities refer to the original
+mesh even after material filtering; objects report corresponding mesh/UV hashes.
+The existing bounded examples and completeness flag still apply. Use whole-chart
+membership when choosing the correction, then re-inspect the intended texture set.
+
 ### Unwrap selected faces
 
 `unwrap_faces` takes current `face_indices`, an existing `uv_layer` (default UV0),
@@ -179,6 +207,41 @@ shared meshes are rejected before writing. Partial writes are rolled back.
 Calls accept 1–20,000 faces and at most 60,000 selected loops; components and
 resulting UVs must be finite within ±1,000,000, with rotation within ±360,000°.
 Reinspect coverage and render the actual material before accepting a repair.
+
+### Match a selected surface's density
+
+Use `uv_transform` with both `target_px_per_m` and `uv_region` to compute a
+uniform scale for the declared source faces. The destination supplies final
+texture width/height, reserved bounds and pixel gutters; dimensions can be
+rectangular and reach 16,384 pixels. Choose the target from the asset's texture
+budget or a measured neighboring surface.
+Density matching shares the source and selected-triangle budgets of `unwrap_faces`.
+
+```json
+{"action":"uv_transform","name":"Body","uv_layer":"BakeAtlas","uv_transform":{"faces":[12,13],"pivot":[0.75,0.75]},"target_px_per_m":512,"uv_region":{"bounds":[0.5,0.5,1,1],"texture_resolution":[2048,1024],"margin_px":8},"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+These numbers are an example. Keep explicit `scale` at `[1,1]`; the target
+computes its own factor. Pivot, offset and rotation retain their UV-space
+meaning. The operation uses unevaluated source positions with object world
+scale and scene units, retaining rig, weights, shape keys and other mesh data.
+An optional `expected_mesh_sha256` also guards ordinary UV transforms.
+
+The existing region policy protects selected pinned coordinates and requires
+clear space around the selected charts. Explicit `allow_pinned` and
+`allow_overlap` have the same meanings as for `unwrap_faces`. The correction
+does not repack islands, lower the density target, or resample texture images.
+It checks overlap, degenerate UVs, region borders and inter-island gutters on
+the coordinates to be stored, then verifies native readback. A failed write
+or readback check restores the original selected UVs.
+
+`uv_transform.density` reports before/after area-weighted RMS pixels per metre,
+minimum/maximum density and directional anisotropy. Stored coordinates must
+meet the requested aggregate within 0.01 percent. Uniform scaling retains
+existing stretch; additional UV rotation on rectangular textures can change
+it. Inspect the reported anisotropy and actual material. Source UV density
+excludes shader mapping transforms and posed deformation. Apply corrections
+before final painting/baking, then validate the resulting texture placement.
 
 ## Composition
 

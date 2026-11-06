@@ -31,6 +31,7 @@ class SceneInfo(Result):
     mesh_sha256: str | None = None
     seams_sha256: str | None = None
     faces: list[dict[str, Any]] | None = None
+    uv: dict[str, Any] | None = None
     edges: list[dict[str, Any]] | None = None
     render_settings: SceneRenderSettings | None = None
     bridge: dict[str, Any] | None = None

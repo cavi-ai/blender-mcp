@@ -89,6 +89,27 @@ def _charts(triangles, vertices, valid):
     return [root(i) for i in range(len(triangles))]
 
 
+def face_charts(triangles, vertices, faces):
+    """Map each source face to the smallest face index in its UV-connected chart."""
+    tri, ids = np.asarray(triangles, dtype=float), np.asarray(vertices)
+    if (tri.ndim != 3 or tri.shape[1:] != (3, 2) or not 1 <= len(tri) <= MAX_TRIANGLES
+            or ids.shape != (len(tri), 3) or ids.dtype.kind not in 'iu' or (ids < 0).any()
+            or len(faces) != len(tri) or any(type(f) is not int or f < 0 for f in faces)
+            or not np.isfinite(tri).all() or (np.abs(tri) > 1e6).any()):
+        raise ValueError('Chart inspection needs finite source UV triangles, vertex IDs and face indices')
+    labels = _charts(tri, ids, range(len(tri)))
+    smallest = {}
+    for label, face in zip(labels, faces, strict=True):
+        smallest[label] = min(smallest.get(label, face), face)
+    result = {}
+    for label, face in zip(labels, faces, strict=True):
+        chart = smallest[label]
+        if face in result and result[face] != chart:
+            raise ValueError('Source polygon triangulation has disconnected UV components')
+        result[face] = chart
+    return result
+
+
 def _candidate_pairs(lo, hi, padding):
     """Sweep X and query active Y intervals before spending a comparison.
 

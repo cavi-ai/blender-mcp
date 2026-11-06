@@ -4,6 +4,8 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info` with `faces=true` pages source polygon indices and local geometry.
+Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;
+match mesh and UV hashes across pages before collecting a whole-chart selection.
 With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.
 `mesh_edit` with `extrude_faces` extrudes a declared region using `face_indices`
 and a local `offset`; optional `expected_mesh_sha256` guards against stale
@@ -314,6 +316,11 @@ original. Modifiers, shape keys and rigged sources are refused.
 optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an
 existing layer (default UV0). It preserves topology, skin and shape keys and
 reports affected faces, materials and UV bounds. No implicit chart expansion.
+With `target_px_per_m` and `uv_region`, it scales the selection to a physical
+density target while enforcing the destination's pixel gutters. Omit explicit
+scale. `uv_transform.density` reports before/after density, stretch and checks;
+unattainable targets are rejected. Optional `expected_mesh_sha256` guards the
+source geometry for either UV-transform form.
 
 `unwrap_faces` takes `face_indices`, an existing `uv_layer` (default UV0) and
 `uv_region` with required `bounds` `[min_u,min_v,max_u,max_v]`,

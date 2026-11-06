@@ -5,6 +5,9 @@ from .uv_layout import MAX_TRIANGLES, analyze
 
 
 def collect(params, find_object):
+    from .blender_mesh_regions import mesh_digest
+    from .blender_uv_charts import uv_digest
+
     names = params['names']
     if (not isinstance(names, list) or not 1 <= len(names) <= 32
             or any(not isinstance(n, str) or not n for n in names) or len(set(names)) != len(names)):
@@ -46,7 +49,8 @@ def collect(params, find_object):
             vertices.append([vertex + vertex_offset for vertex in triangle.vertices])
             sources.append({'object':name, 'face':triangle.polygon_index, 'source_triangle':triangle.index})
         vertex_offset += len(mesh.vertices)
-        objects.append({'name': name, 'mesh': mesh.name, 'uv_layer': layer.name,
+        objects.append({'name': name, 'mesh': mesh.name, 'mesh_sha256': mesh_digest(mesh),
+                        'uv_sha256': uv_digest(layer), 'uv_layer': layer.name,
                         'uv_layer_index': list(mesh.uv_layers).index(layer),
                         'render_uv_layer': next((u.name for u in mesh.uv_layers if u.active_render), None),
                         'first_triangle': first, 'triangles': count,
@@ -59,9 +63,12 @@ def collect(params, find_object):
 
 
 def inspect(params, find_object):
-    triangles, vertices, objects, _sources = collect(params, find_object)
+    triangles, vertices, objects, sources = collect(params, find_object)
     result = analyze(triangles, vertices, params['texture_resolution'], params['padding_pixels'],
                      params.get('comparison_budget'))
+    for field in ('overlap', 'padding'):
+        for example in result[field]['examples']:
+            example['sources'] = [sources[i] for i in example['triangles']]
     return {**result, 'scope': 'source_uv_one_texture_set', 'material': params.get('material'), 'objects': objects,
             'file': bpy.data.filepath, 'dirty': bpy.data.is_dirty,
             'not_checked': ['evaluated or exported UVs', 'material UV transforms',
