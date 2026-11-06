@@ -258,7 +258,7 @@ async def scene_info(
 async def inspect_mesh_quality(
     names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
-                              Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Texture pixels")] = (1024, 1024),
+                              Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Pixels")] = (1024, 1024),
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
     checks: Annotated[list[Check] | None, Field(max_length=6, description="Empty: all checks")] = None,
     naming: Annotated[NamingRules | None, Field(description="Naming rules")] = None,
@@ -278,7 +278,7 @@ async def inspect_mesh_quality(
 async def inspect_uv_layout(
     names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
-                              Annotated[StrictInt, Field(ge=1, le=16384)]] | None, Field(description="Texture pixels")] = None,
+                              Annotated[StrictInt, Field(ge=1, le=16384)]] | None, Field(description="Pixels")] = None,
     padding_pixels: Annotated[Number | None, Field(ge=0, le=256, description="Gutter; requires resolution")] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='UV map; default UV0')] = None,
     comparison_budget: Annotated[StrictInt | None, Field(ge=1, le=1000000, description='Pair cap; default 50/triangle')] = None,
@@ -626,7 +626,7 @@ async def object_edit(
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ObjectEditResult:
-    """Edit objects; make_unique copies definitions, make_single_user copies shared mesh data."""
+    """Create or transform objects, branch definitions, and copy mesh data."""
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
@@ -696,7 +696,7 @@ async def mesh_edit(
     lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="lightmap_uv: atlas pixels")] = None,
     margin_px: Annotated[Number | None, Field(ge=0, le=64, description="lightmap_uv: padding pixels")] = None,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_density/uv_transform: pixels/metre")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
+    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
     pack: Annotated[StrictBool | None, Field(description="texel_density: pack after scaling")] = None,
     shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="collision: proxy shape")] = None,
     max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255, description="collision: hull vertex cap")] = None,
@@ -985,7 +985,7 @@ async def bake(
     source: Annotated[ShaderBakeSource | None, Field(description='shader: socket IDs/UV atlas; raw-data/sRGB-color PNG; signed/HDR needs EXR, alpha its own socket')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> MapBakeResult:
-    """Bake geometry maps/shader socket to new image."""
+    """Bake geometry maps/shader socket to a new image."""
     if map == 'shader':
         if source is None:
             raise ValueError('shader requires source')
@@ -1167,7 +1167,7 @@ async def review_sheet(
     mode: Annotated[Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"], Field(description="Shading/diagnostic mode")] = "shaded",
     resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width")] = 1024,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_heatmap: target density; default 512")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Texture pixels")] = None,
+    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
 ) -> ImageReceipt:
     """Render a multi-view PNG; no lease. Heatmap: blue < target_px_per_m=512 (green) < red."""
