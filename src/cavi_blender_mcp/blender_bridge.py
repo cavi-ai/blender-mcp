@@ -566,6 +566,8 @@ def new_name(name):
 
 
 def scene_info(p):
+    from .preview_settings import snapshot
+
     limit, offset = p.get("limit", 200), p.get("offset", 0)
     if type(limit) is not int or not 1 <= limit <= 1000:
         raise ValueError("limit must be an integer from 1 to 1000")
@@ -582,6 +584,7 @@ def scene_info(p):
                          key=lambda item: item[0].name)
     return {
         "version": bpy.app.version_string,
+        "render_settings": snapshot(bpy.context.scene),
         "bridge": dict(_LOADED_BRIDGE),
         "source_state": _loaded_source.inspect(bpy.data.filepath, bpy.data.is_dirty),
         "file": bpy.data.filepath,
@@ -1165,6 +1168,9 @@ def _dispatch(operation, p):
 
 
 def preview(p):
+    from .preview_settings import configured, validate
+
+    settings = validate(p.get('settings'))
     resolution = p.get("resolution", 512)
     if type(resolution) is not int or not 64 <= resolution <= 2048:
         raise ValueError("Resolution must be between 64 and 2048")
@@ -1216,6 +1222,8 @@ def preview(p):
         render.resolution_y,
         render.resolution_percentage,
         render.image_settings.file_format,
+        render.image_settings.color_mode,
+        render.image_settings.color_depth,
         scene.display.shading.light,
         scene.display.shading.color_type,
     )
@@ -1236,6 +1244,9 @@ def preview(p):
         render.resolution_x = render.resolution_y = resolution
         render.resolution_percentage = 100
         render.image_settings.file_format = "PNG"
+        if settings is not None:
+            render.image_settings.color_mode = 'RGBA'
+            render.image_settings.color_depth = settings['bit_depth']
         scene.display.shading.light = "STUDIO"
         scene.display.shading.color_type = color_mode.upper()
         if renderer == "eevee":
@@ -1244,7 +1255,7 @@ def preview(p):
             lighting = studio(scene, center, radius, min(point.z for point in points))
         else:
             lighting = nullcontext()
-        with lighting, output_file(p["path"], {".png"}) as path:
+        with configured(scene, settings), lighting, output_file(p["path"], {".png"}) as path:
             render.filepath = str(path)
             if "FINISHED" not in bpy.ops.render.render(write_still=True):
                 raise RuntimeError("Preview render did not finish")
@@ -1260,6 +1271,8 @@ def preview(p):
             render.resolution_y,
             render.resolution_percentage,
             render.image_settings.file_format,
+            render.image_settings.color_mode,
+            render.image_settings.color_depth,
             scene.display.shading.light,
             scene.display.shading.color_type,
         ) = original

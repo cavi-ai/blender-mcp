@@ -7,7 +7,7 @@ PROTOCOL = 1
 
 def expected_bridge():
     root = Path(__file__).parent
-    files = sorted({*root.glob('blender_*.py'), root/'operations.py', root/'lease.py',
+    files = sorted({*root.glob('blender_*.py'), *root.glob('preview_*.py'), root/'operations.py', root/'lease.py',
                     root/'geometry.py', root/'paths.py', root/'importing.py', root/'presets.py',
                     root/'source_identity.py', root/'skin_projection.py'})
     digest = hashlib.sha256()

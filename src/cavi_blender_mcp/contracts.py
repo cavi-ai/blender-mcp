@@ -6,7 +6,22 @@ from cavi_mcp_core.contracts import Result, VariantResult
 from pydantic import model_validator
 
 
+class SceneRenderSettings(Result):
+    display_device: str
+    view_transform: str
+    look: str
+    exposure: float
+    gamma: float
+    bit_depth: str
+    file_format: str
+    color_mode: str
+    use_curve_mapping: bool
+    use_white_balance: bool | None
+    use_compositing: bool
+
+
 class SceneInfo(Result):
+    render_settings: SceneRenderSettings | None = None
     bridge: dict[str, Any] | None = None
     source_state: dict[str, Any] | None = None
     name: str | None = None
