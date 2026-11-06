@@ -814,6 +814,8 @@ async def assign_material(
     uv_scale: Vector2 | None = None,
     uv_offset: Vector2 | None = None,
     uv_rotation_degrees: Number | None = None,
+    uv_layer: Annotated[str | None, Field(max_length=63,
+        description="Named mesh UV for textures and normal tangents; empty selects render-active UVs.")] = None,
     update_existing: StrictBool | None = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31)] = 0,
     lease_id: LeaseId = None,
@@ -830,6 +832,7 @@ async def assign_material(
 ) -> MaterialAssignment:
     """assign: names, material_name; color/emission sRGB, data Non-Color.
     instance scopes kit meshes; OBJECT shares geometry.
+    uv_layer selects named sampling and normal tangents without changing mesh UV flags.
     inspect: group_path, node, offset/limit; read-only.
     set_inputs: node, inputs/outputs socket IDs; linear, links kept, shared users
     affected, config detached. set_image: node, image(path,color_space,alpha_mode,tiles); packed.
@@ -845,6 +848,7 @@ async def assign_material(
             'alpha_texture': alpha_texture, 'alpha_mode': alpha_mode, 'uv_scale': uv_scale,
             'uv_offset': uv_offset, 'uv_rotation_degrees': uv_rotation_degrees,
             'update_existing': update_existing, 'instance': instance, 'link_mode': link_mode,
+            'uv_layer': uv_layer,
             'slot': slot if slot != 0 else None}
     if action == 'make_unique':
         pick(action, shader)
@@ -871,6 +875,8 @@ async def assign_material(
     operation = 'assign_instance_material' if instance is not None else (
         'assign_object_material' if link_mode is not None else 'assign_material')
     options = {}
+    if uv_layer is not None:
+        options['uv_layer'] = uv_layer
     if instance is not None:
         options['instance'] = instance
     if link_mode is not None:

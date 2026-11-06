@@ -43,6 +43,7 @@ mesh slots and packs bounded workspace PNG or JPEG maps.
 | `emission_texture`, `emission_strength` | sRGB emission map and strength |
 | `alpha_texture`, `alpha_mode` | Non-Color alpha map and opaque, clip or blend mode |
 | `uv_scale`, `uv_offset`, `uv_rotation_degrees` | One Mapping node for all maps |
+| `uv_layer` | Named UV map for texture coordinates and normal-map tangents; empty selects render-active UVs |
 | `update_existing` | Edit a material created by this tool and bound to the slot |
 | `slot` | Material slot 0–31 |
 | `instance` | Scene collection instance containing internal mesh targets |
@@ -50,6 +51,17 @@ mesh slots and packs bounded workspace PNG or JPEG maps.
 
 Base color and emission use sRGB. Normal, roughness, metallic and alpha use
 Non-Color.
+
+Use `uv_layer="BakeAtlas"` to preview maps baked to that atlas while preserving
+the mesh's active and render-active UV settings. The same named layer drives the
+UV Map node and the tangent-space Normal Map node. Omit `uv_layer` to preserve a
+managed material's current choice during updates; pass `""` to return to
+render-active UVs. New materials use render-active UVs by default.
+
+The named layer must exist on every target. Updating a shared material also
+checks its other mesh owners before changing nodes or loading textures. Branch
+the material first when its users need different UV contracts. This applies to
+scene meshes, OBJECT overrides and collection-instance members.
 
 ### Requirements
 

@@ -120,7 +120,7 @@ cavi-blender-mcp runtime restart --lease-id <current-lease>
   QuadriFlow, lightmap packing, texel density, collision hulls, cleanup,
   booleans, joins, splits, mirrors, arrays and shells.
 - **Materials**: PBR slot assignment with packed workspace textures, UV
-  transforms, alpha modes and material QA.
+  transforms, named UV sampling and normal tangents, alpha modes and material QA.
 - **Baking**: normal, ambient-occlusion, curvature and lightmap maps into a new
   workspace PNG.
 - **Assets**: bounded GLB, FBX, OBJ and USD import; GLB morph targets and

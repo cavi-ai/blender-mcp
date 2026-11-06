@@ -2041,6 +2041,18 @@
     "error": "material_name is required"
   },
   {
+    "id": "material-uv-layer-too-long",
+    "tool": "assign_material",
+    "arguments": {
+      "names": ["MaterialTarget"],
+      "material_name": "InvalidUV",
+      "uv_layer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "at most 63"
+  },
+  {
     "id": "texture-material-escape",
     "tool": "assign_material",
     "arguments": {
