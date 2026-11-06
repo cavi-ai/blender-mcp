@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -13,12 +15,12 @@ USD_AXIS = {"X", "Y", "Z", "NEGATIVE_X", "NEGATIVE_Y", "NEGATIVE_Z"}
 
 
 class AAASurfaceTests(unittest.TestCase):
-    def capture(self):
+    def capture(self, result=None):
         calls = []
 
         def call(operation, params):
             calls.append((operation, params))
-            return {"path": "/tmp/x.png", "workspace": "/w"}
+            return result if result is not None else {"path": "/tmp/x.png", "workspace": "/w"}
 
         patcher = patch.object(server, "BridgeClient", return_value=SimpleNamespace(call=call))
         patcher.start()
@@ -103,8 +105,11 @@ class AAASurfaceTests(unittest.TestCase):
         self.assertEqual(ops[5][1]["bake_pair"], {"high": ["H"], "low": ["R"]})
 
     def test_review_sheet_needs_no_lease_and_scatter_is_owned(self):
-        calls = self.capture()
-        asyncio.run(server.review_sheet("s.png", mode="matcap"))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'sheet.png'
+            path.write_bytes(b'\x89PNG\r\n\x1a\n')
+            calls = self.capture({'path': str(path)})
+            asyncio.run(server.review_sheet("s.png", mode="matcap"))
         asyncio.run(server.scatter("Ground", "Rocks", 2.0, lease_id="L"))
         self.assertEqual(calls[0][0], "review_sheet")
         self.assertNotIn("lease_id", calls[0][1])

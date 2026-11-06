@@ -291,9 +291,9 @@ def main():
         else:
             command.extend([
                 "--arguments", str(ROOT / "evals/native.arguments.json"),
-                "--min-readiness", "85", "--exclude-latency",
-                "--min-area", "protocol=100", "--min-area", "catalog=75",
-                "--min-area", "context=25", "--min-area", "error-honesty=100",
+                "--min-readiness", "90", "--exclude-latency",
+                "--min-area", "protocol=100", "--min-area", "catalog=100",
+                "--min-area", "context=30", "--min-area", "error-honesty=100",
                 "--min-area", "reliability=100", "--min-area", "coverage=100",
             ])
         command.extend(["--", sys.executable, "-m", f"cavi_{APP}_mcp.server"])

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.15"
 
 [[package]]
@@ -52,7 +52,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.5,<5" },
-    { name = "cavi-mcp-core", specifier = ">=0.1,<0.2" },
+    { name = "cavi-mcp-core", specifier = ">=0.1.2,<0.2" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
@@ -66,15 +66,15 @@ dev = [
 
 [[package]]
 name = "cavi-mcp-core"
-version = "0.1.0"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/99/31/0184de98208fd875a65dbb32750808893531c0bd3b402eeadaa917613dce/cavi_mcp_core-0.1.0.tar.gz", hash = "sha256:1c62df88fa84323a1db3281586b3322739c9c81856ac6b2ec54efece786460dc", size = 19898, upload-time = "2026-11-04T08:34:59.644Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3c/d5/ae79ff658da5e00979bec647959ff695643472db39c6e187e6363ed1363c/cavi_mcp_core-0.1.2.tar.gz", hash = "sha256:6a59912c14c78e39bcd4cd3715118d73eb4deffcccac3e72a2a7a40a79c6a4b6", size = 38279, upload-time = "2026-11-06T06:05:05.479Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/ad/14d33d1b4f86e6e049d1cec5223452e30ac786e09afda16652e4c5b5805f/cavi_mcp_core-0.1.0-py3-none-any.whl", hash = "sha256:10687e0468a12a09a6ee691c6e049d0fb1ee89ff8700260398fe2ca2bb4dcd0f", size = 14216, upload-time = "2026-11-04T08:34:58.426Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/3c/b8ca4d0e5c69aa7a16b0edfb7b3a550f16b0334a496de62f0c86912832f8/cavi_mcp_core-0.1.2-py3-none-any.whl", hash = "sha256:4909425ffebe3b66f7d3ca3ba3cd1f73627bfc32d3e8b77a7c0d80df3724c31c", size = 23155, upload-time = "2026-11-06T06:05:04.338Z" },
 ]
 
 [[package]]

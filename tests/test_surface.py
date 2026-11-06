@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -89,8 +91,11 @@ class SurfaceTests(unittest.TestCase):
             asyncio.run(invalid())
 
     def test_render_preview_needs_no_lease(self):
-        calls = self.capture()
-        asyncio.run(server.render_preview("x.png", resolution=64, orthographic=True))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'x.png'
+            path.write_bytes(b'\x89PNG\r\n\x1a\n')
+            calls = self.capture({'path': str(path)})
+            asyncio.run(server.render_preview("x.png", resolution=64, orthographic=True))
         operation, params = calls[0]
         self.assertEqual(operation, "render_preview")
         self.assertNotIn("lease_id", params)
@@ -100,9 +105,12 @@ class SurfaceTests(unittest.TestCase):
     def test_preview_settings_are_forwarded_without_a_scene_edit_or_lease(self):
         from cavi_blender_mcp import scene_models
         self.assertTrue(hasattr(scene_models, "PreviewSettings"), "Temporary preview settings are missing")
-        calls = self.capture()
-        settings = scene_models.PreviewSettings(view_transform="Standard", exposure=1.25)
-        asyncio.run(server.render_preview("x.png", renderer="eevee", settings=settings))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "preview.png"
+            path.write_bytes(b"\x89PNG\r\n\x1a\n")
+            calls = self.capture({"path": str(path)})
+            settings = scene_models.PreviewSettings(view_transform="Standard", exposure=1.25)
+            asyncio.run(server.render_preview("x.png", renderer="eevee", settings=settings))
         operation, params = calls[0]
         self.assertEqual(operation, "render_preview")
         self.assertEqual(params["settings"], {"display_device": "sRGB", "view_transform": "Standard", "look": "None", "exposure": 1.25,
