@@ -11,7 +11,22 @@ class ImageReceipt(Result):
     mime_type: Literal['image/png']
 
 
+class SceneRenderSettings(Result):
+    display_device: str
+    view_transform: str
+    look: str
+    exposure: float
+    gamma: float
+    bit_depth: str
+    file_format: str
+    color_mode: str
+    use_curve_mapping: bool
+    use_white_balance: bool | None
+    use_compositing: bool
+
+
 class SceneInfo(Result):
+    render_settings: SceneRenderSettings | None = None
     bridge: dict[str, Any] | None = None
     source_state: dict[str, Any] | None = None
     name: str | None = None
@@ -85,6 +100,9 @@ class Ownership(Result):
 
 
 class AssetResult(Result):
+    sha256: str | None = None
+    project_id: str | None = None
+    opened: bool | None = None
     uv_maps: list[dict[str,Any]] | None = None
     path: str | None = None
     bytes: int | None = None

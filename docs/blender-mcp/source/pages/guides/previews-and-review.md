@@ -17,9 +17,27 @@ image.
 | `color_mode` | `material` or `vertex` |
 | `renderer` | `workbench` or `eevee` |
 | `orthographic` | Use an orthographic camera |
+| `settings` | Optional temporary display controls and PNG precision |
 
 Workbench checks shape. Eevee checks materials under temporary studio lighting
 at up to 1024 pixels and requires material colors.
+
+Pass `settings` for a reproducible display profile. Its defaults are sRGB display,
+AgX, look `None`, exposure 0, gamma 1 and 16-bit RGBA PNG. Override `display_device`,
+`view_transform`, `look`, `exposure`, `gamma` or `bit_depth` explicitly as needed.
+The selected display, transform and look must exist in the loaded OCIO configuration.
+Exposure and gamma must also fit the native Blender property ranges.
+
+`use_curve_mapping`, `use_white_balance` and `use_compositing` default to false.
+Enabling a toggle reuses the scene's existing curves, balance or compositor; the
+preview does not edit their contents. White balance requires a supporting Blender
+runtime. Omit `settings` to retain the scene's display controls and PNG settings.
+All overridden controls and the original output format, color mode and precision
+are restored after rendering, including failures. Previews need no edit lease.
+
+`scene_info` reports the current `render_settings`, including display controls,
+compositing, image format and precision. These describe the source scene; temporary
+preview settings apply only while the image is rendered.
 
 ## Review sheet
 

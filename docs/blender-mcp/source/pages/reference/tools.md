@@ -9,7 +9,7 @@ in the session workspace; image blocks remain available to visual clients.
 
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
-also runs without a lease, but import, export and save do not.
+also runs without a lease, but import, export, save and open do not.
 `assign_material` `inspect` is lease-free; `set_inputs` requires ownership. Inspect
 native shader inputs/outputs and shared owners before tuning defaults through nested
 `group_path` nodes. `set_image` replaces an image binding with a packed native

@@ -54,6 +54,18 @@ class WorldSpec(Definition):
     rotation_degrees: Vector = (0, 0, 0)
 
 
+class PreviewSettings(Definition):
+    display_device: Annotated[str, Field(min_length=1, max_length=64)] = 'sRGB'
+    view_transform: Annotated[str, Field(min_length=1, max_length=64)] = 'AgX'
+    look: Annotated[str, Field(min_length=1, max_length=64)] = 'None'
+    exposure: Number = 0
+    gamma: Positive = 1
+    bit_depth: Literal['8', '16'] = '16'
+    use_curve_mapping: StrictBool = False
+    use_white_balance: StrictBool = False
+    use_compositing: StrictBool = False
+
+
 class RenderSpec(Definition):
     path: str
     camera: Name

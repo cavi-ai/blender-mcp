@@ -93,6 +93,8 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a npm run eval:core
+      - name: Check saved project switching
+        run: uv run --locked python tests/native_open_project_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

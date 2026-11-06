@@ -100,6 +100,31 @@ class SurfaceTests(unittest.TestCase):
         self.assertEqual(operation, "render_preview")
         self.assertNotIn("lease_id", params)
         self.assertTrue(params["orthographic"])
+        self.assertNotIn("settings", params)
+
+    def test_preview_settings_are_forwarded_without_a_scene_edit_or_lease(self):
+        from cavi_blender_mcp import scene_models
+        self.assertTrue(hasattr(scene_models, "PreviewSettings"), "Temporary preview settings are missing")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "preview.png"
+            path.write_bytes(b"\x89PNG\r\n\x1a\n")
+            calls = self.capture({"path": str(path)})
+            settings = scene_models.PreviewSettings(view_transform="Standard", exposure=1.25)
+            asyncio.run(server.render_preview("x.png", renderer="eevee", settings=settings))
+        operation, params = calls[0]
+        self.assertEqual(operation, "render_preview")
+        self.assertEqual(params["settings"], {"display_device": "sRGB", "view_transform": "Standard", "look": "None", "exposure": 1.25,
+            "gamma": 1, "bit_depth": "16", "use_curve_mapping": False,
+            "use_white_balance": False, "use_compositing": False})
+        self.assertNotIn("lease_id", params)
+
+    def test_preview_settings_reject_unknown_fields_and_invalid_numbers(self):
+        from cavi_blender_mcp import scene_models
+        self.assertTrue(hasattr(scene_models, "PreviewSettings"), "Temporary preview settings are missing")
+        for values in ({"gamma": 0}, {"exposure": float("nan")}, {"bit_depth": "32"},
+                       {"use_compositing": 1}, {"unexpected": True}):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                scene_models.PreviewSettings.model_validate(values)
 
     def test_actions_map_to_owned_bridge_operations(self):
         calls = self.capture()

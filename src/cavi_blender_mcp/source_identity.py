@@ -7,9 +7,15 @@ from pathlib import Path
 class LoadedSource:
     def __init__(self):
         self.source = None
+        self.changed = False
+
+    def mark_changed(self):
+        # Direct RNA writes need not set bpy.data.is_dirty.
+        self.changed = True
 
     def capture(self, path):
         self.source = None
+        self.changed = False
         if not path:
             return
         try:
@@ -27,4 +33,5 @@ class LoadedSource:
 
     def inspect(self, path, dirty):
         same_path = self.source is not None and str(Path(path).resolve()) == self.source['path']
-        return {'saved_source': dict(self.source) if same_path else None, 'dirty': bool(dirty)}
+        return {'saved_source': dict(self.source) if same_path else None,
+                'dirty': bool(dirty or self.changed)}
