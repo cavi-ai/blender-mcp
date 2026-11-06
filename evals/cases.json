@@ -673,7 +673,7 @@
     "modes": [
       "native"
     ],
-    "error": "positive"
+    "error": "nonzero"
   },
   {
     "id": "transform-unchanged",
@@ -7018,6 +7018,18 @@
     "arguments": {
       "action": "save",
       "path": "eval-library.blend"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ]
+  },
+  {
+    "id": "library-eval-consumer",
+    "tool": "asset_io",
+    "arguments": {
+      "action": "save",
+      "path": "eval-consumer.blend"
     },
     "kind": "success",
     "modes": [

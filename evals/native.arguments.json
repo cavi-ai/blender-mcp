@@ -1,0 +1,32 @@
+{
+  "scene_info": {},
+  "inspect_mesh_quality": {
+    "names": ["MaterialTarget"]
+  },
+  "inspect_uv_layout": {
+    "names": ["MaterialTarget"],
+    "texture_resolution": [1024, 1024],
+    "padding_pixels": 0
+  },
+  "inspect_rig": {
+    "armature": "EvalRig",
+    "meshes": ["EvalSkin"]
+  },
+  "compare_rig_motion": {
+    "source": "EvalRig",
+    "candidate": "EvalRig",
+    "meshes": [{"source": "EvalSkin", "candidate": "EvalSkin"}],
+    "start_frame": 1,
+    "end_frame": 24,
+    "max_error_m": 0,
+    "samples": 2
+  },
+  "inspect_skin_clearance": {
+    "body": "EvalSkin",
+    "garments": ["MorphSource"],
+    "start_frame": 1,
+    "end_frame": 24,
+    "min_clearance_m": 0.001,
+    "samples": 2
+  }
+}
