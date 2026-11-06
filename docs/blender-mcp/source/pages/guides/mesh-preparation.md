@@ -180,6 +180,41 @@ Calls accept 1–20,000 faces and at most 60,000 selected loops; components and
 resulting UVs must be finite within ±1,000,000, with rotation within ±360,000°.
 Reinspect coverage and render the actual material before accepting a repair.
 
+### Match a selected surface's density
+
+Use `uv_transform` with both `target_px_per_m` and `uv_region` to compute a
+uniform scale for the declared source faces. The destination supplies final
+texture width/height, reserved bounds and pixel gutters; dimensions can be
+rectangular and reach 16,384 pixels. Choose the target from the asset's texture
+budget or a measured neighboring surface.
+Density matching shares the source and selected-triangle budgets of `unwrap_faces`.
+
+```json
+{"action":"uv_transform","name":"Body","uv_layer":"BakeAtlas","uv_transform":{"faces":[12,13],"pivot":[0.75,0.75]},"target_px_per_m":512,"uv_region":{"bounds":[0.5,0.5,1,1],"texture_resolution":[2048,1024],"margin_px":8},"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+These numbers are an example. Keep explicit `scale` at `[1,1]`; the target
+computes its own factor. Pivot, offset and rotation retain their UV-space
+meaning. The operation uses unevaluated source positions with object world
+scale and scene units, retaining rig, weights, shape keys and other mesh data.
+An optional `expected_mesh_sha256` also guards ordinary UV transforms.
+
+The existing region policy protects selected pinned coordinates and requires
+clear space around the selected charts. Explicit `allow_pinned` and
+`allow_overlap` have the same meanings as for `unwrap_faces`. The correction
+does not repack islands, lower the density target, or resample texture images.
+It checks overlap, degenerate UVs, region borders and inter-island gutters on
+the coordinates to be stored, then verifies native readback. A failed write
+or readback check restores the original selected UVs.
+
+`uv_transform.density` reports before/after area-weighted RMS pixels per metre,
+minimum/maximum density and directional anisotropy. Stored coordinates must
+meet the requested aggregate within 0.01 percent. Uniform scaling retains
+existing stretch; additional UV rotation on rectangular textures can change
+it. Inspect the reported anisotropy and actual material. Source UV density
+excludes shader mapping transforms and posed deformation. Apply corrections
+before final painting/baking, then validate the resulting texture placement.
+
 ## Composition
 
 Booleans, joins, splits, mirrors, arrays and solidify restore the original scene

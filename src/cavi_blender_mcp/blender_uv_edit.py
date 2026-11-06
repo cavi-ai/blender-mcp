@@ -68,6 +68,7 @@ def transform(params, editable_mesh, info):
         if destination:
             from .blender_uv_regions import geometry
 
+            bpy.context.view_layer.update()
             loops, surface = geometry(value, faces)
             if loops != [i for i, _ in before]:
                 raise ValueError('Source UV loop order changed before density matching')

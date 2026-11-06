@@ -15,6 +15,9 @@ surface.location = (7, 2, 3)
 surface.rotation_euler = (.2, .1, .3)
 surface.scale = (2, 3, 1)
 surface.data.shape_keys.key_blocks['Lift'].value = .5
+bone = bpy.data.objects['Skeleton'].pose.bones['Root']
+bone.rotation_mode = 'XYZ'
+bone.rotation_euler.z = .3
 bpy.context.scene.unit_settings.system = 'METRIC'
 bpy.context.scene.unit_settings.scale_length = .01
 surface.data.polygons[1].material_index = 1
@@ -30,6 +33,7 @@ bpy.context.view_layer.update()
 def audit(*_):
     obj = bpy.data.objects['TileGrid']
     mesh = obj.data
+    rig = bpy.data.objects['Skeleton']
     (root/'density-audit.json').write_text(json.dumps({
         'geometry': mesh_digest(mesh),
         'uvs': {l.name: [list(row.uv) for row in l.data] for l in mesh.uv_layers},
@@ -38,6 +42,10 @@ def audit(*_):
                  for k in mesh.shape_keys.key_blocks},
         'weights': [[(g.group, g.weight) for g in v.groups] for v in mesh.vertices],
         'modifiers': [(m.name, m.type, m.object.name) for m in obj.modifiers],
+        'rig_bones': [(b.name, list(b.head_local), list(b.tail_local), b.parent.name if b.parent else None)
+                      for b in rig.data.bones],
+        'rig_pose': [(b.name, b.rotation_mode, list(b.location), list(b.rotation_euler),
+                      list(b.rotation_quaternion), list(b.scale)) for b in rig.pose.bones],
         'parent': obj.parent.name, 'materials': [s.material.name for s in obj.material_slots],
         'slots': [f.material_index for f in mesh.polygons],
         'colors': [list(row.color) for row in mesh.color_attributes['Tint'].data],

@@ -1,5 +1,29 @@
 [
   {
+    "id": "density-transform-requires-region",
+    "tool": "mesh_edit",
+    "arguments": {"action": "uv_transform", "name": "EvalProp", "uv_transform": {"faces": [0]}, "target_px_per_m": 512},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "requires target_px_per_m and uv_region together"
+  },
+  {
+    "id": "density-region-requires-target",
+    "tool": "mesh_edit",
+    "arguments": {"action": "uv_transform", "name": "EvalProp", "uv_transform": {"faces": [0]}, "uv_region": {"bounds": [0,0,1,1], "texture_resolution": [2048,1024], "margin_px": 8}},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "requires target_px_per_m and uv_region together"
+  },
+  {
+    "id": "density-transform-rejects-extra-scale",
+    "tool": "mesh_edit",
+    "arguments": {"action": "uv_transform", "name": "EvalProp", "uv_transform": {"faces": [0], "scale": [2,1]}, "target_px_per_m": 512, "uv_region": {"bounds": [0,0,1,1], "texture_resolution": [2048,1024], "margin_px": 8}},
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "omit the explicit scale"
+  },
+  {
     "id": "fbx-triangulate-invalid-type",
     "tool": "asset_io",
     "arguments": {
