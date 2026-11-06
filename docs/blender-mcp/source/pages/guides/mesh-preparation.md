@@ -17,6 +17,7 @@ on the same object without applying transforms or changing scene references.
 | `unwrap` | Smart UV Project and island packing |
 | `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |
 | `set_seams` | Set or clear exact source-edge seam flags without changing UVs |
+| `move_vertices` | Translate declared source vertices and all their shape-key points |
 | `decimate_to` | Collapse to a triangle target or ratio, optionally preserving seams |
 | `remesh_quad` | QuadriFlow to a face target on a manifold mesh |
 | `lod_chain` | Create `<base>_LOD1..n` in `<base>_LODs` |
@@ -73,6 +74,30 @@ Run topology and UV checks, then inspect the silhouette before export.
 
 Use `unwrap_faces` with the returned `side_faces` and geometry hash to lay out
 the new surfaces while retaining the cap and unselected UVs.
+
+## Adjust source vertices
+
+Page `scene_info(name="Body", vertices=true, limit=100, offset=0)` for source
+indices, local positions/normals and selection flags. Keep matching `mesh_sha256`
+across pages. Vertex, face, edge and instance-definition modes are exclusive.
+
+```json
+{"action":"move_vertices","name":"Body","vertex_indices":[12,18],"offset":[0,0,0.025],"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The operation translates the selected source points in local space. It requires
+editable Object Mode data and independent mesh/shape-key data. Modifiers and
+rigs remain attached. Every relative or absolute shape-key block receives the
+same translation, retaining deformation offsets within native float storage.
+The result's `vertex_edit` reports changed points, key-block count, geometry
+hashes and measured `max_shape_delta_error_local`.
+
+It preserves topology, UVs, pins, colors, weights, materials, rig and animation
+links, and scene context. Selection accepts 1–20,000 unique source indices; at
+most 1,000,000 mesh/key points are captured in one transaction. Validation runs
+before assignment and native write/readback failures restore captured points.
+Inspect texture stretch, normals, intersections and real poses after editing,
+then save/reopen the source before export.
 
 ## Inspect and edit seams
 

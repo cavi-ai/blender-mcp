@@ -19,8 +19,8 @@ def fingerprint(expected, observed=None):
             raise ValueError('Mesh geometry changed since inspection; inspect the faces again')
 
 
-def selection(faces, offset, face_count=None, expected=None, observed=None):
-    indices(faces, face_count)
+def selection(faces, offset, face_count=None, expected=None, observed=None, field='face_indices'):
+    indices(faces, face_count, field)
     if (not isinstance(offset, (list, tuple)) or len(offset) != 3
             or any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e6 for v in offset)
             or not any(offset)):
