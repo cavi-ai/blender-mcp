@@ -69,6 +69,23 @@ class PBRSurfaceTests(unittest.TestCase):
                 asyncio.run(server.mcp.call_tool("assign_material", arguments))
         self.assertEqual(calls, [])
 
+    def test_named_uv_is_forwarded_for_scene_object_and_instance_assignments(self):
+        calls = self.capture()
+        for extra, operation in [({}, 'assign_material'), ({'link_mode': 'OBJECT'}, 'assign_object_material'),
+                                 ({'instance': 'Room'}, 'assign_instance_material')]:
+            asyncio.run(server.assign_material(['A'], 'M', uv_layer='BakeAtlas', lease_id='L', **extra))
+            self.assertEqual(calls[-1][1]['operation'], operation)
+            self.assertEqual(calls[-1][1]['params']['uv_layer'], 'BakeAtlas')
+        asyncio.run(server.assign_material(['A'], 'M', uv_layer='', update_existing=True, lease_id='L'))
+        self.assertEqual(calls[-1][1]['params']['uv_layer'], '')
+
+    def test_uv_selection_is_not_accepted_by_node_inspection_or_material_copy(self):
+        calls = self.capture()
+        for action in ('inspect', 'make_unique'):
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                asyncio.run(server.assign_material(['A'], 'M', action=action, uv_layer='Atlas', lease_id='L'))
+        self.assertEqual(calls, [])
+
     def test_materials_check_is_forwarded_and_bounded(self):
         calls = self.capture()
         asyncio.run(server.inspect_mesh_quality(["A"], checks=["materials"]))

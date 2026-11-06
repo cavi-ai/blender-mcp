@@ -32,6 +32,7 @@ DEFAULTS = {
     "uv_scale": [1.0, 1.0],
     "uv_offset": [0.0, 0.0],
     "uv_rotation_degrees": 0.0,
+    "uv_layer": "",
 }
 
 
@@ -89,6 +90,8 @@ def pair(value, low, high, label):
 
 def overlay(params):
     provided = {}
+    if params.get('uv_layer') is not None:
+        provided['uv_layer'] = uv_name(params['uv_layer'])
     if params.get("base_color") is not None:
         color = params["base_color"]
         if not isinstance(color, (list, tuple)) or len(color) != 4:
@@ -128,6 +131,13 @@ def overlay(params):
         provided["uv_rotation_degrees"] = bounded(params["uv_rotation_degrees"], -3600, 3600,
                                                   "uv_rotation_degrees")
     return provided
+
+
+def uv_name(value):
+    if (not isinstance(value, str) or len(value.encode('utf-8')) > 63
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+        raise ValueError('uv_layer must be an existing UV name or an empty string for render-active UVs')
+    return value
 
 
 def resolve_config(params, existing):
@@ -218,7 +228,7 @@ def build(material, config, workspace, receipts, created_images, discard=None):
     mapping = None
     if receipts:
         uv = nodes.new("ShaderNodeUVMap")
-        uv.uv_map = ""
+        uv.uv_map = config['uv_layer']
         mapping = nodes.new("ShaderNodeMapping")
         mapping.inputs["Scale"].default_value = (*config["uv_scale"], 1)
         mapping.inputs["Location"].default_value = (*config["uv_offset"], 0)
@@ -247,6 +257,7 @@ def build(material, config, workspace, receipts, created_images, discard=None):
         if "normal_texture" in receipts:
             node = image("normal_texture", "Normal")
             normal = nodes.new("ShaderNodeNormalMap")
+            normal.uv_map = config['uv_layer']
             normal.inputs["Strength"].default_value = config["normal_strength"]
             links.new(node.outputs["Color"], normal.inputs["Color"])
             links.new(normal.outputs["Normal"], shader.inputs["Normal"])
@@ -293,6 +304,7 @@ def assign(params, workspace, find_object):
     values = [find_object(value, mesh=True) for value in names]
     existing = bpy.data.materials.get(name)
     config, update = resolve_config(params, existing)
+    config['uv_layer'] = uv_name(config['uv_layer'])
     link_mode = params.get('link_mode')
     if link_mode is not None and link_mode not in {'DATA', 'OBJECT'}:
         raise ValueError('link_mode must be DATA or OBJECT')
@@ -318,6 +330,14 @@ def assign(params, workspace, find_object):
     if any(config.get(key) is not None for key in TEXTURES) and any(
             not value.data.uv_layers for value in values):
         raise ValueError("Textured meshes require an existing UV layer")
+    if config['uv_layer']:
+        owners = set(values)
+        if update:
+            owners.update(value for value in bpy.data.objects if value.type == 'MESH'
+                          and any(slot.material is existing for slot in value.material_slots))
+        missing = sorted(value.name for value in owners if value.data.uv_layers.get(config['uv_layer']) is None)
+        if missing:
+            raise ValueError('Named UV layer is missing on material targets or shared owners: ' + ', '.join(missing))
     receipts = textures(workspace, config)
     old_images = set()
     if update:
