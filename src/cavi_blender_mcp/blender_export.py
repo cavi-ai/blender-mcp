@@ -76,7 +76,8 @@ def active_clip():
         scene.frame_set(previous[3], subframe=previous[4])
 
 
-def fbx(path, preset, empties=False, animations=False, textures=False, animation_step=None, baked_animation=False):
+def fbx(path, preset, empties=False, animations=False, textures=False, animation_step=None, baked_animation=False,
+        triangulate=False):
     object_types = {"MESH", "EMPTY", "ARMATURE"} if animations else (
         {"MESH", "EMPTY"} if empties else {"MESH"})
     with active_clip() if baked_animation else nullcontext():
@@ -95,7 +96,7 @@ def fbx(path, preset, empties=False, animations=False, textures=False, animation
         sampled = {'animation_frame_range': [bpy.context.scene.frame_start, bpy.context.scene.frame_end]} if baked_animation else {}
         result = bpy.ops.export_scene.fbx(
             filepath=str(path), use_selection=True, object_types=object_types,
-            mesh_smooth_type="FACE", use_tspace=True, add_leaf_bones=False,
+            mesh_smooth_type="FACE", use_tspace=True, use_triangles=triangulate, add_leaf_bones=False,
             bake_anim=animations, bake_anim_use_all_bones=animations,
             bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations and not baked_animation,
             bake_anim_force_startend_keying=animations, use_custom_props=animations,
@@ -118,8 +119,13 @@ def usd(path, preset, instances, animations=False):
 
 
 def write(path, objects, selection, preset, instances, empties, animations=False,
-          textures=False, baked_animation=False, animation_step=None, uv_layer=None, uv_objects=None):
+          textures=False, baked_animation=False, animation_step=None, uv_layer=None, uv_objects=None,
+          triangulate=False):
     suffix = path.suffix.lower()
+    if type(triangulate) is not bool:
+        raise ValueError('triangulate must be boolean')
+    if triangulate and suffix != '.fbx':
+        raise ValueError('triangulate applies only to FBX exports')
     sampled = {}
     primary='st' if suffix in {'.usd','.usda','.usdc'} else None
     with promote(objects if uv_objects is None else uv_objects,uv_layer,primary) as uv_maps, selected(selection), (export_identities(selection) if animations else nullcontext()):
@@ -127,7 +133,8 @@ def write(path, objects, selection, preset, instances, empties, animations=False
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if instances else nullcontext():
-                result, sampled = fbx(path, preset, empties, animations, textures, animation_step, baked_animation)
+                result, sampled = fbx(path, preset, empties, animations, textures, animation_step, baked_animation,
+                                      triangulate=triangulate)
         elif suffix == ".glb":
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
@@ -327,6 +334,9 @@ def export_asset(p):
     suffix = Path(p["path"]).suffix.lower()
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
+    triangulate = flag(p, 'triangulate')
+    if triangulate and suffix != '.fbx':
+        raise ValueError('triangulate applies only to FBX exports')
     preset = preset_for(p, suffix)
     if (baked_animation or animation_step is not None) and not animations:
         raise ValueError('Animation sampling options require animations=true')
@@ -406,7 +416,7 @@ def export_asset(p):
                 with prepared_images(objects, directory) if textures else nullcontext():
                     sampled = write(path, objects, selection, preset, False, empties,
                           animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step,
-                          uv_layer=p.get('uv_layer'))
+                          uv_layer=p.get('uv_layer'), triangulate=triangulate)
                     files = texture_receipt(directory) if directory else []
             except Exception:
                 if directory is not None:
@@ -427,7 +437,8 @@ def export_asset(p):
         try:
             with prepared_images(objects, directory) if textures else nullcontext():
                 sampled=write(path, meshes if instances else objects, selection, preset,
-                      instances, empties, textures=textures,uv_layer=p.get('uv_layer'),uv_objects=meshes)
+                      instances, empties, textures=textures,uv_layer=p.get('uv_layer'),uv_objects=meshes,
+                      triangulate=triangulate)
                 files = texture_receipt(directory) if directory else []
         except Exception:
             if directory is not None:
@@ -442,7 +453,7 @@ def export_asset(p):
 
 def bake_pair(p):
     if any(p.get(k) for k in ("names", "lods", "collision", "preserve_instances",
-                              "include_empties", "animations", "textures")):
+                              "include_empties", "animations", "textures", "triangulate")):
         raise ValueError("bake_pair is exported alone")
     pair = p["bake_pair"]
     if not isinstance(pair, dict) or set(pair) != {"high", "low"}:
