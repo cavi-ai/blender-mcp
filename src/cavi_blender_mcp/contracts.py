@@ -3,7 +3,7 @@
 from typing import Any, ClassVar, Literal
 
 from cavi_mcp_core.contracts import Result, VariantResult
-from pydantic import model_validator
+from pydantic import StrictInt, model_validator
 
 
 class ImageReceipt(Result):
@@ -31,7 +31,7 @@ class SceneInfo(Result):
     mesh_sha256: str | None = None
     seams_sha256: str | None = None
     faces: list[dict[str, Any]] | None = None
-    vertices: list[dict[str, Any]] | None = None
+    vertices: StrictInt | list[dict[str, Any]] | None = None
     uv: dict[str, Any] | None = None
     edges: list[dict[str, Any]] | None = None
     render_settings: SceneRenderSettings | None = None
@@ -50,6 +50,18 @@ class SceneInfo(Result):
     instance_collection: str | None = None
     instance_offset: list[float] | None = None
     scene_instances: list[str] | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def vertex_shape(cls,value):
+        if isinstance(value,dict):
+            vertices = value.get('vertices')
+            if value.get('scope') == 'source_mesh_vertices':
+                if not isinstance(vertices,list):
+                    raise ValueError('Source vertex pages require a vertex list')
+            elif vertices is not None and (type(vertices) is not int or vertices < 0):
+                raise ValueError('Named-object vertices require a nonnegative integer count')
+        return value
 
 
 class MeshQuality(Result):

@@ -6,6 +6,19 @@ from mcp.client.stdio import stdio_client
 
 
 class ResultContractTests(unittest.IsolatedAsyncioTestCase):
+    def test_scene_info_keeps_named_vertex_counts_and_scoped_vertex_pages(self):
+        from cavi_blender_mcp.contracts import SceneInfo
+
+        count = SceneInfo.model_validate({'name':'Cube','type':'MESH','vertices':8})
+        page = SceneInfo.model_validate({'name':'Cube','scope':'source_mesh_vertices',
+                                         'vertices':[{'index':0,'position_local':[0,0,0]}]})
+        self.assertEqual(count.vertices,8)
+        self.assertEqual(page.vertices[0]['index'],0)
+        for invalid in ({'vertices':True},{'vertices':-1},{'vertices':1.5},{'vertices':[]},
+                        {'scope':'source_mesh_vertices','vertices':8}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                SceneInfo.model_validate(invalid)
+
     def test_nested_decode_failure_keeps_transport_outcome_unknown(self):
         from cavi_mcp_core.contracts import failure
         from mcp.server.mcpserver.exceptions import ToolError

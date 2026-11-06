@@ -33,6 +33,8 @@ async def exercise(root, env, parameters=None):
 
         before = await snapshot()
         assert before['objects']['TileGrid']['animation']['curves']
+        named = await call('scene_info',name='TileGrid')
+        assert named['vertices'] == len(before['objects']['TileGrid']['vertices'])
         pages = [await call('scene_info',name='TileGrid',vertices=True,limit=3,offset=i) for i in (0,3)]
         assert pages[0]['mesh_sha256'] == pages[1]['mesh_sha256']
         assert [v['index'] for p in pages for v in p['vertices']] == list(range(6))

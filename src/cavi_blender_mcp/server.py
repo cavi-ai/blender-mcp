@@ -676,7 +676,7 @@ async def mesh_edit(
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
                     "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
-    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="modifier needs type")] = None,
+    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="Modifier type")] = None,
     amount: Annotated[Number | None, Field(
         description="Bevel width (0,100], decimate ratio (0,1], subdivision 1-3, voxel size "
         "[0.005,1].")] = None,
@@ -714,7 +714,7 @@ async def mesh_edit(
                             Field(min_length=1, max_length=20000, description="Source polygon indices")] = None,
     count: Annotated[StrictInt | None, Field(ge=2, le=1000, description="array needs count")] = None,
     offset: Annotated[Vector3 | Annotated[Number, Field(ge=-1, le=1)] | None,
-                      Field(description="Vector; solidify: scalar [-1,1]")] = None,
+                      Field(description="Vector; solidify [-1,1]")] = None,
     thickness: Annotated[Number | None, Field(gt=0, le=100, description="solidify needs thickness")] = None,
     clipping: Annotated[StrictBool | None, Field(description="mirror: clip at plane")] = None,
     uv_transform: Annotated[UVTransform | None, Field(description="Required UV transform/face selection")] = None,
@@ -985,7 +985,7 @@ async def bake(
     source: Annotated[ShaderBakeSource | None, Field(description='shader: socket IDs/UV atlas; raw-data/sRGB-color PNG; signed/HDR needs EXR, alpha its own socket')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> MapBakeResult:
-    """Bake geometry maps/shader socket to a new image."""
+    """Bake geometry maps/shader socket to new image."""
     if map == 'shader':
         if source is None:
             raise ValueError('shader requires source')
@@ -1138,7 +1138,7 @@ async def geometry_nodes(
     instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease ID")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit procedural inputs or snapshot meshes; list members with scene_info(definition=true)."""
+    """Inspect/edit procedural inputs or snapshot meshes; members via scene_info(definition=true)."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
               'instance': instance}
     if action == 'inspect':
