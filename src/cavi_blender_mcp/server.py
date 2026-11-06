@@ -493,7 +493,7 @@ async def scene_edit(
 @mcp.tool(annotations=ADDITIVE)
 async def render_preview(
     path: Annotated[str, Field(description="New workspace PNG")],
-    resolution: Annotated[StrictInt, Field(description="Square pixels")] = 512,
+    resolution: Annotated[StrictInt, Field(description="Square size, 64-2048 px")] = 512,
     names: Annotated[list[str] | None, Field(min_length=1, max_length=1000,
                                              description="Meshes to isolate")] = None,
     direction: Annotated[Vector3, Field(description="Camera direction from center")] = (
