@@ -68,6 +68,7 @@ OPERATIONS = frozenset(
         "edit_material_links",
         "inspect_shader_node_types",
         "create_shader_node",
+        "set_shader_ramp",
         "assign_instance_material",
         "assign_object_material",
         "decimate_to",
