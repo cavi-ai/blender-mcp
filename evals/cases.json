@@ -1,4 +1,5 @@
 [
+  {"id": "scene-geometry-hash", "tool": "scene_info", "arguments": {"surface_ray": {"camera": "Hero", "pixel": [1, 1], "image_size": [64, 48], "max_distance_m": 5, "evaluated": true, "expected_geometry_sha256": "invalid"}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "pattern"},
   {"id": "scene-camera-source", "tool": "scene_info", "arguments": {"surface_ray": {"camera": "Hero", "pixel": [1, 1], "image_size": [64, 48], "max_distance_m": 5}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "requires evaluated=true"},
   {"id": "scene-camera-pagination", "tool": "scene_info", "arguments": {"limit": 2, "surface_ray": {"camera": "Hero", "pixel": [1, 1], "image_size": [64, 48], "max_distance_m": 5, "evaluated": true}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "excludes pagination"},
   {"id": "camera-pixel-outside", "tool": "scene_info", "arguments": {"name": "EvalProp", "surface_ray": {"camera": "Hero", "pixel": [64, 0], "image_size": [64, 48], "max_distance_m": 5}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "within the declared image"},

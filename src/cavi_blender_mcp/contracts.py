@@ -172,6 +172,7 @@ class SceneEditResult(VariantResult):
     bit_depth: int | None = None
     sha256: str | None = None
     camera_projection: dict[str, Any] | None = None
+    geometry_identity: dict[str, Any] | None = None
 
 
 Number = int | float
