@@ -28,6 +28,60 @@ def topology(mesh):
     return tuple(signature)
 
 
+def cast(mesh, matrix, spec, unit, camera_query):
+    origin,direction,distance = local_ray(spec['origin_world'],spec['direction_world'],
+        spec['max_distance_m'],matrix,unit)
+    mesh.calc_loop_triangles()
+    if len(mesh.loop_triangles) > 500000:
+        raise ValueError('Surface picking supports at most 500000 triangles')
+    report={'hit':False}
+    if not mesh.loop_triangles:
+        return report
+    triangles = [tuple(t.vertices) for t in mesh.loop_triangles]
+    coordinates = [tuple(v.co) for v in mesh.vertices]
+    tree = BVHTree.FromPolygons(coordinates,triangles,all_triangles=True)
+    point,normal,index,_ = tree.ray_cast(Vector(origin),Vector(direction),distance)
+    if point is None:
+        return report
+    world = matrix[:3,:3] @ np.asarray(point,dtype=np.float64)+matrix[:3,3]
+    distance_m = math.dist(world,spec['origin_world'])*unit
+    if distance_m > spec['max_distance_m']:
+        return report
+    if camera_query is not None:
+        from .blender_camera_ray import inside_clip
+
+        if not inside_clip(world,camera_query):
+            return report
+    world_normal = np.linalg.inv(matrix[:3,:3]).T @ np.asarray(normal,dtype=np.float64)
+    norm = math.hypot(*world_normal)
+    if not 0 < norm < math.inf or not np.isfinite(world).all():
+        raise ValueError('Surface intersection produced nonfinite world geometry')
+    triangle = mesh.loop_triangles[index]
+    factors = barycentric_factors(tuple(point),[coordinates[i] for i in triangle.vertices])
+    if min(factors) < -1e-5 or max(factors) > 1+1e-5:
+        raise ValueError('Surface intersection is outside its source triangle')
+    report.update(hit=True,face_index=triangle.polygon_index,
+        triangle_vertices=list(triangle.vertices),triangle_loops=list(triangle.loops),
+        material_index=mesh.polygons[triangle.polygon_index].material_index,
+        position_local=list(point),position_world=world.tolist(),
+        normal_world=(world_normal/norm).tolist(),distance_m=distance_m,barycentric=list(factors))
+    return report
+
+
+def uv_position(layer, hit):
+    uv=[sum(weight*layer.data[loop].uv[axis]
+            for weight,loop in zip(hit['barycentric'],hit['triangle_loops'],strict=True)) for axis in range(2)]
+    if not all(math.isfinite(v) for v in uv):
+        raise ValueError('Picked source UV coordinates must be finite')
+    return uv
+
+
+def material_binding(value, index):
+    slot=value.material_slots[index] if index < len(value.material_slots) else None
+    return {'index':index,'name':slot.material.name if slot and slot.material else None,
+            'link':slot.link if slot else None}
+
+
 def inspect(p):
     evaluated = None
     try:
@@ -59,14 +113,8 @@ def inspect(p):
                     raise ValueError('Evaluated topology differs from the source; source indices are unavailable')
             unit = bpy.context.scene.unit_settings.scale_length
             matrix = np.asarray((evaluated or value).matrix_world,dtype=np.float64)
-            origin,direction,distance = local_ray(spec['origin_world'],spec['direction_world'],
-                spec['max_distance_m'],matrix,unit)
-            mesh.calc_loop_triangles()
-            if len(mesh.loop_triangles) > 500000:
-                raise ValueError('Surface picking supports at most 500000 triangles')
-            triangles = [tuple(t.vertices) for t in mesh.loop_triangles]
-            coordinates = [tuple(v.co) for v in mesh.vertices]
-            report = {'hit':False,'geometry':'evaluated_current_frame' if evaluated else 'source_mesh',
+            report = {**cast(mesh,matrix,spec,unit,camera_query),
+                'geometry':'evaluated_current_frame' if evaluated else 'source_mesh',
                 'frame':bpy.context.scene.frame_current,'frame_subframe':bpy.context.scene.frame_subframe,
                 'scene_unit_meters':unit,'matrix_world':matrix.tolist(),'ray':dict(spec),
                 'surface_sha256':mesh_digest(mesh),'intersection_precision':'native_float32_bvh'}
@@ -76,40 +124,10 @@ def inspect(p):
                 report['camera_query']=camera_query
             if layer is not None:
                 report['uv'] = {'layer':layer.name,'sha256':uv_digest(layer)}
-            if not triangles:
-                return result
-            tree = BVHTree.FromPolygons(coordinates,triangles,all_triangles=True)
-            point,normal,index,_ = tree.ray_cast(Vector(origin),Vector(direction),distance)
-            if point is None:
-                return result
-            world = matrix[:3,:3] @ np.asarray(point,dtype=np.float64)+matrix[:3,3]
-            distance_m = math.dist(world,spec['origin_world'])*unit
-            if distance_m > spec['max_distance_m']:
-                return result
-            if camera_query is not None:
-                from .blender_camera_ray import inside_clip
-
-                if not inside_clip(world,camera_query):
-                    return result
-            world_normal = np.linalg.inv(matrix[:3,:3]).T @ np.asarray(normal,dtype=np.float64)
-            norm = math.hypot(*world_normal)
-            if not 0 < norm < math.inf or not np.isfinite(world).all():
-                raise ValueError('Surface intersection produced nonfinite world geometry')
-            triangle = mesh.loop_triangles[index]
-            factors = barycentric_factors(tuple(point),[coordinates[i] for i in triangle.vertices])
-            if min(factors) < -1e-5 or max(factors) > 1+1e-5:
-                raise ValueError('Surface intersection is outside its source triangle')
-            report.update(hit=True,face_index=triangle.polygon_index,
-                triangle_vertices=list(triangle.vertices),triangle_loops=list(triangle.loops),
-                material_index=source.polygons[triangle.polygon_index].material_index,
-                position_local=list(point),position_world=world.tolist(),
-                normal_world=(world_normal/norm).tolist(),distance_m=distance_m,barycentric=list(factors))
-            if layer is not None:
-                uv = [sum(weight*layer.data[loop].uv[axis] for weight,loop in zip(factors,triangle.loops,strict=True))
-                      for axis in range(2)]
-                if not all(math.isfinite(v) for v in uv):
-                    raise ValueError('Picked source UV coordinates must be finite')
-                report['uv']['position'] = uv
+            if report['hit']:
+                report['material']=material_binding(value,report['material_index'])
+                if layer is not None:
+                    report['uv']['position']=uv_position(layer,report)
             return result
     finally:
         if evaluated is not None:

@@ -1032,6 +1032,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'pick_scene_surface':
+        from .blender_scene_pick import inspect
+
+        return inspect(p)
     if operation == 'pick_mesh_surface':
         from .blender_surface_pick import inspect
 

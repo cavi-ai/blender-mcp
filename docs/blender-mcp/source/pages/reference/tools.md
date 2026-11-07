@@ -10,6 +10,8 @@ metre range, returning a source face, triangle indices and optional corner UVs.
 Hits and misses are explicit; the query does not test other objects' occlusion.
 `surface_ray` also accepts a named camera, top-left pixel index and image size.
 Named renders return image/projection hashes for rejecting a changed camera view.
+Omit `name` with an evaluated camera query to discover the nearest scene mesh or
+instance, its material binding and the availability of editable source indices.
 With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
 `mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
 Its optional `amount` enables physical proportional falloff along connected source

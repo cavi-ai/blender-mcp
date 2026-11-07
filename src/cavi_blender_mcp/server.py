@@ -236,10 +236,16 @@ async def scene_info(
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
 ) -> SceneInfo:
-    """Inspect paged objects and source topology."""
+    """Inspect objects, source topology or camera-picked scene surfaces."""
     if surface_ray is not None:
-        if name is None or vertices or faces or edges or definition or offset or limit != 200:
+        if vertices or faces or edges or definition or offset or limit != 200:
             raise ValueError('surface_ray requires a mesh name and excludes pagination and other modes')
+        if name is None:
+            if not isinstance(surface_ray,CameraRay):
+                raise ValueError('World surface_ray requires a mesh name')
+            if not surface_ray.evaluated:
+                raise ValueError('Scene camera picking requires evaluated=true')
+            return await run(call,'pick_scene_surface',surface_ray=surface_ray.model_dump(mode='json'),uv_layer=uv_layer)
         return await run(call,'pick_mesh_surface',name=name,surface_ray=surface_ray.model_dump(mode='json'),uv_layer=uv_layer)
     if vertices:
         if name is None or faces or edges or definition or uv_layer is not None:

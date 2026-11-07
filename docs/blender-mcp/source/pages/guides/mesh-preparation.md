@@ -198,6 +198,31 @@ or compensate for depth of field, motion blur or compositor distortion. Use a
 clean review pass and retain source identities. Border/cropped, stereo and
 panoramic mappings are not inferred. Existing world-ray queries remain valid.
 
+### Discover the scene target
+
+Omit `name` with a camera query and `evaluated=true` to intersect the current view
+layer's evaluated meshes and instances. The nearest hit returns the source object
+name, material slot/name/link mode, generated placement matrix, instancer parent
+and persistent instance ID. `hide_render`, camera-ray visibility and instancer
+flags filter candidates. World-ray queries still require a named mesh.
+
+The `scene_surface_pick` receipt explicitly distinguishes a hit from a miss.
+`source_mapping.available` permits source face indices and source UVs only for
+checked topology-preserving geometry. Generated topology remains discoverable,
+with evaluated indices explicitly labeled; it cannot supply editable source
+indices. A missing requested source UV map is reported unavailable.
+
+This query uses current view-layer geometry, rather than executing a render.
+Its `not_checked` fields cover shader opacity, non-mesh objects, render-only
+visibility and render/viewport modifier differences. Keep these aligned for a
+clean geometric selection pass. Transparent or coincident surfaces may need
+separate inspection. Camera projection identities do not bind scene content.
+
+World-space bounds discard objects away from the ray before detailed work.
+Detailed candidates share a 500000-vertex/triangle evaluation budget per query;
+an exceeded budget rejects the query instead of returning a partial nearest hit.
+The query preserves selection, source geometry, camera, frame and materials.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect

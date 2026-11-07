@@ -67,3 +67,22 @@ def pixel_ray(pixel, image_size, projection, camera_world, kind, near, far):
     if not np.isfinite(start_world).all() or not 0 < span < math.inf:
         raise ValueError('Camera ray exceeds finite world geometry')
     return start_world.tolist(),(delta/span).tolist(),span
+
+
+def bounds_intersect(origin, direction, distance, corners):
+    """Conservative ray interval against the axis-aligned envelope of supplied corners."""
+    corners=np.asarray(corners,dtype=np.float64)
+    if (corners.ndim!=2 or corners.shape[1]!=3 or not len(corners)
+            or not np.isfinite(corners).all()):
+        raise ValueError('Scene bounds require finite 3D corners')
+    low,high=0.,distance
+    for o,d,lower,upper in zip(origin,direction,corners.min(axis=0),corners.max(axis=0),strict=True):
+        if d==0:
+            if not lower<=o<=upper:
+                return False
+            continue
+        enter,leave=sorted(((lower-o)/d,(upper-o)/d))
+        low,high=max(low,enter),min(high,leave)
+        if low>high:
+            return False
+    return True
