@@ -173,6 +173,31 @@ are deformed coordinates; inspect the returned source vertices before choosing
 an edit. A base hash does not lock external pose or transform state. Re-pick after
 those changes. Picking does not move the scene, selection or frame.
 
+### Pick a camera pixel
+
+Alternatively, `surface_ray` accepts `camera`, `pixel`, `image_size` and
+`max_distance_m`, with optional `evaluated` and `expected_projection_sha256`:
+
+```json
+{"name":"Body","surface_ray":{"camera":"Hero","pixel":[320,240],"image_size":[640,480],"max_distance_m":5,"evaluated":true,"expected_projection_sha256":"<render-projection-sha256>"},"uv_layer":"UVMap"}
+```
+
+Pixels use zero-based top-left indices at their centers; fractional indices are
+allowed. Image dimensions must match the current effective render raster.
+Blender's projection matrix handles pixel aspect, lens shift and camera sensor
+fit for perspective/orthographic views. The evaluated camera uses the renderer's normalized
+transform. Rays start at the near plane; the far plane and
+the requested metre range both limit hits. The receipt retains the projection
+snapshot and effective world ray.
+
+Named `scene_edit` renders return an image `sha256` and `camera_projection`.
+An available projection is checked before and after rendering; a changed or
+unsupported view receives `available=false` with a reason. Pass its hash when
+picking to reject stale view state. This does not bind every scene-content edit
+or compensate for depth of field, motion blur or compositor distortion. Use a
+clean review pass and retain source identities. Border/cropped, stereo and
+panoramic mappings are not inferred. Existing world-ray queries remain valid.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect

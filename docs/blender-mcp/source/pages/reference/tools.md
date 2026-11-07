@@ -8,6 +8,8 @@ With `surface_ray`, it intersects a named mesh from an explicit world ray and
 metre range, returning a source face, triangle indices and optional corner UVs.
 `evaluated=true` checks current deform-only geometry against source topology.
 Hits and misses are explicit; the query does not test other objects' occlusion.
+`surface_ray` also accepts a named camera, top-left pixel index and image size.
+Named renders return image/projection hashes for rejecting a changed camera view.
 With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
 `mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
 Its optional `amount` enables physical proportional falloff along connected source
