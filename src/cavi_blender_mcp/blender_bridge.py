@@ -1082,6 +1082,10 @@ def _dispatch(operation, p):
         from .blender_uv_edit import transform as transform_uv
 
         return transform_uv(p, editable_mesh, info)
+    if operation == 'edit_material_links':
+        from .blender_shader_links import edit_links
+
+        return edit_links(p)
     if operation in {'inspect_material_nodes', 'set_material_inputs', 'set_material_image'}:
         from .blender_shader_inputs import inspect, set_image, set_inputs
 
