@@ -8,6 +8,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from . import process_launch
 from .paths import destination
 
 MLX_MAX_FACES = 500000
@@ -46,8 +47,12 @@ def run(command, env, timeout, deadline, describe=None):
     try:
         if left <= 0:
             raise subprocess.TimeoutExpired(command, timeout)
+        prepared = process_launch.command(command, env=env)
+        left = deadline - time.monotonic()
+        if left <= 0:
+            raise subprocess.TimeoutExpired(command, timeout)
         result = subprocess.run(
-            command, env=env, capture_output=True, text=True, timeout=left, check=False
+            prepared, env=env, capture_output=True, text=True, timeout=left, check=False
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(
