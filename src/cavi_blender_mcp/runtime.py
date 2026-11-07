@@ -7,11 +7,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+from . import process_launch
 from .client import BridgeClient
 from .paths import environment_path
 
 
 def start_runtime(project=None, background=False):
+    owned = bool(os.environ.get(process_launch.OWNER))
+    if owned and not background:
+        raise RuntimeError("Supervised Blender launches require background mode")
     workspace = environment_path(
         "CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender"
     ).resolve()
@@ -32,6 +36,8 @@ def start_runtime(project=None, background=False):
                 "Cannot confirm that the bridge is unavailable; inspect status before starting"
             ) from exc
     else:
+        if owned:
+            raise RuntimeError("A Blender bridge is already connected; inspect its existing ownership")
         if source is not None and scene.get("file") != str(source):
             raise RuntimeError("A different Blender project is connected; it was left untouched")
         return {"connected": True, "launch_requested": False,
@@ -53,6 +59,8 @@ def start_runtime(project=None, background=False):
     command.extend(["--python-exit-code", "1", "--python", str(Path(__file__).with_name("bootstrap.py"))])
     env = dict(os.environ, CAVI_BLENDER_CONNECTION=str(connection),
                CAVI_BLENDER_WORKSPACE=str(workspace))
+    env = process_launch.environment(env)
+    command = process_launch.command(command, env=env)
     fd, log_path = tempfile.mkstemp(prefix="launch-", suffix=".log", dir=connection.parent)
     with os.fdopen(fd, "wb") as log:
         process = subprocess.Popen(

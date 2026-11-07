@@ -6,12 +6,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from . import process_launch
+
 
 def solve(executable, workspace, request):
     try:
         return _solve(executable, workspace, request)
-    except OSError as exc:
-        raise ValueError('Native UV worker could not run; source UVs were not changed') from exc
+    except (OSError, RuntimeError) as exc:
+        raise ValueError('Native UV worker could not run; source UVs were not changed: '+str(exc)) from exc
 
 
 def _solve(executable, workspace, request):
@@ -27,10 +29,11 @@ def _solve(executable, workspace, request):
         input_path.write_bytes(payload)
         with log_path.open('w') as log:
             try:
-                result = subprocess.run([executable, '--background', '--factory-startup',
+                command = [executable, '--background', '--factory-startup',
                     '--disable-autoexec', '--python-exit-code', '1', '--python',
                     str(Path(__file__).with_name('blender_uv_region_worker.py')), '--',
-                    str(input_path), str(output_path)], env=env, stdin=subprocess.DEVNULL,
+                    str(input_path), str(output_path)]
+                result = subprocess.run(process_launch.command(command, env=env), env=env, stdin=subprocess.DEVNULL,
                     stdout=log, stderr=subprocess.STDOUT, timeout=45, start_new_session=True, check=False)
             except subprocess.TimeoutExpired as exc:
                 raise ValueError('Native UV worker exceeded 45 seconds; source UVs were not changed') from exc
