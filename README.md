@@ -31,6 +31,8 @@ cavi-blender-mcp runtime start --project before.blend
 
 Newly launched sessions use factory settings without loading or saving your usual preferences. An existing connected session may be reused; `start` will not replace a different connected project. See [project startup](https://github.com/cavi-ai/blender-mcp/blob/v0.56.0/docs/blender-mcp/source/pages/guides/runtime-and-headless.md) if you already use Cavi. Blender is found through `PATH`, `CAVI_BLENDER_BIN`, or the standard macOS application path.
 
+Supervised background runs use MCP Core's owned-exec registration gate for startup, reconstruction and nested UV workers. See [supervised launches](docs/blender-mcp/source/pages/guides/runtime-and-headless.md#supervised-launches) for the private owner handoff and helper-launch contract.
+
 Add Cavi to your agent's MCP configuration:
 
 ```json

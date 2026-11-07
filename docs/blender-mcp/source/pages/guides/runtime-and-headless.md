@@ -30,6 +30,27 @@ uncertain failures leave existing sessions untouched.
 Launch acceptance does not prove readiness. Require a successful status check
 before asset operations.
 
+## Supervised launches
+
+A consuming supervisor can set `CAVI_MCP_PROCESS_OWNER` to MCP Core's private
+owner configuration. Runtime startup, local reconstruction and nested UV workers
+then require the shared [owned-exec registration gate](https://github.com/cavi-ai/mcp-core#owned-execution)
+before the native command executes. Missing gate support or invalid registration refuses launch.
+
+Supervised runtime starts require `--background` and refuse to adopt an already
+connected bridge. Inspect that runtime's existing ownership before continuing.
+The supervisor retains responsibility for admission, process identity, deadlines,
+memory and cleanup; a launch request alone does not establish these results.
+
+Runtime startup seals the selected Core gate file, its hash and host Python in
+`CAVI_MCP_PROCESS_GATE` for Blender's embedded Python. Nested UV workers use this
+handoff without importing the host's ABI-specific site-packages. Keep the owner
+configuration and handoff scoped to the supervised attempt.
+
+New helper launch sites must use `process_launch.command` with the same child
+environment and working directory supplied to the subprocess API. Preserve the
+owner through child environments; do not add an unregistered fallback.
+
 ## Status and restart
 
 `status` and `restart` control the bridge inside an already running Blender
