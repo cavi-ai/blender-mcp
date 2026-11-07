@@ -80,6 +80,13 @@ def _distance(a, b):
     return math.sqrt(best)
 
 
+def uv_edge_key(first, second):
+    """Match source edge endpoints and stored UVs exactly, independent of winding."""
+    if any(not math.isfinite(coordinate) for corner in (first, second) for coordinate in corner[1:]):
+        raise ValueError('UV edge coordinates must be finite')
+    return tuple(sorted((tuple(first), tuple(second))))
+
+
 def _charts(triangles, vertices, valid):
     """Join only shared source edges whose two loop UVs agree exactly."""
     parent = list(range(len(triangles)))
@@ -95,7 +102,7 @@ def _charts(triangles, vertices, valid):
         corners = [(int(vertex), float(uv[0]), float(uv[1]))
                    for vertex, uv in zip(vertices[i], triangles[i])]
         for j in range(3):
-            edge = tuple(sorted((corners[j], corners[(j + 1) % 3])))
+            edge = uv_edge_key(corners[j], corners[(j + 1) % 3])
             if edge in edges:
                 parent[root(i)] = root(edges[edge])
             else:

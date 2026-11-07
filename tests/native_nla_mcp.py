@@ -19,6 +19,15 @@ import cavi_blender_mcp
 PACKAGE_ROOT = Path(cavi_blender_mcp.__file__).resolve().parents[1]
 
 
+async def verify_source_identity(env):
+    process=await asyncio.create_subprocess_exec(sys.executable,'-m','unittest','discover',
+        '-s',str(Path(__file__).parent),'-p','test_source_identity.py',
+        '-k','test_native_save_and_external_replacement_keep_distinct_source_identity',
+        env={**env,'CAVI_SOURCE_IDENTITY_NATIVE':'1'},stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
+    output,_=await process.communicate()
+    assert process.returncode==0,output.decode()
+
+
 async def exercise(root, env):
     params = StdioServerParameters(command=sys.executable,
         args=['-m', 'cavi_blender_mcp.server'], env=env)

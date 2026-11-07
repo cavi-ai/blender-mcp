@@ -8153,5 +8153,9 @@
     "error": "validation"
   },
   {"id": "delete-create", "tool": "object_edit", "arguments": {"action": "create_primitive", "name": "EvalDelete", "kind": "cube"}, "kind": "success", "modes": ["native"]},
-  {"id": "delete-native", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalDelete"}, "kind": "success", "modes": ["native"], "equals": {"/deleted": ["EvalDelete"], "/count": 1}}
+  {"id": "delete-native", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalDelete"}, "kind": "success", "modes": ["native"], "equals": {"/deleted": ["EvalDelete"], "/count": 1}},
+  {"id": "region-uv-missing-layer", "tool": "scene_info", "arguments": {"name": "EvalProp", "region": {"seed": 0, "stop_at": ["uv"]}}, "error": "require uv_layer", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "region-uv-unused-layer", "tool": "scene_info", "arguments": {"name": "EvalProp", "region": {"seed": 0}, "uv_layer": "UVMap"}, "error": "exclude it", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "uv-identity-invalid", "tool": "mesh_edit", "arguments": {"action": "uv_transform", "name": "EvalProp", "expected_uv_sha256": "bad", "uv_transform": {"faces": [0]}}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "uv-identity-unrelated-action", "tool": "mesh_edit", "arguments": {"action": "unwrap", "name": "EvalProp", "expected_uv_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "error": "does not accept: expected_uv_sha256", "kind": "invalid", "modes": ["protocol", "native"]}
 ]
