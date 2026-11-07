@@ -27,6 +27,7 @@ async def exercise(root,env,parameters=None):
         saved=hashlib.sha256((root/'initial.blend').read_bytes()).hexdigest()
         assert state['source_state']['saved_source']['sha256']==saved
         before=json.loads((root/'vertex-audit.json').read_text())
+        layer_before=json.loads((root/'density-audit.json').read_text())
 
         async def region(layer=None,stops=None,**page):
             args={} if layer is None else {'uv_layer':layer}
@@ -53,6 +54,7 @@ async def exercise(root,env,parameters=None):
         lease=(await call('session_control',action='claim',owner='uv-island-native',expected_project=owner['project_id']))['lease_id']
         await call('asset_io',action='save',path='inspected.blend',lease_id=lease)
         assert json.loads((root/'vertex-audit.json').read_text())==before
+        assert json.loads((root/'density-audit.json').read_text())==layer_before
         args={'action':'uv_transform','name':'TileGrid','uv_layer':'UVMap',
               'uv_transform':{'faces':[f['index'] for f in island['faces']],'offset':[.125,0]},
               'expected_mesh_sha256':island['mesh_sha256'],'expected_uv_sha256':island['uv']['sha256'],'lease_id':lease}
@@ -72,11 +74,15 @@ async def exercise(root,env,parameters=None):
         for uv in expected['objects']['TileGrid']['uvs']['UVMap'][:4]:
             uv[0]+=.125
         assert after==expected,(after,expected)
+        layer_expected=copy.deepcopy(layer_before)
+        layer_expected['uvs']=expected['objects']['TileGrid']['uvs']
+        assert json.loads((root/'density-audit.json').read_text())==layer_expected
         await call('asset_io',action='open',path='finished.blend',lease_id=lease)
         reopened=await region('UVMap',['uv'])
         assert reopened['uv']==current['uv'] and reopened['region']==current['region']
         await call('asset_io',action='save',path='reopened.blend',lease_id=lease)
         assert json.loads((root/'vertex-audit.json').read_text())==after
+        assert json.loads((root/'density-audit.json').read_text())==layer_expected
         await call('session_control',action='release',lease_id=lease)
         await verify_source_identity(env)
         if os.environ.get('CAVI_NATIVE_EVIDENCE'):
