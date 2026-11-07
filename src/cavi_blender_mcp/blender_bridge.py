@@ -1032,6 +1032,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'inspect_face_region':
+        from .blender_face_regions import inspect
+
+        return inspect(p)
     if operation == 'assign_face_material':
         from .blender_face_materials import assign
 

@@ -56,7 +56,11 @@ class CatalogTests(unittest.TestCase):
         self.assertFalse(write.get('readOnlyHint', False))
         self.assertFalse(write.get('idempotentHint', False))
         self.assertFalse(write.get('destructiveHint', True))
-        self.assertIs(tools['destructive_value'].annotations.destructive_hint, True)
+        destructive = tools['destructive_value'].annotations.model_dump(by_alias=True, exclude_none=True)
+        self.assertIs(destructive['readOnlyHint'], False)
+        self.assertNotIn('destructiveHint', destructive)
+        self.assertFalse(destructive.get('readOnlyHint', False))
+        self.assertTrue(destructive.get('destructiveHint', True))
 
     def test_discovery_preserves_literal_default_fields_in_output_constraints(self):
         class Receipt(BaseModel):

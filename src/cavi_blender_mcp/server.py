@@ -108,6 +108,19 @@ class NamingRules(BaseModel):
     collision_prefixes: Annotated[list[str], Field(max_length=8)] = ["UCX_", "UBX_", "USP_"]
 
 
+class FaceRegion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    seed: Annotated[StrictInt, Field(ge=0)]
+    stop_at: Annotated[list[Literal['seam','material']], Field(max_length=2)] = []
+    angle_limit_degrees: Annotated[Number | None, Field(ge=0, le=180)] = None
+
+    @model_validator(mode='after')
+    def distinct_boundaries(self):
+        if len(set(self.stop_at))!=len(self.stop_at):
+            raise ValueError('region.stop_at boundaries must be unique')
+        return self
+
+
 class ShaderImage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     path: str
@@ -235,8 +248,13 @@ async def scene_info(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='Face/pick UV map')] = None,
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
+    region: Annotated[FaceRegion | None, Field(description='Connected source-face page')] = None,
 ) -> SceneInfo:
     """Inspect objects, source topology or camera-picked scene surfaces."""
+    if region is not None:
+        if name is None or faces or edges or vertices or definition or uv_layer is not None or surface_ray is not None:
+            raise ValueError('region requires a mesh name and excludes other inspection modes')
+        return await run(call,'inspect_face_region',name=name,region=region.model_dump(mode='json'),limit=limit,offset=offset)
     if surface_ray is not None:
         if vertices or faces or edges or definition or offset or limit != 200:
             raise ValueError('surface_ray requires a mesh name and excludes pagination and other modes')
@@ -275,10 +293,10 @@ async def scene_info(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_mesh_quality(
-    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
                               Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Pixels")] = (1024, 1024),
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     checks: Annotated[list[Check] | None, Field(max_length=6, description="Empty: all checks")] = None,
     naming: Annotated[NamingRules | None, Field(description="Naming rules")] = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63, description="Lightmap UVs")] = "UVMap_Lightmap",
@@ -295,7 +313,7 @@ async def inspect_mesh_quality(
 
 @mcp.tool(annotations=READ_ONLY)
 async def inspect_uv_layout(
-    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32, description="Scene objects")],
+    names: Annotated[list[ObjectName], Field(min_length=1, max_length=32)],
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=16384)],
                               Annotated[StrictInt, Field(ge=1, le=16384)]] | None, Field(description="Pixels")] = None,
     padding_pixels: Annotated[Number | None, Field(ge=0, le=256, description="Gutter; requires resolution")] = None,
@@ -350,10 +368,10 @@ async def inspect_rig(
 async def inspect_skin_clearance(
     body: Annotated[ObjectName, Field(description="Closed body mesh")],
     garments: Annotated[list[ObjectName], Field(min_length=1, max_length=8, description="Meshes distinct from body")],
-    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="Start frame")],
-    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="End frame")],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
     min_clearance_m: Annotated[Number, Field(ge=0, description="Minimum signed gap (m)")],
-    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Frame samples")] = 9,
+    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
     surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Garment samples")] = "vertices_and_centres",
     max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
 ) -> SkinClearance:
@@ -369,10 +387,10 @@ async def compare_rig_motion(
     source: Annotated[ObjectName, Field(description="Source armature")],
     candidate: Annotated[ObjectName, Field(description="Candidate armature")],
     meshes: Annotated[list[MotionSkinPair], Field(min_length=1, max_length=8, description="Source/candidate skin pairs")],
-    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="Start frame")],
-    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="End frame")],
+    start_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
+    end_frame: Annotated[StrictInt, Field(ge=1, le=1000000)],
     max_error_m: Annotated[Number, Field(ge=0, description="Position error cap (m)")],
-    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Timeline samples")] = 9,
+    samples: Annotated[StrictInt, Field(ge=2, le=32)] = 9,
     space: Annotated[Literal["world", "start_root"], Field(description="World/start-root-relative positions")] = "world",
     vertex_match: Annotated[Literal["index", "point_set"], Field(description='index: same vertex order; point_set: bidirectional nearest points, unpaired')] = "index",
     candidate_frame_offset: Annotated[Number, Field(ge=-1000000, le=1000000, description="Candidate frame shift")] = 0,
@@ -704,7 +722,7 @@ async def mesh_edit(
     apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
     angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="unwrap: split angle")] = None,
     island_margin: Annotated[Number | None, Field(ge=0, le=0.5, description="unwrap: island margin")] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     target_triangles: Annotated[StrictInt | None, Field(ge=4, le=500000, description="decimate_to: triangle cap, excludes amount")] = None,
     target_faces: Annotated[StrictInt | None, Field(ge=16, le=100000, description="remesh_quad needs face cap")] = None,
     symmetry_axis: Annotated[Literal["X", "Y", "Z"] | None, Field(description="Symmetry axis")] = None,
@@ -1024,7 +1042,7 @@ async def bake(
     cage_extrusion: Annotated[Number | None, Field(ge=0, le=1, description="Cage distance")] = None,
     max_ray_distance: Annotated[Number | None, Field(ge=0, le=10, description="Projection ray cap")] = None,
     normal_space: Annotated[Literal["tangent", "object"] | None, Field(description="Normal space")] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
     isolate: Annotated[StrictBool, Field(description="Isolate bake objects")] = True,
     source: Annotated[ShaderBakeSource | None, Field(description='shader: socket IDs/UV atlas; raw-data/sRGB-color PNG; signed/HDR needs EXR, alpha its own socket')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
@@ -1206,13 +1224,13 @@ async def geometry_nodes(
 @mcp.tool(annotations=ADDITIVE)
 async def review_sheet(
     path: Annotated[str, Field(description="New workspace PNG")],
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=1000, description="Scene objects")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=1000)] = None,
     views: Annotated[list[View] | None, Field(min_length=1, max_length=6, description="Views; omitted uses defaults")] = None,
     mode: Annotated[Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"], Field(description="Shading/diagnostic mode")] = "shaded",
     resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width")] = 1024,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_heatmap: target density; default 512")] = None,
     texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63)] = None,
 ) -> ImageReceipt:
     """Render a multi-view PNG; no lease. Heatmap: blue < target_px_per_m=512 (green) < red."""
     result = await run(call, "review_sheet", path=path, names=names, views=views, mode=mode,
@@ -1238,7 +1256,7 @@ async def level_edit(
     placements: Annotated[list[Placement] | None,
                           Field(min_length=1, max_length=256, description="place needs object transforms")] = None,
     collection: Annotated[str | None, Field(min_length=1, max_length=63, description="Collection")] = None,
-    names: Annotated[list[ObjectName] | None, Field(min_length=1, max_length=256, description="Scene objects")] = None,
+    names: Annotated[list[ObjectName] | None, Field(min_length=1, max_length=256)] = None,
     terrain: Annotated[str | None, Field(min_length=1, max_length=63, description="snap needs terrain")] = None,
     offset: Annotated[Number | None, Field(ge=-1000, le=1000, description="snap: height above surface")] = None,
     align_to_normal: Annotated[StrictBool | None, Field(description='snap: align normals; default false')] = None,

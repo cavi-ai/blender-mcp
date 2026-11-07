@@ -45,7 +45,9 @@ class BlenderServer(CoreServer):
         if not self.compact_schemas:
             return tools
         result = []
-        defaults = {'idempotent_hint': False, 'open_world_hint': True}
+        # Keep readOnlyHint explicit for clients that classify callable safety.
+        defaults = {'destructive_hint': True,
+                    'idempotent_hint': False, 'open_world_hint': True}
         for tool in tools:
             annotations = tool.annotations
             if annotations is not None:

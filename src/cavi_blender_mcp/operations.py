@@ -4,6 +4,7 @@ OPERATIONS = frozenset(
     {
         "scene_info",
         "inspect_mesh_faces",
+        "inspect_face_region",
         "inspect_mesh_vertices",
         "pick_mesh_surface",
         "pick_scene_surface",
@@ -114,6 +115,7 @@ OPERATIONS = frozenset(
 LEASE_FREE = frozenset(
     {
         "inspect_mesh_faces",
+        "inspect_face_region",
         "inspect_mesh_vertices",
         "pick_mesh_surface",
         "pick_scene_surface",
@@ -146,6 +148,7 @@ SOURCE_PRESERVING = frozenset({
 })
 SLOW_OPERATIONS = frozenset(
     {
+        "inspect_face_region",
         "move_vertices",
         "pick_mesh_surface",
         "pick_scene_surface",

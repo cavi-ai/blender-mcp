@@ -252,6 +252,19 @@ appearance equivalence or replace the image hash and source/pose identities.
 
 ## Assign source-face finishes
 
+Start from a source face or a source-resolved surface pick. Use
+`scene_info(name=..., region={"seed": face_index, "stop_at": ["seam", "material"],
+"angle_limit_degrees": 45})` to grow across manifold source edges. `stop_at`
+defaults to no delimiters; angles compare adjacent undeformed local face normals.
+Different material indices and authored seam flags are independent boundaries.
+Disconnected shells and edges with other than two incident faces are never crossed.
+
+Results page `faces` by source index and report the full region's `total`.
+Gather all pages before editing and require the same `mesh_sha256` and
+`region.selection_sha256` throughout. Boundary changes can alter a region without
+changing vertex positions, so recompute it after seam edits. The query preserves
+geometry, native selection and source dirty state.
+
 For distinct finishes on one connected mesh, inspect `scene_info(name=..., faces=true)`
 and use `mesh_edit(action="assign_faces", name=..., material_name="TrimFinish",
 face_indices=[...], expected_mesh_sha256=..., lease_id=lease)`. The material must
