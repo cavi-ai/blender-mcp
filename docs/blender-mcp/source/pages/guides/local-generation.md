@@ -5,7 +5,7 @@ writes a new workspace `.glb`. It does not change the open scene and does not
 need a lease.
 
 The MCP process does not import PyTorch, download weights or send images to a
-remote service. The worker runs in a separate Python 3.11 environment with local
+remote service. The worker runs in a separate Python 3.12 environment with local
 weights.
 
 Three providers are available. `CAVI_GENERATION_PROVIDER` selects one and
@@ -20,7 +20,7 @@ defaults to `triposr`.
 ## Prepare TripoSR
 
 ```bash
-uv venv --python 3.11 /path/to/neural-env
+uv venv --python 3.12 /path/to/neural-env
 uv pip install --python /path/to/neural-env/bin/python -r requirements-neural.txt
 ```
 
@@ -44,7 +44,7 @@ CAVI_TRIPOSR_WEIGHTS=/path/to/weights
 ## Prepare TripoSG
 
 ```bash
-uv venv --python 3.11 /path/to/triposg-env
+uv venv --python 3.12 /path/to/triposg-env
 uv pip install --python /path/to/triposg-env/bin/python -r requirements-triposg.txt
 ```
 
