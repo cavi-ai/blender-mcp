@@ -968,15 +968,15 @@ async def assign_material(
     link_mode: Annotated[Literal['DATA', 'OBJECT'] | None, Field(description='DATA/OBJECT binding; OBJECT shares geometry')] = None,
     action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique', 'connect', 'disconnect'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
     group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
-    node: Annotated[str | None, Field(description="Exact node; links: destination")] = None,
+    node: Annotated[str | None, Field(description="Node; links: destination")] = None,
     inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value; links: input ID/{node,socket} (1..32)")] = None,
     outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
     image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
     offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first node")] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="inspect: node cap")] = None,
 ) -> MaterialAssignment:
-    """Assign PBR; inspect/edit shader graphs.
-    Defaults retain links; rewiring is explicit. Edits affect shared users and detach tool configuration."""
+    """Assign PBR or edit native shaders.
+    Defaults retain links; edits affect shared users and detach tool configuration."""
     if material_name is None:
         raise ValueError('material_name is required')
     shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
