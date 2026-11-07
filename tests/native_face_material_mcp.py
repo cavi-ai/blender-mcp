@@ -57,9 +57,11 @@ async def exercise(root,env,parameters=None):
         current={**args,'expected_mesh_sha256':receipt['mesh_sha256_after']}
         for invalid in [{'face_indices':[0,0]},{'face_indices':[20]},
                         {'expected_mesh_sha256':page['mesh_sha256']},{'name':'SharedA'},
-                        {'material_name':'MissingFinish'}]:
+                        {'material_name':'MissingFinish'},{'name':'Static','expected_mesh_sha256':None}]:
             result=await client.call_tool('mesh_edit',{**current,**invalid})
             assert result.is_error and result.structured_content['error']['outcome']=='rejected',result
+            if invalid.get('name')=='Static':
+                assert any('unselected faces' in getattr(i,'text','') for i in result.content),result
             assert not (await call('scene_info',limit=1))['source_state']['dirty']
             assert await snapshot()==after
         reuse=(await call('mesh_edit',**{**current,'face_indices':[1]}))['face_material']
@@ -81,7 +83,7 @@ async def exercise(root,env,parameters=None):
         evidence=os.environ.get('CAVI_NATIVE_EVIDENCE')
         if evidence:
             (Path(evidence)/'source-audits.json').write_text(json.dumps({'before':before,'after':after,'final':final},indent=2)+'\n')
-        return {'face_materials':'passed','scoped_profile':scoped,'preflight_rejections':5,
+        return {'face_materials':'passed','scoped_profile':scoped,'preflight_rejections':6,
                 'rig_uv_shape_keys_context':'preserved','save_reopen':'passed','receipts':[receipt,reuse,unchanged]}
 
 

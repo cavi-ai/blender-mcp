@@ -26,6 +26,9 @@ def assign(p):
         slot=slots[0] if slots else len(value.material_slots)
         if slot>bpy.types.MeshPolygon.bl_rna.properties['material_index'].hard_max:
             raise ValueError('No additional polygon material index is available')
+        selected=set(faces)
+        if not slots and any(f.material_index==slot and f.index not in selected for f in mesh.polygons):
+            raise ValueError('Appending this slot would bind unselected faces; include them or repair their indices')
         previous=[mesh.polygons[i].material_index for i in faces]
         changed=sum(old!=slot for old in previous)
         summary={'face_indices':faces,'material':material.name,'slot':slot,

@@ -8,5 +8,7 @@ import bpy
 runpy.run_path(str(Path(__file__).with_name('vertex_edit_fixture.py')))
 finish=bpy.data.materials.new('TrimFinish')
 finish.diffuse_color=(.7,.35,.08,1)
+# A new slot must not silently bind an unselected, previously invalid polygon.
+bpy.data.objects['Static'].data.polygons[1].material_index=2
 bpy.ops.wm.save_as_mainfile(filepath=str(Path(os.environ['CAVI_BLENDER_WORKSPACE'])/'initial.blend'),
                           check_existing=False)
