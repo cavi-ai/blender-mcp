@@ -9,7 +9,8 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from native_nla_mcp import main
 
-from cavi_blender_mcp.client import BridgeClient, BridgeOperationError
+from cavi_blender_mcp.blender_errors import PreflightRejected
+from cavi_blender_mcp.client import BridgeClient
 
 
 async def exercise(root, env, parameters=None):
@@ -71,7 +72,7 @@ async def exercise(root, env, parameters=None):
             try:
                 BridgeClient(root/'connection.json').call('inspect_scene_spatial',
                     {'subjects': ['Shelter'], 'context': ['Crossing'], **changes})
-            except BridgeOperationError:
+            except PreflightRejected:
                 pass
             else:
                 raise AssertionError('Internal spatial validation did not reject invalid input')
