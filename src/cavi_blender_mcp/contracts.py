@@ -26,6 +26,7 @@ class SceneRenderSettings(Result):
 
 
 class SceneInfo(Result):
+    region: dict[str, Any] | None = None
     scope: str | None = None
     mesh: str | None = None
     mesh_sha256: str | None = None

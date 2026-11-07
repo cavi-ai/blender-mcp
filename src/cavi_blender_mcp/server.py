@@ -108,6 +108,19 @@ class NamingRules(BaseModel):
     collision_prefixes: Annotated[list[str], Field(max_length=8)] = ["UCX_", "UBX_", "USP_"]
 
 
+class FaceRegion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    seed: Annotated[StrictInt, Field(ge=0)]
+    stop_at: Annotated[list[Literal['seam','material']], Field(max_length=2)] = []
+    angle_limit_degrees: Annotated[Number | None, Field(ge=0, le=180)] = None
+
+    @model_validator(mode='after')
+    def distinct_boundaries(self):
+        if len(set(self.stop_at))!=len(self.stop_at):
+            raise ValueError('region.stop_at boundaries must be unique')
+        return self
+
+
 class ShaderImage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     path: str
@@ -235,8 +248,13 @@ async def scene_info(
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='Face/pick UV map')] = None,
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
+    region: Annotated[FaceRegion | None, Field(description='Connected source-face page')] = None,
 ) -> SceneInfo:
     """Inspect objects, source topology or camera-picked scene surfaces."""
+    if region is not None:
+        if name is None or faces or edges or vertices or definition or uv_layer is not None or surface_ray is not None:
+            raise ValueError('region requires a mesh name and excludes other inspection modes')
+        return await run(call,'inspect_face_region',name=name,region=region.model_dump(mode='json'),limit=limit,offset=offset)
     if surface_ray is not None:
         if vertices or faces or edges or definition or offset or limit != 200:
             raise ValueError('surface_ray requires a mesh name and excludes pagination and other modes')

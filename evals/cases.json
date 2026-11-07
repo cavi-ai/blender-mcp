@@ -1,4 +1,9 @@
 [
+  {"id":"region-needs-name","tool":"scene_info","arguments":{"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"region requires a mesh name"},
+  {"id":"region-excludes-face-page","tool":"scene_info","arguments":{"name":"EvalProp","faces":true,"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"excludes other inspection modes"},
+  {"id":"region-seed-type","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":true}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
+  {"id":"region-angle-range","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":0,"angle_limit_degrees":181}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
+  {"id":"region-duplicate-boundaries","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":0,"stop_at":["seam","seam"]}},"kind":"invalid","modes":["protocol","native"],"error":"boundaries must be unique"},
   {"id":"face-material-missing","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","face_indices":[0]},"kind":"invalid","modes":["protocol","native"],"error":"requires: material_name"},
   {"id":"face-material-duplicates","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0,0]},"kind":"invalid","modes":["protocol","native"],"error":"unique current indices"},
   {"id":"face-material-hash","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"expected_mesh_sha256":"bad"},"kind":"invalid","modes":["protocol","native"],"error":"pattern"},

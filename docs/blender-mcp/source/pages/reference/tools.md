@@ -3,6 +3,10 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`scene_info(name=..., region={"seed": 0, "stop_at": ["seam", "material"]})`
+pages a connected source-face selection without changing native selection.
+An optional `angle_limit_degrees` stops at sharper source-normal transitions.
+
 `mesh_edit(action="assign_faces", name=..., material_name=..., face_indices=[...])`
 binds existing finishes to source polygons. It reuses the first matching slot or
 appends one, retaining other slots and all UV, skin and shape-key data.

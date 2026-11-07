@@ -45,7 +45,9 @@ class BlenderServer(CoreServer):
         if not self.compact_schemas:
             return tools
         result = []
-        defaults = {'idempotent_hint': False, 'open_world_hint': True}
+        # MCP ToolAnnotations defaults; nondefault safety hints remain explicit.
+        defaults = {'read_only_hint': False, 'destructive_hint': True,
+                    'idempotent_hint': False, 'open_world_hint': True}
         for tool in tools:
             annotations = tool.annotations
             if annotations is not None:
