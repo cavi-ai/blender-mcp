@@ -11,13 +11,13 @@ from cavi_blender_mcp.catalog import BlenderServer, omit_null_defaults
 
 class CatalogTests(unittest.TestCase):
     def test_shared_arrays_preserve_nullable_bounds_and_default_literals(self):
-        from cavi_blender_mcp.catalog import shared_arrays, short_references
+        from cavi_blender_mcp.catalog import shared_constraints, short_references
 
         vector={'type':['array','null'],'items':{'type':'number'},'minItems':3,'maxItems':3}
         source={'type':'object','additionalProperties':False,'properties':{
             name:{**vector,'description':name,'default':{'$ref':'literal'}} for name in ['head','tail','offset','pivot']}}
         original=copy.deepcopy(source)
-        compact=short_references(shared_arrays(source))
+        compact=short_references(shared_constraints(source))
         self.assertEqual(source,original)
         self.assertLess(len(str(compact)),len(str(source)))
         for name,field in compact['properties'].items():
@@ -27,9 +27,37 @@ class CatalogTests(unittest.TestCase):
                       {'head':[1,2,3,4]},{'head':[True,1,2]},{'head':['1',2,3]},
                       {'head':[1,2,3],'foreign':0}):
             self.assertEqual(Draft202012Validator(source).is_valid(value),Draft202012Validator(compact).is_valid(value))
-        self.assertEqual(shared_arrays({**source,'$id':'https://example.test/root'}),{**source,'$id':'https://example.test/root'})
+        self.assertEqual(shared_constraints({**source,'$id':'https://example.test/root'}),{**source,'$id':'https://example.test/root'})
         pointer={**source,'$ref':'#/properties/head'}
-        self.assertEqual(shared_arrays(pointer),pointer)
+        self.assertEqual(shared_constraints(pointer),pointer)
+
+    def test_shared_nullable_scalars_keep_bounds_annotations_and_literal_data(self):
+        from cavi_blender_mcp.catalog import shared_constraints, short_references
+
+        spec={'type':['string','null'],'minLength':2,'maxLength':8,'pattern':'^[A-Z]+$'}
+        source={'type':'object','additionalProperties':False,'properties':{
+            name:{**spec,'description':name,'default':{'type':'string','minLength':2}}
+            for name in ['a','b','c','d','e','f','g','h']}}
+        original=copy.deepcopy(source)
+        compact=short_references(shared_constraints(source))
+        self.assertEqual(source,original)
+        self.assertLess(len(str(compact)),len(str(source)))
+        for name,field in compact['properties'].items():
+            self.assertEqual(field['description'],name)
+            self.assertEqual(field['default'],source['properties'][name]['default'])
+        for value in [{},{'a':None},{'a':'AB'},{'a':'A'},{'a':'ABCDEFGHI'},
+                      {'a':'ab'},{'a':1},{'a':False},{'a':'AB','extra':0}]:
+            self.assertEqual(Draft202012Validator(source).is_valid(value),Draft202012Validator(compact).is_valid(value))
+
+    def test_sharing_preserves_scopes_and_unknown_or_descendant_references(self):
+        from cavi_blender_mcp.catalog import shared_constraints
+
+        source={'type':'object','properties':{key:{'type':['number','null'],'minimum':0,'maximum':1}
+            for key in ['a','b','c','d','e','f','g','h']}}
+        for extra in [{'$ref':'#/$defs/missing'},{'$ref':'#/properties/a'},
+                      {'unevaluatedProperties':False},{'$id':'https://example.test/root'},
+                      {'allOf':[{'$anchor':'local','type':'string'}]}]:
+            with self.subTest(extra=extra):self.assertEqual(shared_constraints({**source,**extra}),{**source,**extra})
 
     def test_empty_reference_elision_keeps_constraints_and_literal_dictionaries(self):
         from cavi_blender_mcp.catalog import short_references

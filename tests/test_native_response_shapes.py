@@ -7,7 +7,7 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from cavi_blender_mcp import contracts
-from cavi_blender_mcp.catalog import shared_arrays, short_references
+from cavi_blender_mcp.catalog import shared_constraints, short_references
 
 
 def object_info(**extra):
@@ -77,7 +77,7 @@ class NativeResponseShapes(unittest.TestCase):
             model = getattr(contracts, name)
             schema = Draft202012Validator(model.model_json_schema())
             compact = Draft202012Validator(
-                short_references(shared_arrays(compact_schema(model.model_json_schema(), output=True))))
+                short_references(shared_constraints(compact_schema(model.model_json_schema(), output=True))))
             for original in records:
                 with self.subTest(model=name, keys=sorted(original)):
                     record = {**copy.deepcopy(original), "extension": {"preserved": [1, None]}}
