@@ -714,7 +714,7 @@ async def object_edit(
 
 @mcp.tool(annotations=MUTATING)
 async def mesh_edit(
-    action: Annotated[Literal["modifier", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
+    action: Annotated[Literal["modifier", "modifier_update", "modifier_remove", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
                     "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "assign_faces", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
@@ -773,6 +773,7 @@ async def mesh_edit(
                              Field(min_length=1, max_length=20000, description='Source vertices')] = None,
     symmetry_tolerance_m: Annotated[Number | None, Field(gt=0, description='move_vertices: symmetry match tolerance (m)')] = None,
     material_name: Annotated[str | None, Field(min_length=1, max_length=63, description='assign_faces: existing finish')] = None,
+    modifier_name: Annotated[RigName | None, Field(description='Existing modifier')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -792,7 +793,12 @@ async def mesh_edit(
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
               'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m,
-              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256}
+              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,'modifier_name':modifier_name}
+    if action in ('modifier_update','modifier_remove'):
+        required=['modifier_name','amount'] if action=='modifier_update' else ['modifier_name']
+        params=pick(action,values,required)
+        return await run(call,'update_modifier' if action=='modifier_update' else 'remove_modifier',
+                         lease_id=lease_id,name=name,**params)
     if action == 'assign_faces':
         from .mesh_regions import fingerprint, indices
 

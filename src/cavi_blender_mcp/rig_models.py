@@ -8,7 +8,7 @@ from .blender_nla_settings import validate as validate_nla_settings
 
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 Vector = tuple[Number, Number, Number]
-Name = Annotated[str, Field(min_length=1, max_length=63)]
+type Name = Annotated[str, Field(min_length=1, max_length=63)]
 
 
 class ConstraintSpec(BaseModel):

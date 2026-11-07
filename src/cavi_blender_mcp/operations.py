@@ -46,6 +46,8 @@ OPERATIONS = frozenset(
         "transform_object",
         "set_color",
         "add_modifier",
+        "update_modifier",
+        "remove_modifier",
         "shade_mesh",
         "unwrap_mesh",
         "transform_uv",
