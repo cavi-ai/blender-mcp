@@ -1032,6 +1032,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'assign_face_material':
+        from .blender_face_materials import assign
+
+        return assign(p)
     if operation == 'delete_objects':
         from .blender_object_delete import delete
 

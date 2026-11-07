@@ -119,6 +119,8 @@ jobs:
         run: uv run --locked python tests/native_geometry_identity_mcp.py --blender "$(command -v blender)"
       - name: Check object deletion and shared data
         run: uv run --locked python tests/native_object_delete_mcp.py --blender "$(command -v blender)"
+      - name: Check source-face material assignment
+        run: uv run --locked python tests/native_face_material_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -3,6 +3,10 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`mesh_edit(action="assign_faces", name=..., material_name=..., face_indices=[...])`
+binds existing finishes to source polygons. It reuses the first matching slot or
+appends one, retaining other slots and all UV, skin and shape-key data.
+
 `object_edit(action="delete", name=..., lease_id=...)` removes a named object.
 `recursive=true` includes parented descendants. Complete dependency checks precede
 removal; shared data is preserved and the receipt lists exactly which objects were deleted.
