@@ -93,7 +93,11 @@ def socket_report(socket):
 
 
 def node_report(node):
+    from .blender_shader_nodes import control_schema
+
+    schema=control_schema(type(node),node)
     report = {'name': node.name, 'type': node.type, 'bl_idname':node.bl_idname,
+              'settings':{key:getattr(node,key) for key in schema},'control_schema':schema,
               'inputs': [socket_report(s) for s in node.inputs],
               'outputs': [socket_report(s) for s in node.outputs]}
     for name in ['uv_map', 'from_instancer', 'vector_type', 'projection', 'extension', 'is_active_output']:

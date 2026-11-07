@@ -1,19 +1,7 @@
 """Validate complete native ramp requests before changing collection elements."""
 import math
-import struct
 
 from .native_controls import controls
-
-
-def equivalent(left,right):
-    """Compare exactly at the native collection's float storage precision."""
-    if isinstance(left,dict) and isinstance(right,dict):
-        return left.keys()==right.keys() and all(equivalent(left[k],right[k]) for k in left)
-    if isinstance(left,list) and isinstance(right,list):
-        return len(left)==len(right) and all(equivalent(a,b) for a,b in zip(left,right,strict=True))
-    if type(left) in (int,float) and type(right) in (int,float):
-        return struct.pack('=f',left)==struct.pack('=f',right)
-    return left==right
 
 
 def settings(values,schema):

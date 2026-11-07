@@ -428,6 +428,18 @@ then set defaults and wire the graph explicitly. Existing active outputs are
 preserved unless `is_active_output` is requested. Creation failures remove the
 new node and restore output activation and configuration tags.
 
+`inspect` reports each node's current scalar `settings` and native `control_schema`,
+including instance read-only state. `set_node` updates existing native controls
+through a nonempty `node_settings` map, such as `{"noise_dimensions":"4D","normalize":true}`
+or `{"operation":"MULTIPLY"}`. Use the inspected types, enum identifiers and ranges.
+Socket defaults use `set_inputs`; image resources use `set_image`.
+Read `changed_settings` and `changed_active_outputs`; no-ops retain configuration.
+Native modes can change socket availability. Edits that remove connections restore
+the graph and require those links to be explicitly disconnected first. Failed
+setters, readback or receipts restore properties, socket defaults, links, active
+outputs and configuration tags. Animated/driven properties and external driver
+references are rejected before changes; independent controls remain editable.
+
 `set_ramp` edits an existing node's native ColorRamp through `node_settings`.
 Inspection returns `color_ramp` with stops, modes and `control_schema` containing
 native enum identifiers and numeric bounds. `elements` replaces all stops with

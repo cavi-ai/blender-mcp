@@ -18,3 +18,22 @@ def bound_curves(owner):
             for strip in layer.strips:
                 for bag in getattr(strip,'channelbags',()):
                     if slot is None or bag.slot_handle==slot.handle:yield from bag.fcurves
+
+
+def require_static(matches,subject,*,root=None):
+    """Check bound curves and external driver aliases across native ID owners."""
+    import bpy
+
+    mapping=bpy.data.user_map()
+    owners=set(mapping)
+    if root is not None:owners.add(root)
+    for users in mapping.values():owners.update(users)
+    owners.update(tree for owner in tuple(owners) if (tree:=getattr(owner,'node_tree',None)) is not None)
+    for owner in owners:
+        if any(matches(owner,curve.data_path) for curve in bound_curves(owner)):
+            raise ValueError(subject+' is animated or driven; edit its animation before changing static data')
+        animation=getattr(owner,'animation_data',None)
+        for curve in animation.drivers if animation else ():
+            for variable in curve.driver.variables:
+                if any(matches(t.id,t.data_path) for t in variable.targets):
+                    raise ValueError('A driver references '+subject+'; detach that reference before editing')
