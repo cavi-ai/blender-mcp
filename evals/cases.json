@@ -8161,5 +8161,8 @@
   {"id": "modifier-update-missing-name", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "amount": 0.1}, "error": "requires: modifier_name", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-update-missing-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel"}, "error": "requires: amount", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-remove-unused-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "amount": 0.1}, "error": "does not accept: amount", "kind": "invalid", "modes": ["protocol", "native"]},
-  {"id": "modifier-name-empty", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": ""}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]}
+  {"id": "modifier-name-empty", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": ""}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-map-and-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel", "amount": 0.1, "modifier_settings": {"segments": 8}}, "error": "exclusively", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-map-unused-action", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "modifier_settings": {"segments": 8}}, "error": "does not accept: modifier_settings", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-map-list", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel", "modifier_settings": []}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]}
 ]

@@ -138,7 +138,7 @@ def set_rotation(value, degrees):
         value.rotation_euler = euler.to_matrix().to_euler(mode, value.rotation_euler)
 
 
-def info(value):
+def info(value,*,modifier_schema=False):
     from .blender_modifiers import inspect as inspect_modifier
 
     angles = (
@@ -155,7 +155,7 @@ def info(value):
         "parent": value.parent.name if value.parent else None,
         "children": len(value.children),
         "collections": [item.name for item in value.users_collection],
-        "modifiers": [inspect_modifier(m) for m in value.modifiers],
+        "modifiers": [inspect_modifier(m,detailed=modifier_schema) for m in value.modifiers],
     }
     if value.type == 'CAMERA':
         data = value.data
@@ -1248,7 +1248,7 @@ def _dispatch(operation, p):
 
         return edit({**p,'action':'remove' if operation=='remove_modifier' else 'update'},obj,info)
     if operation == "object_info":
-        return info(obj(p["name"]))
+        return info(obj(p["name"]),modifier_schema=True)
     handlers = {
         "scene_info": scene_info,
         "create_mesh": create_mesh,

@@ -774,6 +774,7 @@ async def mesh_edit(
     symmetry_tolerance_m: Annotated[Number | None, Field(gt=0, description='move_vertices: symmetry match tolerance (m)')] = None,
     material_name: Annotated[str | None, Field(min_length=1, max_length=63, description='assign_faces: existing finish')] = None,
     modifier_name: Annotated[RigName | None, Field(description='Existing modifier')] = None,
+    modifier_settings: Annotated[dict[str,JsonValue] | None, Field(description='Native modifier controls')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -793,10 +794,13 @@ async def mesh_edit(
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
               'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m,
-              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,'modifier_name':modifier_name}
+              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,
+              'modifier_name':modifier_name,'modifier_settings':modifier_settings}
     if action in ('modifier_update','modifier_remove'):
-        required=['modifier_name','amount'] if action=='modifier_update' else ['modifier_name']
-        params=pick(action,values,required)
+        params=pick(action,values,['modifier_name'],
+                    {'amount':None,'modifier_settings':None} if action=='modifier_update' else {})
+        if action=='modifier_update' and (amount is None)==(modifier_settings is None):
+            raise ValueError('modifier_update requires: amount or modifier_settings, exclusively')
         return await run(call,'update_modifier' if action=='modifier_update' else 'remove_modifier',
                          lease_id=lease_id,name=name,**params)
     if action == 'assign_faces':

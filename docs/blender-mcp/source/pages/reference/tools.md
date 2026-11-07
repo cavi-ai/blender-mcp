@@ -4,19 +4,32 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info(name=...)` reports ordered modifier names, native types, viewport/render
-visibility and the exposed scalar settings. `mesh_edit(action="modifier_update",
+visibility, exposed settings and `control_schema` with their native types, hard
+ranges, enum identifiers and read-only state. Scene-wide pages omit this detailed
+schema. `mesh_edit(action="modifier_update",
 name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
 in place: bevel width, collapse-decimation ratio, subdivision viewport/render
 levels, or voxel size. Other controls and stack order are retained. Percentage
 bevels and other remesh/decimation modes require their own native controls and are
-rejected by this scalar update. Subdivision levels remain 1–3; voxel size remains
-0.005–1, matching modifier creation.
+rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
+size 0.005–1, matching modifier creation.
+
+Alternatively, pass `modifier_settings` as an explicit property map, omitting
+`amount`. It supports exposed bevel finish controls, decimation modes, independent
+subdivision levels, remesh controls and viewport/render visibility. For example,
+`{"segments": 8, "profile": 0.7, "show_render": true}` tunes a bevel.
+Use the inspected native types and hard ranges; integers, booleans and enum
+identifiers are distinct. Unknown, read-only, nonfinite or out-of-range values
+reject the complete map before assignment. No values are silently clamped.
+Native subdivision ranges apply to this form, subject to the geometry budget;
+the shorthand's fixed level range does not apply. Angle properties use radians.
 
 Updates check a conservative 500,000-triangle bound across bevel, decimate,
 subdivision and armature stacks before evaluating changed geometry. Unknown
-topology-changing modifiers cannot establish that bound. Voxel updates require
+topology-changing modifiers cannot establish that bound. Remesh updates require
 a standalone modifier on a shape-key-free working mesh and at most two million
-bounding voxels. A rejected update leaves the original stack intact.
+bounding voxel or octree cells. Visibility-only disabling does not enlarge a
+stack and can bypass its growth estimate. A rejected update leaves the stack intact.
 
 `mesh_edit(action="modifier_remove", name=..., modifier_name=..., lease_id=...)`
 removes exactly the named modifier, including types outside scalar editing.

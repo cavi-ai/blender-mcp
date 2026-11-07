@@ -6,9 +6,9 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
-Positive = Annotated[Number, Field(gt=0)]
+type Positive = Annotated[Number, Field(gt=0)]
 Vector = tuple[Number, Number, Number]
-Name = Annotated[str, Field(min_length=1, max_length=63)]
+type Name = Annotated[str, Field(min_length=1, max_length=63)]
 
 
 class Definition(BaseModel):
