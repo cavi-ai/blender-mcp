@@ -970,7 +970,7 @@ async def assign_material(
     group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
     node: Annotated[str | None, Field(description="Node; links: destination")] = None,
     node_type: Annotated[str | None, Field(min_length=1,max_length=127,description='Native type ID')] = None,
-    node_settings: Annotated[dict[str,JsonValue] | None, Field(max_length=32,description='Native settings')] = None,
+    node_settings: Annotated[dict[str,JsonValue] | None, Field(max_length=32,description='create_node/set_node controls; set_ramp configuration')] = None,
     inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value; links: input ID/{node,socket} (1..32)")] = None,
     outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
     image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
