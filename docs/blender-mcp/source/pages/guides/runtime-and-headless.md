@@ -39,6 +39,10 @@ before the native command executes. Missing gate support or invalid registration
 
 Supervised runtime starts require `--background` and refuse to adopt an already
 connected bridge. Inspect that runtime's existing ownership before continuing.
+The launcher waits for its child's matching owner record before returning, so a
+short-lived CLI cannot orphan the child before registration. A missing registration
+retires the direct child and fails startup. Core still requires its own matching
+acknowledgment before the native command executes.
 The supervisor retains responsibility for admission, process identity, deadlines,
 memory and cleanup; a launch request alone does not establish these results.
 

@@ -1,6 +1,7 @@
 """Start a dedicated Blender bridge without replacing an occupied session."""
 
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -60,13 +61,16 @@ def start_runtime(project=None, background=False):
     env = dict(os.environ, CAVI_BLENDER_CONNECTION=str(connection),
                CAVI_BLENDER_WORKSPACE=str(workspace))
     env = process_launch.environment(env)
-    command = process_launch.command(command, env=env)
+    native_command, launch_id = command, secrets.token_hex(16) if owned else None
+    command = process_launch.command(command, env=env,launch_id=launch_id)
     fd, log_path = tempfile.mkstemp(prefix="launch-", suffix=".log", dir=connection.parent)
     with os.fdopen(fd, "wb") as log:
         process = subprocess.Popen(
             command, env=env, stdin=subprocess.DEVNULL, stdout=log,
             stderr=subprocess.STDOUT, start_new_session=True,
         )
+    if owned:
+        process_launch.wait_registered(process,env=env,launch_id=launch_id,args=native_command)
     return {"connected": False, "launch_requested": True, "pid": process.pid,
             "background": background,
             "workspace": str(workspace), "log": log_path,

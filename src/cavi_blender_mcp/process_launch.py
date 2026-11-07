@@ -5,7 +5,9 @@ import importlib
 import json
 import os
 import stat
+import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -83,11 +85,51 @@ def environment(env):
     return result
 
 
-def command(args, *, env, cwd=None):
+def command(args, *, env, cwd=None, launch_id=None):
     if not _active(env):
         return list(map(str, args))
     module, frame = _client(env)
     try:
-        return module.command(args, cwd=cwd, env=env, python=frame['python'])
+        return module.command(args, cwd=cwd, env=env, python=frame['python'],launch_id=launch_id)
     except (OSError, ValueError, TypeError) as error:
         raise RuntimeError('Process launch registration failed: '+str(error)) from error
+
+
+def wait_registered(process, *, env, launch_id, args, timeout=5):
+    """Keep a short-lived launcher alive until the owner has recorded its child."""
+    try:
+        module, _frame = _client(env)
+        owner, _digest = module.configuration(env[OWNER])
+        deadline = time.monotonic()+min(timeout,5)
+        while True:
+            if process.poll() is not None:
+                raise RuntimeError('The child exited before registration was observed')
+            records = list(Path(owner['records']).glob('*.json'))
+            if len(records)>1024:
+                raise ValueError('The owner registration directory exceeds its launch limit')
+            for path in records:
+                try:
+                    record = module.parse(module.read_private(path))
+                except (OSError,ValueError):
+                    continue  # A record can be visible before its writer finishes.
+                request = record.get('request') if isinstance(record,dict) else None
+                if (isinstance(request,dict) and request.get('launch_id')==launch_id
+                        and request.get('pid')==process.pid and request.get('pgid')==process.pid
+                        and request.get('parent_pid')==os.getpid()
+                        and request.get('attempt')==owner['attempt'] and request.get('command')==args
+                        and request.get('cwd')==os.getcwd()
+                        and request.get('environment_sha256')==module.digest(env)
+                        and isinstance(record.get('birth_identity'),str) and record['birth_identity']):
+                    return
+            if time.monotonic()>=deadline:
+                raise TimeoutError('The owner did not record this launch before its deadline')
+            time.sleep(.01)
+    except BaseException as error:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
+        raise RuntimeError('Blender launch registration was not observed: '+str(error)) from error
