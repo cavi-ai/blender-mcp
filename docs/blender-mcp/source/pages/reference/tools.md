@@ -3,6 +3,30 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`scene_info(name=...)` reports ordered modifier names, native types, viewport/render
+visibility and the exposed scalar settings. `mesh_edit(action="modifier_update",
+name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
+in place: bevel width, collapse-decimation ratio, subdivision viewport/render
+levels, or voxel size. Other controls and stack order are retained. Percentage
+bevels and other remesh/decimation modes require their own native controls and are
+rejected by this scalar update. Subdivision levels remain 1–3; voxel size remains
+0.005–1, matching modifier creation.
+
+Updates check a conservative 500,000-triangle bound across bevel, decimate,
+subdivision and armature stacks before evaluating changed geometry. Unknown
+topology-changing modifiers cannot establish that bound. Voxel updates require
+a standalone modifier on a shape-key-free working mesh and at most two million
+bounding voxels. A rejected update leaves the original stack intact.
+
+`mesh_edit(action="modifier_remove", name=..., modifier_name=..., lease_id=...)`
+removes exactly the named modifier, including types outside scalar editing.
+Both actions operate on the object's stack and retain its base mesh, UVs,
+shape keys and vertex weights. Objects sharing that mesh keep their own stacks.
+Neither action applies a modifier or edits the base geometry.
+Animated or driven controls require animation editing instead of a static update.
+Removal rejects modifier animation and driver references to the modifier; unrelated
+object animation remains supported.
+
 `scene_info(name=..., region={"seed": 0, "stop_at": ["seam", "material"]})`
 pages a connected source-face selection without changing native selection.
 An optional `angle_limit_degrees` stops at sharper source-normal transitions.

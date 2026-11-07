@@ -139,6 +139,8 @@ def set_rotation(value, degrees):
 
 
 def info(value):
+    from .blender_modifiers import inspect as inspect_modifier
+
     angles = (
         value.rotation_euler if value.rotation_mode == "XYZ" else rotation(value).to_euler("XYZ")
     )
@@ -153,7 +155,7 @@ def info(value):
         "parent": value.parent.name if value.parent else None,
         "children": len(value.children),
         "collections": [item.name for item in value.users_collection],
-        "modifiers": [{"name": m.name, "type": m.type} for m in value.modifiers],
+        "modifiers": [inspect_modifier(m) for m in value.modifiers],
     }
     if value.type == 'CAMERA':
         data = value.data
@@ -1241,6 +1243,10 @@ def _dispatch(operation, p):
         return HANDLERS[operation](p)
     if operation in {"runtime_status", "runtime_restart"}:
         return runtime(operation, p)
+    if operation in ('update_modifier','remove_modifier'):
+        from .blender_modifiers import edit
+
+        return edit({**p,'action':'remove' if operation=='remove_modifier' else 'update'},obj,info)
     if operation == "object_info":
         return info(obj(p["name"]))
     handlers = {
