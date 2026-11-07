@@ -33,6 +33,28 @@ def control_schema(cls,node=None):
     return result
 
 
+def resource_schema(cls):
+    return {'node_tree':{'parameter':'node_settings.node_tree','type':'string',
+        'id_type':'NODETREE','tree_type':'ShaderNodeTree'}} if cls.bl_rna.identifier=='ShaderNodeGroup' else {}
+
+
+def resources(settings,cls,tree):
+    if 'node_tree' not in settings or 'node_tree' not in resource_schema(cls):return {},settings
+    name=settings['node_tree']
+    if not isinstance(name,str) or not name:raise ValueError('node_tree requires an exact native shader-group name')
+    group=bpy.data.node_groups.get(name)
+    if group is None or group.bl_idname!='ShaderNodeTree':
+        raise ValueError('node_tree must name an existing ShaderNodeTree')
+    pending,seen=[group],set()
+    while pending:
+        current=pending.pop()
+        if current==tree:raise ValueError('Shader group binding would create recursion')
+        if current in seen:continue
+        seen.add(current)
+        pending.extend(child for node in current.nodes if (child:=getattr(node,'node_tree',None)) is not None)
+    return {'node_tree':group},{key:value for key,value in settings.items() if key!='node_tree'}
+
+
 def inspect_types(params):
     material,tree=target(params)
     if tree is None:
@@ -53,7 +75,9 @@ def inspect_types(params):
     rows=[]
     for cls in sorted(classes,key=lambda c:c.bl_rna.identifier)[offset:offset+limit]:
         row={'type':cls.bl_rna.identifier,'label':cls.bl_rna.name}
-        if kind is not None:row['control_schema']=control_schema(cls)
+        if kind is not None:
+            row['control_schema']=control_schema(cls)
+            if bindings:=resource_schema(cls):row['resource_schema']=bindings
         rows.append(row)
     return {'material':material.name,'node_tree':tree.name,'group_path':params.get('group_path',[]),
             'node_types':rows,'total':len(classes),'offset':offset,'limit':limit}
@@ -80,6 +104,7 @@ def create(params):
         settings=params.get('node_settings',{})
         if not isinstance(settings,dict) or len(settings)>32:
             raise ValueError('node_settings must contain at most 32 native properties')
+        bindings,settings=resources(settings,cls,tree)
         values=controls(settings,control_schema(cls),subject='shader node',parameter='node_settings') if settings else {}
         before=active_outputs(tree)
         prior=set(tree.nodes)
@@ -87,15 +112,19 @@ def create(params):
     try:
         node=tree.nodes.new(cls.bl_rna.identifier)
         node.name=name
+        for key,value in bindings.items():setattr(node,key,value)
         if 'is_active_output' not in values:
             restore_outputs(before)
         for key,value in values.items():
             setattr(node,key,value)
         update(tree)
-        if node.name!=name or any(not matches(getattr(node,key),value) for key,value in values.items()):
+        if (node.name!=name or any(not matches(getattr(node,key),value) for key,value in values.items())
+                or any(getattr(node,key)!=value for key,value in bindings.items())):
             raise RuntimeError('Native node settings differ from the requested creation')
-        return finish_edit({**params,'node':name},tree,True,created_node={
-            'name':node.name,'type':node.bl_idname,'settings':{key:getattr(node,key) for key in values}})
+        created={'name':node.name,'type':node.bl_idname,'settings':{key:getattr(node,key) for key in values}}
+        if bindings:created['resources']={key:{'name':value.name,'id_type':value.id_type,'tree_type':value.bl_idname}
+            for key,value in bindings.items()}
+        return finish_edit({**params,'node':name},tree,True,created_node=created)
     except Exception:
         for added in set(tree.nodes)-prior:tree.nodes.remove(added)
         restore_outputs(before)
