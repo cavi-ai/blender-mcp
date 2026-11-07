@@ -1,4 +1,8 @@
 [
+  {"id":"ramp-missing-node","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node_settings":{"interpolation":"LINEAR"}},"kind":"invalid","modes":["protocol","native"],"error":"requires: node"},
+  {"id":"ramp-missing-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette"},"kind":"invalid","modes":["protocol","native"],"error":"requires: node_settings"},
+  {"id":"ramp-empty-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{}},"kind":"invalid","modes":["protocol","native"],"error":"requires nonempty node_settings"},
+  {"id":"ramp-output-fields","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{"interpolation":"LINEAR"},"outputs":{"Color":[1,1,1,1]}},"kind":"invalid","modes":["protocol","native"],"error":"set_ramp does not accept"},
   {"id":"region-needs-name","tool":"scene_info","arguments":{"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"region requires a mesh name"},
   {"id":"region-excludes-face-page","tool":"scene_info","arguments":{"name":"EvalProp","faces":true,"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"excludes other inspection modes"},
   {"id":"region-seed-type","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":true}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},

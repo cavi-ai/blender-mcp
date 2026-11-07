@@ -966,11 +966,11 @@ async def assign_material(
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
     instance: Annotated[str | None, Field(description="Scene collection instance")] = None,
     link_mode: Annotated[Literal['DATA', 'OBJECT'] | None, Field(description='DATA/OBJECT binding; OBJECT shares geometry')] = None,
-    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique', 'connect', 'disconnect', 'node_types', 'create_node'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
+    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique', 'connect', 'disconnect', 'node_types', 'create_node', 'set_ramp'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
     group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
     node: Annotated[str | None, Field(description="Node; links: destination")] = None,
     node_type: Annotated[str | None, Field(min_length=1,max_length=127,description='Native type ID')] = None,
-    node_settings: Annotated[dict[str,JsonValue] | None, Field(max_length=32,description='create_node: scalar/enum controls')] = None,
+    node_settings: Annotated[dict[str,JsonValue] | None, Field(max_length=32,description='create_node controls or set_ramp configuration')] = None,
     inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value; links: input ID/{node,socket} (1..32)")] = None,
     outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
     image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
@@ -1015,6 +1015,10 @@ async def assign_material(
         if action=='create_node':
             params=pick(action,shader,['node','node_type'],{'group_path':[],'node_settings':{}})
             return await run(call,'create_shader_node',material_name=material_name,lease_id=lease_id,**params)
+        if action=='set_ramp':
+            params=pick(action,shader,['node','node_settings'],{'group_path':[]})
+            if not params['node_settings']:raise ValueError('set_ramp requires nonempty node_settings')
+            return await run(call,'set_shader_ramp',material_name=material_name,lease_id=lease_id,**params)
         if action == 'inspect':
             params = pick(action, shader, (), {'group_path': [], 'node': None, 'offset': 0, 'limit': 100})
             return await run(call, 'inspect_material_nodes', material_name=material_name, **params)
