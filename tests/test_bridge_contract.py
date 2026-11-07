@@ -12,7 +12,8 @@ class BridgeContractTests(unittest.TestCase):
         read=Path.read_bytes
         for name in ('blender_scene.py', 'blender_uv_charts.py', 'skin_projection.py', 'preview_settings.py', 'preview_studio.py',
                      'mesh_regions.py', 'uv_regions.py', 'uv_worker.py', 'uv_layout.py',
-                     'uv_density.py', 'mapping.py', 'vertex_edit.py', 'blender_vertices.py'):
+                     'uv_density.py', 'mapping.py', 'vertex_edit.py', 'blender_vertices.py',
+                     'modifier_settings.py','shader_links.py'):
             def changed(path, name=name):
                 return read(path)+(b'\n' if path.name==name else b'')
             with self.subTest(name=name), patch.object(Path,'read_bytes',changed):
