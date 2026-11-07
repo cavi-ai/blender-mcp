@@ -41,6 +41,66 @@ assert layout['padding']['minimum_border_pixels'] > 3.99, layout['padding']
 assert area > 0.3, area
 assert result['margin_uv'] == 4 / 1024, result
 
+# Many small charts can exceed the space available for a large fractional margin.
+# Blender may return FINISHED while collapsing every UV triangle to a point.
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5, radius=1)
+crowded = bpy.context.active_object
+crowded.name = 'Crowded'
+rng = np.random.default_rng(3)
+for vertex in crowded.data.vertices:
+    vertex.co *= 1 + .15 * rng.standard_normal()
+params = {'lease_id': lease, 'name': crowded.name, 'angle_limit_degrees': 66,
+          'island_margin': .002, 'uv_layer': 'UVMap'}
+bridge.dispatch('owned_edit', {'operation': 'unwrap_mesh', 'params': params})
+packed = bridge.dispatch('inspect_uv_layout', {'names': [crowded.name],
+    'texture_resolution': [2048, 2048], 'padding_pixels': 4})
+assert packed['unique_tile_ready'], packed
+assert packed['degenerate_triangles'] == 0, packed
+
+layers = crowded.data.uv_layers
+other = layers.new(name='OtherUV')
+layers.active = other
+other.active_clone = True
+layers['UVMap'].active_render = True
+for i, row in enumerate(layers['UVMap'].data):
+    row.pin_uv = i % 7 == 0
+for data in (crowded.data.vertices, crowded.data.edges, crowded.data.polygons):
+    for i, row in enumerate(data):
+        row.select = i % 3 == 0
+uv_selection = ('.uv_select_vert', '.uv_select_edge', '.uv_select_face')
+assert all(crowded.data.attributes.get(key) is not None for key in uv_selection)
+for key in uv_selection:
+    attr = crowded.data.attributes[key]
+    attr.data.foreach_set('value', np.arange(len(attr.data)) % 3 == 0)
+print('UV selection storage:', [(key, crowded.data.attributes[key].data_type,
+       crowded.data.attributes[key].domain) for key in uv_selection],
+      'layer collections:', [key for key in ('vertex_selection', 'edge_selection')
+                             if hasattr(layers['UVMap'], key)])
+
+def uv_state():
+    layers = crowded.data.uv_layers
+    return (layers.active.name, [(layer.name, layer.active_render, layer.active_clone,
+             [(tuple(row.uv), row.pin_uv) for row in layer.data]) for layer in layers],
+             [[row.select for row in data] for data in
+              (crowded.data.vertices, crowded.data.edges, crowded.data.polygons)],
+             [(key, [row.value for row in crowded.data.attributes[key].data]) for key in uv_selection])
+
+before = uv_state()
+geometry_before = ([tuple(v.co) for v in crowded.data.vertices],
+                   [tuple(p.vertices) for p in crowded.data.polygons])
+for label in ('UVMap', 'NewUV'):
+    try:
+        bridge.dispatch('owned_edit', {'operation': 'unwrap_mesh',
+            'params': {**params, 'island_margin': .02, 'uv_layer': label}})
+    except ValueError as error:
+        assert 'UV packing' in str(error), str(error)
+    else:
+        raise AssertionError('Infeasible margin must not acknowledge collapsed UVs')
+    assert uv_state() == before, label
+assert geometry_before == ([tuple(v.co) for v in crowded.data.vertices],
+                           [tuple(p.vertices) for p in crowded.data.polygons])
+print(f"crowded: {packed['charts']} charts, 4px gutter passed; invalid packing restored UVs and flags")
+
 # A ramp of one and a half turns projects as one Smart UV chart that covers itself.
 ramp = bmesh.new()
 steps, rings = 96, 6

@@ -803,7 +803,10 @@ def planar_islands(mesh, layer, indices):
 
 
 def unwrap(p):
-    from .blender_geometry import PACK, integer
+    import numpy as np
+
+    from .blender_geometry import PACK, integer, uv_triangles
+    from .uv_layout import validate_packed
 
     value = editable_mesh(p["name"])
     angle = number(p.get("angle_limit_degrees", 66), 1, 89, "angle_limit_degrees")
@@ -823,12 +826,40 @@ def unwrap(p):
     if bpy.context.mode != "OBJECT":
         raise ValueError("Switch Blender to Object Mode before this operation")
     layers = value.data.uv_layers
-    created = None
-    previous = layers.active
+    previous = layers.active.name if layers.active else None
+    flags = {layer.name: (layer.active_render, layer.active_clone) for layer in layers}
+    target = layers.get(name) if name is not None else layers.active
+    saved = {}
+    layer_selection = {}
+    if target is not None:
+        for key in ('uv', 'pin_uv'):
+            saved[key] = np.empty(len(target.data) * (2 if key == 'uv' else 1),
+                                  np.float32 if key == 'uv' else np.bool_)
+            target.data.foreach_get(key, saved[key])
+        # Older Blender versions store UV selection per layer; 5.x uses shared mesh attributes.
+        for key in ('vertex_selection', 'edge_selection'):
+            if hasattr(target, key):
+                rows = getattr(target, key)
+                layer_selection[key] = np.empty(len(rows), np.bool_)
+                rows.foreach_get('value', layer_selection[key])
+    uv_selection = {}
+    for key in ('.uv_select_vert', '.uv_select_edge', '.uv_select_face'):
+        attr = value.data.attributes.get(key)
+        if attr is None:
+            uv_selection[key] = None
+        else:
+            data = np.empty(len(attr.data), np.bool_)
+            attr.data.foreach_get('value', data)
+            uv_selection[key] = (attr.data_type, attr.domain, data)
+    selection = {}
+    for key in ('vertices', 'edges', 'polygons'):
+        selection[key] = np.empty(len(getattr(value.data, key)), np.bool_)
+        getattr(value.data, key).foreach_get('select', selection[key])
+    target_name = target.name if target else None
     if name is not None and layers.get(name) is None:
         if len(layers) >= 8:
             raise ValueError("Mesh already has the maximum of 8 UV layers")
-        created = layers.new(name=name)
+        layers.new(name=name)
     try:
         if name is not None:
             layers.active = layers[name]
@@ -863,11 +894,38 @@ def unwrap(p):
             if folded:
                 planar_islands(value.data, layers.active.name, folded)
                 pack()
+        # Operators can return FINISHED even when an infeasible fractional margin collapses islands.
+        layers = value.data.uv_layers
+        validate_packed(uv_triangles(value.data, layers.active), margin)
     except Exception:
-        if created is not None:
-            layers.remove(layers[name])
-            if previous is not None:
-                layers.active = previous
+        # Edit Mode reallocates layers; restore the original data and flags by name.
+        layers = value.data.uv_layers
+        for layer in list(layers):
+            if layer.name not in flags:
+                layers.remove(layer)
+        if target_name is not None:
+            for key, data in saved.items():
+                layers[target_name].data.foreach_set(key, data)
+            for key, data in layer_selection.items():
+                getattr(layers[target_name], key).foreach_set('value', data)
+        for key, state in uv_selection.items():
+            attr = value.data.attributes.get(key)
+            if state is None:
+                if attr is not None:
+                    value.data.attributes.remove(attr)
+            else:
+                kind, domain, data = state
+                if attr is None:
+                    attr = value.data.attributes.new(key, kind, domain)
+                attr.data.foreach_set('value', data)
+        for label, (render, clone) in flags.items():
+            layers[label].active_render = render
+            layers[label].active_clone = clone
+        if previous is not None:
+            layers.active = layers[previous]
+        for key, data in selection.items():
+            getattr(value.data, key).foreach_set('select', data)
+        value.data.update()
         raise
     return {**info(value), "uv_layer": layers.active.name, "margin_uv": margin}
 
