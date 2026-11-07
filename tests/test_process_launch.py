@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -37,6 +38,46 @@ def offline(*_args):
 
 
 class OwnedLaunchTests(unittest.TestCase):
+    def registration_backend(self, root):
+        return SimpleNamespace(configuration=lambda path:({'records':str(root),'attempt':'attempt'},'hash'),
+            parse=json.loads,read_private=lambda path:path.read_bytes(),digest=lambda env:'environment')
+
+    def registration(self, launch_id):
+        return {'birth_identity':'birth','request':{'pid':123,'pgid':123,'parent_pid':os.getpid(),
+            'launch_id':launch_id,'attempt':'attempt','command':['native'],
+            'cwd':os.getcwd(),'environment_sha256':'environment'}}
+
+    def test_registration_wait_requires_the_matching_child_and_launch(self):
+        launch = self.module()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'other.json').write_text(json.dumps(self.registration('different-launch')))
+            observed = []
+            child = SimpleNamespace(pid=123,poll=lambda:None,
+                terminate=lambda:observed.append('terminated'),wait=lambda **kwargs:None)
+            timer = threading.Timer(.03,lambda:(root/'matching.json').write_text(json.dumps(self.registration('launch'))))
+            timer.start()
+            try:
+                with patch.object(launch,'_client',return_value=(self.registration_backend(root),{})):
+                    launch.wait_registered(child,env={OWNER:'owner'},launch_id='launch',args=['native'],timeout=.5)
+                self.assertTrue((root/'matching.json').exists())
+                self.assertEqual(observed,[])
+            finally:
+                timer.join()
+
+    def test_unobserved_registration_retires_the_child_and_reports_failure(self):
+        launch = self.module()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'other.json').write_text(json.dumps(self.registration('different-launch')))
+            observed = []
+            child = SimpleNamespace(pid=123,poll=lambda:None,
+                terminate=lambda:observed.append('terminated'),wait=lambda **kwargs:observed.append('waited'))
+            with patch.object(launch,'_client',return_value=(self.registration_backend(root),{})), \
+                    self.assertRaisesRegex(RuntimeError,'deadline'):
+                launch.wait_registered(child,env={OWNER:'owner'},launch_id='launch',args=['native'],timeout=.01)
+            self.assertEqual(observed,['terminated','waited'])
+
     def module(self):
         try:
             return importlib.import_module('cavi_blender_mcp.process_launch')
@@ -128,12 +169,29 @@ class OwnedLaunchTests(unittest.TestCase):
                 self.assertEqual(kwargs['env'][OWNER], str(root/'owner.json'))
                 return SimpleNamespace(pid=123)
             with backend(root, 'def command(args, **kwargs): return ["registered", *args]'), \
+                    patch.object(runtime.process_launch,'wait_registered'), \
                     patch.dict(os.environ, {OWNER:str(root/'owner.json'),
                         'CAVI_BLENDER_BIN':str(binary), 'CAVI_BLENDER_WORKSPACE':str(root),
                         'CAVI_BLENDER_CONNECTION':str(root/'connection.json')}), \
                     patch.object(runtime.BridgeClient, 'call', side_effect=offline), \
                     patch.object(runtime.subprocess, 'Popen', side_effect=spawned):
                 self.assertEqual(runtime.start_runtime(background=True)['pid'], 123)
+
+    def test_runtime_keeps_launcher_alive_until_registration_is_observed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            binary = root/'blender'
+            binary.write_bytes(b'not an application'); binary.chmod(0o700)
+            observed = []
+            with backend(root, 'def command(args, **kwargs): return args'), \
+                    patch.dict(os.environ,{OWNER:str(root/'owner.json'),'CAVI_BLENDER_BIN':str(binary),
+                        'CAVI_BLENDER_WORKSPACE':str(root),'CAVI_BLENDER_CONNECTION':str(root/'connection.json')}), \
+                    patch.object(runtime.BridgeClient,'call',side_effect=offline), \
+                    patch.object(runtime.subprocess,'Popen',return_value=SimpleNamespace(pid=123)), \
+                    patch.object(runtime.process_launch,'wait_registered',
+                        side_effect=lambda *args,**kwargs:observed.append(args[0].pid)):
+                runtime.start_runtime(background=True)
+            self.assertEqual(observed,[123])
 
     def test_reconstruction_passes_the_registered_command_to_its_runner(self):
         with tempfile.TemporaryDirectory() as folder:
