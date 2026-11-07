@@ -1,5 +1,6 @@
 """Reproducible camera, lighting, environment and production render definitions."""
 
+import math
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
@@ -12,6 +13,19 @@ Name = Annotated[str, Field(min_length=1, max_length=63)]
 
 class Definition(BaseModel):
     model_config = ConfigDict(extra='forbid')
+
+
+class SurfaceRay(Definition):
+    origin_world: Vector
+    direction_world: Vector
+    max_distance_m: Positive
+    evaluated: StrictBool = False
+
+    @model_validator(mode='after')
+    def nonzero_direction(self):
+        if not 0 < math.hypot(*self.direction_world) < math.inf:
+            raise ValueError('Surface ray direction must be nonzero and finite')
+        return self
 
 
 class CameraSpec(Definition):

@@ -6,6 +6,16 @@ from mcp.client.stdio import stdio_client
 
 
 class ResultContractTests(unittest.IsolatedAsyncioTestCase):
+    def test_surface_pick_requires_an_explicit_hit_or_miss(self):
+        from cavi_blender_mcp.contracts import SceneInfo
+
+        for hit in (True,False):
+            result=SceneInfo.model_validate({'scope':'mesh_surface_pick','surface_pick':{'hit':hit}})
+            self.assertIs(result.surface_pick['hit'],hit)
+        for pick in (None,{}, {'hit':1}, {'hit':'false'}):
+            with self.subTest(pick=pick),self.assertRaises(ValueError):
+                SceneInfo.model_validate({'scope':'mesh_surface_pick','surface_pick':pick})
+
     def test_scene_info_keeps_named_vertex_counts_and_scoped_vertex_pages(self):
         from cavi_blender_mcp.contracts import SceneInfo
 

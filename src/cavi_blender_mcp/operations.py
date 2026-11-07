@@ -5,6 +5,7 @@ OPERATIONS = frozenset(
         "scene_info",
         "inspect_mesh_faces",
         "inspect_mesh_vertices",
+        "pick_mesh_surface",
         "inspect_mesh_edges",
         "set_seams",
         "extrude_faces",
@@ -111,6 +112,7 @@ LEASE_FREE = frozenset(
     {
         "inspect_mesh_faces",
         "inspect_mesh_vertices",
+        "pick_mesh_surface",
         "inspect_mesh_edges",
         "inspect_material_nodes",
         "scene_info",
@@ -141,6 +143,7 @@ SOURCE_PRESERVING = frozenset({
 SLOW_OPERATIONS = frozenset(
     {
         "move_vertices",
+        "pick_mesh_surface",
         "unwrap_faces",
         "export_uv_assembly",
         "export_uv_asset",
