@@ -250,6 +250,24 @@ parameters, image content, lighting, opacity, non-mesh geometry, render-only
 visibility and render/viewport modifier differences. It does not establish
 appearance equivalence or replace the image hash and source/pose identities.
 
+## Delete discarded objects
+
+Inspect the current scene and save an owned source copy before deletion. Use
+`object_edit(action="delete", name="Draft", lease_id=lease)` for one object.
+An object with children requires explicit `recursive=true`, which includes its
+parented descendants. A collection-instance placement can be removed without
+deleting its shared definition.
+
+The result returns `name`, sorted `deleted` names and their exact `count`.
+Objects in other scenes, definitions used by surviving instances and external
+content references are checked before any removal. A rejected hierarchy leaves
+all its objects intact. Ambiguous object names are refused. Shared meshes and
+materials remain; no datablock purge is performed.
+
+Inspect the actual remaining scene and save/reopen when persistence is required.
+A missing object is a rejection, not a no-op success. An uncertain native failure
+requires inspection before another action; removal is not automatically retried.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect

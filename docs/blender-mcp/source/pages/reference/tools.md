@@ -3,6 +3,10 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`object_edit(action="delete", name=..., lease_id=...)` removes a named object.
+`recursive=true` includes parented descendants. Complete dependency checks precede
+removal; shared data is preserved and the receipt lists exactly which objects were deleted.
+
 `scene_info` with `faces=true` pages source polygon indices and local geometry.
 With `surface_ray`, it intersects a named mesh from an explicit world ray and
 metre range, returning a source face, triangle indices and optional corner UVs.

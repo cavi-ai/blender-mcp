@@ -612,7 +612,7 @@ async def session_control(
 async def object_edit(
     action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
-                    "duplicate", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
+                    "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
                     "shape_key_value", "shape_key_keyframe", "shape_key_remove"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
     kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
@@ -643,16 +643,17 @@ async def object_edit(
     source: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_add: source mesh")] = None,
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
+    recursive: Annotated[StrictBool | None, Field(description='delete: descendants')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ObjectEditResult:
-    """Create or transform objects, branch definitions, and copy mesh data."""
+    """Create, transform or delete objects and branch data."""
     values = {"kind": kind, "location": location, "rotation_degrees": rotation_degrees,
               "scale": scale, "vertices": vertices, "faces": faces, "rgba": rgba, "slot": slot,
               "smooth": smooth, "components": components, "make_single_user": make_single_user,
               "origin": origin, "grid": grid, "new_name": new_name, "count": count,
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
-              "offsets": offsets}
+              "offsets": offsets, "recursive": recursive}
     operation, params = {
         "create_primitive": ("create_primitive",
                              lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
@@ -673,6 +674,7 @@ async def object_edit(
             "count": 1, "offset": (0, 0, 0), "linked": False})),
         "make_unique": ("make_instance_unique", lambda: pick(action, values, ["new_name"])),
         "make_single_user": ("make_mesh_single_user", lambda: pick(action, values)),
+        "delete": ("delete_objects", lambda: pick(action, values, (), {"recursive": False})),
         "parent": ("parent_object", lambda: pick(action, values, ["new_name"])),
         "unparent": ("unparent_object", lambda: pick(action, values)),
         "move_to_collection": ("move_to_collection", lambda: pick(action, values, ["new_name"], {

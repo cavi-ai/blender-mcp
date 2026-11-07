@@ -255,7 +255,7 @@ class ObjectEditResult(ObjectFields):
     nullable_shape_fields = frozenset(
         {"parent", "previous_parent", "mesh", "shape_key_action", "action_slot"}
     )
-    shapes = (OBJECT_FIELDS, ("source", "count", "linked", "offset", "objects"))
+    shapes = (OBJECT_FIELDS, ("source", "count", "linked", "offset", "objects"), ("name", "deleted", "count"))
     source: str | None = None
     count: int | None = None
     linked: bool | None = None
@@ -265,6 +265,18 @@ class ObjectEditResult(ObjectFields):
     frame_range: list[Number] | None = None
     frames: list[Number] | None = None
     mesh_copy: Record | None = None
+    deleted: list[str] | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def deletion_receipt(cls,value):
+        if isinstance(value,dict) and value.get('deleted') is not None:
+            names=value['deleted']
+            if (not isinstance(names,list) or not names or any(type(name) is not str for name in names)
+                    or len(set(names))!=len(names) or value.get('name') not in names
+                    or type(value.get('count')) is not int or value['count']!=len(names)):
+                raise ValueError('Deletion receipts need unique names, their root and an exact count')
+        return value
 
 
 class RigEditResult(ObjectFields):

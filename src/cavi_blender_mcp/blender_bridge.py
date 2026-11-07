@@ -1032,6 +1032,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'delete_objects':
+        from .blender_object_delete import delete
+
+        return delete(p)
     if operation == 'pick_scene_surface':
         from .blender_scene_pick import inspect
 
