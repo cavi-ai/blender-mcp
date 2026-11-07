@@ -12,7 +12,7 @@ def expected_bridge():
                     root/'source_identity.py', root/'skin_projection.py', root/'mesh_regions.py',
                     root/'uv_regions.py', root/'uv_worker.py', root/'uv_layout.py', root/'process_launch.py',
                     root/'uv_density.py', root/'mapping.py', root/'vertex_edit.py', root/'surface_ray.py',
-                    root/'modifier_settings.py',root/'shader_links.py'})
+                    root/'modifier_settings.py',root/'shader_links.py',root/'native_controls.py'})
     digest = hashlib.sha256()
     for path in files:
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')

@@ -364,7 +364,7 @@ class MeshEditResult(ObjectFields):
 class MaterialAssignment(VariantResult):
     shapes = (('material', 'objects', 'slot', 'updated', 'material_users', 'base_color_srgb',
                'roughness', 'metallic', 'base_color_texture', 'textures', 'config', 'texture_packed'),
-              ('material', 'nodes', 'total', 'links'))
+              ('material', 'nodes', 'total', 'links'),('material','node_types','total'))
     nullable_shape_fields = frozenset({'base_color_texture'})
     material: str
     objects: list[str] | None = None
@@ -382,6 +382,7 @@ class MaterialAssignment(VariantResult):
     reserved_empty_slots: list[str] | None = None
     instance: str | None = None
     nodes: list[dict[str, Any]] | None = None
+    node_types: list[dict[str, Any]] | None = None
     total: int | None = None
     links: list[dict[str, Any]] | None = None
     changed_inputs: list[str] | None = None
