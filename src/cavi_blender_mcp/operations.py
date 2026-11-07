@@ -65,6 +65,7 @@ OPERATIONS = frozenset(
         "inspect_material_nodes",
         "set_material_inputs",
         "set_material_image",
+        "edit_material_links",
         "assign_instance_material",
         "assign_object_material",
         "decimate_to",

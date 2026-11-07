@@ -961,22 +961,22 @@ async def assign_material(
     uv_rotation_degrees: Annotated[Number | None, Field(description="assign: UV rotation")] = None,
     uv_layer: Annotated[str | None, Field(max_length=63,
         description='Sampling/tangent UVs; empty: render-active; keep UV flags')] = None,
-    update_existing: Annotated[StrictBool | None, Field(description="assign: update managed material")] = None,
+    update_existing: Annotated[StrictBool | None, Field(description="assign: managed update; connect: replace occupied inputs")] = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31, description="Slot")] = 0,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
     instance: Annotated[str | None, Field(description="Scene collection instance")] = None,
     link_mode: Annotated[Literal['DATA', 'OBJECT'] | None, Field(description='DATA/OBJECT binding; OBJECT shares geometry')] = None,
-    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
+    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique', 'connect', 'disconnect'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
     group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
-    node: Annotated[str | None, Field(description="Exact node")] = None,
-    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value map")] = None,
+    node: Annotated[str | None, Field(description="Exact node; links: destination")] = None,
+    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value; links: input ID/{node,socket} (1..32)")] = None,
     outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
     image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
     offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first node")] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="inspect: node cap")] = None,
 ) -> MaterialAssignment:
-    """Assign PBR; inspect/edit shader sockets.
-    Socket edits retain links, affect shared users and detach tool configuration."""
+    """Assign PBR; inspect/edit shader graphs.
+    Defaults retain links; rewiring is explicit. Edits affect shared users and detach tool configuration."""
     if material_name is None:
         raise ValueError('material_name is required')
     shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
@@ -993,6 +993,17 @@ async def assign_material(
         pick(action, shader)
         params = pick(action, values, ['names'], {'slot': 0, 'link_mode': 'OBJECT'})
         return await run(call, 'make_material_unique', material_name=material_name, lease_id=lease_id, **params)
+    if action in {'connect','disconnect'}:
+        from .shader_links import bindings
+
+        replace = values.pop('update_existing')
+        pick(action,values)
+        if action=='disconnect' and replace is not None:
+            raise ValueError('disconnect does not accept update_existing')
+        params=pick(action,shader,['node','inputs'],{'group_path':[]})
+        bindings(params['inputs'])
+        return await run(call,'edit_material_links',material_name=material_name,lease_id=lease_id,
+                         action=action,update_existing=False if replace is None else replace,**params)
     if action != 'assign':
         pick(action, values)
         if action == 'inspect':

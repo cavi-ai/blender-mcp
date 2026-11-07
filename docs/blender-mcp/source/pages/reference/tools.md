@@ -87,7 +87,7 @@ in the session workspace; image blocks remain available to visual clients.
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export, save and open do not.
-`assign_material` `inspect` is lease-free; `set_inputs` requires ownership. Inspect
+`assign_material` `inspect` is lease-free; shader edits require ownership. Inspect
 native shader inputs/outputs and shared owners before tuning defaults through nested
 `group_path` nodes. `set_image` replaces an image binding with a packed native
 workspace snapshot and explicit color/alpha interpretation. Optional `image.tiles`
@@ -415,6 +415,19 @@ It updates only selected seam flags, preserving UVs and other mesh data.
 [Guide](../guides/mesh-preparation.md)
 
 ## assign_material
+
+`connect` and `disconnect` edit links between existing nodes in one `group_path`.
+Set `node` to the destination and `inputs` to 1–32 bindings:
+`{"Color":{"node":"Tint","socket":"Color"}}`. Keys and source socket values
+are exact inspected identifiers. `connect` requires `update_existing=true` for
+an occupied input; identical links are no-ops. `disconnect` checks the exact current
+source and rejects stale or missing links. Batches validate endpoints, cycles and
+native conversions before source edits; failed readback or receipts restore links
+and managed configuration tags. Defaults and unrelated links are preserved.
+`changed_links` reports before/after pairs. Nested groups retain their shared users;
+inspect `affected_materials` or branch with `make_unique` first. Native color-to-shader
+conversion is supported. Socket discovery includes availability and multi-input
+flags; link discovery includes validity and mute state.
 
 `make_unique` copies the selected slots' authored material and nested node groups
 to a new `material_name`. It takes `names`, `slot` (default 0) and `link_mode`

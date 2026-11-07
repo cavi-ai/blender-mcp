@@ -85,6 +85,8 @@ def owners(tree):
 def socket_report(socket):
     prop = socket.bl_rna.properties.get('default_value')
     return {'identifier': socket.identifier, 'name': socket.name, 'type': socket.type,
+        'enabled': socket.enabled, 'unavailable': socket.is_unavailable,
+        'multi_input': socket.is_multi_input,
         'editable': editable(socket), 'linked': socket.is_linked,
         'value': encode(socket.default_value) if editable(socket) else None,
         'minimum': getattr(prop, 'hard_min', None), 'maximum': getattr(prop, 'hard_max', None)}
@@ -133,8 +135,11 @@ def inspect(params):
         'affected_material_total': len(users), 'affected_materials_truncated': len(users) > 1000,
         'nodes': [node_report(n) for n in page], 'total': len(nodes), 'offset': offset, 'limit': limit,
         'links': [{'from_node': l.from_node.name, 'from_socket': l.from_socket.identifier,
-                   'to_node': l.to_node.name, 'to_socket': l.to_socket.identifier}
-                  for l in tree.links if l.from_node in selected or l.to_node in selected] if tree else [],
+                   'to_node': l.to_node.name, 'to_socket': l.to_socket.identifier,
+                   'valid': l.is_valid, 'muted': l.is_muted}
+                  for l in sorted(tree.links,key=lambda l:(l.to_node.name,l.to_socket.identifier,
+                                                          l.from_node.name,l.from_socket.identifier))
+                  if l.from_node in selected or l.to_node in selected] if tree else [],
         'link_scope': 'touching_returned_nodes'}
 
 
