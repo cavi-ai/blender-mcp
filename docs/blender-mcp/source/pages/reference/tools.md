@@ -436,6 +436,18 @@ then set defaults and wire the graph explicitly. Existing active outputs are
 preserved unless `is_active_output` is requested. Creation failures remove the
 new node and restore output activation and configuration tags.
 
+`set_ramp` edits an existing node's native ColorRamp through `node_settings`.
+Inspection returns `color_ramp` with stops, modes and `control_schema` containing
+native enum identifiers and numeric bounds. `elements` replaces all stops with
+1–32 `{"position":0.5,"color":[0.2,0.3,2.5,1]}` entries. Each color is scene-linear
+RGBA at native float precision. Positions are sorted; equal positions and one
+stop are supported. Optional `interpolation`, `color_mode` and `hue_interpolation`
+use the inspected enums. Omitted settings are retained.
+Animated/driven ramps and external driver references are rejected before changes.
+Failed edits restore the original collection, modes and managed configuration tags.
+Read `changed_ramp` and `managed_materials_detached`; a no-op preserves configuration.
+Inspect shared owners before editing or use `make_unique` for a separate finish.
+
 `connect` and `disconnect` edit links between existing nodes in one `group_path`.
 Set `node` to the destination and `inputs` to 1–32 bindings:
 `{"Color":{"node":"Tint","socket":"Color"}}`. Keys and source socket values

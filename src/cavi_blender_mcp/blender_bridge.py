@@ -1090,6 +1090,10 @@ def _dispatch(operation, p):
         from .blender_shader_links import edit_links
 
         return edit_links(p)
+    if operation == 'set_shader_ramp':
+        from .blender_shader_ramps import set_ramp
+
+        return set_ramp(p)
     if operation in {'inspect_shader_node_types','create_shader_node'}:
         from .blender_shader_nodes import create, inspect_types
 

@@ -101,6 +101,10 @@ def node_report(node):
             report[name] = getattr(node, name)
     if node.type == 'GROUP' and node.node_tree:
         report['group'] = node.node_tree.name
+    if isinstance(getattr(node,'color_ramp',None),bpy.types.ColorRamp):
+        from .blender_shader_ramps import control_schema, read
+
+        report['color_ramp']={**read(node.color_ramp),'control_schema':control_schema(node.color_ramp)}
     if hasattr(node, 'image') and node.image:
         image = node.image
         report['image'] = {'name': image.name, 'source': image.source, 'path': image.filepath,

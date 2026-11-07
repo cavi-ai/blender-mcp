@@ -10,19 +10,26 @@ from cavi_mcp_core.server import Server as CoreServer
 __all__ = ['BlenderServer', 'omit_null_defaults']
 
 
-def _shared_constraints(schema, constraints, annotations, accepts, kind):
+def shared_constraints(schema):
+    """Share repeated value constraints while retaining field annotations."""
     if not isinstance(schema,dict) or preserve_structure(schema):
         return schema
+    constraints={'type','items','prefixItems','minItems','maxItems','minimum','maximum',
+                 'exclusiveMinimum','exclusiveMaximum','multipleOf','minLength','maxLength','pattern'}
+    annotations={'description','default','title','examples'}
     counts,values=Counter(),{}
     known={'#/$defs/'+k.replace('~','~0').replace('/','~1') for k in schema.get('$defs',{})}
     unknown=[]
 
     def signature(node):
+        types=node.get('type')
+        if (not isinstance(types,(str,list)) or (isinstance(types,list) and any(not isinstance(t,str) for t in types))
+                or not set([types] if isinstance(types,str) else types)<={
+                'array','boolean','integer','number','object','string','null'}):
+            return None
         if set(node)-constraints-annotations:
             return None
         body={k:v for k,v in node.items() if k in constraints}
-        if not accepts(body):
-            return None
         return json.dumps(body,sort_keys=True,separators=(',',':'))
 
     def count(node):
@@ -36,13 +43,12 @@ def _shared_constraints(schema, constraints, annotations, accepts, kind):
 
     map_schema(schema,count)
     if unknown:return schema
-    overhead=24 if kind=='array' else 5+(0 if known else 10)
-    selected={key for key,n in counts.items() if (len(key)-20)*n>len(key)+overhead}
+    selected={key for key,n in counts.items() if (len(key)-20)*n>len(key)+5+(0 if known else 10)}
     if not selected:return schema
     definitions=dict(schema.get('$defs',{}))
     names={}
     for key in sorted(selected):
-        name=kind+str(len(definitions))
+        name='shared'+str(len(definitions))
         while name in definitions:name+='a'
         definitions[name]=values[key]
         names[key]='#/$defs/'+name
@@ -56,42 +62,9 @@ def _shared_constraints(schema, constraints, annotations, accepts, kind):
     result=map_schema(schema,replace)
     # New definitions retain their bodies; only occurrences in the original schema move.
     result['$defs']={**result.get('$defs',{}),**{ref.split('/')[-1]:values[key] for key,ref in names.items()}}
-    if kind=='scalar':
-        def size(value):
-            return len(json.dumps(short_references(value),separators=(',',':'),ensure_ascii=False).encode())
-        if size(result)>=size(schema):
-            return schema
-    return result
-
-
-def shared_arrays(schema):
-    """Hoist profitable, identical arrays without moving scoped schemas."""
-    def accepts(body):
-        return body.get('type') in ('array', ['array','null'], ['null','array'])
-
-    return _shared_constraints(schema, {'type','items','prefixItems','minItems','maxItems'},
-        {'description','default','title','examples'}, accepts, 'array')
-
-
-def shared_scalars(schema):
-    """Share repeated scalar constraints, retaining annotations at each use site."""
-    def accepts(body):
-        types=body.get('type')
-        types=[types] if isinstance(types,str) else types
-        if types is None and not {'enum','const'} & body.keys():
-            return False
-        if types is not None and (not types or any(
-                t not in {'string','number','integer','boolean','null'} for t in types)):
-            return False
-        if 'const' in body and isinstance(body['const'],(dict,list)):
-            return False
-        return not ('enum' in body and any(isinstance(v,(dict,list)) for v in body['enum']))
-
-    return _shared_constraints(schema,
-        {'type','enum','const','minimum','maximum','exclusiveMinimum','exclusiveMaximum',
-         'multipleOf','minLength','maxLength','pattern','format','contentEncoding','contentMediaType'},
-        {'description','default','title','examples','deprecated','readOnly','writeOnly'},
-        accepts, 'scalar')
+    def size(value):
+        return len(json.dumps(short_references(value),separators=(',',':'),ensure_ascii=False).encode())
+    return result if size(result)<size(schema) else schema
 
 
 def short_references(schema):
@@ -150,8 +123,8 @@ class BlenderServer(CoreServer):
                     omitted.update(destructive_hint=None, idempotent_hint=None)
                 annotations = annotations.model_copy(update=omitted)
             result.append(tool.model_copy(update={'annotations': annotations,
-                'input_schema': short_references(shared_arrays(shared_scalars(tool.input_schema))),
-                'output_schema': short_references(shared_arrays(shared_scalars(tool.output_schema)))}))
+                'input_schema': short_references(shared_constraints(tool.input_schema)),
+                'output_schema': short_references(shared_constraints(tool.output_schema))}))
         return result
 
 
