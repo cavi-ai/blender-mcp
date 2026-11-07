@@ -25,10 +25,10 @@ These are read by the MCP server. All must be absolute local paths.
 | Variable | Purpose |
 | --- | --- |
 | `CAVI_GENERATION_PROVIDER` | `triposr` (default), `triposg` or `triposg-mlx` |
-| `CAVI_TRIPOSR_PYTHON` | Python 3.11 worker environment |
+| `CAVI_TRIPOSR_PYTHON` | Python 3.12 worker environment |
 | `CAVI_TRIPOSR_SOURCE` | TripoSR checkout |
 | `CAVI_TRIPOSR_WEIGHTS` | Directory with `config.yaml`, `model.ckpt` and `dino-config.json` |
-| `CAVI_TRIPOSG_PYTHON` | Python 3.11 worker environment |
+| `CAVI_TRIPOSG_PYTHON` | Python 3.12 worker environment |
 | `CAVI_TRIPOSG_SOURCE` | TripoSG checkout |
 | `CAVI_TRIPOSG_WEIGHTS` | Local `VAST-AI/TripoSG` model directory |
 | `CAVI_TRIPOSG_MLX_PYTHON` | Python 3.11 or newer with Pillow; frames the image and runs the launcher |

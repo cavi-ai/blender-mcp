@@ -6,7 +6,7 @@ einops==0.8.2
 filelock==4.2.7
 fsspec==2026.9.0
 hf-xet==1.8.0
-huggingface-hub==0.36.2
+huggingface-hub==2.3.0
 idna==3.20
 imageio==2.38.1
 importlib-metadata==10.1.0
@@ -33,7 +33,7 @@ scipy==1.17.1
 setuptools==84.2.1
 sympy==1.14.0
 tifffile==2026.3.3
-tokenizers==0.22.2
+tokenizers==0.23.3
 torch==2.15.0
 torchvision==0.29.2
 tqdm==4.70.1
