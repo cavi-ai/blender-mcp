@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze, overlapping
+from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze, overlapping, validate_packed
 
 QUAD = [[(.1, .1), (.4, .1), (.4, .4)], [(.1, .1), (.4, .4), (.1, .4)]]
 IDS = [[0, 1, 2], [0, 2, 3]]
@@ -14,6 +14,20 @@ def check(triangles=QUAD, vertices=IDS, resolution=(100, 100), padding=2, budget
 
 
 class UVLayoutTests(unittest.TestCase):
+    def test_packed_uvs_reject_collapsed_nonfinite_and_outside_results(self):
+        validate_packed(QUAD, .1)
+        for triangles in ([[[.2, .2]] * 3],
+                          [[(float('nan'), .2), (.3, .2), (.2, .3)]],
+                          [[(.2, .2), (1.1, .2), (.2, .3)]],
+                          [[(.001, .2), (.3, .2), (.2, .3)]], []):
+            with self.subTest(triangles=triangles), self.assertRaises(ValueError):
+                validate_packed(triangles, .002)
+
+    def test_packed_uv_border_allows_only_float32_roundoff(self):
+        validate_packed([[(.002 - 1e-8, .002), (.3, .002), (.002, .3)]], .002)
+        with self.assertRaises(ValueError):
+            validate_packed([[(.002 - 1e-5, .002), (.3, .002), (.002, .3)]], .002)
+
     def test_shared_diagonal_is_one_chart_without_overlap(self):
         r = check()
         self.assertTrue(r['complete'])

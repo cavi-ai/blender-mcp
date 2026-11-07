@@ -251,7 +251,12 @@ working surface. It does not save a project, bake textures or change seams.
 islands at `texture_resolution` (default 1024); `island_margin` instead sets the
 margin as a fraction of the UV square. Faces that fold over their own island are
 projected again at half the angle limit; any still folded become islands of their
-own. `decimate_to` dissolves faces collapsed onto coincident vertices. `lightmap_uv` creates
+own. Packing that produces zero-area, nonfinite or out-of-tile UVs is rejected and
+the previous UV coordinates, pins, selection and layer flags are restored. Large
+fractional margins can be infeasible on surfaces with many islands; the tool does
+not reduce them automatically. Use `inspect_uv_layout` to check overlaps and the
+required pixel gutters after a successful unwrap.
+`decimate_to` dissolves faces collapsed onto coincident vertices. `lightmap_uv` creates
 `UVMap_Lightmap` when missing, keeps the render-active layer and rasterizes the
 overlap ratio. `texel_density` scales the layer around its UV bounds center;
 `pack=true` rearranges islands without rescaling.

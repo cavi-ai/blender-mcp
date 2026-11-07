@@ -13,6 +13,20 @@ DISTANCE_EPSILON = 1e-6  # Pixels; only used for the requested padding compariso
 EXAMPLES = 32
 
 
+def validate_packed(triangles, margin):
+    """Reject invalid native packing output; overlap and chart gutters need separate inspection."""
+    triangles = np.asarray(triangles, dtype=np.float64)
+    if (triangles.ndim != 3 or triangles.shape[1:] != (3, 2) or not len(triangles)
+            or not np.isfinite(triangles).all()):
+        raise ValueError('UV packing produced empty or nonfinite triangles')
+    a, b = triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]
+    if np.any(a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0] == 0):
+        raise ValueError('UV packing produced zero-area triangles; reduce the requested margin')
+    # UV storage is float32; this tolerance only covers its rounding at the tile border.
+    if triangles.min() < margin - 1e-6 or triangles.max() > 1 - margin + 1e-6:
+        raise ValueError('UV packing does not fit the tile with the requested border margin')
+
+
 def default_budget(triangles):
     """Candidate comparisons grow with the inspected triangles, up to the analysis maximum."""
     return max(1, min(MAX_COMPARISONS, COMPARISONS_PER_TRIANGLE * triangles))
