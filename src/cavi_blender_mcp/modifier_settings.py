@@ -1,6 +1,13 @@
 """Scalar modifier controls and conservative topology bounds."""
 import math
 
+from .native_controls import controls as native_controls
+
+
+def controls(values,schema):
+    """Validate the complete map against inspected native property metadata."""
+    return native_controls(values,schema,subject='modifier',parameter='modifier_settings')
+
 
 def update(kind,settings,amount):
     if type(amount) not in (float,int) or not math.isfinite(amount):

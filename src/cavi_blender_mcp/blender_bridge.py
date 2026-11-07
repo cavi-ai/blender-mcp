@@ -138,7 +138,7 @@ def set_rotation(value, degrees):
         value.rotation_euler = euler.to_matrix().to_euler(mode, value.rotation_euler)
 
 
-def info(value):
+def info(value,*,modifier_schema=False):
     from .blender_modifiers import inspect as inspect_modifier
 
     angles = (
@@ -155,7 +155,7 @@ def info(value):
         "parent": value.parent.name if value.parent else None,
         "children": len(value.children),
         "collections": [item.name for item in value.users_collection],
-        "modifiers": [inspect_modifier(m) for m in value.modifiers],
+        "modifiers": [inspect_modifier(m,detailed=modifier_schema) for m in value.modifiers],
     }
     if value.type == 'CAMERA':
         data = value.data
@@ -1082,6 +1082,14 @@ def _dispatch(operation, p):
         from .blender_uv_edit import transform as transform_uv
 
         return transform_uv(p, editable_mesh, info)
+    if operation == 'edit_material_links':
+        from .blender_shader_links import edit_links
+
+        return edit_links(p)
+    if operation in {'inspect_shader_node_types','create_shader_node'}:
+        from .blender_shader_nodes import create, inspect_types
+
+        return {'inspect_shader_node_types':inspect_types,'create_shader_node':create}[operation](p)
     if operation in {'inspect_material_nodes', 'set_material_inputs', 'set_material_image'}:
         from .blender_shader_inputs import inspect, set_image, set_inputs
 
@@ -1248,7 +1256,7 @@ def _dispatch(operation, p):
 
         return edit({**p,'action':'remove' if operation=='remove_modifier' else 'update'},obj,info)
     if operation == "object_info":
-        return info(obj(p["name"]))
+        return info(obj(p["name"]),modifier_schema=True)
     handlers = {
         "scene_info": scene_info,
         "create_mesh": create_mesh,

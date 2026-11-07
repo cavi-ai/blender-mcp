@@ -774,6 +774,7 @@ async def mesh_edit(
     symmetry_tolerance_m: Annotated[Number | None, Field(gt=0, description='move_vertices: symmetry match tolerance (m)')] = None,
     material_name: Annotated[str | None, Field(min_length=1, max_length=63, description='assign_faces: existing finish')] = None,
     modifier_name: Annotated[RigName | None, Field(description='Existing modifier')] = None,
+    modifier_settings: Annotated[dict[str,JsonValue] | None, Field(description='Native modifier controls')] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -793,10 +794,13 @@ async def mesh_edit(
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
               'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m,
-              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,'modifier_name':modifier_name}
+              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,
+              'modifier_name':modifier_name,'modifier_settings':modifier_settings}
     if action in ('modifier_update','modifier_remove'):
-        required=['modifier_name','amount'] if action=='modifier_update' else ['modifier_name']
-        params=pick(action,values,required)
+        params=pick(action,values,['modifier_name'],
+                    {'amount':None,'modifier_settings':None} if action=='modifier_update' else {})
+        if action=='modifier_update' and (amount is None)==(modifier_settings is None):
+            raise ValueError('modifier_update requires: amount or modifier_settings, exclusively')
         return await run(call,'update_modifier' if action=='modifier_update' else 'remove_modifier',
                          lease_id=lease_id,name=name,**params)
     if action == 'assign_faces':
@@ -957,25 +961,28 @@ async def assign_material(
     uv_rotation_degrees: Annotated[Number | None, Field(description="assign: UV rotation")] = None,
     uv_layer: Annotated[str | None, Field(max_length=63,
         description='Sampling/tangent UVs; empty: render-active; keep UV flags')] = None,
-    update_existing: Annotated[StrictBool | None, Field(description="assign: update managed material")] = None,
+    update_existing: Annotated[StrictBool | None, Field(description="assign: managed update; connect: replace occupied inputs")] = None,
     slot: Annotated[StrictInt, Field(ge=0, le=31, description="Slot")] = 0,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
     instance: Annotated[str | None, Field(description="Scene collection instance")] = None,
     link_mode: Annotated[Literal['DATA', 'OBJECT'] | None, Field(description='DATA/OBJECT binding; OBJECT shares geometry')] = None,
-    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
+    action: Annotated[Literal['assign', 'inspect', 'set_inputs', 'set_image', 'make_unique', 'connect', 'disconnect', 'node_types', 'create_node'], Field(description='Action; make_unique copies groups, shares images/actions')] = 'assign',
     group_path: Annotated[list[str] | None, Field(description="Groups, outermost first")] = None,
-    node: Annotated[str | None, Field(description="Exact node")] = None,
-    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value map")] = None,
+    node: Annotated[str | None, Field(description="Node; links: destination")] = None,
+    node_type: Annotated[str | None, Field(min_length=1,max_length=127,description='Native type ID')] = None,
+    node_settings: Annotated[dict[str,JsonValue] | None, Field(max_length=32,description='create_node: scalar/enum controls')] = None,
+    inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: ID/value; links: input ID/{node,socket} (1..32)")] = None,
     outputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs: output ID/value map")] = None,
     image: Annotated[ShaderImage | None, Field(description='set_image: pack native snapshot')] = None,
     offset: Annotated[StrictInt | None, Field(ge=0, description="inspect: first node")] = None,
     limit: Annotated[StrictInt | None, Field(ge=1, le=1000, description="inspect: node cap")] = None,
 ) -> MaterialAssignment:
-    """Assign PBR; inspect/edit shader sockets.
-    Socket edits retain links, affect shared users and detach tool configuration."""
+    """Assign PBR or edit native shaders.
+    Defaults retain links; edits affect shared users and detach tool configuration."""
     if material_name is None:
         raise ValueError('material_name is required')
-    shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit}
+    shader = {'group_path': group_path, 'node': node, 'inputs': inputs, 'outputs': outputs, 'image': image, 'offset': offset, 'limit': limit,
+              'node_type':node_type,'node_settings':node_settings}
     values = {'names': names, 'base_color_texture': base_color_texture, 'base_color': base_color,
             'roughness': roughness, 'metallic': metallic, 'roughness_texture': roughness_texture,
             'metallic_texture': metallic_texture, 'normal_texture': normal_texture, 'normal_strength': normal_strength,
@@ -989,8 +996,25 @@ async def assign_material(
         pick(action, shader)
         params = pick(action, values, ['names'], {'slot': 0, 'link_mode': 'OBJECT'})
         return await run(call, 'make_material_unique', material_name=material_name, lease_id=lease_id, **params)
+    if action in {'connect','disconnect'}:
+        from .shader_links import bindings
+
+        replace = values.pop('update_existing')
+        pick(action,values)
+        if action=='disconnect' and replace is not None:
+            raise ValueError('disconnect does not accept update_existing')
+        params=pick(action,shader,['node','inputs'],{'group_path':[]})
+        bindings(params['inputs'])
+        return await run(call,'edit_material_links',material_name=material_name,lease_id=lease_id,
+                         action=action,update_existing=False if replace is None else replace,**params)
     if action != 'assign':
         pick(action, values)
+        if action=='node_types':
+            params=pick(action,shader,(),{'group_path':[],'node_type':None,'offset':0,'limit':100})
+            return await run(call,'inspect_shader_node_types',material_name=material_name,**params)
+        if action=='create_node':
+            params=pick(action,shader,['node','node_type'],{'group_path':[],'node_settings':{}})
+            return await run(call,'create_shader_node',material_name=material_name,lease_id=lease_id,**params)
         if action == 'inspect':
             params = pick(action, shader, (), {'group_path': [], 'node': None, 'offset': 0, 'limit': 100})
             return await run(call, 'inspect_material_nodes', material_name=material_name, **params)

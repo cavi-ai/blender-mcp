@@ -4,19 +4,32 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info(name=...)` reports ordered modifier names, native types, viewport/render
-visibility and the exposed scalar settings. `mesh_edit(action="modifier_update",
+visibility, exposed settings and `control_schema` with their native types, hard
+ranges, enum identifiers and read-only state. Scene-wide pages omit this detailed
+schema. `mesh_edit(action="modifier_update",
 name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
 in place: bevel width, collapse-decimation ratio, subdivision viewport/render
 levels, or voxel size. Other controls and stack order are retained. Percentage
 bevels and other remesh/decimation modes require their own native controls and are
-rejected by this scalar update. Subdivision levels remain 1–3; voxel size remains
-0.005–1, matching modifier creation.
+rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
+size 0.005–1, matching modifier creation.
+
+Alternatively, pass `modifier_settings` as an explicit property map, omitting
+`amount`. It supports exposed bevel finish controls, decimation modes, independent
+subdivision levels, remesh controls and viewport/render visibility. For example,
+`{"segments": 8, "profile": 0.7, "show_render": true}` tunes a bevel.
+Use the inspected native types and hard ranges; integers, booleans and enum
+identifiers are distinct. Unknown, read-only, nonfinite or out-of-range values
+reject the complete map before assignment. No values are silently clamped.
+Native subdivision ranges apply to this form, subject to the geometry budget;
+the shorthand's fixed level range does not apply. Angle properties use radians.
 
 Updates check a conservative 500,000-triangle bound across bevel, decimate,
 subdivision and armature stacks before evaluating changed geometry. Unknown
-topology-changing modifiers cannot establish that bound. Voxel updates require
+topology-changing modifiers cannot establish that bound. Remesh updates require
 a standalone modifier on a shape-key-free working mesh and at most two million
-bounding voxels. A rejected update leaves the original stack intact.
+bounding voxel or octree cells. Visibility-only disabling does not enlarge a
+stack and can bypass its growth estimate. A rejected update leaves the stack intact.
 
 `mesh_edit(action="modifier_remove", name=..., modifier_name=..., lease_id=...)`
 removes exactly the named modifier, including types outside scalar editing.
@@ -74,7 +87,7 @@ in the session workspace; image blocks remain available to visual clients.
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export, save and open do not.
-`assign_material` `inspect` is lease-free; `set_inputs` requires ownership. Inspect
+`assign_material` `inspect` is lease-free; shader edits require ownership. Inspect
 native shader inputs/outputs and shared owners before tuning defaults through nested
 `group_path` nodes. `set_image` replaces an image binding with a packed native
 workspace snapshot and explicit color/alpha interpretation. Optional `image.tiles`
@@ -402,6 +415,31 @@ It updates only selected seam flags, preserving UVs and other mesh data.
 [Guide](../guides/mesh-preparation.md)
 
 ## assign_material
+
+`node_types` pages native node types available in the material's `group_path`.
+Pass `node_type` to inspect its `control_schema` without creating nodes.
+`create_node` requires a unique `node` name and an exact discovered `node_type`.
+Optional `node_settings` supplies up to 32 initial Boolean, integer, finite float,
+enum or text controls. For example, `ShaderNodeMath` accepts
+`{"operation":"MULTIPLY","use_clamp":false}`; `ShaderNodeUVMap` accepts
+`{"uv_map":"ShaderUV"}`. Resource paths and ID pointers use their separate
+binding operations. Read `created_node` and the actual returned socket identifiers,
+then set defaults and wire the graph explicitly. Existing active outputs are
+preserved unless `is_active_output` is requested. Creation failures remove the
+new node and restore output activation and configuration tags.
+
+`connect` and `disconnect` edit links between existing nodes in one `group_path`.
+Set `node` to the destination and `inputs` to 1–32 bindings:
+`{"Color":{"node":"Tint","socket":"Color"}}`. Keys and source socket values
+are exact inspected identifiers. `connect` requires `update_existing=true` for
+an occupied input; identical links are no-ops. `disconnect` checks the exact current
+source and rejects stale or missing links. Batches validate endpoints, cycles and
+native conversions before source edits; failed readback or receipts restore links
+and managed configuration tags. Defaults and unrelated links are preserved.
+`changed_links` reports before/after pairs. Nested groups retain their shared users;
+inspect `affected_materials` or branch with `make_unique` first. Native color-to-shader
+conversion is supported. Socket discovery includes availability and multi-input
+flags; link discovery includes validity and mute state.
 
 `make_unique` copies the selected slots' authored material and nested node groups
 to a new `material_name`. It takes `names`, `slot` (default 0) and `link_mode`

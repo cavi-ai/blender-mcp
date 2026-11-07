@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import unittest
 from typing import Annotated
 
@@ -9,6 +10,50 @@ from cavi_blender_mcp.catalog import BlenderServer, omit_null_defaults
 
 
 class CatalogTests(unittest.TestCase):
+    def test_shared_arrays_preserve_nullable_bounds_and_default_literals(self):
+        from cavi_blender_mcp.catalog import shared_arrays, short_references
+
+        vector={'type':['array','null'],'items':{'type':'number'},'minItems':3,'maxItems':3}
+        source={'type':'object','additionalProperties':False,'properties':{
+            name:{**vector,'description':name,'default':{'$ref':'literal'}} for name in ['head','tail','offset','pivot']}}
+        original=copy.deepcopy(source)
+        compact=short_references(shared_arrays(source))
+        self.assertEqual(source,original)
+        self.assertLess(len(str(compact)),len(str(source)))
+        for name,field in compact['properties'].items():
+            self.assertEqual(field['description'],name)
+            self.assertEqual(field['default'],{'$ref':'literal'})
+        for value in ({},{'head':None},{'head':[1,2,3]},{'head':[]},{'head':[1,2]},
+                      {'head':[1,2,3,4]},{'head':[True,1,2]},{'head':['1',2,3]},
+                      {'head':[1,2,3],'foreign':0}):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),Draft202012Validator(compact).is_valid(value))
+        self.assertEqual(shared_arrays({**source,'$id':'https://example.test/root'}),{**source,'$id':'https://example.test/root'})
+        pointer={**source,'$ref':'#/properties/head'}
+        self.assertEqual(shared_arrays(pointer),pointer)
+
+    def test_empty_reference_elision_keeps_constraints_and_literal_dictionaries(self):
+        from cavi_blender_mcp.catalog import short_references
+
+        ref='#/$defs/Anything'
+        source={'$defs':{'Anything':{}},'type':'object','additionalProperties':False,
+            'properties':{'payload':{'$ref':ref,'type':'array','minItems':1}},'required':['payload'],
+            'default':{'$ref':ref}}
+        compact=short_references(source)
+        self.assertNotIn('$defs',compact)
+        self.assertNotIn('$ref',compact['properties']['payload'])
+        self.assertEqual(compact['default'],source['default'])
+        self.assertIn('$ref',source['properties']['payload'])
+        for value in ({'payload':[1]},{'payload':[]},{'payload':None},{'payload':'bad'},
+                      {'payload':[None,{'a':True}]},{},{'payload':[1],'extra':1}):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),Draft202012Validator(compact).is_valid(value))
+        mapping={'$defs':{'Anything':{}},'type':'object','additionalProperties':{'$ref':ref}}
+        self.assertNotIn('additionalProperties',short_references(mapping))
+        for value in ({},{'a':[1]},{'b':None},[],None):
+            self.assertEqual(Draft202012Validator(mapping).is_valid(value),
+                             Draft202012Validator(short_references(mapping)).is_valid(value))
+        scoped={**mapping,'unevaluatedProperties':False}
+        self.assertEqual(short_references(scoped),scoped)
+
     def test_named_references_shorten_without_rewriting_literal_data(self):
         from cavi_blender_mcp.catalog import short_references
 
