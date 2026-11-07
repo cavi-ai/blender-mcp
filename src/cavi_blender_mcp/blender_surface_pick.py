@@ -36,8 +36,13 @@ def inspect(p):
             source = value.data
             bpy.context.view_layer.update()
             spec = p['surface_ray']
+            camera_query=None
             if type(spec.get('evaluated',False)) is not bool:
                 raise ValueError('evaluated must be a boolean')
+            if 'camera' in spec:
+                from .blender_camera_ray import from_query
+
+                spec,camera_query=from_query(spec)
             layer = source.uv_layers.get(p['uv_layer']) if p.get('uv_layer') is not None else None
             if p.get('uv_layer') is not None and layer is None:
                 raise ValueError('Requested UV layer is missing')
@@ -67,6 +72,8 @@ def inspect(p):
                 'surface_sha256':mesh_digest(mesh),'intersection_precision':'native_float32_bvh'}
             result = {'name':value.name,'type':'MESH','mesh':source.name,'scope':'mesh_surface_pick',
                 'mesh_sha256':mesh_digest(source),'surface_pick':report}
+            if camera_query is not None:
+                report['camera_query']=camera_query
             if layer is not None:
                 report['uv'] = {'layer':layer.name,'sha256':uv_digest(layer)}
             if not triangles:
@@ -79,6 +86,11 @@ def inspect(p):
             distance_m = math.dist(world,spec['origin_world'])*unit
             if distance_m > spec['max_distance_m']:
                 return result
+            if camera_query is not None:
+                from .blender_camera_ray import inside_clip
+
+                if not inside_clip(world,camera_query):
+                    return result
             world_normal = np.linalg.inv(matrix[:3,:3]).T @ np.asarray(normal,dtype=np.float64)
             norm = math.hypot(*world_normal)
             if not 0 < norm < math.inf or not np.isfinite(world).all():

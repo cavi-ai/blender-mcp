@@ -28,6 +28,21 @@ class SurfaceRay(Definition):
         return self
 
 
+class CameraRay(Definition):
+    camera: Name
+    pixel: tuple[Number, Number]
+    image_size: tuple[Annotated[StrictInt, Field(gt=0)], Annotated[StrictInt, Field(gt=0)]]
+    max_distance_m: Positive
+    evaluated: StrictBool = False
+    expected_projection_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None
+
+    @model_validator(mode='after')
+    def inside_image(self):
+        if any(not 0 <= p <= size-1 for p,size in zip(self.pixel,self.image_size,strict=True)):
+            raise ValueError('Camera pixel must lie within the declared image')
+        return self
+
+
 class CameraSpec(Definition):
     name: Name
     location: Vector

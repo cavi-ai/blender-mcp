@@ -1,5 +1,6 @@
 """Persistent cameras, lights, managed world nodes and production scene rendering."""
 
+import hashlib
 import json
 import math
 import time
@@ -209,16 +210,31 @@ def render(spec):
         scene.view_settings.view_transform = spec['view_transform']
         scene.view_settings.exposure, scene.view_settings.gamma = spec['exposure'], spec['gamma']
         scene['cavi_render_definition'] = json.dumps(spec, sort_keys=True)
+        def projection():
+            from .blender_camera_ray import snapshot
+
+            try:
+                return snapshot(camera_object,[width,height])
+            except (ValueError,TypeError,RuntimeError) as exc:
+                return {'available':False,'reason':str(exc)}
+
+        camera_projection=projection()
         result = bpy.ops.render.render(write_still=True)
         if 'FINISHED' not in result:
             raise RuntimeError('Scene render did not finish')
+        after=projection()
+        if camera_projection.get('available') and after != camera_projection:
+            camera_projection={'available':False,'reason':'Camera projection changed during render'}
     elapsed = time.monotonic()-started
+    with path.open('rb') as stream:
+        sha256=hashlib.file_digest(stream,'sha256').hexdigest()
     return {'path': str(path), 'bytes': path.stat().st_size, 'engine': scene.render.engine,
             'width': width, 'height': height, 'bit_depth': int(spec['bit_depth']),
             'samples_requested': samples, 'elapsed_seconds': elapsed,
             'cycles_sampling_may_have_hit_time_limit': spec['engine'] == 'cycles'
             and spec['cycles_time_limit'] > 0 and elapsed >= spec['cycles_time_limit'],
-            'camera': camera_object.name, 'world': scene.world.name if scene.world else None}
+            'camera': camera_object.name, 'world': scene.world.name if scene.world else None,
+            'sha256':sha256,'camera_projection':camera_projection}
 
 
 def author(p, workspace):

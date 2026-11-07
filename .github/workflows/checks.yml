@@ -111,6 +111,8 @@ jobs:
         run: uv run --locked python tests/native_vertex_symmetry_mcp.py --blender "$(command -v blender)"
       - name: Check source and posed surface picking
         run: uv run --locked python tests/native_surface_pick_mcp.py --blender "$(command -v blender)"
+      - name: Check rendered camera pixel picking
+        run: uv run --locked python tests/native_camera_pick_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
