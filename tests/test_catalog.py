@@ -58,7 +58,7 @@ class CatalogTests(unittest.TestCase):
         self.assertFalse(write.get('destructiveHint', True))
         destructive = tools['destructive_value'].annotations.model_dump(by_alias=True, exclude_none=True)
         self.assertIs(destructive['readOnlyHint'], False)
-        self.assertNotIn('destructiveHint', destructive)
+        self.assertIs(destructive['destructiveHint'], True)
         self.assertFalse(destructive.get('readOnlyHint', False))
         self.assertTrue(destructive.get('destructiveHint', True))
 
