@@ -2,6 +2,28 @@
 import math
 
 
+def controls(values,schema):
+    """Validate the complete map against inspected native property metadata."""
+    if not isinstance(values,dict) or not values:
+        raise ValueError('modifier_settings requires a nonempty property map')
+    result={}
+    for key,value in values.items():
+        spec=schema.get(key)
+        if spec is None or spec['readonly']:
+            raise ValueError(f'Unknown or read-only modifier control: {key}')
+        kind=spec['type']
+        if kind=='BOOLEAN':valid=type(value) is bool
+        elif kind=='ENUM':valid=type(value) is str and value in spec['items']
+        elif kind in ('INT','FLOAT'):
+            valid=type(value) is int if kind=='INT' else type(value) in (int,float)
+            try:valid=valid and math.isfinite(value) and spec['min']<=value<=spec['max']
+            except OverflowError:valid=False
+        else:valid=False
+        if not valid:raise ValueError(f'Invalid native type or range for modifier control: {key}')
+        result[key]=float(value) if kind=='FLOAT' else value
+    return result
+
+
 def update(kind,settings,amount):
     if type(amount) not in (float,int) or not math.isfinite(amount):
         raise ValueError('Modifier amount must be finite')

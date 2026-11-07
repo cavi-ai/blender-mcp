@@ -33,6 +33,9 @@ hero.keyframe_insert('location',frame=10)
 peer=hero.copy()
 peer.name='Peer'
 bpy.context.collection.objects.link(peer)
+unknown=bpy.data.objects.new('Unknown',hero.data)
+bpy.context.collection.objects.link(unknown)
+unknown.modifiers.new('Procedural','NODES')
 for name,kind in [('Subdiv','SUBSURF'),('Voxel','REMESH')]:
     value=hero.copy()
     value.data=hero.data.copy()
@@ -80,7 +83,7 @@ driver.expression=variable.name
 @bpy.app.handlers.persistent
 def audit(*_):
     result={}
-    for name in ('Hero','Peer','Subdiv','Voxel','BudgetGrid','Animated','NlaAnimated','Driven','Referenced'):
+    for name in ('Hero','Peer','Subdiv','Voxel','BudgetGrid','Animated','NlaAnimated','Driven','Referenced','Unknown'):
         value=bpy.data.objects[name]
         mesh=value.data
         result[name]={'mesh':mesh.name,'users':mesh.users,
