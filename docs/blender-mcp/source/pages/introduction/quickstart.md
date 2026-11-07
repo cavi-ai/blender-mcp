@@ -1,6 +1,25 @@
 # Quickstart
 
-## 1. Inspect before editing
+## Direct your agent
+
+After [installing and connecting Cavi](installation.md), give your agent a
+creative goal in ordinary language. Start with a working copy of your project:
+
+> Inspect this Blender scene before changing it. Keep the defining shape of the
+> prop, give it a wider base and a more protective hood, then show me the next
+> pass. Leave the parts editable and save the revision as a new Blender file.
+
+Review the preview and choose the next change. The agent handles scene
+inspection, edit ownership and Blender operations; you do not need to call each
+MCP tool yourself. The [README](https://github.com/cavi-ai/blender-mcp) has an
+editable example to try.
+
+## MCP client integration
+
+The sequence below is for client authors and developers inspecting the tool
+contract. It shows the calls an agent makes on the user's behalf.
+
+### 1. Inspect before editing
 
 Call `scene_info`. It returns the Blender version, file, workspace, collection
 tree and a page of objects. Use `name` to inspect one object, or `limit` and
@@ -12,7 +31,7 @@ tree and a page of objects. Use `name` to inspect one object, or `limit` and
 
 Use exact object names from this response in later calls.
 
-## 2. Claim ownership
+### 2. Claim ownership
 
 Every mutation requires an edit lease. Read-only calls do not.
 
@@ -34,7 +53,7 @@ Renew or release with the same `lease_id`. Break ends a lease unused for 300
 seconds. Release, break and expiry never save, close or discard a project. See
 [Share application ownership](../guides/session-ownership.md).
 
-## 3. Make a bounded change
+### 3. Make a bounded change
 
 Create a primitive:
 
@@ -61,13 +80,13 @@ Then move it:
 
 The tool refuses unrelated action parameters before contacting Blender.
 
-## 4. Inspect and preview
+### 4. Inspect and preview
 
 Run `inspect_mesh_quality` with `checks=["topology", "lightmap",
 "transforms", "materials"]`. Then call `render_preview` with a new workspace
 `.png` path. Previews do not need a lease and restore scene state.
 
-## 5. Export
+### 5. Export
 
 Call `asset_io` with `action="export"`, the exact mesh names and a new
 workspace path:

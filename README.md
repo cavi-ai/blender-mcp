@@ -1,61 +1,37 @@
-# Blender MCP
+# Cavi Blender MCP
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**Bring your idea. Keep shaping it in Blender.**
 
-Local-first MCP tools for Blender scene inspection, mesh editing, previews and
-game asset export. The server publishes 20 tools over stdio and sends every
-operation to a bridge that runs on Blender's main thread.
+[![PyPI version](https://img.shields.io/pypi/v/cavi-blender-mcp)](https://pypi.org/project/cavi-blender-mcp/) [![PyPI downloads](https://img.shields.io/pypi/dw/cavi-blender-mcp?label=PyPI%20downloads)](https://pypistats.org/packages/cavi-blender-mcp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`scene_info` and `runtime status` report the loaded bridge's protocol and source
-fingerprint. Status exits nonzero when the native implementation differs from
-the installed server. Preserve the active project and edit ownership before
-refreshing an outdated bridge; updating the MCP process alone does not reload it.
+Cavi connects your agent to a real Blender project. Give it a direction, review the next pass, and keep working in the same editable scene. Your agent can inspect the project, change geometry and materials, show you a preview, and save or export the result.
 
-The server type, failure contract and schema compaction come from
-[`cavi-mcp-core`](https://github.com/cavi-ai/mcp-core), shared with the other CAVI MCP servers.
+![Night Watch Lantern: an indigo-and-brass harbor lantern framed by an oversized crescent](examples/creator-directed-revision/after.png)
 
-Everything runs on the local machine. The bridge binds only to IPv4 loopback and
-requires a random session token. There is no arbitrary Python tool, telemetry,
-external asset download or remote inference.
+## Give the lantern a night shift
 
-## Try one material handoff
+The crescent stays. The rest needs to survive a harbor night.
 
-Inspect a utility case's material assignments, export its nine mesh objects,
-and check the two texture sets that Painter actually receives. The example
-includes the original mesh, exported maps and reproduction steps.
+> Keep the oversized crescent and brass pivot. Make this feel like a working harbor signal: lower and widen the storm hood, give it a broader stance, protect the lamp with a ribbed guard, and use indigo enamel with a warmer amber light. Show me the revision before saving a new copy. Leave the parts editable.
 
-[![One utility case, nine mesh objects and two assigned material names](examples/material-texture-sets/utility-case-material-handoff-poster.png)](examples/material-texture-sets/utility-case-material-handoff.mp4)
+[Compare the two designs and open the Blender files →](examples/creator-directed-revision/README.md)
 
-[Watch the 30-second edited handoff](examples/material-texture-sets/utility-case-material-handoff.mp4)
-or [count the assigned materials](examples/material-texture-sets/README.md).
+Use the example as a starting point, or bring a working copy of your own project. You choose what to change and judge the result; the agent operates Blender through Cavi.
 
 ## Install
 
-Requirements: Python 3.15 or newer, [`uv`](https://docs.astral.sh/uv/), and
-Blender. Native checks target Blender 5.2.3 LTS.
+You need [uv](https://docs.astral.sh/uv/), **Python 3.11+** and **Blender**. The published 0.56.0 package targets macOS and Linux; native checks target Blender 5.2.3 LTS.
+
+Save the [starting scene](examples/creator-directed-revision/before.blend) as `before.blend` in `~/Documents/CaviBlender/`, the default workspace. Create that folder if needed. Install Cavi and start with this project:
 
 ```bash
-uv tool install cavi-blender-mcp
+uv tool install cavi-blender-mcp==0.56.0
+cavi-blender-mcp runtime start --project before.blend
 ```
 
-Start a dedicated Blender session with the bridge:
+Newly launched sessions use factory settings without loading or saving your usual preferences. An existing connected session may be reused; `start` will not replace a different connected project. See [project startup](https://github.com/cavi-ai/blender-mcp/blob/v0.56.0/docs/blender-mcp/source/pages/guides/runtime-and-headless.md) if you already use Cavi. Blender is found through `PATH`, `CAVI_BLENDER_BIN`, or the standard macOS application path.
 
-```bash
-cavi-blender-mcp runtime start
-```
-
-It runs `blender` from `PATH`, `CAVI_BLENDER_BIN`, or on macOS
-`/Applications/Blender.app`, with `--factory-startup` so the session opens a
-separate default scene without loading or saving user preferences. The stdio MCP
-server never launches or authenticates Blender by itself.
-
-To work from a source checkout instead, clone the repository, run
-`uv sync --locked`, and start Blender with
-`blender --factory-startup --python scripts/start_bridge.py`.
-
-## Quickstart
-
-Register the installed entry point with your MCP client:
+Add Cavi to your agent's MCP configuration:
 
 ```json
 {
@@ -67,184 +43,45 @@ Register the installed entry point with your MCP client:
 }
 ```
 
-If your client does not inherit your shell's `PATH`, use the absolute path that
-`which cavi-blender-mcp` prints.
+If your client does not inherit your shell's `PATH`, use the full path printed by `which cavi-blender-mcp`. The agent must support local stdio MCP servers.
 
-Call `scene_info` first. Then inspect the session with `session_control`:
+Then ask your agent:
 
-```json
-{"action": "inspect"}
-```
+> Inspect the lantern in the connected scene. Make the harbor-signal revision above, then show me a preview. Save the revised scene as a new `.blend` file and keep its parts editable.
 
-Claim the returned `project_id` and pass the returned `lease_id` on mutations:
+To work on your own asset, start Cavi with a working copy of that project instead. The [installation guide](https://github.com/cavi-ai/blender-mcp/blob/v0.56.0/docs/blender-mcp/source/pages/introduction/installation.md) covers the remaining setup options.
 
-```json
-{
-  "action": "claim",
-  "owner": "asset-agent",
-  "expected_project": "<project_id>",
-  "ttl_seconds": 600
-}
-```
+## Keep developing the asset
 
-Make a bounded change with `object_edit`:
+| You want to… | Your agent can… |
+| --- | --- |
+| [Understand the scene](docs/blender-mcp/source/pages/guides/scene-inspection.md) | Inspect objects, mesh quality, materials, UVs and rigs. |
+| [Revise the shape](docs/blender-mcp/source/pages/guides/mesh-preparation.md) | Edit meshes, apply modifiers and organize parts. |
+| [Develop the surface](docs/blender-mcp/source/pages/guides/materials-and-uvs.md) | Assign PBR materials and textures, inspect UVs and bake maps. |
+| [Judge the next pass](docs/blender-mcp/source/pages/guides/previews-and-review.md) | Produce PNG previews, lit Eevee views and review sheets. |
+| [Take the work onward](docs/blender-mcp/source/pages/guides/asset-import-export.md) | Save the project or export supported GLB, FBX, OBJ and USD assets. |
 
-```json
-{
-  "action": "create_primitive",
-  "name": "Crate_01",
-  "kind": "cube",
-  "lease_id": "<lease_id>"
-}
-```
+For a narrower production example, [the material handoff](examples/material-texture-sets/README.md) follows a utility case's material assignments into Painter texture sets. [Local image-to-mesh generation](docs/blender-mcp/source/pages/guides/local-generation.md) is an optional route with separate model and worker setup.
 
-Read-only calls do not need a lease. `break` ends a lease unused for 300 seconds.
-Release, break or expiry never saves, closes or discards a project. See the
-[ownership guide](docs/blender-mcp/source/pages/guides/session-ownership.md).
+## Local work, explicit ownership
 
-You can also let the CLI manage the session:
+The server and Blender bridge run on your machine. The bridge uses a private session token on loopback; Cavi provides no arbitrary Python tool, telemetry, remote inference or external asset downloads.
 
-```bash
-cavi-blender-mcp runtime start
-cavi-blender-mcp runtime status
-cavi-blender-mcp runtime restart --lease-id <current-lease>
-```
+Your agent claims edit ownership for the current project before changing it. Saves, previews and exports stay inside the configured workspace and refuse existing output paths. If an operation times out, inspect the scene before trying again: the change may already have happened.
 
-## What it does
+The default workspace is `~/Documents/CaviBlender`. See [configuration](docs/blender-mcp/source/pages/reference/configuration.md), [project ownership](docs/blender-mcp/source/pages/guides/session-ownership.md) and the [security model](docs/blender-mcp/source/pages/security/model.md) for the relevant settings and behavior. Report security issues through [SECURITY.md](SECURITY.md).
 
-- **Inspection**: scene and object metadata, mesh budgets, texel density, UV
-  stretch, material bindings, bone hierarchies and skin weights.
-- **Object editing**: primitives, custom meshes, transforms, origins, names,
-  sockets, duplicates, parents, collections and shape keys.
-- **Mesh preparation**: modifiers, UV unwrapping, decimation, LOD chains,
-  QuadriFlow, lightmap packing, texel density, collision hulls, cleanup,
-  booleans, joins, splits, mirrors, arrays and shells.
-- **Materials**: PBR slot assignment with packed workspace textures, UV
-  transforms, named UV sampling and normal tangents, alpha modes and material QA.
-- **Baking**: normal, ambient-occlusion, curvature and lightmap maps into a new
-  workspace PNG.
-- **Assets**: bounded GLB, FBX, OBJ and USD import; GLB morph targets and
-  shape-key animation; static, skinned and animated FBX, GLB and USD export;
-  FBX and USD texture sidecars; Unity, Unreal and Godot axis presets; LOD groups,
-  collision naming and bake pairs.
-- **Rigging**: armature creation, automatic skin binding, weight repair, pose
-  authoring, action creation, clip/NLA management, animation QA and retargeting.
-- **Previews**: isolated PNG previews, lit Eevee previews and multi-view review
-  sheets.
-- **Levels**: heightmap or procedural terrain, bulk placement and surface snapping.
-- **Scatter**: fixed Geometry Nodes instancing with explicit budgets.
-- **Ownership**: edit leases shared by independent MCP clients.
+## Documentation and development
 
-Every input and output is bounded. When Blender does not expose an operation,
-the server reports the boundary and fails closed instead of simulating a write.
+The first-use steps above use the **published 0.56.0 package**. [Its tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.56.0/docs/blender-mcp/source) matches that version. The documentation in this checkout follows current source, which requires **Python 3.15+**. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
 
-## Documentation
+The server publishes 20 tools over stdio. The [tool reference](docs/blender-mcp/source/pages/reference/tools.md) documents exact operations, bounds and response contracts.
 
-The versioned documentation is published to
-[cavi-ai.xyz/docs/blender-mcp](https://cavi-ai.xyz/docs/blender-mcp). The source
-lives in this repository.
-
-- [Overview](docs/blender-mcp/source/pages/introduction/overview.md),
-  [Installation](docs/blender-mcp/source/pages/introduction/installation.md),
-  [Quickstart](docs/blender-mcp/source/pages/introduction/quickstart.md)
-- [Inspect a scene](docs/blender-mcp/source/pages/guides/scene-inspection.md)
-- [Prepare meshes](docs/blender-mcp/source/pages/guides/mesh-preparation.md)
-- [Materials and UVs](docs/blender-mcp/source/pages/guides/materials-and-uvs.md)
-- [Import and export assets](docs/blender-mcp/source/pages/guides/asset-import-export.md)
-- [Generate a mesh locally](docs/blender-mcp/source/pages/guides/local-generation.md)
-- [Rig and animate](docs/blender-mcp/source/pages/guides/rigging-and-animation.md)
-- [Preview and review](docs/blender-mcp/source/pages/guides/previews-and-review.md)
-- [Tools](docs/blender-mcp/source/pages/reference/tools.md),
-  [CLI](docs/blender-mcp/source/pages/reference/cli.md),
-  [Configuration](docs/blender-mcp/source/pages/reference/configuration.md),
-  [Limits](docs/blender-mcp/source/pages/reference/limits.md)
-- [Security model](docs/blender-mcp/source/pages/security/model.md)
-- [Troubleshooting](docs/blender-mcp/source/pages/guides/troubleshooting.md)
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `CAVI_BLENDER_WORKSPACE` | `~/Documents/CaviBlender` | Workspace for saves, exports, previews, imports and generated assets |
-| `CAVI_BLENDER_CONNECTION` | `~/.cavi/blender-mcp/connection.json` | Private connection file with loopback port, token and pid |
-| `CAVI_BLENDER_BIN` | Blender on `PATH`, or the standard macOS app path | Executable used by `runtime start` |
-| `CAVI_TRIPOSR_PYTHON` | unset | Python 3.11 environment for optional local image-to-3D |
-| `CAVI_TRIPOSR_SOURCE` | unset | TripoSR checkout |
-| `CAVI_TRIPOSR_WEIGHTS` | unset | Local TripoSR weights directory |
-| `CAVI_GENERATION_PROVIDER` | `triposr` | Local image-to-3D provider: `triposr`, `triposg` or `triposg-mlx` |
-| `CAVI_TRIPOSG_PYTHON` | unset | Python 3.11 environment for TripoSG |
-| `CAVI_TRIPOSG_SOURCE` | unset | TripoSG checkout |
-| `CAVI_TRIPOSG_WEIGHTS` | unset | Local TripoSG weights directory |
-| `CAVI_TRIPOSG_MLX_PYTHON` | unset | Python 3.11+ with Pillow for TripoSG through mlx-agent |
-| `CAVI_TRIPOSG_MLX_AGENT` | unset | `mlx-agent` launcher script |
-| `CAVI_TRIPOSG_MLX_MODEL` | unset | Converted TripoSG model directory |
-
-Set a variable in both Blender's environment and the MCP server's environment
-when both processes read it. See [configuration](docs/blender-mcp/source/pages/reference/configuration.md).
-
-## Security
-
-The bridge listens on loopback and requires a random bearer token from a private
-connection file. Mutations require a claimed edit lease bound to the current
-project. Paths are confined to the workspace, including through symbolic links,
-and existing outputs are never overwritten. Changes are never retried after a
-timeout; inspect the scene before resubmitting an uncertain mutation.
-
-See the [security model](docs/blender-mcp/source/pages/security/model.md) and
-[SECURITY.md](SECURITY.md).
-
-## Tests
-
-```bash
-uv sync --locked --dev
-uv run --locked python -m unittest discover -s tests
-uv run --locked ruff check .
-npm install
-npm run eval:protocol
-```
-
-The unit suite does not need Blender. Native checks under `tests/blender_*.py`
-run against a disposable factory scene and an empty workspace, including
-animation QA and retargeting:
-
-```bash
-blender --background --factory-startup --python-exit-code 1 \
-  --python tests/blender_smoke.py -- /path/to/empty/workspace
-```
-
-Docs are built and verified with:
-
-```bash
-uv run --locked python -m scripts.docs.build
-uv run --locked python -m scripts.docs.verify
-```
-
-`npm run eval:protocol` checks discovery size, catalog token budgets,
-pagination, surface listing and protocol negotiation. `npm run eval:core` adds
-native application checks and requires Blender. See
-[MCP evaluation](docs/blender-mcp/source/pages/introduction/overview.md#evaluation).
-
-## Project status
-
-See [GitHub Releases](https://github.com/cavi-ai/blender-mcp/releases) and the
-[changelog](CHANGELOG.md). The tool surface can still change before 1.0.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Using the tools:** [overview](docs/blender-mcp/source/pages/introduction/overview.md), [installation](docs/blender-mcp/source/pages/introduction/installation.md), [quickstart](docs/blender-mcp/source/pages/introduction/quickstart.md), [troubleshooting](docs/blender-mcp/source/pages/guides/troubleshooting.md).
+- **Building an integration:** [tool reference](docs/blender-mcp/source/pages/reference/tools.md), [CLI](docs/blender-mcp/source/pages/reference/cli.md), [configuration](docs/blender-mcp/source/pages/reference/configuration.md), [limits](docs/blender-mcp/source/pages/reference/limits.md).
+- **Contributing:** [development setup, tests and contribution guidance](CONTRIBUTING.md). Reproduction steps and a small project that demonstrates an issue make bug reports useful.
+- **Following changes:** [changelog](CHANGELOG.md), [tags](https://github.com/cavi-ai/blender-mcp/tags) and [GitHub Releases](https://github.com/cavi-ai/blender-mcp/releases). The tool surface can change before 1.0.
 
 ## License
 
-MIT. Third-party product names belong to their owners. No vendor assets, logos
-or presets are included, and no endorsement is implied.
-
-## Response contracts and recovery
-
-The catalog declares fields for key status, ownership and export results. Existing
-additional details remain available. Discovery omits redundant schema titles while
-retaining validation constraints and field names.
-
-Anticipated MCP failures retain readable text and include code, operation, outcome,
-retry_safe and next_action. Unknown outcomes require application and output
-inspection; these hints never automatically retry a mutation. Unexpected defects
-remain opaque to callers.
+[MIT](LICENSE).

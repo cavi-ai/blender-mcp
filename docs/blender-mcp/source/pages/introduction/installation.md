@@ -4,33 +4,42 @@
 
 - macOS or Linux. Windows is not part of the tested surface.
 - Blender 5.2.3 LTS. Other releases may work, but native checks target 5.2.3.
-- Python 3.15 or newer.
+- Python 3.11 or newer for the published 0.56.0 package. The current source
+  checkout requires Python 3.15 or newer.
 - [`uv`](https://docs.astral.sh/uv/) to install the server.
 - Node.js 22 or newer, only for MCP evaluation.
 
 ## Install the server
 
 ```bash
-uv tool install cavi-blender-mcp
+uv tool install cavi-blender-mcp==0.56.0
 ```
 
 This installs the `cavi-blender-mcp` entry point on your `PATH`.
 
 ## Start Blender with the bridge
 
+For a new scene:
+
 ```bash
 cavi-blender-mcp runtime start
 ```
 
-It runs `blender` from `PATH`, `CAVI_BLENDER_BIN`, or on macOS
-`/Applications/Blender.app`, with `--factory-startup` so the session opens a
-separate default scene without loading or saving user preferences. The bridge
-grants access to scene contents, so use it only with trusted local MCP clients.
+To start with an existing project, put a working copy inside the configured
+workspace (`~/Documents/CaviBlender` by default), then select that file at launch:
 
-To work on an existing project, open its working copy in the dedicated session.
-Do not point the bridge at a project you are unwilling to edit. See
-[Run a dedicated session](../guides/runtime-and-headless.md) for `--project`,
-`--background`, status and restart.
+```bash
+cavi-blender-mcp runtime start --project working-copy.blend
+```
+
+New sessions use `blender` from `PATH`, `CAVI_BLENDER_BIN`, or on macOS
+`/Applications/Blender.app`, with factory settings and no user preference changes.
+An existing connected session may be reused; `--project` refuses to replace a
+different connected project. The bridge grants access to scene contents, so use
+it only with trusted local MCP clients and projects you intend to edit.
+
+See [Run a dedicated session](../guides/runtime-and-headless.md) for project
+startup, `--background`, separate connections, status and restart.
 
 ## Register the MCP server
 
@@ -51,8 +60,8 @@ If your client does not inherit your shell's `PATH`, use the absolute path that
 
 ## Check the connection
 
-Call `scene_info` from the client. It reports the Blender version, current file,
-workspace and a page of objects.
+Ask your agent to inspect the connected Blender scene. It should report the
+Blender version, current file, workspace and objects.
 
 From a shell:
 
@@ -64,6 +73,10 @@ cavi-blender-mcp runtime status
 [Troubleshooting](../guides/troubleshooting.md).
 
 ## Install from source
+
+Use Python 3.15 or newer for the current development checkout. For the published
+package's source and documentation, use the
+[v0.56.0 tag](https://github.com/cavi-ai/blender-mcp/tree/v0.56.0).
 
 ```bash
 git clone https://github.com/cavi-ai/blender-mcp.git

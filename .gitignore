@@ -20,3 +20,7 @@ node_modules/
 .code-review-graph/
 .remember/
 /docs/blender-mcp/v*/
+
+# Editable source for the documented lantern example.
+!examples/creator-directed-revision/before.blend
+!examples/creator-directed-revision/night-watch-lantern.blend
