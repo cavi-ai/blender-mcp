@@ -34,6 +34,7 @@ class SceneInfo(Result):
     vertices: StrictInt | list[dict[str, Any]] | None = None
     uv: dict[str, Any] | None = None
     edges: list[dict[str, Any]] | None = None
+    surface_pick: dict[str, Any] | None = None
     render_settings: SceneRenderSettings | None = None
     bridge: dict[str, Any] | None = None
     source_state: dict[str, Any] | None = None
@@ -61,6 +62,10 @@ class SceneInfo(Result):
                     raise ValueError('Source vertex pages require a vertex list')
             elif vertices is not None and (type(vertices) is not int or vertices < 0):
                 raise ValueError('Named-object vertices require a nonnegative integer count')
+            if value.get('scope') == 'mesh_surface_pick':
+                pick = value.get('surface_pick')
+                if not isinstance(pick,dict) or type(pick.get('hit')) is not bool:
+                    raise ValueError('Surface picks require an explicit hit or miss')
         return value
 
 

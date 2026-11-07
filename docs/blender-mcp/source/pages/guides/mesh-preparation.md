@@ -143,6 +143,36 @@ spatial candidate comparisons. Coincident split vertices are ambiguous;
 disconnected geometry can be a valid mirrored counterpart. Omit both symmetry
 arguments for the existing point/proportional workflows.
 
+## Pick a mesh surface
+
+Call `scene_info` with a mesh name and `surface_ray` containing `origin_world`,
+`direction_world` and positive `max_distance_m`. Origins use scene world units;
+direction is normalized and range uses metres. Optional `uv_layer` interpolates
+the hit triangle's source corner UVs. This mode excludes pagination and the other
+inspection modes.
+
+```json
+{"name":"Body","surface_ray":{"origin_world":[0,-2,1],"direction_world":[0,1,0],"max_distance_m":5,"evaluated":true},"uv_layer":"UVMap"}
+```
+
+`surface_pick.hit` distinguishes a hit from a successful miss. Hits report the
+source polygon, triangle vertex/corner identities, barycentric weights, local
+and world position, inverse-transpose world normal, metre distance and optional
+UV position/hash. The query is two-sided and targets only the named mesh;
+other objects are not occluders. Shared-edge ties can select either triangle.
+
+The default uses base source coordinates. `evaluated=true` uses current posed
+geometry with a deform-only stack and verifies indexed source topology before
+returning source IDs. Unsupported or topology-changing stacks reject before
+evaluation; they need a separate source mapping. The existing 500,000
+vertex/triangle budget applies, plus a 1,500,000 evaluated-loop cap.
+
+The receipt includes base/surface hashes, frame/subframe, scene units and world
+matrix. BVH intersections retain native float32 precision. Evaluated hit positions
+are deformed coordinates; inspect the returned source vertices before choosing
+an edit. A base hash does not lock external pose or transform state. Re-pick after
+those changes. Picking does not move the scene, selection or frame.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect

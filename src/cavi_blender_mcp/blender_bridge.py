@@ -974,6 +974,10 @@ def shade(p):
 
 
 def _dispatch(operation, p):
+    if operation == 'pick_mesh_surface':
+        from .blender_surface_pick import inspect
+
+        return inspect(p)
     if operation in {'inspect_mesh_vertices', 'move_vertices'}:
         from .blender_vertices import inspect, move
 

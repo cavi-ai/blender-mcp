@@ -58,7 +58,7 @@ from .rig_models import (
     VertexWeights,
 )
 from .rig_models import Name as RigName
-from .scene_models import CameraSpec, LightSpec, PreviewSettings, RenderSpec, WorldSpec
+from .scene_models import CameraSpec, LightSpec, PreviewSettings, RenderSpec, SurfaceRay, WorldSpec
 
 Server = CoreServer
 
@@ -224,10 +224,15 @@ async def scene_info(
     definition: Annotated[StrictBool | None, Field(description='Instance contents')] = None,
     faces: Annotated[StrictBool | None, Field(description='Source polygons')] = None,
     edges: Annotated[StrictBool | None, Field(description='Source edges/seams')] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='faces: UV charts')] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='Face/pick UV map')] = None,
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
+    surface_ray: Annotated[SurfaceRay | None, Field(description='World-unit ray; range in metres')] = None,
 ) -> SceneInfo:
     """Inspect paged objects and source topology."""
+    if surface_ray is not None:
+        if name is None or vertices or faces or edges or definition or offset or limit != 200:
+            raise ValueError('surface_ray requires a mesh name and excludes pagination and other modes')
+        return await run(call,'pick_mesh_surface',name=name,surface_ray=surface_ray.model_dump(mode='json'),uv_layer=uv_layer)
     if vertices:
         if name is None or faces or edges or definition or uv_layer is not None:
             raise ValueError('vertices requires a mesh name and excludes other page modes')
@@ -379,33 +384,33 @@ async def rig_edit(
     names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; optional for bake/contact_lock")] = None,
     max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="weights/transfer_weights cap")] = None,
     clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="weights: drop below value")] = None,
-    normalize: Annotated[StrictBool | None, Field(description="weights/assign_weights: normalize")] = None,
+    normalize: Annotated[StrictBool | None, Field(description="Normalize weights")] = None,
     poses: Annotated[list[PoseSpec] | None, Field(min_length=1, max_length=128, description="Bone poses")] = None,
     keyframes: Annotated[list[KeyframeSpec] | None, Field(min_length=1, max_length=32, description="Frame/pose keys")] = None,
     action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="Clip name")] = None,
-    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="pose/clear_pose frame")] = None,
+    frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="Pose frame")] = None,
     reset: Annotated[StrictBool | None, Field(description="Reset pose first")] = None,
     source: Annotated[str | None, Field(min_length=1, max_length=63, description="retarget: rig; transfer_weights: skin")] = None,
     source_action: Annotated[str | None, Field(min_length=1, max_length=63, description="Source clip")] = None,
     mapping: Annotated[dict[str, str] | None, Field(max_length=128, description="Source-to-target bones")] = None,
     samples: Annotated[StrictInt | None, Field(ge=2, le=256, description="retarget samples")] = None,
-    new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="rename_action/bake/transfer_weights/contact_lock: required")] = None,
+    new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="New result name")] = None,
     track_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA track")] = None,
     strip_name: Annotated[str | None, Field(min_length=1, max_length=63, description="NLA strip")] = None,
-    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake: first frame; nla_push: start")] = None,
-    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="bake: last frame")] = None,
+    start_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="First frame")] = None,
+    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="Last frame")] = None,
     frame_step: Annotated[Number | None, Field(gt=0, le=10000, description="bake/contact_lock: frame step")] = None,
     constraint: Annotated[Constraint | None, Field(description="Constraint spec")] = None,
     bone: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint: bone")] = None,
     constraint_name: Annotated[str | None, Field(min_length=1, max_length=63, description="remove_constraint: name")] = None,
     vertex_weights: Annotated[list[VertexWeights] | None,
                               Field(min_length=1, max_length=100000, description="assign_weights map")] = None,
-    replace: Annotated[StrictBool | None, Field(description="assign_weights: replace")] = None,
+    replace: Annotated[StrictBool | None, Field(description="Replace weights")] = None,
     max_distance_m: Annotated[Number | None, Field(gt=0, description="transfer_weights radius (m)")] = None,
-    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1, description="transfer_weights weight loss/vertex")] = None,
+    max_discarded_weight: Annotated[Number | None, Field(ge=0, le=1, description="Weight loss/vertex")] = None,
     shape_names: Annotated[list[RigName] | None, Field(max_length=64, description="transfer_weights shapes")] = None,
     calibration: Annotated[RetargetCalibration | None, Field(description="Rest alignment")] = None,
-    skinning_mode: Annotated[Literal['preserve', 'linear'] | None, Field(description="bake: source or linear skinning")] = None,
+    skinning_mode: Annotated[Literal['preserve', 'linear'] | None, Field(description="Baked skinning")] = None,
     foot_locks: Annotated[list[FootLockWindow] | None, Field(min_length=1, max_length=16, description="Contact windows")] = None,
     timing: Annotated[ClipTiming | None, Field(description="bake clip timing")] = None,
     strip_settings: Annotated[NlaStripSettings | None, Field(description="nla_edit: required; nla_push: optional")] = None,
