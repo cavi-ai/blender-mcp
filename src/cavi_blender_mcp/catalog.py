@@ -10,11 +10,12 @@ from cavi_mcp_core.server import Server as CoreServer
 __all__ = ['BlenderServer', 'omit_null_defaults']
 
 
-def shared_arrays(schema):
-    """Hoist profitable, identical arrays without moving scoped schemas."""
+def shared_constraints(schema):
+    """Share repeated value constraints while retaining field annotations."""
     if not isinstance(schema,dict) or preserve_structure(schema):
         return schema
-    constraints={'type','items','prefixItems','minItems','maxItems'}
+    constraints={'type','items','prefixItems','minItems','maxItems','minimum','maximum',
+                 'exclusiveMinimum','exclusiveMaximum','multipleOf','minLength','maxLength','pattern'}
     annotations={'description','default','title','examples'}
     counts,values=Counter(),{}
     known={'#/$defs/'+k.replace('~','~0').replace('/','~1') for k in schema.get('$defs',{})}
@@ -22,7 +23,9 @@ def shared_arrays(schema):
 
     def signature(node):
         types=node.get('type')
-        if types!='array' and types!=['array','null'] and types!=['null','array']:
+        if (not isinstance(types,(str,list)) or (isinstance(types,list) and any(not isinstance(t,str) for t in types))
+                or not set([types] if isinstance(types,str) else types)<={
+                'array','boolean','integer','number','object','string','null'}):
             return None
         if set(node)-constraints-annotations:
             return None
@@ -45,7 +48,7 @@ def shared_arrays(schema):
     definitions=dict(schema.get('$defs',{}))
     names={}
     for key in sorted(selected):
-        name='array'+str(len(definitions))
+        name='shared'+str(len(definitions))
         while name in definitions:name+='a'
         definitions[name]=values[key]
         names[key]='#/$defs/'+name
@@ -118,8 +121,8 @@ class BlenderServer(CoreServer):
                     omitted.update(destructive_hint=None, idempotent_hint=None)
                 annotations = annotations.model_copy(update=omitted)
             result.append(tool.model_copy(update={'annotations': annotations,
-                'input_schema': short_references(shared_arrays(tool.input_schema)),
-                'output_schema': short_references(shared_arrays(tool.output_schema))}))
+                'input_schema': short_references(shared_constraints(tool.input_schema)),
+                'output_schema': short_references(shared_constraints(tool.output_schema))}))
         return result
 
 
