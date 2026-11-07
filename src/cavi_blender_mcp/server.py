@@ -111,7 +111,7 @@ class NamingRules(BaseModel):
 class FaceRegion(BaseModel):
     model_config = ConfigDict(extra='forbid')
     seed: Annotated[StrictInt, Field(ge=0)]
-    stop_at: Annotated[list[Literal['seam','material']], Field(max_length=2)] = []
+    stop_at: Annotated[list[Literal['seam','material','uv']], Field(max_length=3)] = []
     angle_limit_degrees: Annotated[Number | None, Field(ge=0, le=180)] = None
 
     @model_validator(mode='after')
@@ -245,16 +245,19 @@ async def scene_info(
     definition: Annotated[StrictBool | None, Field(description='Instance contents')] = None,
     faces: Annotated[StrictBool | None, Field(description='Source polygons')] = None,
     edges: Annotated[StrictBool | None, Field(description='Source edges/seams')] = None,
-    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='Face/pick UV map')] = None,
+    uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description='Face/pick/region UV map')] = None,
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
     region: Annotated[FaceRegion | None, Field(description='Connected source-face page')] = None,
 ) -> SceneInfo:
     """Inspect objects, source topology or camera-picked scene surfaces."""
     if region is not None:
-        if name is None or faces or edges or vertices or definition or uv_layer is not None or surface_ray is not None:
+        if name is None or faces or edges or vertices or definition or surface_ray is not None:
             raise ValueError('region requires a mesh name and excludes other inspection modes')
-        return await run(call,'inspect_face_region',name=name,region=region.model_dump(mode='json'),limit=limit,offset=offset)
+        if ('uv' in region.stop_at) != (uv_layer is not None):
+            raise ValueError('region UV boundaries require uv_layer; other regions exclude it')
+        return await run(call,'inspect_face_region',name=name,region=region.model_dump(mode='json'),
+                         uv_layer=uv_layer,limit=limit,offset=offset)
     if surface_ray is not None:
         if vertices or faces or edges or definition or offset or limit != 200:
             raise ValueError('surface_ray requires a mesh name and excludes pagination and other modes')
@@ -759,6 +762,7 @@ async def mesh_edit(
     uv_transform: Annotated[UVTransform | None, Field(description="UV transform/selected faces")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
     expected_mesh_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='Source geometry SHA256')] = None,
+    expected_uv_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='UV SHA256')] = None,
     uv_region: Annotated[UVRegion | None, Field(description='unwrap_faces/UV density: region and gutters')] = None,
     edge_indices: Annotated[list[Annotated[StrictInt, Field(ge=0)]] | None,
                            Field(min_length=1, max_length=20000, description='set_seams: edge indices')] = None,
@@ -788,7 +792,7 @@ async def mesh_edit(
               'expected_mesh_sha256': expected_mesh_sha256, 'uv_region': uv_region,
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
               'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m,
-              'material_name': material_name}
+              'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256}
     if action == 'assign_faces':
         from .mesh_regions import fingerprint, indices
 
@@ -878,7 +882,7 @@ async def mesh_edit(
 
         operation = 'transform_uv'
         params = pick(action, values, ['uv_transform'], {'uv_layer': None,
-            'target_px_per_m': None, 'uv_region': None, 'expected_mesh_sha256': None})
+            'target_px_per_m': None, 'uv_region': None, 'expected_mesh_sha256': None, 'expected_uv_sha256': None})
         destination = params['uv_region'].model_dump(mode='json') if params['uv_region'] else None
         options(params['target_px_per_m'], destination, params['uv_transform'].scale)
         fingerprint(params['expected_mesh_sha256'])

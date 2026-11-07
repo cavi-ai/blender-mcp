@@ -1,5 +1,4 @@
 """Pick, grow and finish a source region through MCP, then reopen the saved source."""
-import asyncio
 import hashlib
 import json
 import os
@@ -8,7 +7,7 @@ from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from native_nla_mcp import main
+from native_nla_mcp import main, verify_source_identity
 
 
 async def exercise(root,env,parameters=None):
@@ -77,11 +76,7 @@ async def exercise(root,env,parameters=None):
         await call('asset_io',action='save',path='reopened.blend',lease_id=lease)
         assert {name:json.loads((root/f'{name}-audit.json').read_text()) for name in before}==after
         await call('session_control',action='release',lease_id=lease)
-        process=await asyncio.create_subprocess_exec(sys.executable,'-m','unittest','discover','-s','tests',
-            '-p','test_source_identity.py','-k','test_native_save_and_external_replacement_keep_distinct_source_identity',
-            env={**env,'CAVI_SOURCE_IDENTITY_NATIVE':'1'},stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
-        output,_=await process.communicate()
-        assert process.returncode==0,output.decode()
+        await verify_source_identity(env)
         if os.environ.get('CAVI_NATIVE_EVIDENCE'):
             (Path(os.environ['CAVI_NATIVE_EVIDENCE'])/'source-audits.json').write_text(json.dumps({'before':before,'after':after},indent=2)+'\n')
         return {'face_regions':'passed','scoped_profile':scoped,'query_mutations':False,

@@ -28,6 +28,16 @@ class UVTransformSurfaceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 server.UVTransform(**value)
 
+    def test_uv_identity_routes_only_to_uv_transform(self):
+        digest='a'*64
+        calls=[]
+        with patch.object(server,'call',lambda op,**kw:calls.append((op,kw)) or {}):
+            asyncio.run(server.mesh_edit(action='uv_transform',name='Skin',expected_uv_sha256=digest,
+                uv_transform=server.UVTransform(faces=[0])))
+        self.assertEqual(calls[0][1]['expected_uv_sha256'],digest)
+        with self.assertRaises(ValueError):
+            asyncio.run(server.mesh_edit(action='unwrap',name='Skin',expected_uv_sha256=digest))
+
     def test_action_rejects_missing_and_unrelated_parameters(self):
         with self.assertRaises(ValueError):
             asyncio.run(server.mesh_edit(action='uv_transform', name='Skin'))

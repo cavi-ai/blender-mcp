@@ -6,6 +6,10 @@ tool is listed as lease-free.
 `scene_info(name=..., region={"seed": 0, "stop_at": ["seam", "material"]})`
 pages a connected source-face selection without changing native selection.
 An optional `angle_limit_degrees` stops at sharper source-normal transitions.
+`stop_at=["uv"]` requires an explicit `uv_layer` and follows matching source-edge
+corner UVs, including unmarked splits. It returns `uv.layer` and `uv.sha256`;
+the selection identity also binds those coordinates and pin flags. UV, seam,
+material and angle boundaries can be combined. Non-manifold edges always stop.
 
 `mesh_edit(action="assign_faces", name=..., material_name=..., face_indices=[...])`
 binds existing finishes to source polygons. It reuses the first matching slot or
@@ -349,6 +353,10 @@ density target while enforcing the destination's pixel gutters. Omit explicit
 scale. `uv_transform.density` reports before/after density, stretch and checks;
 unattainable targets are rejected. Optional `expected_mesh_sha256` guards the
 source geometry for either UV-transform form.
+`expected_uv_sha256` rejects changes to the selected layer's coordinates or pins
+before writing. Pass both identities from the inspected UV region; geometry
+identity alone does not detect UV edits. Receipts include `uv_sha256_before`
+and `uv_sha256_after`. This guard applies only to `uv_transform`.
 
 `unwrap_faces` takes `face_indices`, an existing `uv_layer` (default UV0) and
 `uv_region` with required `bounds` `[min_u,min_v,max_u,max_v]`,

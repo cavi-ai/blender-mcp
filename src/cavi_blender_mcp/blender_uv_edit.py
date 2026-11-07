@@ -5,6 +5,7 @@ import bpy
 
 from .blender_errors import preflight
 from .blender_mesh_regions import mesh_digest
+from .blender_uv_charts import uv_digest
 from .mesh_regions import fingerprint
 from .uv_density import measure, options, review
 from .uv_regions import reservation
@@ -42,6 +43,9 @@ def transform(params, editable_mesh, info):
             mesh.uv_layers[0] if mesh.uv_layers else None)
         if layer is None:
             raise ValueError('Requested UV layer is missing')
+        uv_before=uv_digest(layer)
+        if params.get('expected_uv_sha256') is not None and params['expected_uv_sha256']!=uv_before:
+            raise ValueError('UV layer changed since inspection; inspect the UV region again')
         spec = params.get('transform')
         if not isinstance(spec, dict) or set(spec) - {'faces','offset','scale','rotation_degrees','pivot'}:
             raise ValueError('Expected a UV transform with explicit faces')
@@ -110,6 +114,7 @@ def transform(params, editable_mesh, info):
             _, checked = review(surface, [uv for _, uv in actual], destination, params['target_px_per_m'])
             density.update(checked)
         result = {**info(value), 'uv_layer':layer.name, 'uv_transform':{
+            'uv_sha256_before':uv_before, 'uv_sha256_after':uv_digest(layer),
             'faces':faces, 'loops':len(after), 'materials':materials,
             'bounds_before':bounds(before), 'bounds_after':bounds(actual),
             'offset':list(offset), 'scale':list(scale), 'rotation_degrees':angle, 'pivot':list(pivot)}}
