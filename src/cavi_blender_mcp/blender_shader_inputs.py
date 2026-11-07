@@ -93,10 +93,10 @@ def socket_report(socket):
 
 
 def node_report(node):
-    report = {'name': node.name, 'type': node.type,
+    report = {'name': node.name, 'type': node.type, 'bl_idname':node.bl_idname,
               'inputs': [socket_report(s) for s in node.inputs],
               'outputs': [socket_report(s) for s in node.outputs]}
-    for name in ['uv_map', 'from_instancer', 'vector_type', 'projection', 'extension']:
+    for name in ['uv_map', 'from_instancer', 'vector_type', 'projection', 'extension', 'is_active_output']:
         if hasattr(node, name):
             report[name] = getattr(node, name)
     if node.type == 'GROUP' and node.node_tree:

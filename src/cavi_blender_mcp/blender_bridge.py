@@ -1086,6 +1086,10 @@ def _dispatch(operation, p):
         from .blender_shader_links import edit_links
 
         return edit_links(p)
+    if operation in {'inspect_shader_node_types','create_shader_node'}:
+        from .blender_shader_nodes import create, inspect_types
+
+        return {'inspect_shader_node_types':inspect_types,'create_shader_node':create}[operation](p)
     if operation in {'inspect_material_nodes', 'set_material_inputs', 'set_material_image'}:
         from .blender_shader_inputs import inspect, set_image, set_inputs
 

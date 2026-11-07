@@ -416,6 +416,18 @@ It updates only selected seam flags, preserving UVs and other mesh data.
 
 ## assign_material
 
+`node_types` pages native node types available in the material's `group_path`.
+Pass `node_type` to inspect its `control_schema` without creating nodes.
+`create_node` requires a unique `node` name and an exact discovered `node_type`.
+Optional `node_settings` supplies up to 32 initial Boolean, integer, finite float,
+enum or text controls. For example, `ShaderNodeMath` accepts
+`{"operation":"MULTIPLY","use_clamp":false}`; `ShaderNodeUVMap` accepts
+`{"uv_map":"ShaderUV"}`. Resource paths and ID pointers use their separate
+binding operations. Read `created_node` and the actual returned socket identifiers,
+then set defaults and wire the graph explicitly. Existing active outputs are
+preserved unless `is_active_output` is requested. Creation failures remove the
+new node and restore output activation and configuration tags.
+
 `connect` and `disconnect` edit links between existing nodes in one `group_path`.
 Set `node` to the destination and `inputs` to 1–32 bindings:
 `{"Color":{"node":"Tint","socket":"Color"}}`. Keys and source socket values

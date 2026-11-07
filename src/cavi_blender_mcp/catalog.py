@@ -1,11 +1,65 @@
 """Keep the discovery catalog compact without changing validation constraints."""
+import json
 import string
+from collections import Counter
 
 from cavi_mcp_core.schema import compact_schema
 from cavi_mcp_core.schema_refs import map_schema, preserve_structure
 from cavi_mcp_core.server import Server as CoreServer
 
 __all__ = ['BlenderServer', 'omit_null_defaults']
+
+
+def shared_arrays(schema):
+    """Hoist profitable, identical arrays without moving scoped schemas."""
+    if not isinstance(schema,dict) or preserve_structure(schema):
+        return schema
+    constraints={'type','items','prefixItems','minItems','maxItems'}
+    annotations={'description','default','title','examples'}
+    counts,values=Counter(),{}
+    known={'#/$defs/'+k.replace('~','~0').replace('/','~1') for k in schema.get('$defs',{})}
+    unknown=[]
+
+    def signature(node):
+        types=node.get('type')
+        if types!='array' and types!=['array','null'] and types!=['null','array']:
+            return None
+        if set(node)-constraints-annotations:
+            return None
+        body={k:v for k,v in node.items() if k in constraints}
+        return json.dumps(body,sort_keys=True,separators=(',',':'))
+
+    def count(node):
+        if '$ref' in node and node['$ref'] not in known:
+            unknown.append(node['$ref'])
+        key=signature(node)
+        if key is not None:
+            counts[key]+=1
+            values[key]={k:v for k,v in node.items() if k in constraints}
+        return node
+
+    map_schema(schema,count)
+    if unknown:return schema
+    selected={key for key,n in counts.items() if (len(key)-20)*n>len(key)+24}
+    if not selected:return schema
+    definitions=dict(schema.get('$defs',{}))
+    names={}
+    for key in sorted(selected):
+        name='array'+str(len(definitions))
+        while name in definitions:name+='a'
+        definitions[name]=values[key]
+        names[key]='#/$defs/'+name
+
+    def replace(node):
+        key=signature(node)
+        if key in names:
+            return {'$ref':names[key],**{k:v for k,v in node.items() if k not in constraints}}
+        return node
+
+    result=map_schema(schema,replace)
+    # New definitions retain their bodies; only occurrences in the original schema move.
+    result['$defs']={**result.get('$defs',{}),**{ref.split('/')[-1]:values[key] for key,ref in names.items()}}
+    return result
 
 
 def short_references(schema):
@@ -17,6 +71,8 @@ def short_references(schema):
              for index, name in enumerate(schema['$defs'])}
     references = {'#/$defs/'+name.replace('~', '~0').replace('/', '~1'): '#/$defs/'+short
                   for name, short in names.items()}
+    empty = {'#/$defs/'+name.replace('~','~0').replace('/','~1')
+             for name,value in schema['$defs'].items() if value=={}}
     unknown = []
 
     def check(node):
@@ -30,13 +86,18 @@ def short_references(schema):
         return schema
 
     def rewrite(node):
+        if node.get('$ref') in empty:
+            return {key:value for key,value in node.items() if key!='$ref'}
         if node.get('$ref') in references:
             node['$ref'] = references[node['$ref']]
         return node
 
     result = map_schema(schema, rewrite)
-    result['$defs'] = {names[name]: value for name, value in result['$defs'].items()}
-    return result
+    result['$defs'] = {names[name]: value for name, value in result['$defs'].items() if value!={}}
+    if not result['$defs']:
+        result.pop('$defs')
+    return map_schema(result,lambda node:{key:value for key,value in node.items()
+                                          if key!='additionalProperties' or value!={}})
 
 
 class BlenderServer(CoreServer):
@@ -57,8 +118,8 @@ class BlenderServer(CoreServer):
                     omitted.update(destructive_hint=None, idempotent_hint=None)
                 annotations = annotations.model_copy(update=omitted)
             result.append(tool.model_copy(update={'annotations': annotations,
-                'input_schema': short_references(tool.input_schema),
-                'output_schema': short_references(tool.output_schema)}))
+                'input_schema': short_references(shared_arrays(tool.input_schema)),
+                'output_schema': short_references(shared_arrays(tool.output_schema))}))
         return result
 
 

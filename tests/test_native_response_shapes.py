@@ -7,6 +7,7 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from cavi_blender_mcp import contracts
+from cavi_blender_mcp.catalog import shared_arrays, short_references
 
 
 def object_info(**extra):
@@ -53,7 +54,8 @@ def cases():
             "updated": False, "material_users": 1, "base_color_srgb": [1., 1., 1., 1.],
             "roughness": .5, "metallic": 0., "base_color_texture": None,
             "textures": {}, "config": {}, "texture_packed": True},
-            {"material": "Clay", "nodes": [], "total": 0, "links": [], "node_tree": None}],
+            {"material": "Clay", "nodes": [], "total": 0, "links": [], "node_tree": None},
+            {"material":"Clay","node_types":[{"type":"ShaderNodeMath","label":"Math"}],"total":1}],
         "MapBakeResult": [{"bit_depth": 16, "color_space": "Non-Color",
             "normal_channels": ["+X", "+Y", "+Z"], "path": "normal.png", "bytes": 128, "sha256": "a" * 64,
             "map": "normal", "resolution": 16, "samples": 1, "margin": 2,
@@ -75,7 +77,7 @@ class NativeResponseShapes(unittest.TestCase):
             model = getattr(contracts, name)
             schema = Draft202012Validator(model.model_json_schema())
             compact = Draft202012Validator(
-                compact_schema(model.model_json_schema(), output=True))
+                short_references(shared_arrays(compact_schema(model.model_json_schema(), output=True))))
             for original in records:
                 with self.subTest(model=name, keys=sorted(original)):
                     record = {**copy.deepcopy(original), "extension": {"preserved": [1, None]}}
