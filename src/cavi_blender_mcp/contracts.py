@@ -326,6 +326,7 @@ class ProceduralAssetResult(Result):
 
 
 class MeshEditResult(ObjectFields):
+    face_material: Record | None = None
     vertex_edit: Record | None = None
     seam_edit: Record | None = None
     face_unwrap: Record | None = None

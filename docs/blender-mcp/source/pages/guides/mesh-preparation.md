@@ -250,7 +250,19 @@ parameters, image content, lighting, opacity, non-mesh geometry, render-only
 visibility and render/viewport modifier differences. It does not establish
 appearance equivalence or replace the image hash and source/pose identities.
 
+## Assign source-face finishes
+
+For distinct finishes on one connected mesh, inspect `scene_info(name=..., faces=true)`
+and use `mesh_edit(action="assign_faces", name=..., material_name="TrimFinish",
+face_indices=[...], expected_mesh_sha256=..., lease_id=lease)`. The material must
+already exist. The operation reuses its first bound slot or appends one; it changes
+only the selected source polygons' material indices. Shared mesh data requires an
+explicit independent working copy. Rigged and shape-key meshes keep their surface,
+UVs and deformation data. Inspect `face_material` for the actual slot, previous
+indices and before/after source hashes, then save/reopen for persistent acceptance.
+
 ## Delete discarded objects
+
 
 Inspect the current scene and save an owned source copy before deletion. Use
 `object_edit(action="delete", name="Draft", lease_id=lease)` for one object.
