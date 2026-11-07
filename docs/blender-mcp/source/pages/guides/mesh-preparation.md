@@ -99,6 +99,50 @@ before assignment and native write/readback failures restore captured points.
 Inspect texture stretch, normals, intersections and real poses after editing,
 then save/reopen the source before export.
 
+For proportional editing, pass `amount` as a positive radius in metres.
+`vertex_indices` then selects full-weight seeds. Smoothstep falloff follows
+shortest source-edge paths using object world scale and scene units. Nearby
+disconnected surfaces stay untouched; UV seams and material boundaries do not
+split the graph. Edge layout affects this source-space metric.
+
+```json
+{"action":"move_vertices","name":"Body","vertex_indices":[12],"offset":[0,0,0.025],"amount":0.05,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+The receipt includes all affected indices plus `falloff` with seed indices,
+radius, world metric and up to 64 weight samples (`weights_truncated` is explicit).
+Each corresponding shape-key point receives the same weighted offset. Omitting
+`amount` retains the declared-point translation. Proportional planning handles
+up to 500,000 source vertices and 1,500,000 edges, with the existing affected-point
+budgets. Excessive selections fail before assignment; no radius is silently reduced.
+
+### Paired symmetry
+
+Supply both `symmetry_axis` (`X`, `Y` or `Z`) and a positive
+`symmetry_tolerance_m` to reflect displacement across the corresponding local
+origin plane. The vector remains object-local. Matching compares reflected base
+positions in world metres, including parent/object linear transforms and scene
+units. It requires unique reciprocal matches; missing or ambiguous counterparts
+reject the whole edit before writing.
+
+```json
+{"action":"move_vertices","name":"Body","vertex_indices":[12],"offset":[0.01,0,0.025],"amount":0.05,"symmetry_axis":"X","symmetry_tolerance_m":0.00001,"expected_mesh_sha256":"<inspected-mesh-sha256>","lease_id":"<claim-token>"}
+```
+
+Seeds must occupy one side or the center band. Proportional paths remain on
+that hemisphere, then mirror the weighted displacement. Center-only seeds use
+the positive hemisphere. Center points (axis coordinate scaled into metres
+within half the tolerance) receive only tangential displacement. This preserves
+existing base asymmetry and each shape key's offsets; it does not symmetrize
+expressions or weights. Inspect the origin and the actual left/right poses.
+
+`vertex_edit.symmetry` reports the axis, tolerance, metric, source side, maximum
+matching error and up to 64 source/partner pairs with explicit truncation.
+Affected-point budgets include both sides. Matching is limited to 2,000,000
+spatial candidate comparisons. Coincident split vertices are ambiguous;
+disconnected geometry can be a valid mirrored counterpart. Omit both symmetry
+arguments for the existing point/proportional workflows.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect
