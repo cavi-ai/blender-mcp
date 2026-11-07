@@ -219,12 +219,18 @@ def render(spec):
                 return {'available':False,'reason':str(exc)}
 
         camera_projection=projection()
+        from .blender_scene_geometry import capture
+
+        geometry_identity=capture()
         result = bpy.ops.render.render(write_still=True)
         if 'FINISHED' not in result:
             raise RuntimeError('Scene render did not finish')
         after=projection()
         if camera_projection.get('available') and after != camera_projection:
             camera_projection={'available':False,'reason':'Camera projection changed during render'}
+        after_geometry=capture()
+        if geometry_identity.get('available') and after_geometry.get('sha256')!=geometry_identity['sha256']:
+            geometry_identity={'available':False,'reason':'Scene geometry changed during render'}
     elapsed = time.monotonic()-started
     with path.open('rb') as stream:
         sha256=hashlib.file_digest(stream,'sha256').hexdigest()
@@ -234,7 +240,7 @@ def render(spec):
             'cycles_sampling_may_have_hit_time_limit': spec['engine'] == 'cycles'
             and spec['cycles_time_limit'] > 0 and elapsed >= spec['cycles_time_limit'],
             'camera': camera_object.name, 'world': scene.world.name if scene.world else None,
-            'sha256':sha256,'camera_projection':camera_projection}
+            'sha256':sha256,'camera_projection':camera_projection,'geometry_identity':geometry_identity}
 
 
 def author(p, workspace):

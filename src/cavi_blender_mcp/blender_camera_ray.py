@@ -48,7 +48,16 @@ def from_query(query):
     unit=bpy.context.scene.unit_settings.scale_length
     ray={'origin_world':origin,'direction_world':direction,
         'max_distance_m':min(query['max_distance_m'],span*unit),'evaluated':query.get('evaluated',False)}
-    return ray,{'query':dict(query),'projection':view,'identity_checked':expected is not None}
+    context={'query':dict(query),'projection':view,'identity_checked':expected is not None,
+        'geometry_identity_checked':False}
+    if query.get('expected_geometry_sha256') is not None:
+        from .blender_scene_geometry import snapshot as geometry_snapshot
+
+        geometry=geometry_snapshot()
+        if geometry['sha256'] != query['expected_geometry_sha256']:
+            raise ValueError('Scene geometry changed; capture the current scene before picking')
+        context.update(geometry_identity=geometry,geometry_identity_checked=True)
+    return ray,context
 
 
 def inside_clip(point, context):

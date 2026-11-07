@@ -35,6 +35,7 @@ class CameraRay(Definition):
     max_distance_m: Positive
     evaluated: StrictBool = False
     expected_projection_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None
+    expected_geometry_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$')] = None
 
     @model_validator(mode='after')
     def inside_image(self):

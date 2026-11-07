@@ -223,6 +223,33 @@ Detailed candidates share a 500000-vertex/triangle evaluation budget per query;
 an exceeded budget rejects the query instead of returning a partial nearest hit.
 The query preserves selection, source geometry, camera, frame and materials.
 
+### Bind picking to captured geometry
+
+Named renders include `geometry_identity` beside `camera_projection` and the image
+hash. An available identity fingerprints the current evaluated view-layer mesh
+geometry, named UV layers and active UV state, object/instance placements and
+material-slot bindings. The same candidate enumeration serves scene queries.
+Canonical placement ordering retains duplicate instances; shared evaluated mesh
+data is hashed once per snapshot.
+
+Pass its `sha256` as `surface_ray.expected_geometry_sha256` with the projection
+hash. A changed identity rejects picking before returning a target, including when
+the camera is unchanged. The receipt records `geometry_identity_checked`; without
+the optional expected hash it records false. Dirty flags, saved-file paths and
+leases do not define geometric content. Exact geometric restoration can match an
+earlier receipt.
+
+Geometry is inspected before and after rendering. If it changes, the geometry
+receipt is unavailable with a reason; the image remains usable. Unsupported or
+over-budget identity capture is also reported unavailable. A snapshot supports up
+to 500000 unique evaluated vertices/triangles and 1500000 edges/loops; instances
+reuse their evaluated mesh data for this budget.
+
+This is a geometric selection identity. Its `not_checked` list includes shader
+parameters, image content, lighting, opacity, non-mesh geometry, render-only
+visibility and render/viewport modifier differences. It does not establish
+appearance equivalence or replace the image hash and source/pose identities.
+
 ## Inspect and edit seams
 
 Page `scene_info(name="Body", edges=true, offset=0, limit=100)` to inspect

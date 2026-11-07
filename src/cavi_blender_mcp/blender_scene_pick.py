@@ -7,6 +7,7 @@ import numpy as np
 from .blender_camera_ray import from_query
 from .blender_errors import preflight
 from .blender_mesh_regions import mesh_digest
+from .blender_scene_geometry import candidates
 from .blender_surface_pick import DEFORMERS, cast, material_binding, topology, uv_position
 from .blender_uv_charts import uv_digest
 from .surface_ray import bounds_intersect
@@ -27,21 +28,11 @@ def inspect(p):
         result={'scope':'scene_surface_pick','surface_pick':{'hit':False}}
         best=None
         triangles=vertices=0
-        for instance in graph.object_instances:
-            value=instance.object
-            parent=instance.parent
-            if (value.type!='MESH' or value.original.type!='MESH' or not instance.show_self
-                    or value.hide_render or not value.visible_camera
-                    or (parent is not None and (parent.hide_render or not parent.visible_camera))):
-                continue
-            matrix=np.asarray(instance.matrix_world,dtype=np.float64)
-            if not value.data.polygons:
-                continue
+        for value,identity in candidates(graph):
+            matrix=np.asarray(identity['matrix_world'],dtype=np.float64)
             corners=np.asarray(value.bound_box,dtype=np.float64)@matrix[:3,:3].T+matrix[:3,3]
             if not bounds_intersect(ray['origin_world'],ray['direction_world'],ray['max_distance_m']/unit,corners):
                 continue
-            identity={'is_instance':instance.is_instance,'parent':parent.original.name if parent else None,
-                      'persistent_id':list(instance.persistent_id),'matrix_world':matrix.tolist()}
             mesh=value.to_mesh(preserve_all_data_layers=True,depsgraph=graph)
             try:
                 vertices+=len(mesh.vertices)
