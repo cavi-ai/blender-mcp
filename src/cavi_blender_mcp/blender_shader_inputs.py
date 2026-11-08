@@ -104,7 +104,10 @@ def node_report(node):
         if hasattr(node, name):
             report[name] = getattr(node, name)
     if node.type == 'GROUP' and node.node_tree:
+        from .blender_shader_groups import interface_report
+
         report['group'] = node.node_tree.name
+        report['group_interface']=interface_report(node.node_tree)
     if isinstance(getattr(node,'color_ramp',None),bpy.types.ColorRamp):
         from .blender_shader_ramps import control_schema, read
 
