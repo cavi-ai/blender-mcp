@@ -1,5 +1,18 @@
 """Validate scalar RNA controls without coercion, clamping or partial application."""
 import math
+import struct
+
+
+def equivalent(left,right):
+    """Compare native float storage without merging distinct integer controls."""
+    if isinstance(left,dict) and isinstance(right,dict):
+        return left.keys()==right.keys() and all(equivalent(left[k],right[k]) for k in left)
+    if isinstance(left,list) and isinstance(right,list):
+        return len(left)==len(right) and all(equivalent(a,b) for a,b in zip(left,right,strict=True))
+    if type(left) in (int,float) and type(right) in (int,float):
+        if type(left) is int and type(right) is int:return left==right
+        return struct.pack('=f',left)==struct.pack('=f',right)
+    return type(left) is type(right) and left==right
 
 
 def controls(values,schema,*,subject,parameter):

@@ -135,6 +135,8 @@ jobs:
         run: uv run --locked python tests/native_shader_node_mcp.py --blender "$(command -v blender)"
       - name: Check native shader ramps
         run: uv run --locked python tests/native_shader_ramp_mcp.py --blender "$(command -v blender)"
+      - name: Check existing shader node controls
+        run: uv run --locked python tests/native_shader_control_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -1,7 +1,8 @@
 """Ramp requests retain native precision and reject invalid batches before writes."""
 import unittest
 
-from cavi_blender_mcp.blender_ramp_settings import equivalent, settings
+from cavi_blender_mcp.blender_ramp_settings import settings
+from cavi_blender_mcp.native_controls import equivalent
 
 
 class RampSettingsTests(unittest.TestCase):
@@ -9,6 +10,8 @@ class RampSettingsTests(unittest.TestCase):
         self.assertTrue(equivalent({'color':[.1]}, {'color':[.10000000149011612]}))
         self.assertFalse(equivalent({'color':[0]}, {'color':[1e-9]}))
         self.assertFalse(equivalent([1], [.9999999]))
+        self.assertFalse(equivalent(16777216,16777217))
+        self.assertFalse(equivalent(True,1))
 
     def schema(self):
         return {'min_elements':1,'max_elements':32,'position':{'min':0,'max':1},

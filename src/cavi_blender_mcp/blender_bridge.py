@@ -1094,6 +1094,10 @@ def _dispatch(operation, p):
         from .blender_shader_ramps import set_ramp
 
         return set_ramp(p)
+    if operation == 'set_shader_node':
+        from .blender_shader_controls import set_controls
+
+        return set_controls(p)
     if operation in {'inspect_shader_node_types','create_shader_node'}:
         from .blender_shader_nodes import create, inspect_types
 

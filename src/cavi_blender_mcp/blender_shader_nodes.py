@@ -15,14 +15,14 @@ def node_class(kind,tree):
     return cls
 
 
-def control_schema(cls):
+def control_schema(cls,node=None):
     inherited=set(bpy.types.Node.bl_rna.properties.keys())
     result={}
     for prop in cls.bl_rna.properties:
         if (prop.identifier in inherited or prop.type not in {'BOOLEAN','INT','FLOAT','ENUM','STRING'}
                 or getattr(prop,'is_array',False) or getattr(prop,'subtype','') in {'FILE_PATH','DIR_PATH'}):
             continue
-        spec={'type':prop.type,'readonly':prop.is_readonly}
+        spec={'type':prop.type,'readonly':prop.is_readonly or bool(node and node.is_property_readonly(prop.identifier))}
         if prop.type in {'INT','FLOAT'}:
             spec.update(min=prop.hard_min,max=prop.hard_max)
         elif prop.type=='ENUM':

@@ -70,6 +70,7 @@ OPERATIONS = frozenset(
         "inspect_shader_node_types",
         "create_shader_node",
         "set_shader_ramp",
+        "set_shader_node",
         "assign_instance_material",
         "assign_object_material",
         "decimate_to",

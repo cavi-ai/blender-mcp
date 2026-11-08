@@ -1,12 +1,11 @@
 """Atomic native ColorRamp authoring, including shared and animated graph guards."""
 import re
 
-import bpy
-
-from .blender_animation_refs import bound_curves
+from .blender_animation_refs import require_static
 from .blender_errors import preflight
-from .blender_ramp_settings import equivalent, settings
+from .blender_ramp_settings import settings
 from .blender_shader_inputs import editable_node, finish_edit, update
+from .native_controls import equivalent
 
 FIELDS=('interpolation','color_mode','hue_interpolation')
 
@@ -38,22 +37,6 @@ def references(owner,path,ramp):
     return False
 
 
-def require_static(ramp):
-    mapping=bpy.data.user_map()
-    owners=set(mapping)
-    for users in mapping.values():owners.update(users)
-    owners.add(ramp.id_data)
-    owners.update(tree for owner in tuple(owners) if (tree:=getattr(owner,'node_tree',None)) is not None)
-    for owner in owners:
-        if any(references(owner,curve.data_path,ramp) for curve in bound_curves(owner)):
-            raise ValueError('Ramp is animated or driven; edit its animation before changing static ramp data')
-        animation=getattr(owner,'animation_data',None)
-        for curve in animation.drivers if animation else ():
-            for variable in curve.driver.variables:
-                if any(references(t.id,t.data_path,ramp) for t in variable.targets):
-                    raise ValueError('A driver references this ramp; detach that reference before editing')
-
-
 def apply(ramp,values):
     for key in FIELDS:
         if key in values:setattr(ramp,key,values[key])
@@ -76,7 +59,7 @@ def set_ramp(params):
         before=read(ramp)
         expected={**before,**values}
         changed=not equivalent(before,expected)
-        if changed:require_static(ramp)
+        if changed:require_static(lambda owner,path:references(owner,path,ramp),'Ramp',root=ramp.id_data)
     try:
         if changed:
             apply(ramp,values)
