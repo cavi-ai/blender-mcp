@@ -430,11 +430,20 @@ Pass `node_type` to inspect its `control_schema` without creating nodes.
 Optional `node_settings` supplies up to 32 initial Boolean, integer, finite float,
 enum or text controls. For example, `ShaderNodeMath` accepts
 `{"operation":"MULTIPLY","use_clamp":false}`; `ShaderNodeUVMap` accepts
-`{"uv_map":"ShaderUV"}`. Resource paths and ID pointers use their separate
-binding operations. Read `created_node` and the actual returned socket identifiers,
+`{"uv_map":"ShaderUV"}`. Image resources use `set_image`; shader-group bindings
+are described below. Read `created_node` and the actual returned socket identifiers,
 then set defaults and wire the graph explicitly. Existing active outputs are
 preserved unless `is_active_output` is requested. Creation failures remove the
 new node and restore output activation and configuration tags.
+
+For `ShaderNodeGroup`, `node_types` also reports `resource_schema`.
+Create a bound instance with `node_settings={"node_tree":"StudioFinish"}` using
+an existing native ShaderNodeTree name. Append library groups through `asset_library`
+and use their returned names to resolve collisions. Other initial settings remain
+scalar controls. Missing groups, other tree types and recursive bindings reject
+before creation. Read `created_node.resources.node_tree` and the node's actual
+`group`, inputs and outputs. Instance input defaults remain independent while the
+definition is shared. Failed creation removes the node and releases its group user.
 
 `inspect` reports each node's current scalar `settings` and native `control_schema`,
 including instance read-only state. `set_node` updates existing native controls
