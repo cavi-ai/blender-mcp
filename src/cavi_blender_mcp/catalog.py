@@ -43,7 +43,7 @@ def shared_constraints(schema):
 
     map_schema(schema,count)
     if unknown:return schema
-    selected={key for key,n in counts.items() if (len(key)-20)*n>len(key)+24}
+    selected={key for key,n in counts.items() if (len(key)-20)*n>len(key)+5+(0 if known else 10)}
     if not selected:return schema
     definitions=dict(schema.get('$defs',{}))
     names={}
@@ -62,7 +62,9 @@ def shared_constraints(schema):
     result=map_schema(schema,replace)
     # New definitions retain their bodies; only occurrences in the original schema move.
     result['$defs']={**result.get('$defs',{}),**{ref.split('/')[-1]:values[key] for key,ref in names.items()}}
-    return result
+    def size(value):
+        return len(json.dumps(short_references(value),separators=(',',':'),ensure_ascii=False).encode())
+    return result if size(result)<size(schema) else schema
 
 
 def short_references(schema):

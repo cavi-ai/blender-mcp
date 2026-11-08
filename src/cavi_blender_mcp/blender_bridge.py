@@ -1050,6 +1050,10 @@ def _dispatch(operation, p):
         from .blender_scene_pick import inspect
 
         return inspect(p)
+    if operation == 'inspect_scene_spatial':
+        from .blender_spatial import inspect
+
+        return inspect(p)
     if operation == 'pick_mesh_surface':
         from .blender_surface_pick import inspect
 
