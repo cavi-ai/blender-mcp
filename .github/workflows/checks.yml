@@ -115,6 +115,8 @@ jobs:
         run: uv run --locked python tests/native_camera_pick_mcp.py --blender "$(command -v blender)"
       - name: Check scene surface discovery
         run: uv run --locked python tests/native_scene_pick_mcp.py --blender "$(command -v blender)"
+      - name: Check evaluated scene placement
+        run: uv run --locked python tests/native_scene_spatial_mcp.py --blender "$(command -v blender)"
       - name: Check rendered geometry identities
         run: uv run --locked python tests/native_geometry_identity_mcp.py --blender "$(command -v blender)"
       - name: Check object deletion and shared data

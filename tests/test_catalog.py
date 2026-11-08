@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import json
 import unittest
 from typing import Annotated
 
@@ -10,6 +11,75 @@ from cavi_blender_mcp.catalog import BlenderServer, omit_null_defaults
 
 
 class CatalogTests(unittest.TestCase):
+    def test_shared_constraints_preserve_constraints_and_use_site_annotations(self):
+        from cavi_blender_mcp import catalog
+
+        share = getattr(catalog, 'shared_constraints', None)
+        self.assertIsNotNone(share, 'Shared value-constraint compaction is missing')
+        name = {'type': 'string', 'minLength': 1, 'maxLength': 63, 'pattern': '^[a-z]+$'}
+        role = {'enum': ['subject', 'context', 'foreground', 'background', None]}
+        source = {'type': 'object', 'additionalProperties': False,
+            'properties': {**{f'name{i}': {**name, 'description': f'name {i}',
+                'default': 'mesh', 'examples': [{'$ref': 'literal'}]} for i in range(5)},
+                **{f'role{i}': {**role, 'description': f'role {i}'} for i in range(5)}},
+            'required': ['name0']}
+        original = copy.deepcopy(source)
+        compact = catalog.short_references(share(source))
+        self.assertLess(len(str(compact)), len(str(source)))
+        self.assertEqual(source, original)
+        for i in range(5):
+            field = compact['properties'][f'name{i}']
+            self.assertEqual(field['description'], f'name {i}')
+            self.assertEqual(field['default'], 'mesh')
+            self.assertEqual(field['examples'], [{'$ref': 'literal'}])
+        for value in ({}, {'name0': ''}, {'name0': 'a'}, {'name0': 'a'*63},
+                      {'name0': 'a'*64}, {'name0': 'INVALID'}, {'name0': None},
+                      {'name0': True}, {'name0': 'mesh', 'role0': None},
+                      {'name0': 'mesh', 'role1': 'context'},
+                      {'name0': 'mesh', 'role2': 'invalid'},
+                      {'name0': 'mesh', 'role3': {'$ref': 'literal'}},
+                      {'name0': 'mesh', 'foreign': 1}):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),
+                             Draft202012Validator(compact).is_valid(value))
+
+    def test_scalar_sharing_keeps_scoped_and_unknown_reference_schemas_in_place(self):
+        from cavi_blender_mcp import catalog
+
+        share = getattr(catalog, 'shared_constraints', None)
+        self.assertIsNotNone(share, 'Shared value-constraint compaction is missing')
+        source = {'type': 'object', 'properties': {str(i): {'type': 'string',
+                  'minLength': 1, 'maxLength': 63} for i in range(8)}}
+        for change in ({'$id': 'https://example.test/scoped'}, {'$anchor': 'scoped'},
+                       {'$ref': '#/properties/0'}, {'$ref': '#/$defs/Missing'},
+                       {'unevaluatedProperties': False}):
+            with self.subTest(change=change):
+                value = {**source, **change}
+                self.assertEqual(share(value), value)
+
+    def test_scalar_sharing_does_not_grow_a_schema_with_long_local_reference_names(self):
+        from cavi_blender_mcp.catalog import shared_constraints, short_references
+
+        source = {'$defs': {str(i): {'const': f'value{i}'} for i in range(64)},
+            'type': 'object', 'properties': {str(i): {'type': 'string',
+                'minLength': 1, 'maxLength': 63} for i in range(2)}}
+        encoded = lambda value: len(json.dumps(short_references(value), separators=(',', ':')))
+        self.assertLessEqual(encoded(shared_constraints(source)), encoded(source))
+
+    def test_shared_constraints_reuse_an_existing_definition_container_when_profitable(self):
+        from cavi_blender_mcp.catalog import shared_constraints, short_references
+
+        source = {'$defs': {'Existing': {'type': 'integer', 'minimum': 0}},
+            'type': 'object', 'additionalProperties': False,
+            'properties': {name: {'type': 'string', 'minLength': 1, 'maxLength': 63}
+                           for name in ('head', 'tail')}}
+        compact = short_references(shared_constraints(source))
+        encoded = lambda value: len(json.dumps(short_references(value), separators=(',', ':')))
+        self.assertLess(encoded(compact), encoded(source))
+        for value in ({}, {'head': 'a', 'tail': 'b'}, {'head': ''}, {'tail': 'a'*64},
+                      {'head': None}, {'head': True}, {'head': 'a', 'extra': 1}):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),
+                             Draft202012Validator(compact).is_valid(value))
+
     def test_shared_arrays_preserve_nullable_bounds_and_default_literals(self):
         from cavi_blender_mcp.catalog import shared_constraints, short_references
 
