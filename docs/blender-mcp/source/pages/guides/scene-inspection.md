@@ -17,6 +17,46 @@ count and material slots.
 Use `name` to inspect one object without paging. Use `limit` (1–1000) and
 `offset` to walk large scenes.
 
+## Placement and surface clearance
+
+Use `scene_info(spatial=["CanopyRoof", "Town"])` to inspect one named subject mesh
+against one named context mesh at the current frame. The query evaluates modifiers and parent transforms
+without moving objects or changing selection. It reports world bounds in metres,
+geometry and query identities, triangle intersection pairs, and sampled nearest
+surface points.
+
+```json
+{
+  "spatial": ["CanopyRoof", "Town"]
+}
+```
+
+The pair is ordered subject first, context second, and the names must differ.
+The context may be a combined mesh containing several buildings or props.
+This selector excludes pagination and all other `scene_info` inspection modes.
+
+Bounds overlap is a broadphase result. `intersections` tests triangles through
+native float32 BVHs plus a float64 projected separating-axis narrowphase for
+coplanar triangles, including when a combined context mesh spans a large area.
+The coplanar pass includes shared-edge/vertex contacts, uses a 0.000001-metre
+plane/projected-edge tolerance and a 0.000001 normalized-normal cross-product
+tolerance, and reports how many unique pairs it adds. It only examines overlapping
+triangle bounds within the same pair-work budget. World coordinates outside finite
+float32 range are rejected before native vector/BVH conversion.
+`nearest` samples vertices and triangle centres in both directions and reports the
+closest sampled witness. Its distance is an
+upper bound on the continuous surface minimum. Neither zero intersection pairs nor
+positive sampled gaps prove solid containment, physics clearance or absence of all
+contacts. The report returns no all-clear verdict.
+
+The fixed query budgets are 100,000 combined triangles, 500,000 combined vertices,
+256 samples per side, 1,000,000 pair-work units and 32 intersection examples.
+Spatial chunks contain at most
+128 triangles, bounding each native overlap result to 16,384 pairs. Exceeding a
+geometry or pair-work budget rejects the query; truncated examples retain the full
+tested intersection count. Collection-instance empties, non-mesh geometry and
+render-only modifier differences are outside this query's scope.
+
 ## Mesh quality
 
 `inspect_mesh_quality` measures exact static mesh names. It refuses modifiers,

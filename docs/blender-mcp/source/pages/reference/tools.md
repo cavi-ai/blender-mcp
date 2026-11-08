@@ -3,6 +3,14 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
+`scene_info(spatial=["Subject", "Context"])` evaluates one named subject mesh
+against one named context mesh without editing the scene. It returns metre world bounds, geometry/query
+identities, bounded triangle intersection pairs and bidirectional sampled nearest
+surface gaps with fixed safety budgets. Bounds are broadphase only; sampled distances are not
+continuous clearance or solid-containment proofs. See [placement and surface
+clearance](../guides/scene-inspection.md#placement-and-surface-clearance) for limits
+and an example. This mode excludes other `scene_info` arguments.
+
 `scene_info(name=...)` reports ordered modifier names, native types, viewport/render
 visibility, exposed settings and `control_schema` with their native types, hard
 ranges, enum identifiers and read-only state. Scene-wide pages omit this detailed
