@@ -4,15 +4,14 @@
 
 - macOS or Linux. Windows is not part of the tested surface.
 - Blender 5.2.3 LTS. Other releases may work, but native checks target 5.2.3.
-- Python 3.11 or newer for the published 0.56.0 package. The current source
-  checkout requires Python 3.15 or newer.
+- Python 3.15 or newer.
 - [`uv`](https://docs.astral.sh/uv/) to install the server.
 - Node.js 22 or newer, only for MCP evaluation.
 
 ## Install the server
 
 ```bash
-uv tool install cavi-blender-mcp==0.56.0
+uv tool install cavi-blender-mcp==0.57.0
 ```
 
 This installs the `cavi-blender-mcp` entry point on your `PATH`.
@@ -76,7 +75,7 @@ cavi-blender-mcp runtime status
 
 Use Python 3.15 or newer for the current development checkout. For the published
 package's source and documentation, use the
-[v0.56.0 tag](https://github.com/cavi-ai/blender-mcp/tree/v0.56.0).
+[v0.57.0 tag](https://github.com/cavi-ai/blender-mcp/tree/v0.57.0).
 
 ```bash
 git clone https://github.com/cavi-ai/blender-mcp.git

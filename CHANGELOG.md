@@ -7,32 +7,27 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
-- Add opt-in FBX triangulation on exporter copies without changing source meshes.
+## 0.57.0 - 2026-11-09
 
-- Require Python 3.15 or newer; CI, documentation and PyPI publishing run Python 3.15.
-- Branch authored materials and nested shader groups onto selected mesh slots.
-- Preserve shared geometry with object bindings and retain external image/action references.
-- Share material-slot capture and rollback across assignment and finish variants.
+### Added
 
-- Make shared mesh data independent without replacing the object or applying transforms.
-- Retain skin, animated shape keys and material-slot bindings; clean failed copies.
-- Keep scene and object-transform dispatch separate from UV transforms.
+- Author shader nodes, links, color ramps, and reusable groups with typed inputs and outputs.
+- Edit modifier stacks, mesh regions, source vertices, and selected-face material assignments.
+- Pick source and evaluated surfaces from camera pixels and inspect scene placement.
+- Unwrap selected faces with authored seams, edit UV islands, and match texture density.
+- Inspect UDIM coverage, select named UV layers, and bake authored shader channels.
+- Open saved projects, control preview color settings, and triangulate FBX exporter copies.
 
-- Transform explicit source-face UVs on an existing layer without rebuilding geometry.
-- Preserve skin weights, shape keys, other UVs and selection; roll back failed writes.
-- Report affected faces, materials and before/after UV bounds.
+### Changed
 
-- The package version, and the release the documentation names, come from the git tag.
-- Generation removes a plain background of any colour from opaque images, keeps enclosed colours and refuses busy backgrounds.
-- `unwrap` packs islands `margin_px` apart (default 4 px at `texture_resolution` 1024) instead of 2% of the UV square, clear of the tile border, and gives faces that fold over their own island new islands; `island_margin` still sets a fraction.
-- `decimate_to` dissolves faces collapsed onto coincident vertices.
-- `inspect_uv_layout` sizes its comparison budget at 50 per inspected triangle unless one is given.
+- Requires Python 3.15 or newer and MCP Core 0.1.3 or newer.
+- Register supervised Blender and generation processes before execution.
+- Preserve shared geometry and material bindings when branching materials or extracting faces.
 
-- Check source UV coverage against an existing tiled image before rendering.
-- Report missing, unavailable and unused tiles with affected object and face examples.
-- Keep incomplete analysis from passing and retain per-material object overrides.
-- Share source UV collection and analytic clipping with unique-tile inspection.
-- Expose native shader UV-map/projection settings and mesh render-active UV names.
+### Fixed
+
+- Pack UV islands with pixel-based margins and detect folded source UVs.
+- Remove plain backgrounds of any color before local mesh generation.
 
 ## 0.56.0 - 2026-11-04
 
