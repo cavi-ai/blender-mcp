@@ -20,16 +20,16 @@ Use the example as a starting point, or bring a working copy of your own project
 
 ## Install
 
-You need [uv](https://docs.astral.sh/uv/), **Python 3.11+** and **Blender**. The published 0.56.0 package targets macOS and Linux; native checks target Blender 5.2.3 LTS.
+You need [uv](https://docs.astral.sh/uv/), **Python 3.15+** and **Blender**. Cavi targets macOS and Linux; native checks target Blender 5.2.3 LTS.
 
 Save the [starting scene](examples/creator-directed-revision/before.blend) as `before.blend` in `~/Documents/CaviBlender/`, the default workspace. Create that folder if needed. Install Cavi and start with this project:
 
 ```bash
-uv tool install cavi-blender-mcp==0.56.0
+uv tool install cavi-blender-mcp==0.57.0
 cavi-blender-mcp runtime start --project before.blend
 ```
 
-Newly launched sessions use factory settings without loading or saving your usual preferences. An existing connected session may be reused; `start` will not replace a different connected project. See [project startup](https://github.com/cavi-ai/blender-mcp/blob/v0.56.0/docs/blender-mcp/source/pages/guides/runtime-and-headless.md) if you already use Cavi. Blender is found through `PATH`, `CAVI_BLENDER_BIN`, or the standard macOS application path.
+Newly launched sessions use factory settings without loading or saving your usual preferences. An existing connected session may be reused; `start` will not replace a different connected project. See [project startup](https://github.com/cavi-ai/blender-mcp/blob/v0.57.0/docs/blender-mcp/source/pages/guides/runtime-and-headless.md) if you already use Cavi. Blender is found through `PATH`, `CAVI_BLENDER_BIN`, or the standard macOS application path.
 
 Supervised background runs use MCP Core's owned-exec registration gate for startup, reconstruction and nested UV workers. See [supervised launches](docs/blender-mcp/source/pages/guides/runtime-and-headless.md#supervised-launches) for the private owner handoff and helper-launch contract.
 
@@ -51,7 +51,7 @@ Then ask your agent:
 
 > Inspect the lantern in the connected scene. Make the harbor-signal revision above, then show me a preview. Save the revised scene as a new `.blend` file and keep its parts editable.
 
-To work on your own asset, start Cavi with a working copy of that project instead. The [installation guide](https://github.com/cavi-ai/blender-mcp/blob/v0.56.0/docs/blender-mcp/source/pages/introduction/installation.md) covers the remaining setup options.
+To work on your own asset, start Cavi with a working copy of that project instead. The [installation guide](https://github.com/cavi-ai/blender-mcp/blob/v0.57.0/docs/blender-mcp/source/pages/introduction/installation.md) covers the remaining setup options.
 
 ## Keep developing the asset
 
@@ -75,7 +75,7 @@ The default workspace is `~/Documents/CaviBlender`. See [configuration](docs/ble
 
 ## Documentation and development
 
-The first-use steps above use the **published 0.56.0 package**. [Its tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.56.0/docs/blender-mcp/source) matches that version. The documentation in this checkout follows current source, which requires **Python 3.15+**. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
+The first-use steps above install **0.57.0** and require **Python 3.15+**. [Tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.57.0/docs/blender-mcp/source) matches that version. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
 
 The server publishes 20 tools over stdio. The [tool reference](docs/blender-mcp/source/pages/reference/tools.md) documents exact operations, bounds and response contracts.
 
