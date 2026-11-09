@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import os
 import subprocess
@@ -10,13 +11,36 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from cavi_blender_mcp import generation, neural_worker
+from cavi_blender_mcp import generation, neural_worker, server
 from cavi_blender_mcp.generation import generate
 
 FAKE_AGENT = Path(__file__).with_name("fake_mlx_agent.py")
 
 
 class GenerationTests(unittest.TestCase):
+    def test_server_generation_uses_configured_workspace_without_reading_scene(self):
+        with tempfile.TemporaryDirectory() as folder:
+            workspace = Path(folder)
+            report = {"path": str(workspace / "mesh.glb")}
+            with (
+                patch.dict(os.environ, {"CAVI_BLENDER_WORKSPACE": str(workspace)}),
+                patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
+                patch.object(server, "generate", return_value=report) as native,
+            ):
+                result = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png"))
+            self.assertEqual(result, report)
+            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None)
+
+    def test_server_generation_defaults_to_runtime_workspace_without_a_bridge(self):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(server, "call", side_effect=ConnectionError("Bridge offline")),
+            patch.object(server, "generate", return_value={}) as native,
+        ):
+            asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", resolution=96))
+        native.assert_called_once_with((Path.home() / "Documents/CaviBlender").resolve(),
+                                       "input.png", "mesh.glb", 96)
+
     def configured(self, work):
         return patch.dict(
             os.environ,

@@ -46,6 +46,7 @@ from .contracts import (
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
+from .paths import environment_path
 from .rig_models import (
     ClipTiming,
     Constraint,
@@ -1175,7 +1176,7 @@ async def asset_io(
         values.pop('assembly')
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None})
-        workspace = (await run(call, "scene_info", limit=1))["workspace"]
+        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
         return await run(generate, workspace, params["image"], path, params["resolution"])
     if action == "import":
         suffix = Path(path).suffix.lower()
