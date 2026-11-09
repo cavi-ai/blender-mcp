@@ -139,6 +139,8 @@ jobs:
         run: uv run --locked python tests/native_shader_control_mcp.py --blender "$(command -v blender)"
       - name: Check native shader group instances
         run: uv run --locked python tests/native_shader_group_mcp.py --blender "$(command -v blender)"
+      - name: Check native shader function authoring
+        run: uv run --locked python tests/native_shader_group_author_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

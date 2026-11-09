@@ -445,6 +445,19 @@ before creation. Read `created_node.resources.node_tree` and the node's actual
 `group`, inputs and outputs. Instance input defaults remain independent while the
 definition is shared. Failed creation removes the node and releases its group user.
 
+To create a new definition, pass a `node_tree` object with a unique `name` and
+optional `interface` list. Each socket declares `name`, `in_out` (INPUT/OUTPUT),
+and native `socket_type`, with optional `description`, `default_value`,
+`min_value` and `max_value`. Blender validates the declared socket and its values;
+failed construction removes the new definition and instance. Defaults retain
+native precision. `created_node.resources.node_tree.created` distinguishes a new
+definition from an existing binding.
+Inspection returns `group_interface` with native identifiers, directions, types,
+defaults and ranges. Create `NodeGroupInput`/`NodeGroupOutput` in the new group,
+then build and connect its function through existing node operations. These I/O
+types are discoverable inside group definitions. Use returned identifiers rather
+than declaration positions when wiring sockets.
+
 `inspect` reports each node's current scalar `settings` and native `control_schema`,
 including instance read-only state. `set_node` updates existing native controls
 through a nonempty `node_settings` map, such as `{"noise_dimensions":"4D","normalize":true}`
