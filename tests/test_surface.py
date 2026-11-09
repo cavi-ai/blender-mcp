@@ -158,7 +158,8 @@ class SurfaceTests(unittest.TestCase):
 
     def test_generate_runs_without_lease(self):
         calls = self.capture()
-        with patch.object(server, "generate", return_value={"path": "g.glb"}) as generate:
+        with (patch.dict("os.environ", {"CAVI_BLENDER_WORKSPACE": "/w"}),
+              patch.object(server, "generate", return_value={"path": "g.glb"}) as generate):
             asyncio.run(server.asset_io("generate", "g.glb", image="in.png"))
-        self.assertEqual(calls, [("scene_info", {"limit": 1})])
-        generate.assert_called_once_with("/w", "in.png", "g.glb", None)
+        self.assertEqual(calls, [])
+        generate.assert_called_once_with(Path("/w"), "in.png", "g.glb", None)
