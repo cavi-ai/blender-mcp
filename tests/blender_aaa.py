@@ -201,6 +201,31 @@ assert clean["custom_normals_cleared"] and not dirty.has_custom_normals
 refused("cleanup_mesh", "steps", name="Dirty", steps=["explode"])
 results["cleanup"] = clean["delta"]
 
+# A needle: one corner sits a float32 step off the opposite edge, so no two vertices are close.
+needle = bpy.data.meshes.new("Needle")
+needle.from_pydata([(4, 4, 4), (5, 4, 4), (5, 5, 4), (4, 5, 4), (4.5, 4 - 2 ** -21, 4)], [],
+                   [(0, 4, 1), (0, 1, 2), (0, 2, 3)])
+needle_obj = bpy.data.objects.new("Needle", needle)
+bpy.context.scene.collection.objects.link(needle_obj)
+
+
+def thinnest(mesh):
+    heights = []
+    for polygon in mesh.polygons:
+        corners = [mesh.vertices[i].co for i in polygon.vertices]
+        longest = max((b - a).length for a, b in itertools.combinations(corners, 2))
+        heights.append(2 * polygon.area / longest)
+    return min(heights)
+
+
+assert thinnest(needle) < 1e-6, thinnest(needle)
+welded = edit("cleanup_mesh", name="Needle", merge_distance=1e-5, steps=["merge"])
+assert welded["merged_vertices"] == 0, welded
+assert thinnest(needle) > 1e-5, thinnest(needle)
+assert all(len(polygon.vertices) == 3 for polygon in needle.polygons), welded
+assert abs(sum(polygon.area for polygon in needle.polygons) - 1) < 1e-5, welded
+results["needle"] = welded["after"]
+
 # apply_transforms preserves world geometry and children.
 bpy.ops.mesh.primitive_cube_add(location=(2, 3, 4), rotation=(0, 0, math.radians(30)))
 box = bpy.context.object

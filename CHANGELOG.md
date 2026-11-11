@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Fixed
+
+- Mesh cleanup's merge step dissolves faces thinner than the merge distance.
+
 ## 0.57.0 - 2026-11-09
 
 ### Added
