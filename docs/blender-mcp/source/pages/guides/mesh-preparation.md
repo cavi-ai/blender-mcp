@@ -25,7 +25,7 @@ on the same object without applying transforms or changing scene references.
 | `texel_density` | Scale a UV layer to a target pixels-per-metre |
 | `uv_transform` | Move, scale or rotate explicit source-face UV loops on an existing layer |
 | `collision` | Create `UCX_`, `UBX_` or `USP_` collision objects per loose part |
-| `cleanup` | Merge, delete loose geometry, recalculate normals, triangulate, clear custom normals |
+| `cleanup` | Merge, delete loose geometry, delete connected fragments under 0.5% of the surface area, recalculate normals, triangulate, clear custom normals |
 | `boolean` | Union, difference or intersect against one operand |
 | `join` | Consume sources into the target with transform, UV, group and slot remapping |
 | `separate` | Split by loose parts or material |

@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- Mesh cleanup's `delete_fragments` step removes connected parts under 0.5% of the surface area.
+
 ### Fixed
 
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.

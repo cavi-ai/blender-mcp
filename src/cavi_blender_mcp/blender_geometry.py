@@ -23,8 +23,9 @@ PACK = {"margin_method": "FRACTION", "rotate": True, "rotate_method": "CARDINAL"
         "shape_method": "AABB"}
 AXES = {"X", "Y", "Z"}
 COINCIDENT = 1e-9  # Below float32 spacing at unit scale: only vertices collapsed onto each other.
-CLEANUP_STEPS = {"merge", "delete_loose", "recalc_normals", "triangulate",
+CLEANUP_STEPS = {"merge", "delete_loose", "delete_fragments", "recalc_normals", "triangulate",
                  "clear_custom_normals"}
+FRAGMENT_SHARE = 0.005  # A connected part under this share of the surface area is debris.
 
 
 def triangle_count(mesh):
@@ -586,6 +587,32 @@ def counts(bm):
             "triangles": sum(len(f.verts) - 2 for f in bm.faces)}
 
 
+def delete_fragments(bm):
+    """Delete connected parts holding under FRAGMENT_SHARE of the surface area; return their count."""
+    total = sum(f.calc_area() for f in bm.faces)
+    seen, doomed, count = set(), [], 0
+    for start in bm.verts:
+        if start in seen:
+            continue
+        seen.add(start)
+        part, stack = [start], [start]
+        while stack:
+            vert = stack.pop()
+            for edge in vert.link_edges:
+                other = edge.other_vert(vert)
+                if other not in seen:
+                    seen.add(other)
+                    part.append(other)
+                    stack.append(other)
+        faces = {f for v in part for f in v.link_faces}
+        if faces and total > 0 and sum(f.calc_area() for f in faces) < FRAGMENT_SHARE * total:
+            doomed.extend(part)
+            count += 1
+    if doomed:
+        bmesh.ops.delete(bm, geom=doomed, context="VERTS")
+    return count
+
+
 def cleanup(p):
     value, _ = source(p["name"])
     distance = number(p.get("merge_distance", 0.0001), 0, 1, "merge_distance")
@@ -602,6 +629,7 @@ def cleanup(p):
     try:
         bm.from_mesh(mesh)
         before = counts(bm)
+        fragments = delete_fragments(bm) if "delete_fragments" in steps else 0
         merged = 0
         if distance > 0:
             count = len(bm.verts)
@@ -641,7 +669,8 @@ def cleanup(p):
     mesh.update()
     return {**info(value), "before": before, "after": after,
             "delta": {k: after[k] - before[k] for k in after}, "merged_vertices": merged,
-            "loose_removed": removed, "flipped_faces": flipped, "steps": steps,
+            "loose_removed": removed, "fragments_removed": fragments, "flipped_faces": flipped,
+            "steps": steps,
             "custom_normals_cleared": cleared}
 
 

@@ -226,6 +226,20 @@ assert all(len(polygon.vertices) == 3 for polygon in needle.polygons), welded
 assert abs(sum(polygon.area for polygon in needle.polygons) - 1) < 1e-5, welded
 results["needle"] = welded["after"]
 
+# A fragment: a speck floating beside a unit cube is removed; the cube stays whole.
+bpy.ops.mesh.primitive_cube_add(size=1, location=(8, 8, 8))
+speckled = bpy.context.object
+speckled.name = speckled.data.name = "Speckled"
+speck = bmesh.new()
+speck.from_mesh(speckled.data)
+speck.faces.new([speck.verts.new(co) for co in ((2, 0, 0), (2.05, 0, 0), (2, .05, 0))])
+speck.to_mesh(speckled.data)
+speck.free()
+kept = edit("cleanup_mesh", name="Speckled", steps=["delete_fragments"])
+assert kept["fragments_removed"] == 1 and kept["after"]["faces"] == 6, kept
+assert edit("cleanup_mesh", name="Speckled", steps=["delete_loose"])["fragments_removed"] == 0
+results["fragments"] = kept["after"]
+
 # apply_transforms preserves world geometry and children.
 bpy.ops.mesh.primitive_cube_add(location=(2, 3, 4), rotation=(0, 0, math.radians(30)))
 box = bpy.context.object
