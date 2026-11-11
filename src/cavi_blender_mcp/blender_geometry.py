@@ -607,6 +607,13 @@ def cleanup(p):
             count = len(bm.verts)
             bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=distance)
             merged = count - len(bm.verts)
+            # A corner within the distance of its opposite edge leaves a face with no usable
+            # area although no two vertices are close; dissolve it into its neighbours.
+            triangles = all(len(f.verts) == 3 for f in bm.faces)
+            bmesh.ops.dissolve_degenerate(bm, dist=distance, edges=list(bm.edges))
+            split = [f for f in bm.faces if len(f.verts) > 3]
+            if triangles and split:
+                bmesh.ops.triangulate(bm, faces=split, quad_method="BEAUTY", ngon_method="BEAUTY")
         removed = 0
         if loose:
             count = len(bm.verts) + len(bm.edges)
