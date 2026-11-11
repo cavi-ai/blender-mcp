@@ -101,7 +101,8 @@ Names = Annotated[list[str], Field(min_length=1, max_length=256)]
 Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
 View = Literal["front", "back", "left", "right", "top", "persp"]
 Preserve = Literal["seams", "sharp", "boundary"]
-Step = Literal["merge", "delete_loose", "recalc_normals", "triangulate", "clear_custom_normals"]
+Step = Literal["merge", "delete_loose", "delete_fragments", "recalc_normals", "triangulate",
+               "clear_custom_normals"]
 
 
 class NamingRules(BaseModel):
