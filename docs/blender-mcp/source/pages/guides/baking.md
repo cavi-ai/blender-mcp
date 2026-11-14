@@ -7,17 +7,17 @@ workspace image. It requires a `lease_id`.
 
 | Parameter | Meaning |
 | --- | --- |
-| `map` | `normal`, `ao`, `curvature`, `lightmap` or `shader` |
+| `map` | `normal`, `ao`, `curvature`, `lightmap`, `vertex_color` or `shader` |
 | `name` | Low-poly target mesh |
 | `path` | New workspace `.png`; `shader` also accepts `.exr` |
-| `high` | Optional 1–64 high-poly meshes for selected-to-active normal/AO baking |
+| `high` | 1–64 high-poly meshes for selected-to-active baking; optional for normal/AO, required for `vertex_color` |
 | `resolution` | 64–4096, default 1024 |
 | `bit_depth` | PNG: 8/16, default 16. Shader EXR: 16/32, default 32 |
 | `source` | Shader only: material, group path, node, socket identifier, INPUT/OUTPUT direction and data/color role |
 | `samples` | 1–256, default 16; used by AO, curvature and lightmap |
 | `margin` | 0–64 pixels, default 4 |
-| `cage_extrusion` | 0–1, default 0.01; normal/AO only |
-| `max_ray_distance` | 0–10, default 0.1; normal/AO only |
+| `cage_extrusion` | 0–1, default 0.01; normal/AO/vertex_color only |
+| `max_ray_distance` | 0–10, default 0.1; normal/AO/vertex_color only |
 | `normal_space` | `tangent` or `object`; normal bakes only |
 | `uv_layer` | Bake target UV layer; defaults to the render-active layer |
 | `isolate` | Hide unrelated renderable objects, default true |
@@ -32,14 +32,19 @@ workspace image. It requires a `lease_id`.
   material slots, object overrides and linked mesh data remain unchanged. Empty
   or untextured source slots do not need active image nodes.
 - Output uses the requested PNG depth without an intermediate 8-bit image.
-- Normal, AO and curvature values remain raw linear data. Lightmaps use the sRGB
-  transfer, without the current scene's artistic view transform, exposure or gamma.
+- Normal, AO and curvature values remain raw linear data. Lightmaps and vertex
+  color maps use the sRGB transfer, without the current scene's artistic view
+  transform, exposure or gamma.
 - Normal RGB channels are always +X, +Y, +Z; tangent normals use OpenGL orientation.
   Existing scene channel swizzles are restored afterward.
 - Curvature is self-baked from Cycles pointiness; it does not take high-poly sources.
 - Lightmap bakes direct and indirect diffuse lighting. Keep scene lights visible;
   `isolate` hides unrelated meshes but never lights.
 - Normal and AO support selected-to-active high-poly sources.
+- `vertex_color` projects each high mesh's render color attribute onto the low
+  mesh's UV layer as an sRGB base color map. Every high mesh needs a color
+  attribute. It emits the colors from private copies of the high meshes, so their
+  materials are not used or changed.
 - Scene state, selection, materials and visibility are restored afterward.
 
 The result reports the file path, byte count, SHA-256, map, resolution, samples,

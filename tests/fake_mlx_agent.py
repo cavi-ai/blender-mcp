@@ -17,7 +17,7 @@ parser.add_argument("kind")
 parser.add_argument("--path", required=True)
 parser.add_argument("--image", required=True)
 parser.add_argument("--out", required=True)
-parser.add_argument("--steps", type=int, required=True)
+parser.add_argument("--steps", type=int)
 parser.add_argument("--seed", type=int, required=True)
 parser.add_argument("--resolution", type=int, required=True)
 parser.add_argument("--max-faces", type=int, required=True)
@@ -25,6 +25,8 @@ parser.add_argument("--timeout", type=int, required=True)
 parser.add_argument("--json", action="store_true", required=True)
 arguments = parser.parse_args()
 mode = os.environ["FAKE_AGENT_MODE"]
+# TripoSG takes fixed steps and an RGB frame; TRELLIS.2 keeps its own steps and needs alpha.
+trellis = os.environ.get("FAKE_AGENT_MODEL") == "trellis2"
 record = Path(os.environ["FAKE_AGENT_RECORD"])
 out = Path(arguments.out)
 
@@ -44,10 +46,11 @@ valid = (
     and Path(arguments.path).is_dir()
     and image[:8] == PNG_SIGNATURE
     and struct.unpack(">II", image[16:24]) == (512, 512)
+    and image[25] == (6 if trellis else 2)
     and out.suffix == ".glb"
     and not out.exists()
     and out.parent.is_dir()
-    and (arguments.steps, arguments.seed, arguments.resolution) == (50, 42, 512)
+    and (arguments.steps, arguments.seed, arguments.resolution) == (None if trellis else 50, 42, 512)
     and arguments.max_faces == 500000
     and 1 <= arguments.timeout <= 600
 )
@@ -71,22 +74,22 @@ if mode != "missing":
     (record / "mesh.glb").write_bytes(glb)
 if mode == "race":
     (out.parent.parent / "mesh.glb").write_bytes(b"other-writer")
-reply(
-    "ok",
-    {
-        "path": str(out),
-        "seconds": 143.536,
-        "steps": 50,
-        "seed": 42,
-        "resolution": 512,
-        "vertices": 249896,
-        "faces": 500001 if mode == "oversized" else 499990,
-        "queries": [16777216, 12473832],
-        "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
-        "peak_memory_gb": 10.301,
-        "load_seconds": 0.864,
-        "schema": "mesh/1",
-        "backend": "mlx-3d",
-        "model": arguments.path,
-    },
-)
+data = {
+    "path": str(out),
+    "seconds": 143.536,
+    "steps": 12 if trellis else 50,
+    "seed": 42,
+    "resolution": 512,
+    "vertices": 249896,
+    "faces": 500001 if mode == "oversized" else 499990,
+    "queries": [16777216, 12473832],
+    "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
+    "peak_memory_gb": 10.301,
+    "load_seconds": 0.864,
+    "schema": "mesh/1",
+    "backend": "mlx-3d",
+    "model": arguments.path,
+}
+if trellis and mode != "unflagged":
+    data["vertex_colors"] = mode != "uncolored"
+reply("ok", data)

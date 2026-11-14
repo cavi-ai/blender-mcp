@@ -8047,6 +8047,21 @@
     "error": "requires source"
   },
   {
+    "id": "bake-vertex-color-missing-high",
+    "tool": "bake",
+    "arguments": {
+      "map": "vertex_color",
+      "name": "Low",
+      "path": "color.png"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "requires: high"
+  },
+  {
     "id": "bake-shader-invalid-source",
     "tool": "bake",
     "arguments": {

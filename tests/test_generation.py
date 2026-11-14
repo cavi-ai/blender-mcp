@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import patch
 
 from PIL import Image
@@ -199,6 +200,12 @@ class GenerationTests(unittest.TestCase):
 
 
 class TripoSGMlxTests(unittest.TestCase):
+    provider, prefix, model, name = "triposg-mlx", "CAVI_TRIPOSG_MLX", "triposg", "TripoSG"
+    extra: ClassVar[dict] = {}
+
+    def expected_frame(self, image):
+        return neural_worker.prepare_image(image, background=(255, 255, 255), extent=427)
+
     def setUp(self):
         root = tempfile.TemporaryDirectory()
         self.addCleanup(root.cleanup)
@@ -206,26 +213,27 @@ class TripoSGMlxTests(unittest.TestCase):
         self.work.mkdir()
         self.record = Path(root.name) / "record"
         self.record.mkdir()
-        self.model = Path(root.name) / "model"
-        self.model.mkdir()
+        self.checkpoint = Path(root.name) / "model"
+        self.checkpoint.mkdir()
         cutout = Image.new("RGBA", (400, 800), (0, 0, 0, 0))
         cutout.paste((150, 30, 20, 255), (100, 0, 300, 800))
         cutout.save(self.work / "input.png")
 
     def settings(self, mode, **extra):
         return {
-            "CAVI_GENERATION_PROVIDER": "triposg-mlx",
-            "CAVI_TRIPOSG_MLX_PYTHON": sys.executable,
-            "CAVI_TRIPOSG_MLX_AGENT": str(FAKE_AGENT),
-            "CAVI_TRIPOSG_MLX_MODEL": str(self.model),
+            "CAVI_GENERATION_PROVIDER": self.provider,
+            f"{self.prefix}_PYTHON": sys.executable,
+            f"{self.prefix}_AGENT": str(FAKE_AGENT),
+            f"{self.prefix}_MODEL": str(self.checkpoint),
+            "FAKE_AGENT_MODEL": self.model,
             "FAKE_AGENT_MODE": mode,
             "FAKE_AGENT_RECORD": str(self.record),
             **extra,
         }
 
-    def generate(self, mode="ok", **extra):
+    def generate(self, mode="ok", image="input.png", **extra):
         with patch.dict(os.environ, self.settings(mode, **extra)):
-            return generate(self.work, "input.png", "mesh.glb")
+            return generate(self.work, image, "mesh.glb")
 
     def assert_nothing_published(self):
         self.assertFalse((self.work / "mesh.glb").exists())
@@ -238,7 +246,7 @@ class TripoSGMlxTests(unittest.TestCase):
         self.assertEqual(
             report,
             {
-                "provider": "TripoSG",
+                "provider": self.name,
                 "backend": "mlx-3d",
                 "vertices": 249896,
                 "faces": 499990,
@@ -246,17 +254,16 @@ class TripoSGMlxTests(unittest.TestCase):
                 "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
                 "peak_memory_gb": 10.301,
                 "input_sha256": hashlib.sha256((self.work / "input.png").read_bytes()).hexdigest(),
+                **self.extra,
                 "path": str(published.resolve()),
                 "bytes": 28,
             },
         )
         self.assertFalse(list(self.work.glob(".cavi-generation-*")))
 
-    def test_the_agent_receives_the_image_framed_like_the_pytorch_provider(self):
+    def test_the_agent_receives_the_framed_image(self):
         self.generate()
-        expected = neural_worker.prepare_image(
-            self.work / "input.png", background=(255, 255, 255), extent=427
-        )
+        expected = self.expected_frame(self.work / "input.png")
         with Image.open(self.record / "image.png") as received:
             self.assertEqual(received.size, (512, 512))
             self.assertEqual(received.mode, expected.mode)
@@ -264,7 +271,7 @@ class TripoSGMlxTests(unittest.TestCase):
 
     def test_each_runtime_path_must_be_existing_and_absolute(self):
         for suffix in ("PYTHON", "AGENT", "MODEL"):
-            key = f"CAVI_TRIPOSG_MLX_{suffix}"
+            key = f"{self.prefix}_{suffix}"
             for bad in ("relative/path", str(self.work / "missing")):
                 with self.subTest(key=key, value=bad), self.assertRaisesRegex(RuntimeError, key):
                     self.generate(**{key: bad})
@@ -272,8 +279,8 @@ class TripoSGMlxTests(unittest.TestCase):
 
     def test_unconfigured_runtime_is_refused_before_any_asset(self):
         with (
-            patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "triposg-mlx"}, clear=True),
-            self.assertRaisesRegex(RuntimeError, "CAVI_TRIPOSG_MLX_PYTHON"),
+            patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": self.provider}, clear=True),
+            self.assertRaisesRegex(RuntimeError, f"{self.prefix}_PYTHON"),
         ):
             generate(self.work, "input.png", "mesh.glb")
         self.assert_nothing_published()
@@ -302,7 +309,7 @@ class TripoSGMlxTests(unittest.TestCase):
 
     def test_a_hung_agent_is_stopped_at_the_timeout(self):
         with (
-            patch.dict(generation.PROVIDERS["triposg-mlx"], {"timeout": 3}),
+            patch.dict(generation.PROVIDERS[self.provider], {"timeout": 3}),
             self.assertRaisesRegex(RuntimeError, "3 seconds"),
         ):
             self.generate("hang")
@@ -322,3 +329,30 @@ class TripoSGMlxTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.generate("race")
         self.assertEqual((self.work / "mesh.glb").read_bytes(), b"other-writer")
+
+
+class Trellis2MlxTests(TripoSGMlxTests):
+    provider, prefix, model, name = "trellis2-mlx", "CAVI_TRELLIS2_MLX", "trellis2", "TRELLIS.2"
+    extra: ClassVar[dict] = {"vertex_colors": True}
+
+    def expected_frame(self, image):
+        return neural_worker.prepare_image(image, background=None, extent=512)
+
+    def test_an_opaque_plain_background_reaches_the_agent_as_alpha(self):
+        opaque = Image.new("RGB", (600, 400), (255, 255, 255))
+        opaque.paste((40, 90, 160), (200, 100, 400, 300))
+        opaque.save(self.work / "opaque.png")
+        self.generate(image="opaque.png")
+        with Image.open(self.record / "image.png") as received:
+            self.assertEqual((received.size, received.mode), ((512, 512), "RGBA"))
+            self.assertEqual(received.getpixel((0, 0))[3], 0)
+            self.assertEqual(received.getpixel((256, 256)), (40, 90, 160, 255))
+
+    def test_an_uncolored_checkpoint_publishes_a_mesh_without_vertex_colors(self):
+        self.assertIs(self.generate("uncolored")["vertex_colors"], False)
+        self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def test_a_result_without_the_color_flag_publishes_nothing(self):
+        with self.assertRaisesRegex(RuntimeError, "no usable mesh result"):
+            self.generate("unflagged")
+        self.assert_nothing_published()

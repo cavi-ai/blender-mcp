@@ -1,4 +1,4 @@
-"""Cycles-backed normal, AO, curvature and lightmap baking into workspace PNGs."""
+"""Cycles-backed normal, AO, curvature, lightmap and vertex-color baking into workspace PNGs."""
 
 import hashlib
 from pathlib import Path
@@ -12,6 +12,7 @@ MAX_HIGH_TRIANGLES = 1000000
 MAX_HIGH_OBJECTS = 64
 MAX_RESOLUTION = 4096
 MAX_SAMPLES = 256
+COLOR_MAPS = {"lightmap", "vertex_color"}
 
 
 def triangles(value):
@@ -71,7 +72,7 @@ def write_png(image, path, bit_depth, mode):
         settings.color_mode = "RGB"
         settings.color_depth = str(bit_depth)
         output_scene.render.dither_intensity = 0
-        output_scene.view_settings.view_transform = "Standard" if mode == "lightmap" else "Raw"
+        output_scene.view_settings.view_transform = "Standard" if mode in COLOR_MAPS else "Raw"
         output_scene.view_settings.look = "None"
         output_scene.view_settings.exposure = 0
         output_scene.view_settings.gamma = 1
@@ -94,11 +95,13 @@ def bake(p):
     if not 0 < low_triangles <= MAX_LOW_TRIANGLES:
         raise ValueError(f"Low-poly target needs 1 to {MAX_LOW_TRIANGLES} triangles")
     mode = p.get("map")
-    if mode not in {"normal", "ao", "curvature", "lightmap"}:
-        raise ValueError("map must be normal, ao, curvature or lightmap")
+    if mode not in {"normal", "ao", "curvature", "lightmap", "vertex_color"}:
+        raise ValueError("map must be normal, ao, curvature, lightmap or vertex_color")
     high_names = p.get("high")
-    if high_names is not None and mode not in {"normal", "ao"}:
-        raise ValueError("high applies to normal and ao bakes")
+    if high_names is not None and mode not in {"normal", "ao", "vertex_color"}:
+        raise ValueError("high applies to normal, ao and vertex_color bakes")
+    if high_names is None and mode == "vertex_color":
+        raise ValueError("vertex_color requires high-poly sources")
     if high_names is not None:
         if (not isinstance(high_names, list) or not 1 <= len(high_names) <= MAX_HIGH_OBJECTS
                 or len(set(high_names)) != len(high_names)):
@@ -109,6 +112,8 @@ def bake(p):
     for value in high:
         if value.modifiers or value.data.shape_keys is not None:
             raise ValueError("High-poly sources must not have modifiers or shape keys")
+        if mode == "vertex_color" and not value.data.color_attributes:
+            raise ValueError(f"High-poly source {value.name} has no color attribute")
     high_triangles = sum(triangles(value) for value in high)
     if high_triangles > MAX_HIGH_TRIANGLES:
         raise ValueError(f"High-poly sources are limited to {MAX_HIGH_TRIANGLES} triangles")
@@ -145,8 +150,34 @@ def bake(p):
     active = bpy.context.view_layer.objects.active
     visibility = [(value, value.hide_render, value.hide_viewport, value.hide_get())
                   for value in scene.objects]
-    image = material = bake_low = None
+    image = material = bake_low = paint = None
+    sources, copies = high, []
     try:
+        if mode == "vertex_color":
+            # Emit each source's render color attribute from private copies of the high meshes.
+            paint = bpy.data.materials.new("CAVI Bake Color")
+            paint.use_nodes = True
+            paint_nodes = paint.node_tree.nodes
+            for node in list(paint_nodes):
+                paint_nodes.remove(node)
+            emission = paint_nodes.new("ShaderNodeEmission")
+            paint.node_tree.links.new(paint_nodes.new("ShaderNodeVertexColor").outputs["Color"],
+                                      emission.inputs["Color"])
+            paint.node_tree.links.new(emission.outputs["Emission"],
+                                      paint_nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
+            for value in high:
+                source = value.copy()
+                copies.append(source)
+                source.data = value.data.copy()
+                source.parent = None
+                scene.collection.objects.link(source)
+                source.matrix_world = value.matrix_world.copy()
+                source.hide_render = False
+                source.data.materials.clear()
+                source.data.materials.append(paint)
+                source.material_slots[0].link = "DATA"
+                source.data.polygons.foreach_set("material_index", [0] * len(source.data.polygons))
+            sources = copies
         bake_low = low.copy()
         bake_low.data = low.data.copy()
         bake_low.parent = None
@@ -162,7 +193,7 @@ def bake(p):
         layers.active = target_layer
         target_layer.active_render = True
         image = bpy.data.images.new("CAVI Bake", resolution, resolution, alpha=False,
-                                    float_buffer=True, is_data=mode != "lightmap")
+                                    float_buffer=True, is_data=mode not in COLOR_MAPS)
         material = bpy.data.materials.new("CAVI Bake")
         material.use_nodes = True
         nodes, links = material.node_tree.nodes, material.node_tree.links
@@ -194,7 +225,7 @@ def bake(p):
             polygon.material_index = 0
 
         for value, hidden_render, hidden_viewport, _ in visibility:
-            if value is bake_low or value in high:
+            if value is bake_low or value in sources:
                 value.hide_render = False
             elif value.type in {"LIGHT", "LIGHT_PROBE", "LIGHTPROBE"}:
                 value.hide_render = hidden_render
@@ -202,12 +233,12 @@ def bake(p):
                 value.hide_render = True
             else:
                 value.hide_render = hidden_render
-        for value in [bake_low, *high]:
+        for value in [bake_low, *sources]:
             value.hide_viewport = False
             value.hide_set(False)
         for value in list(bpy.context.selected_objects):
             value.select_set(False)
-        for value in [bake_low, *high]:
+        for value in [bake_low, *sources]:
             value.select_set(True)
         bpy.context.view_layer.objects.active = bake_low
         bpy.context.view_layer.update()
@@ -237,7 +268,7 @@ def bake(p):
                 result = bpy.ops.object.bake(type="NORMAL")
             elif mode == "ao":
                 result = bpy.ops.object.bake(type="AO")
-            elif mode == "curvature":
+            elif mode in {"curvature", "vertex_color"}:
                 result = bpy.ops.object.bake(type="EMIT")
             else:
                 result = bpy.ops.object.bake(type="DIFFUSE",
@@ -250,7 +281,7 @@ def bake(p):
                 "sha256": hashlib.sha256(data).hexdigest(), "map": mode,
                 "resolution": resolution, "samples": samples, "margin": margin,
                 "bit_depth": bit_depth,
-                "color_space": "sRGB" if mode == "lightmap" else "Non-Color",
+                "color_space": "sRGB" if mode in COLOR_MAPS else "Non-Color",
                 "normal_channels": ["+X", "+Y", "+Z"] if mode == "normal" else None,
                 "cage_extrusion": cage, "max_ray_distance": distance,
                 "normal_space": normal_space if mode == "normal" else None,
@@ -282,6 +313,13 @@ def bake(p):
             bpy.data.objects.remove(bake_low, do_unlink=True)
             if data.users == 0:
                 bpy.data.meshes.remove(data)
+        for value in copies:
+            data = value.data
+            bpy.data.objects.remove(value, do_unlink=True)
+            if data.users == 0:
+                bpy.data.meshes.remove(data)
+        if paint is not None:
+            bpy.data.materials.remove(paint)
         if material is not None:
             bpy.data.materials.remove(material)
         if image is not None:

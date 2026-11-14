@@ -61,7 +61,7 @@ def backdrop_alpha(rgb):
 
 
 def prepare_image(source, background=(128, 128, 128), extent=435):
-    """Frame the subject inside a 512-pixel square on a flat background."""
+    """Frame the subject inside a 512-pixel square on a flat background, or transparent for None."""
     from PIL import Image
 
     with Image.open(source) as original:
@@ -77,9 +77,10 @@ def prepare_image(source, background=(128, 128, 128), extent=435):
             raise ValueError("Input image has no visible foreground")
         cutout = cutout.crop(bounds)
         cutout.thumbnail((extent, extent), Image.Resampling.LANCZOS)
-        canvas = Image.new("RGBA", (512, 512), (*background, 255))
+        fill = (0, 0, 0, 0) if background is None else (*background, 255)
+        canvas = Image.new("RGBA", (512, 512), fill)
         canvas.alpha_composite(cutout, ((512 - cutout.width) // 2, (512 - cutout.height) // 2))
-        return canvas.convert("RGB")
+        return canvas if background is None else canvas.convert("RGB")
 
 
 def linearize_vertex_colors(colors):
