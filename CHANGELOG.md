@@ -9,6 +9,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Added
 
+- `asset_io` generate `quality="fast"` runs the MLX providers with fewer steps (TripoSG also on a 256³ grid).
 - Mesh cleanup's `delete_fragments` step removes connected parts under 0.5% of the surface area.
 - TRELLIS.2 image-to-3D through mlx-agent as `trellis2-mlx`, reporting whether the mesh has vertex colors.
 - `bake` map `vertex_color` projects high-poly color attributes into an sRGB base color PNG.

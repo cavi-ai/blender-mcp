@@ -1142,6 +1142,7 @@ async def asset_io(
     include_empties: Annotated[StrictBool | None, Field(description="export: empties")] = None,
     image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
+    quality: Annotated[Literal["fast", "default"] | None, Field(description='generate (MLX providers): fast about 2-4x quicker')] = None,
     lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
     collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
     animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
@@ -1159,6 +1160,7 @@ async def asset_io(
     """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "resolution": resolution,
+              "quality": quality,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
@@ -1179,9 +1181,9 @@ async def asset_io(
     if action == 'export' and assembly is False:
         values.pop('assembly')
     if action == "generate":
-        params = pick(action, values, ["image"], {"resolution": None})
+        params = pick(action, values, ["image"], {"resolution": None, "quality": None})
         workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
-        return await run(generate, workspace, params["image"], path, params["resolution"])
+        return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"])
     if action == "import":
         suffix = Path(path).suffix.lower()
         operation = {".fbx": "import_fbx", ".obj": "import_obj",

@@ -21,12 +21,21 @@ parser.add_argument("--steps", type=int)
 parser.add_argument("--seed", type=int, required=True)
 parser.add_argument("--resolution", type=int, required=True)
 parser.add_argument("--max-faces", type=int, required=True)
+parser.add_argument("--denoiser-cache", choices=("off", "adaptive"), default="off")
 parser.add_argument("--timeout", type=int, required=True)
 parser.add_argument("--json", action="store_true", required=True)
 arguments = parser.parse_args()
 mode = os.environ["FAKE_AGENT_MODE"]
 # TripoSG takes fixed steps and an RGB frame; TRELLIS.2 keeps its own steps and needs alpha.
 trellis = os.environ.get("FAKE_AGENT_MODEL") == "trellis2"
+# Sampler steps, grid resolution and denoiser cache each quality tier must send.
+TIERS = {
+    (False, "default"): (50, 512, "off"),
+    (False, "fast"): (25, 256, "adaptive"),
+    (True, "default"): (None, 512, "off"),
+    (True, "fast"): (6, 512, "off"),
+}
+tier = TIERS[trellis, os.environ.get("FAKE_AGENT_QUALITY", "default")]
 record = Path(os.environ["FAKE_AGENT_RECORD"])
 out = Path(arguments.out)
 
@@ -50,7 +59,8 @@ valid = (
     and out.suffix == ".glb"
     and not out.exists()
     and out.parent.is_dir()
-    and (arguments.steps, arguments.seed, arguments.resolution) == (None if trellis else 50, 42, 512)
+    and (arguments.steps, arguments.resolution, arguments.denoiser_cache) == tier
+    and arguments.seed == 42
     and arguments.max_faces == 500000
     and 1 <= arguments.timeout <= 600
 )
