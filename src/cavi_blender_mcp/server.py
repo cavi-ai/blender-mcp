@@ -1085,7 +1085,7 @@ async def bake(
     map: Annotated[Literal["normal", "ao", "curvature", "lightmap", "vertex_color", "shader"], Field(description="Map; shader needs source")],
     name: Annotated[ObjectName, Field(description="Mesh")],
     path: Annotated[str, Field(description="New workspace PNG; shader allows EXR")],
-    high: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="normal/AO/vertex_color sources")] = None,
+    high: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="Sources")] = None,
     resolution: Annotated[StrictInt, Field(ge=64, le=4096, description="Image pixels")] = 1024,
     samples: Annotated[StrictInt, Field(ge=1, le=256, description="Samples/pixel")] = 16,
     margin: Annotated[StrictInt, Field(ge=0, le=64, description="Gutter pixels")] = 4,
