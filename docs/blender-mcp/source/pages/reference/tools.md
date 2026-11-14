@@ -256,7 +256,26 @@ Read-only. Reports hierarchy, linked clips and skin weights.
 
 Each mesh needs one vertex-group Armature modifier bound to that rig. With
 `checks`, the call samples the named or active action and restores the action,
-pose and frame afterward.
+pose and frame afterward. `root_motion` retains its armature-space values and
+labels them `coordinate_space: armature`, `distance_unit: armature_unit`. Its
+`world_space` reports positions and distances in metres using the scene unit
+scale, with the unit system and conversion factor included. The evaluated
+armature world transform is sampled at each frame, including object and parent
+motion. `loop_distance_m` compares root positions only; it is not a loop-quality
+verdict. Conversion applies the sampled world transform and configured
+`scene.unit_settings.scale_length`, as the motion-comparison and clearance
+helpers do; `NONE` is still reported as the scene unit system. The conversion
+factor does not by itself establish that the source was physically calibrated.
+
+`world_space` contains:
+
+| Field | Meaning |
+| --- | --- |
+| `scene_unit_system`, `meters_per_scene_unit` | Scene setting and conversion factor |
+| `root_bones[].start_m`, `end_m` | Sampled world-space endpoint positions |
+| `root_bones[].displacement_m`, `horizontal_m`, `vertical_m` | Endpoint displacement, Blender world XY distance, and absolute world Z distance |
+| `root_bones[].max_travel_m` | Greatest sampled distance from the start |
+| `max_travel_m`, `loop_distance_m` | Greatest root travel and endpoint distance across roots |
 
 ## compare_rig_motion
 

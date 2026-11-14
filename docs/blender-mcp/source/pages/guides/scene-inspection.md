@@ -96,8 +96,10 @@ with bounded samples. `max_influences` selects the caller's target profile; it i
 not a universal engine requirement.
 
 Optional `action` selects a clip and `checks` adds animation QA. `root_motion`
-reports displacement in armature space, `loop` compares first and last bone
-matrices, and `deformation` reports evaluated mesh bounds, dimension ratios,
+retains armature-space displacement and adds labelled world-space root
+positions and distances in metres using the scene unit scale. Object and parent
+motion are included at each sampled frame. A root positional seam does not prove
+the full pose loops. `loop` compares first and last bone matrices, and `deformation` reports evaluated mesh bounds, dimension ratios,
 centroid movement and non-finite vertices. `samples` is 2–32 and defaults to 8.
 
 It does not change pose, normalize weights or establish Unity import quality.

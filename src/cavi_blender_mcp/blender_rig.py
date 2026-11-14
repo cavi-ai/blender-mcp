@@ -125,22 +125,30 @@ def sample_frames(action, samples):
 
 
 def pose_matrices(rig, frames):
-    poses = []
+    poses, worlds = [], []
     for frame in frames:
         bpy.context.scene.frame_set(frame)
         bpy.context.view_layer.update()
         poses.append({bone.name: rig.pose.bones[bone.name].matrix.copy()
                       for bone in rig.data.bones})
-    return poses
+        worlds.append(rig.evaluated_get(bpy.context.evaluated_depsgraph_get()).matrix_world.copy())
+    return poses, worlds
 
 
-def root_motion_report(rig, action, frames, poses):
+def root_motion_report(rig, action, frames, poses, worlds, unit_system, scale_length):
+    if (not isinstance(scale_length, (float, int)) or isinstance(scale_length, bool)
+            or not math.isfinite(scale_length) or scale_length <= 0):
+        raise ValueError("Scene unit scale must be finite and positive")
+    if len(worlds) != len(poses) or any(
+            not math.isfinite(value) for matrix in worlds for row in matrix for value in row):
+        raise ValueError("Armature world transforms must be finite")
     roots = [bone.name for bone in rig.data.bones if bone.parent is None]
     if not roots:
         raise ValueError("Rig has no root bone for root-motion analysis")
-    entries = []
+    entries, world_entries = [], []
     maximum = 0.0
     loop = 0.0
+    world_maximum = world_loop = 0.0
     for name in roots:
         points = [pose[name].translation.copy() for pose in poses]
         start, end = points[0], points[-1]
@@ -153,7 +161,26 @@ def root_motion_report(rig, action, frames, poses):
         entries.append({"name": name, "start": list(start), "end": list(end),
                         "displacement": displacement, "horizontal": horizontal,
                         "vertical": vertical, "max_travel": travel})
-    return {"action": action.name, "frames": [frames[0], frames[-1]],
+        world_points = [(matrix @ pose[name].translation) * scale_length
+                        for matrix, pose in zip(worlds, poses, strict=True)]
+        if any(not math.isfinite(value) for point in world_points for value in point):
+            raise ValueError("World-space root positions must be finite")
+        first, last = world_points[0], world_points[-1]
+        delta = last - first
+        world_distance = delta.length
+        world_travel = max((point - first).length for point in world_points)
+        if not math.isfinite(world_distance) or not math.isfinite(world_travel):
+            raise ValueError("World-space root distances must be finite")
+        world_maximum, world_loop = max(world_maximum, world_travel), max(world_loop, world_distance)
+        world_entries.append({"name": name, "start_m": list(first), "end_m": list(last),
+                              "displacement_m": world_distance,
+                              "horizontal_m": math.hypot(delta.x, delta.y),
+                              "vertical_m": abs(delta.z), "max_travel_m": world_travel})
+    return {"coordinate_space": "armature", "distance_unit": "armature_unit",
+            "world_space": {"coordinate_space": "world", "distance_unit": "m",
+                            "scene_unit_system": unit_system, "meters_per_scene_unit": scale_length,
+                            "root_bones": world_entries, "max_travel_m": world_maximum,
+                            "loop_distance_m": world_loop}, "action": action.name, "frames": [frames[0], frames[-1]],
             "samples": len(frames), "root_bones": entries,
             "max_travel": maximum, "loop_distance": loop,
             "loops": loop <= 1e-3}
@@ -362,12 +389,13 @@ def inspect(params, find_object):
                 stack.enter_context(action_context(*reference))
             stack.enter_context(action_context(rig, action))
             frames = sample_frames(action, samples)
-            poses = (pose_matrices(rig, frames)
-                     if "root_motion" in requested or "loop" in requested else None)
+            poses, worlds = (pose_matrices(rig, frames)
+                             if "root_motion" in requested or "loop" in requested else (None, None))
             checks_report = {}
             if "root_motion" in requested:
                 checks_report["root_motion"] = root_motion_report(
-                    rig, action, frames, poses)
+                    rig, action, frames, poses, worlds,
+                    bpy.context.scene.unit_settings.system, bpy.context.scene.unit_settings.scale_length)
             if "loop" in requested:
                 checks_report["loop"] = loop_report(rig, frames, poses)
             if "deformation" in requested:

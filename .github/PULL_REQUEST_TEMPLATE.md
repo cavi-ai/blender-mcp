@@ -12,7 +12,7 @@
 - [ ] `uv run --locked ruff check .`
 - [ ] `npm run eval:protocol`
 - [ ] Native Blender check, if Blender-side behavior changed (Blender version: )
-- [ ] `python3 scripts/docs/build.py` and `python3 scripts/docs/verify.py`, if docs changed
+- [ ] `uv run --locked python -m scripts.docs.build` and `uv run --locked python -m scripts.docs.verify`, if docs changed
 
 ## Contract impact
 
