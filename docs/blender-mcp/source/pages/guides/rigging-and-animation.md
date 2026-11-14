@@ -143,8 +143,10 @@ tolerance, and compare the bake and actual export round trip.
 `inspect_rig` can sample a clip. Set `action` to a clip name, or omit it to use
 the active action, and pass `checks`:
 
-- `root_motion` reports root-bone displacement, horizontal and vertical travel,
-  maximum travel and whether the clip loops.
+- `root_motion` retains armature-space displacement and its existing positional
+  loop flag. The labelled `world_space` values apply each sampled armature world
+  transform and the scene unit scale to report root positions and distances in
+  metres. Its positional seam does not establish a full-pose loop.
 - `loop` compares first and last bone matrices for translation, rotation and
   scale.
 - `deformation` reports evaluated mesh bounds, maximum dimensions, dimension

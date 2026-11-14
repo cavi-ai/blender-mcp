@@ -1,6 +1,7 @@
 """Native animation QA checks for root motion, loop seams and deformation."""
 
 import json
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -65,6 +66,50 @@ try:
     assert root["action"] == "Move" and root["samples"] == 4, root
     assert abs(root["root_bones"][0]["displacement"] - 2) < 1e-4, root
     assert abs(root["root_bones"][0]["horizontal"] - 2) < 1e-4, root
+    assert root["coordinate_space"] == "armature"
+    world = root["world_space"]
+    assert world["coordinate_space"] == "world" and world["distance_unit"] == "m"
+    assert abs(world["root_bones"][0]["displacement_m"] - 2) < 1e-4
+    rig.scale = (0.01, 0.01, 0.01)
+    bpy.context.view_layer.update()
+    scaled = inspect("Move", ["root_motion"])["animation_checks"]["root_motion"]
+    assert abs(scaled["root_bones"][0]["displacement"] - 2) < 1e-4
+    assert abs(scaled["world_space"]["root_bones"][0]["displacement_m"] - .02) < 1e-4
+    old_scale, old_rotation = rig.scale.copy(), rig.rotation_euler.copy()
+    old_system = bpy.context.scene.unit_settings.system
+    old_factor = bpy.context.scene.unit_settings.scale_length
+    try:
+        rig.rotation_euler = (0, math.pi / 2, 0)
+        bpy.context.scene.unit_settings.system = "METRIC"
+        bpy.context.scene.unit_settings.scale_length = 2
+        bpy.context.view_layer.update()
+        rotated = inspect("Move", ["root_motion"])["animation_checks"]["root_motion"]
+        entry = rotated["world_space"]["root_bones"][0]
+        assert abs(entry["vertical_m"] - .04) < 1e-4, entry
+        assert entry["horizontal_m"] < 1e-4, entry
+    finally:
+        rig.scale, rig.rotation_euler = old_scale, old_rotation
+        bpy.context.scene.unit_settings.system = old_system
+        bpy.context.scene.unit_settings.scale_length = old_factor
+    rig.scale = (1, 1, 1)
+    parent = bpy.data.objects.new("QaMotionParent", None)
+    bpy.context.scene.collection.objects.link(parent)
+    old_parent = rig.parent
+    try:
+        rig.parent = parent
+        for key_frame, x in ((1, 0), (6, 3), (11, 0)):
+            parent.location.x = x
+            parent.keyframe_insert(data_path="location", frame=key_frame)
+        bpy.context.scene.frame_set(7)
+        parented = inspect("Loop", ["root_motion"], samples=3)["animation_checks"]["root_motion"]
+        assert parented["max_travel"] < 1e-4, parented
+        assert parented["world_space"]["max_travel_m"] > 2.9, parented
+        assert parented["world_space"]["loop_distance_m"] < 1e-4, parented
+        assert bpy.context.scene.frame_current == 7
+    finally:
+        rig.parent = old_parent
+        bpy.data.objects.remove(parent, do_unlink=True)
+        bpy.context.view_layer.update()
     assert root["loops"] is False
     assert moved["animation_checks"]["loop"]["loop_closes"] is False
     assert moved["analyzed_action"] == "Move"
