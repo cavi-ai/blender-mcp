@@ -6,7 +6,7 @@ einops==0.8.2
 filelock==4.2.7
 fsspec==2026.9.0
 hf-xet==1.8.0
-huggingface-hub==2.3.0
+huggingface-hub==2.4.0
 idna==3.20
 imageio==2.38.1
 importlib-metadata==10.1.0
