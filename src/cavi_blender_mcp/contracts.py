@@ -398,7 +398,7 @@ class MapBakeResult(Result):
     path: str
     bytes: int
     sha256: str
-    map: Literal["normal", "ao", "curvature", "lightmap", "shader"]
+    map: Literal["normal", "ao", "curvature", "lightmap", "vertex_color", "shader"]
     resolution: int
     samples: int
     margin: int

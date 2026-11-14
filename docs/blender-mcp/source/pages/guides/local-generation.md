@@ -8,7 +8,7 @@ The MCP process does not import PyTorch, download weights or send images to a
 remote service. The worker runs in a separate Python 3.12 environment with local
 weights.
 
-Three providers are available. `CAVI_GENERATION_PROVIDER` selects one and
+Four providers are available. `CAVI_GENERATION_PROVIDER` selects one and
 defaults to `triposr`.
 
 | Provider | Output | Device | Timeout |
@@ -16,6 +16,7 @@ defaults to `triposr`.
 | `triposr` | Vertex-colored surface, resolution 64–192 | CPU, four threads | 180 seconds |
 | `triposg` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MPS), CUDA or CPU | 600 seconds |
 | `triposg-mlx` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MLX) through mlx-agent | 600 seconds |
+| `trellis2-mlx` | Vertex-colored surface, at most 500,000 faces | Apple Silicon (MLX) through mlx-agent | 600 seconds |
 
 ## Prepare TripoSR
 
@@ -87,6 +88,23 @@ CAVI_TRIPOSG_MLX_AGENT=/path/to/mlx-agent/scripts/mlx-agent
 CAVI_TRIPOSG_MLX_MODEL=/path/to/converted-triposg
 ```
 
+## Prepare TRELLIS.2 on MLX
+
+`trellis2-mlx` runs `microsoft/TRELLIS.2-4B` through `mlx-agent convert mesh`
+with the same `mlx-3d` backend. Convert it with `--model-type trellis2`; a model
+converted with its texture stage writes a base color into the GLB's `COLOR_0`
+vertex attribute in linear RGB. `--q-bits 8` and `--q-bits 32` both work.
+
+```text
+CAVI_GENERATION_PROVIDER=trellis2-mlx
+CAVI_TRELLIS2_MLX_PYTHON=/path/to/python
+CAVI_TRELLIS2_MLX_AGENT=/path/to/mlx-agent/scripts/mlx-agent
+CAVI_TRELLIS2_MLX_MODEL=/path/to/converted-trellis2
+```
+
+`CAVI_TRELLIS2_MLX_PYTHON` has the same requirements as
+`CAVI_TRIPOSG_MLX_PYTHON`.
+
 ## Run
 
 Put an image of one isolated object on a plain background or transparency inside
@@ -101,7 +119,7 @@ the workspace, then call:
 ```
 
 `resolution` applies only to TripoSR, defaults to 128 and is bounded to 64–192.
-Both TripoSG providers refuse it. Input images are at most 16 MiB and 4096
+The other providers refuse it. Input images are at most 16 MiB and 4096
 pixels per side. An existing transparent cutout is used as provided. An opaque
 image loses the plain background that frames its border, in any colour, while
 colours the object encloses stay; an opaque image without a plain background is
@@ -118,9 +136,17 @@ faces. `triposg` uses seed 0, so the two providers return different meshes. A
 character takes two to three minutes and peaks near 10 GB of memory. The agent
 stops itself 30 seconds before the timeout and reports why.
 
+`trellis2-mlx` frames the same cutout on a transparent 512-pixel square, with
+the object's longer side at most 512 pixels, then runs the checkpoint's own
+sampler steps and guidance with seed 42 at resolution 512 and reduces the
+surface to at most 500,000 faces. With the 8-bit model one run takes about two
+minutes and peaks near 18 GB of memory.
+
 The result includes the provider, device, object counts, the input SHA-256 and
-the output path. `triposg-mlx` returns `backend`, `vertices`, `faces`, `seconds`,
-`stage_seconds` and `peak_memory_gb` instead of the device and triangle count.
+the output path. `triposg-mlx` and `trellis2-mlx` return `backend`, `vertices`,
+`faces`, `seconds`, `stage_seconds` and `peak_memory_gb` instead of the device
+and triangle count. `trellis2-mlx` also returns `vertex_colors`, false when the
+converted model has no texture stage.
 
 ## Continue
 

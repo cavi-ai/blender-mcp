@@ -1082,10 +1082,10 @@ class ShaderBakeSource(BaseModel):
 
 @mcp.tool(annotations=MUTATING)
 async def bake(
-    map: Annotated[Literal["normal", "ao", "curvature", "lightmap", "shader"], Field(description="Map; shader needs source")],
+    map: Annotated[Literal["normal", "ao", "curvature", "lightmap", "vertex_color", "shader"], Field(description="Map; shader needs source")],
     name: Annotated[ObjectName, Field(description="Mesh")],
     path: Annotated[str, Field(description="New workspace PNG; shader allows EXR")],
-    high: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="normal/AO sources")] = None,
+    high: Annotated[list[str] | None, Field(min_length=1, max_length=64, description="Sources")] = None,
     resolution: Annotated[StrictInt, Field(ge=64, le=4096, description="Image pixels")] = 1024,
     samples: Annotated[StrictInt, Field(ge=1, le=256, description="Samples/pixel")] = 16,
     margin: Annotated[StrictInt, Field(ge=0, le=64, description="Gutter pixels")] = 4,
@@ -1120,11 +1120,14 @@ async def bake(
               "normal_space": normal_space, "uv_layer": uv_layer, "isolate": isolate}
     defaults = {"resolution": 1024, "samples": 16, "margin": 4, "bit_depth": 16,
                 "uv_layer": None, "isolate": True}
+    if map in {"normal", "ao", "vertex_color"}:
+        defaults.update({"cage_extrusion": 0.01, "max_ray_distance": 0.1})
     if map in {"normal", "ao"}:
-        defaults.update({"high": None, "cage_extrusion": 0.01, "max_ray_distance": 0.1})
+        defaults["high"] = None
     if map == "normal":
         defaults["normal_space"] = "tangent"
-    params = pick(map, values, (), defaults)
+    # Vertex colors are always projected from high-poly sources.
+    params = pick(map, values, ("high",) if map == "vertex_color" else (), defaults)
     return await run(call, "bake_png", lease_id=lease_id, map=map, name=name, path=path,
                      **params)
 

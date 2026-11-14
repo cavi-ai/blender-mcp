@@ -59,6 +59,24 @@ class BakeSurfaceTests(unittest.TestCase):
             "path": "lightmap.png", "resolution": 1024, "samples": 4,
             "margin": 4, "uv_layer": None, "isolate": True, "bit_depth": 16}))
 
+    def test_vertex_color_projects_from_required_high_sources(self):
+        calls = self.capture()
+        asyncio.run(server.bake("vertex_color", "Low", "color.png", high=["High"],
+                                lease_id="L"))
+        self.assertEqual(self.inner(calls)[0], ("bake_png", {
+            "lease_id": "L", "map": "vertex_color", "name": "Low", "path": "color.png",
+            "high": ["High"], "resolution": 1024, "samples": 16, "margin": 4,
+            "cage_extrusion": .01, "max_ray_distance": .1, "uv_layer": None,
+            "isolate": True, "bit_depth": 16}))
+        for arguments, message in [
+            ({"map": "vertex_color", "name": "Low", "path": "c.png"}, "requires: high"),
+            ({"map": "vertex_color", "name": "Low", "path": "c.png", "high": ["High"],
+              "normal_space": "object"}, "does not accept: normal_space"),
+        ]:
+            with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
+                asyncio.run(server.mcp.call_tool("bake", arguments))
+        self.assertEqual(len(calls), 1)
+
     def test_explicit_output_precision_reaches_the_owned_operation(self):
         calls = self.capture()
         for depth in (8, 16):

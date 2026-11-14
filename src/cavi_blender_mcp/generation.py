@@ -29,6 +29,19 @@ PROVIDERS = {
         "prefix": "CAVI_TRIPOSG_MLX",
         "suffixes": ("PYTHON", "AGENT", "MODEL"),
         "timeout": 600,
+        "model": "TripoSG",
+        "frame": "triposg_frame.py",
+        "options": ("--steps", "50"),
+    },
+    "trellis2-mlx": {
+        "prefix": "CAVI_TRELLIS2_MLX",
+        "suffixes": ("PYTHON", "AGENT", "MODEL"),
+        "timeout": 600,
+        "model": "TRELLIS.2",
+        "frame": "trellis2_frame.py",
+        # Steps and guidance stay at the converted checkpoint's sampler settings.
+        "options": (),
+        "vertex_colors": True,
     },
 }
 
@@ -71,10 +84,10 @@ def run(command, env, timeout, deadline, describe=None):
     return result
 
 
-def triposg_mlx(configured, source, generated, env, timeout, deadline):
-    """Frame the image like the PyTorch provider, then run the mlx-agent mesh command."""
+def mlx_mesh(settings, configured, source, generated, env, timeout, deadline):
+    """Frame the image for the model, then run the mlx-agent mesh command."""
     framed = generated.with_name("framed.png")
-    frame = Path(__file__).with_name("triposg_frame.py")
+    frame = Path(__file__).with_name(settings["frame"])
     run([configured["PYTHON"], str(frame), str(source), str(framed)], env, timeout, deadline)
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
@@ -89,8 +102,7 @@ def triposg_mlx(configured, source, generated, env, timeout, deadline):
         str(framed),
         "--out",
         str(generated),
-        "--steps",
-        "50",
+        *settings["options"],
         "--seed",
         "42",
         "--resolution",
@@ -108,7 +120,7 @@ def triposg_mlx(configured, source, generated, env, timeout, deadline):
             raise ValueError(envelope["status"])
         data = envelope["data"]
         report = {
-            "provider": "TripoSG",
+            "provider": settings["model"],
             "backend": data["backend"],
             "vertices": data["vertices"],
             "faces": data["faces"],
@@ -117,6 +129,11 @@ def triposg_mlx(configured, source, generated, env, timeout, deadline):
             "peak_memory_gb": data["peak_memory_gb"],
             "input_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         }
+        if settings.get("vertex_colors"):
+            # A checkpoint converted without the texture stage writes the mesh uncolored.
+            report["vertex_colors"] = data["vertex_colors"]
+            if type(report["vertex_colors"]) is not bool:
+                raise TypeError("vertex_colors")
     except (ValueError, KeyError, TypeError) as exc:
         raise RuntimeError("mlx-agent returned no usable mesh result") from exc
     if type(report["faces"]) is not int or not 0 < report["faces"] <= MLX_MAX_FACES:
@@ -127,7 +144,9 @@ def triposg_mlx(configured, source, generated, env, timeout, deadline):
 def generate(workspace, image, path, resolution=None):
     provider = os.environ.get("CAVI_GENERATION_PROVIDER", "triposr")
     if provider not in PROVIDERS:
-        raise ValueError("CAVI_GENERATION_PROVIDER must be triposr, triposg or triposg-mlx")
+        raise ValueError(
+            "CAVI_GENERATION_PROVIDER must be triposr, triposg, triposg-mlx or trellis2-mlx"
+        )
     settings = PROVIDERS[provider]
     workspace = Path(workspace).resolve()
     source = (workspace / image).resolve()
@@ -165,8 +184,8 @@ def generate(workspace, image, path, resolution=None):
     deadline = time.monotonic() + timeout
     with tempfile.TemporaryDirectory(prefix=".cavi-generation-", dir=workspace) as temporary:
         generated = Path(temporary) / "mesh.glb"
-        if provider == "triposg-mlx":
-            report = triposg_mlx(configured, source, generated, env, timeout, deadline)
+        if "frame" in settings:
+            report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline)
         else:
             command = [
                 configured["PYTHON"],

@@ -87,8 +87,9 @@ Imports are bounded and preflighted:
 
 ## Image-to-3D is unavailable
 
-`Configure CAVI_TRIPOSR_*`, `Configure CAVI_TRIPOSG_*` or
-`Configure CAVI_TRIPOSG_MLX_*` means the selected provider's environment,
+`Configure CAVI_TRIPOSR_*`, `Configure CAVI_TRIPOSG_*`,
+`Configure CAVI_TRIPOSG_MLX_*` or `Configure CAVI_TRELLIS2_MLX_*` means the
+selected provider's environment,
 source, weights, launcher or model path is missing or not absolute. See
 [Generate a mesh locally](local-generation.md).
 

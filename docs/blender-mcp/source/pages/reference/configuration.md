@@ -24,7 +24,7 @@ These are read by the MCP server. All must be absolute local paths.
 
 | Variable | Purpose |
 | --- | --- |
-| `CAVI_GENERATION_PROVIDER` | `triposr` (default), `triposg` or `triposg-mlx` |
+| `CAVI_GENERATION_PROVIDER` | `triposr` (default), `triposg`, `triposg-mlx` or `trellis2-mlx` |
 | `CAVI_TRIPOSR_PYTHON` | Python 3.12 worker environment |
 | `CAVI_TRIPOSR_SOURCE` | TripoSR checkout |
 | `CAVI_TRIPOSR_WEIGHTS` | Directory with `config.yaml`, `model.ckpt` and `dino-config.json` |
@@ -34,9 +34,12 @@ These are read by the MCP server. All must be absolute local paths.
 | `CAVI_TRIPOSG_MLX_PYTHON` | Python 3.11 or newer with Pillow; frames the image and runs the launcher |
 | `CAVI_TRIPOSG_MLX_AGENT` | `mlx-agent` launcher script |
 | `CAVI_TRIPOSG_MLX_MODEL` | Converted TripoSG model directory |
+| `CAVI_TRELLIS2_MLX_PYTHON` | Python 3.11 or newer with Pillow; frames the image and runs the launcher |
+| `CAVI_TRELLIS2_MLX_AGENT` | `mlx-agent` launcher script |
+| `CAVI_TRELLIS2_MLX_MODEL` | Converted TRELLIS.2 model directory |
 
 Only the selected provider's paths are required. The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
-`HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS=4`. `triposg-mlx` finds
+`HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS=4`. `triposg-mlx` and `trellis2-mlx` find
 the mlx-agent backend under `$XDG_DATA_HOME/mlx-workbench/backends`. See
 [Generate a mesh locally](../guides/local-generation.md).
 

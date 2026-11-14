@@ -1,4 +1,4 @@
-"""Native normal/AO baking, output and scene-restoration checks."""
+"""Native normal/AO/vertex-color baking, output and scene-restoration checks."""
 
 import json
 import sys
@@ -76,6 +76,34 @@ try:
     assert {value.name: value.hide_render for value in scene.objects} == visibility
     assert not [value for value in bpy.data.objects if value.name.startswith("CAVI Bake")]
     assert not [value for value in bpy.data.materials if value.name.startswith("CAVI Bake")]
+
+    refused("bake_map", "no color attribute", map="vertex_color", name="BakeLow",
+            path="bad-color.png", high=["BakeHigh"])
+    paint = (0.2, 0.5, 0.05)
+    attribute = high.data.color_attributes.new("Paint", "FLOAT_COLOR", "POINT")
+    attribute.data.foreach_set("color", [*paint, 1.0] * len(high.data.vertices))
+    meshes = set(bpy.data.meshes)
+    colored = edit("bake_map", map="vertex_color", name="BakeLow", path="vertex_color.png",
+                   high=["BakeHigh"], resolution=64, samples=1, margin=2,
+                   cage_extrusion=.1, max_ray_distance=.5)
+    assert colored["map"] == "vertex_color" and colored["color_space"] == "sRGB", colored
+    assert colored["selected_to_active"] and colored["high"] == ["BakeHigh"], colored
+    stored = bpy.data.images.load(str(root / "vertex_color.png"))
+    try:
+        stored.colorspace_settings.name = "Non-Color"
+        pixels = np.empty(len(stored.pixels), np.float32)
+        stored.pixels.foreach_get(pixels)
+    finally:
+        bpy.data.images.remove(stored)
+    covered = pixels.reshape(-1, 4)[:, :3]
+    covered = covered[covered.max(axis=1) > 0.05]
+    encoded = [1.055 * value ** (1 / 2.4) - 0.055 for value in paint]
+    assert len(covered) > 100, len(covered)
+    assert np.allclose(np.median(covered, axis=0), encoded, atol=0.01), np.median(covered, axis=0)
+    assert set(bpy.data.objects) == objects and set(bpy.data.meshes) == meshes
+    assert set(bpy.data.materials) == materials and set(bpy.data.images) == images
+    assert {value.name: value.hide_render for value in scene.objects} == visibility
+    assert not high.data.materials and high.data.color_attributes.get("Paint") is not None
 
     bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=.35,
                                       major_segments=32, minor_segments=12)
