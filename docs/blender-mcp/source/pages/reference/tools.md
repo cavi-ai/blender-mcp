@@ -561,7 +561,8 @@ evaluated assemblies. `uv_maps` records the mapping; source data is restored.
 `generate` takes `quality` `fast` or `default` (the default) with the
 `triposg-mlx` and `trellis2-mlx` providers. With `trellis2-mlx` it also takes
 `views` (up to five more workspace images) and `guide` (a workspace GLB that
-sets the shape and frame).
+sets the shape and frame). With `prompt` in place of `image` it writes a
+wrapping 2048×1024 panorama PNG for `scene_edit` `world.hdri`.
 
 [Guide](../guides/asset-import-export.md) and
 [local generation](../guides/local-generation.md).
