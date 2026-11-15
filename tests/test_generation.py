@@ -30,7 +30,7 @@ class GenerationTests(unittest.TestCase):
             ):
                 result = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png"))
             self.assertEqual(result, report)
-            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None)
+            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None, None)
 
     def test_server_generation_defaults_to_runtime_workspace_without_a_bridge(self):
         with (
@@ -40,7 +40,7 @@ class GenerationTests(unittest.TestCase):
         ):
             asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", resolution=96))
         native.assert_called_once_with((Path.home() / "Documents/CaviBlender").resolve(),
-                                       "input.png", "mesh.glb", 96)
+                                       "input.png", "mesh.glb", 96, None)
 
     def configured(self, work):
         return patch.dict(
@@ -143,6 +143,20 @@ class GenerationTests(unittest.TestCase):
                 generate(work, "input.png", "mesh.glb")
             self.assertFalse((work / "mesh.glb").exists())
 
+    def test_quality_tiers_apply_only_to_mlx_providers(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            for provider in ("triposr", "triposg"):
+                with (
+                    self.subTest(provider=provider),
+                    self.configured(work),
+                    patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": provider}),
+                    self.assertRaisesRegex(ValueError, "triposg-mlx and trellis2-mlx"),
+                ):
+                    generate(work, "input.png", "mesh.glb", quality="fast")
+            self.assertFalse((work / "mesh.glb").exists())
+
     def test_triposg_requires_its_own_runtime(self):
         with tempfile.TemporaryDirectory() as root:
             work = Path(root)
@@ -231,9 +245,10 @@ class TripoSGMlxTests(unittest.TestCase):
             **extra,
         }
 
-    def generate(self, mode="ok", image="input.png", **extra):
+    def generate(self, mode="ok", image="input.png", quality=None, **extra):
+        options = {} if quality is None else {"quality": quality}
         with patch.dict(os.environ, self.settings(mode, **extra)):
-            return generate(self.work, image, "mesh.glb")
+            return generate(self.work, image, "mesh.glb", **options)
 
     def assert_nothing_published(self):
         self.assertFalse((self.work / "mesh.glb").exists())
@@ -254,12 +269,34 @@ class TripoSGMlxTests(unittest.TestCase):
                 "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
                 "peak_memory_gb": 10.301,
                 "input_sha256": hashlib.sha256((self.work / "input.png").read_bytes()).hexdigest(),
+                "quality": "default",
                 **self.extra,
                 "path": str(published.resolve()),
                 "bytes": 28,
             },
         )
         self.assertFalse(list(self.work.glob(".cavi-generation-*")))
+
+    def test_fast_quality_reaches_the_agent_and_is_reported(self):
+        report = self.generate(quality="fast", FAKE_AGENT_QUALITY="fast")
+        self.assertEqual(report["quality"], "fast")
+        self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def test_the_server_forwards_the_quality_tier(self):
+        settings = {**self.settings("ok", FAKE_AGENT_QUALITY="fast"), "CAVI_BLENDER_WORKSPACE": str(self.work)}
+        with (
+            patch.dict(os.environ, settings),
+            patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
+        ):
+            report = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", quality="fast"))
+        self.assertEqual(report["quality"], "fast")
+        self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def test_unknown_quality_is_refused_before_any_asset(self):
+        with self.assertRaisesRegex(ValueError, "fast or default"):
+            self.generate(quality="high")
+        self.assert_nothing_published()
+        self.assertFalse((self.record / "image.png").exists())
 
     def test_the_agent_receives_the_framed_image(self):
         self.generate()

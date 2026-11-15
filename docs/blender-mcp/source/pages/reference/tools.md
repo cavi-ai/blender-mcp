@@ -558,6 +558,8 @@ texture sidecars with `textures=true`.
 false and is unavailable for other formats or bake pairs.
 `uv_layer` exports a named map as UV0 for FBX/GLB or `st` for USD, including
 evaluated assemblies. `uv_maps` records the mapping; source data is restored.
+`generate` takes `quality` `fast` or `default` (the default) with the
+`triposg-mlx` and `trellis2-mlx` providers.
 
 [Guide](../guides/asset-import-export.md) and
 [local generation](../guides/local-generation.md).

@@ -142,10 +142,22 @@ sampler steps and guidance with seed 42 at resolution 512 and reduces the
 surface to at most 500,000 faces. With the 8-bit model one run takes about two
 minutes and peaks near 18 GB of memory.
 
+`quality="fast"` trades detail for time on the two MLX providers.
+`triposg-mlx` then runs 25 steps on a 256³ grid with the adaptive denoiser
+cache, and `trellis2-mlx` runs 6 steps at resolution 512. `quality="default"`
+is the setting described above. The other providers refuse `fast`.
+
+| Provider | `default` | `fast` |
+| --- | --- | --- |
+| `triposg-mlx` (32-bit) | 150 s | 41 s |
+| `trellis2-mlx` (8-bit) | 113 s | 68 s |
+
+Times are for one furniture reference on an Apple M5 Max.
+
 The result includes the provider, device, object counts, the input SHA-256 and
 the output path. `triposg-mlx` and `trellis2-mlx` return `backend`, `vertices`,
-`faces`, `seconds`, `stage_seconds` and `peak_memory_gb` instead of the device
-and triangle count. `trellis2-mlx` also returns `vertex_colors`, false when the
+`faces`, `seconds`, `stage_seconds`, `peak_memory_gb` and `quality` instead of
+the device and triangle count. `trellis2-mlx` also returns `vertex_colors`, false when the
 converted model has no texture stage.
 
 ## Continue

@@ -31,7 +31,10 @@ PROVIDERS = {
         "timeout": 600,
         "model": "TripoSG",
         "frame": "triposg_frame.py",
-        "options": ("--steps", "50"),
+        "quality": {
+            "default": ("--steps", "50", "--resolution", "512"),
+            "fast": ("--steps", "25", "--resolution", "256", "--denoiser-cache", "adaptive"),
+        },
     },
     "trellis2-mlx": {
         "prefix": "CAVI_TRELLIS2_MLX",
@@ -39,11 +42,15 @@ PROVIDERS = {
         "timeout": 600,
         "model": "TRELLIS.2",
         "frame": "trellis2_frame.py",
-        # Steps and guidance stay at the converted checkpoint's sampler settings.
-        "options": (),
+        # Default keeps the converted checkpoint's sampler steps and guidance.
+        "quality": {
+            "default": ("--resolution", "512"),
+            "fast": ("--steps", "6", "--resolution", "512"),
+        },
         "vertex_colors": True,
     },
 }
+QUALITIES = ("fast", "default")
 
 
 def envelope_error(result):
@@ -84,7 +91,7 @@ def run(command, env, timeout, deadline, describe=None):
     return result
 
 
-def mlx_mesh(settings, configured, source, generated, env, timeout, deadline):
+def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality):
     """Frame the image for the model, then run the mlx-agent mesh command."""
     framed = generated.with_name("framed.png")
     frame = Path(__file__).with_name(settings["frame"])
@@ -102,11 +109,9 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline):
         str(framed),
         "--out",
         str(generated),
-        *settings["options"],
+        *settings["quality"][quality],
         "--seed",
         "42",
-        "--resolution",
-        "512",
         "--max-faces",
         str(MLX_MAX_FACES),
         "--timeout",
@@ -128,6 +133,7 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline):
             "stage_seconds": data["stage_seconds"],
             "peak_memory_gb": data["peak_memory_gb"],
             "input_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            "quality": quality,
         }
         if settings.get("vertex_colors"):
             # A checkpoint converted without the texture stage writes the mesh uncolored.
@@ -141,13 +147,18 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline):
     return report
 
 
-def generate(workspace, image, path, resolution=None):
+def generate(workspace, image, path, resolution=None, quality=None):
     provider = os.environ.get("CAVI_GENERATION_PROVIDER", "triposr")
     if provider not in PROVIDERS:
         raise ValueError(
             "CAVI_GENERATION_PROVIDER must be triposr, triposg, triposg-mlx or trellis2-mlx"
         )
     settings = PROVIDERS[provider]
+    quality = "default" if quality is None else quality
+    if quality not in QUALITIES:
+        raise ValueError("Quality must be fast or default")
+    if quality != "default" and "quality" not in settings:
+        raise ValueError("Quality tiers apply only to the triposg-mlx and trellis2-mlx providers")
     workspace = Path(workspace).resolve()
     source = (workspace / image).resolve()
     if Path(image).is_absolute() or not source.is_relative_to(workspace):
@@ -185,7 +196,7 @@ def generate(workspace, image, path, resolution=None):
     with tempfile.TemporaryDirectory(prefix=".cavi-generation-", dir=workspace) as temporary:
         generated = Path(temporary) / "mesh.glb"
         if "frame" in settings:
-            report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline)
+            report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality)
         else:
             command = [
                 configured["PYTHON"],
