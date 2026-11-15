@@ -30,7 +30,7 @@ class GenerationTests(unittest.TestCase):
             ):
                 result = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png"))
             self.assertEqual(result, report)
-            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None, None)
+            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None, None, None, None)
 
     def test_server_generation_defaults_to_runtime_workspace_without_a_bridge(self):
         with (
@@ -40,7 +40,7 @@ class GenerationTests(unittest.TestCase):
         ):
             asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", resolution=96))
         native.assert_called_once_with((Path.home() / "Documents/CaviBlender").resolve(),
-                                       "input.png", "mesh.glb", 96, None)
+                                       "input.png", "mesh.glb", 96, None, None, None)
 
     def configured(self, work):
         return patch.dict(
@@ -362,6 +362,20 @@ class TripoSGMlxTests(unittest.TestCase):
                 self.generate(mode)
             self.assert_nothing_published()
 
+    def test_views_and_guides_need_trellis2(self):
+        if generation.PROVIDERS[self.provider].get("guides"):
+            self.skipTest("this provider accepts views and guides")
+        (self.work / "guide.glb").write_bytes(b"glTF")
+        for options in ({"views": ["input.png"]}, {"guide": "guide.glb"}):
+            with (
+                self.subTest(options=options),
+                patch.dict(os.environ, self.settings("ok")),
+                self.assertRaisesRegex(ValueError, "only to the trellis2-mlx"),
+            ):
+                generate(self.work, "input.png", "mesh.glb", **options)
+            self.assert_nothing_published()
+        self.assertFalse((self.record / "image.png").exists())
+
     def test_a_competing_output_is_never_replaced(self):
         with self.assertRaises(FileExistsError):
             self.generate("race")
@@ -393,3 +407,48 @@ class Trellis2MlxTests(TripoSGMlxTests):
         with self.assertRaisesRegex(RuntimeError, "no usable mesh result"):
             self.generate("unflagged")
         self.assert_nothing_published()
+
+    def guided(self, **options):
+        side = Image.new("RGBA", (300, 600), (0, 0, 0, 0))
+        side.paste((20, 120, 60, 255), (50, 0, 250, 600))
+        side.save(self.work / "side.png")
+        (self.work / "guide.glb").write_bytes(b"glTF guide")
+        with patch.dict(os.environ, self.settings("ok")):
+            return generate(self.work, "input.png", "mesh.glb", **options)
+
+    def test_views_and_a_guide_reach_the_agent_and_are_reported(self):
+        report = self.guided(views=["side.png"], guide="guide.glb")
+        expected = self.expected_frame(self.work / "side.png")
+        with Image.open(self.record / "view-0.png") as received:
+            self.assertEqual((received.size, received.tobytes()), ((512, 512), expected.tobytes()))
+        self.assertEqual((self.record / "guide.glb").read_bytes(), b"glTF guide")
+        self.assertEqual((report["views"], report["guided"]), (2, True))
+        self.assertEqual(report["view_sha256"], [hashlib.sha256((self.work / "side.png").read_bytes()).hexdigest()])
+        self.assertEqual(report["guide_sha256"], hashlib.sha256(b"glTF guide").hexdigest())
+        self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def test_views_and_guides_outside_the_contract_are_refused_before_the_agent(self):
+        for options, message in (
+            ({"views": ["../side.png"]}, "Each view"),
+            ({"views": ["guide.glb"]}, "Each view"),
+            ({"views": ["side.png"] * 6}, "at most 5"),
+            ({"guide": "side.png"}, "workspace GLB"),
+            ({"guide": "missing.glb"}, "workspace GLB"),
+        ):
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, message):
+                self.guided(**options)
+            self.assert_nothing_published()
+        self.assertFalse((self.record / "image.png").exists())
+
+    def test_the_server_forwards_views_and_the_guide(self):
+        settings = {**self.settings("ok"), "CAVI_BLENDER_WORKSPACE": str(self.work)}
+        self.guided(views=["side.png"])
+        (self.work / "mesh.glb").unlink()
+        with (
+            patch.dict(os.environ, settings),
+            patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
+        ):
+            report = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", views=["side.png"],
+                                                 guide="guide.glb"))
+        self.assertEqual((report["views"], report["guided"]), (2, True))
+        self.assertEqual((self.record / "guide.glb").read_bytes(), b"glTF guide")

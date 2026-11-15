@@ -154,6 +154,19 @@ is the setting described above. The other providers refuse `fast`.
 
 Times are for one furniture reference on an Apple M5 Max.
 
+`trellis2-mlx` also takes `views`, up to five more workspace images of the same
+object, framed like `image`; each sampler step is conditioned on the next image
+in turn, so `quality="fast"` (6 steps) uses at most five. `guide` names a
+workspace GLB whose surface sets the coarse shape in place of the sampled one;
+the generated mesh is written in the guide's own position and size. Other
+providers refuse both. The result adds `views`, `guided`, `view_sha256` and,
+with a guide, `guide_sha256`.
+
+To texture an existing mesh, export it with `asset_io` `action="export"` as a
+GLB, generate with that file as `guide`, import the result and run `bake` with
+`map="vertex_color"` (and `map="vertex_orm"` when the model writes `COLOR_1`)
+from the generated mesh as `high` onto the existing one.
+
 The result includes the provider, device, object counts, the input SHA-256 and
 the output path. `triposg-mlx` and `trellis2-mlx` return `backend`, `vertices`,
 `faces`, `seconds`, `stage_seconds`, `peak_memory_gb` and `quality` instead of

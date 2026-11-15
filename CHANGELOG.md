@@ -14,6 +14,7 @@ adds its lines under Unreleased and never edits a version.
 - TRELLIS.2 image-to-3D through mlx-agent as `trellis2-mlx`, reporting whether the mesh has vertex colors.
 - `bake` map `vertex_color` projects high-poly color attributes into an sRGB base color PNG.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
+- `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
 
 ### Fixed
 
