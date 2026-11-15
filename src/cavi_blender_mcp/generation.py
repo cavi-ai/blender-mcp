@@ -48,9 +48,12 @@ PROVIDERS = {
             "fast": ("--steps", "6", "--resolution", "512"),
         },
         "vertex_colors": True,
+        "guides": True,
     },
 }
 QUALITIES = ("fast", "default")
+IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
+MAX_VIEWS = 5
 
 
 def envelope_error(result):
@@ -91,11 +94,18 @@ def run(command, env, timeout, deadline, describe=None):
     return result
 
 
-def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality):
-    """Frame the image for the model, then run the mlx-agent mesh command."""
+def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality, views=(), guide=None):
+    """Frame the images for the model, then run the mlx-agent mesh command."""
     framed = generated.with_name("framed.png")
     frame = Path(__file__).with_name(settings["frame"])
     run([configured["PYTHON"], str(frame), str(source), str(framed)], env, timeout, deadline)
+    extra = []
+    for index, view in enumerate(views):
+        framed_view = generated.with_name(f"view-{index}.png")
+        run([configured["PYTHON"], str(frame), str(view), str(framed_view)], env, timeout, deadline)
+        extra += ["--view", str(framed_view)]
+    if guide is not None:
+        extra += ["--guide", str(guide)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
     command = [
@@ -110,6 +120,7 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         "--out",
         str(generated),
         *settings["quality"][quality],
+        *extra,
         "--seed",
         "42",
         "--max-faces",
@@ -140,6 +151,13 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
             report["vertex_colors"] = data["vertex_colors"]
             if type(report["vertex_colors"]) is not bool:
                 raise TypeError("vertex_colors")
+        if views or guide is not None:
+            report.update(views=data["views"], guided=data["guided"],
+                          view_sha256=[hashlib.sha256(view.read_bytes()).hexdigest() for view in views])
+            if report["views"] != 1 + len(views) or report["guided"] is not (guide is not None):
+                raise ValueError("views")
+            if guide is not None:
+                report["guide_sha256"] = hashlib.sha256(guide.read_bytes()).hexdigest()
     except (ValueError, KeyError, TypeError) as exc:
         raise RuntimeError("mlx-agent returned no usable mesh result") from exc
     if type(report["faces"]) is not int or not 0 < report["faces"] <= MLX_MAX_FACES:
@@ -147,7 +165,17 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
     return report
 
 
-def generate(workspace, image, path, resolution=None, quality=None):
+def inside(workspace, relative, suffixes, limit, message):
+    """An existing workspace file with an accepted suffix and size, else ``ValueError(message)``."""
+    resolved = (workspace / relative).resolve()
+    if (Path(relative).is_absolute() or not resolved.is_relative_to(workspace)
+            or resolved.suffix.lower() not in suffixes or not resolved.is_file()
+            or not 0 < resolved.stat().st_size <= limit):
+        raise ValueError(message)
+    return resolved
+
+
+def generate(workspace, image, path, resolution=None, quality=None, views=None, guide=None):
     provider = os.environ.get("CAVI_GENERATION_PROVIDER", "triposr")
     if provider not in PROVIDERS:
         raise ValueError(
@@ -167,6 +195,16 @@ def generate(workspace, image, path, resolution=None, quality=None):
         raise ValueError("Provide an existing PNG, JPEG or WebP image")
     if not 0 < source.stat().st_size <= 16 * 1024 * 1024:
         raise ValueError("Input image must be at most 16 MiB")
+    views = list(views or ())
+    if (views or guide is not None) and not settings.get("guides"):
+        raise ValueError("Views and guides apply only to the trellis2-mlx provider")
+    if len(views) > MAX_VIEWS:
+        raise ValueError(f"Provide at most {MAX_VIEWS} views")
+    views = [inside(workspace, view, IMAGES, 16 * 1024 * 1024,
+                    "Each view must be a workspace PNG, JPEG or WebP image of at most 16 MiB") for view in views]
+    if guide is not None:
+        guide = inside(workspace, guide, {".glb"}, 64 * 1024 * 1024,
+                       "The guide must be a workspace GLB of at most 64 MiB")
     target = destination(workspace, path, {".glb"})
     if provider == "triposr":
         resolution = 128 if resolution is None else resolution
@@ -196,7 +234,8 @@ def generate(workspace, image, path, resolution=None, quality=None):
     with tempfile.TemporaryDirectory(prefix=".cavi-generation-", dir=workspace) as temporary:
         generated = Path(temporary) / "mesh.glb"
         if "frame" in settings:
-            report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality)
+            report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality,
+                              views, guide)
         else:
             command = [
                 configured["PYTHON"],
