@@ -77,6 +77,18 @@ class BakeSurfaceTests(unittest.TestCase):
                 asyncio.run(server.mcp.call_tool("bake", arguments))
         self.assertEqual(len(calls), 1)
 
+    def test_vertex_orm_projects_from_required_high_sources(self):
+        calls = self.capture()
+        with self.assertRaisesRegex(Exception, "requires: high"):
+            asyncio.run(server.mcp.call_tool("bake", {"map": "vertex_orm", "name": "Low",
+                                                      "path": "orm.png"}))
+        asyncio.run(server.bake("vertex_orm", "Low", "orm.png", high=["High"], lease_id="L"))
+        self.assertEqual(self.inner(calls), [("bake_png", {
+            "lease_id": "L", "map": "vertex_orm", "name": "Low", "path": "orm.png",
+            "high": ["High"], "resolution": 1024, "samples": 16, "margin": 4,
+            "cage_extrusion": .01, "max_ray_distance": .1, "uv_layer": None,
+            "isolate": True, "bit_depth": 16})])
+
     def test_explicit_output_precision_reaches_the_owned_operation(self):
         calls = self.capture()
         for depth in (8, 16):

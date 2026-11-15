@@ -540,8 +540,8 @@ Mutating. Binds a PBR material to exact mesh slots.
 ## bake
 
 Mutating. Bakes geometry maps or high-poly vertex colors into a new PNG or an
-explicit numeric/color/vector shader socket into PNG/EXR. `vertex_color` needs
-`high`. `source` selects the material, nested group path,
+explicit numeric/color/vector shader socket into PNG/EXR. `vertex_color` and
+`vertex_orm` (glTF `COLOR_1` occlusion, roughness, metallic) need `high`. `source` selects the material, nested group path,
 node, socket identifier, INPUT/OUTPUT direction and data/color role. PNG defaults
 to 16-bit; shader EXR to 32-bit. Shader bakes preserve the actor and shader UVs
 while rasterizing the chosen 0..1 atlas. Signed/HDR channels require EXR.

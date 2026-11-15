@@ -7,17 +7,17 @@ workspace image. It requires a `lease_id`.
 
 | Parameter | Meaning |
 | --- | --- |
-| `map` | `normal`, `ao`, `curvature`, `lightmap`, `vertex_color` or `shader` |
+| `map` | `normal`, `ao`, `curvature`, `lightmap`, `vertex_color`, `vertex_orm` or `shader` |
 | `name` | Low-poly target mesh |
 | `path` | New workspace `.png`; `shader` also accepts `.exr` |
-| `high` | 1–64 high-poly meshes for selected-to-active baking; optional for normal/AO, required for `vertex_color` |
+| `high` | 1–64 high-poly meshes for selected-to-active baking; optional for normal/AO, required for `vertex_color` and `vertex_orm` |
 | `resolution` | 64–4096, default 1024 |
 | `bit_depth` | PNG: 8/16, default 16. Shader EXR: 16/32, default 32 |
 | `source` | Shader only: material, group path, node, socket identifier, INPUT/OUTPUT direction and data/color role |
 | `samples` | 1–256, default 16; used by AO, curvature and lightmap |
 | `margin` | 0–64 pixels, default 4 |
-| `cage_extrusion` | 0–1, default 0.01; normal/AO/vertex_color only |
-| `max_ray_distance` | 0–10, default 0.1; normal/AO/vertex_color only |
+| `cage_extrusion` | 0–1, default 0.01; normal/AO/vertex_color/vertex_orm only |
+| `max_ray_distance` | 0–10, default 0.1; normal/AO/vertex_color/vertex_orm only |
 | `normal_space` | `tangent` or `object`; normal bakes only |
 | `uv_layer` | Bake target UV layer; defaults to the render-active layer |
 | `isolate` | Hide unrelated renderable objects, default true |
@@ -45,6 +45,9 @@ workspace image. It requires a `lease_id`.
   mesh's UV layer as an sRGB base color map. Every high mesh needs a color
   attribute. It emits the colors from private copies of the high meshes, so their
   materials are not used or changed.
+- `vertex_orm` projects each high mesh's second color attribute, where glTF
+  `COLOR_1` imports, as a Non-Color RGB map: occlusion, roughness and metallic
+  in glTF channel order. Every high mesh needs two color attributes.
 - Scene state, selection, materials and visibility are restored afterward.
 
 The result reports the file path, byte count, SHA-256, map, resolution, samples,
