@@ -154,13 +154,67 @@ jobs:
           if-no-files-found: error
 
   pin-consumers:
-    # A green main moves the blender-mcp pin in game-art-pipeline through its pin-servers workflow.
+    # A green main opens the server pin pull request in game-art-pipeline, checks it here and merges it.
     needs: [python]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    concurrency:
+      group: pin-consumers
+      cancel-in-progress: false
+    env:
+      # Fine-grained token: contents read on the server repos; contents and pull requests write on the consumer.
+      GH_TOKEN: ${{ secrets.CONSUMER_DISPATCH_TOKEN }}
     steps:
-      - name: Dispatch server-merged to game-art-pipeline
+      - name: Require CONSUMER_DISPATCH_TOKEN
+        run: test -n "$GH_TOKEN" || { echo "::error::Add the CONSUMER_DISPATCH_TOKEN repository secret"; exit 1; }
+      - uses: actions/checkout@v7
+        with:
+          repository: cavi-ai/game-art-pipeline
+          token: ${{ secrets.CONSUMER_DISPATCH_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.15'
+      - name: Server access for uv
+        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/cavi-ai/".insteadOf "https://github.com/cavi-ai/"
+      - id: sync
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 scripts/servers.py sync > "$RUNNER_TEMP/sync.json"
+          cat "$RUNNER_TEMP/sync.json"
+          if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["changed"] else 1)' "$RUNNER_TEMP/sync.json"; then
+            key=$(git submodule status | awk '{gsub(/^[-+U]/, "", $1); print substr($1, 1, 7)}' | paste -sd- -)
+            echo "branch=bot/pin-servers-$key" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check the pinned consumer
+        if: steps.sync.outputs.branch
+        run: |
+          uv sync --locked --dev
+          uv run --locked ruff check scripts tests skills
+          for suite in tests skills/blender-unity-assets/scripts skills/unity-hdrp/scripts; do
+            uv run --locked python -m unittest discover -s "$suite" || exit 1
+          done
+      - name: Propose and merge the pin
+        if: steps.sync.outputs.branch
         env:
-          GH_TOKEN: ${{ secrets.CONSUMER_DISPATCH_TOKEN }}
-        run: gh api repos/cavi-ai/game-art-pipeline/dispatches --method POST -f event_type=server-merged
+          BRANCH: ${{ steps.sync.outputs.branch }}
+        run: |
+          body=$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1]))["moved"]; print("\n".join("- %s %s -> %s" % (r, (v["from"] or "new")[:7], v["to"][:7]) for r, v in m.items()))' "$RUNNER_TEMP/sync.json")
+          if ! git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null; then
+            git switch -c "$BRANCH"
+            git add -A -- .gitmodules pyproject.toml uv.lock servers plugin.json .claude-plugin .codex-plugin
+            git commit -q -m "chore: pin servers to main"
+            git push -q origin "$BRANCH"
+          fi
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')" ]; then
+            gh pr list --state open --json number,headRefName -q '.[] | select(.headRefName | startswith("bot/pin-servers-")) | "\(.number) \(.headRefName)"' | while read -r old head; do
+              if [ "$head" != "$BRANCH" ]; then
+                gh pr close "$old" --delete-branch --comment "Superseded by a newer server pin."
+              fi
+            done
+            gh pr create --head "$BRANCH" --title "chore: pin servers to main" --body "$body"
+          fi
+          gh pr merge "$BRANCH" --squash
