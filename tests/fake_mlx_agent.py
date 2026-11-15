@@ -22,6 +22,8 @@ parser.add_argument("--seed", type=int, required=True)
 parser.add_argument("--resolution", type=int, required=True)
 parser.add_argument("--max-faces", type=int, required=True)
 parser.add_argument("--denoiser-cache", choices=("off", "adaptive"), default="off")
+parser.add_argument("--view", action="append", default=[])
+parser.add_argument("--guide")
 parser.add_argument("--timeout", type=int, required=True)
 parser.add_argument("--json", action="store_true", required=True)
 arguments = parser.parse_args()
@@ -49,13 +51,19 @@ def reply(status, data=None, code="", exit_code=0):
     sys.exit(exit_code)
 
 
-image = Path(arguments.image).read_bytes()
+def framed(path):
+    data = Path(path).read_bytes()
+    return (data[:8] == PNG_SIGNATURE and struct.unpack(">II", data[16:24]) == (512, 512)
+            and data[25] == (6 if trellis else 2))
+
+
 valid = (
     (arguments.command, arguments.kind) == ("convert", "mesh")
     and Path(arguments.path).is_dir()
-    and image[:8] == PNG_SIGNATURE
-    and struct.unpack(">II", image[16:24]) == (512, 512)
-    and image[25] == (6 if trellis else 2)
+    and framed(arguments.image)
+    and all(trellis and framed(view) for view in arguments.view)
+    and (arguments.guide is None or (trellis and Path(arguments.guide).suffix == ".glb"
+                                     and Path(arguments.guide).is_file()))
     and out.suffix == ".glb"
     and not out.exists()
     and out.parent.is_dir()
@@ -67,6 +75,10 @@ valid = (
 if not valid:
     reply("error", code="invalid_arguments", exit_code=2)
 shutil.copy(arguments.image, record / "image.png")
+for index, view in enumerate(arguments.view):
+    shutil.copy(view, record / f"view-{index}.png")
+if arguments.guide:
+    shutil.copy(arguments.guide, record / "guide.glb")
 if mode == "hang":
     time.sleep(60)
 if mode == "crash":
@@ -102,4 +114,6 @@ data = {
 }
 if trellis and mode != "unflagged":
     data["vertex_colors"] = mode != "uncolored"
+if trellis:
+    data.update(views=1 + len(arguments.view), guided=arguments.guide is not None)
 reply("ok", data)

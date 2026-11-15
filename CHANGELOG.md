@@ -15,10 +15,12 @@ adds its lines under Unreleased and never edits a version.
 - `bake` map `vertex_color` projects high-poly color attributes into an sRGB base color PNG.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
 - `asset_io` generate with `prompt` writes a horizontally wrapping 2048×1024 panorama PNG from the local image model for `world.hdri`.
+- `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
 
 ### Fixed
 
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
+- Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.
 
 ## 0.57.0 - 2026-11-09
 

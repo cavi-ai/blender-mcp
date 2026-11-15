@@ -875,6 +875,9 @@ def unwrap(p):
         def pack():
             bpy.ops.mesh.select_all(action="SELECT")
             bpy.ops.uv.select_all(action="SELECT")
+            # Faces projected again fill the tile on their own scale; packing keeps relative sizes.
+            if "FINISHED" not in bpy.ops.uv.average_islands_scale():
+                raise RuntimeError("UV island scaling did not finish")
             if "FINISHED" not in bpy.ops.uv.pack_islands(
                 margin=margin * PACK_HEADROOM, scale=True, **PACK
             ):

@@ -1146,6 +1146,8 @@ async def asset_io(
     prompt: Annotated[str | None, Field(max_length=1000, description="generate: 2:1 panorama PNG, not image")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
     quality: Annotated[Literal["fast", "default"] | None, Field(description='generate: MLX tier; fast is 2-4x quicker')] = None,
+    views: Annotated[list[str] | None, Field(max_length=5, description="generate: more images (TRELLIS.2)")] = None,
+    guide: Annotated[str | None, Field(description="generate: shape-guide GLB (TRELLIS.2)")] = None,
     lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
     collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
     animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
@@ -1163,7 +1165,7 @@ async def asset_io(
     """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "prompt": prompt, "resolution": resolution,
-              "quality": quality,
+              "quality": quality, "views": views, "guide": guide,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
@@ -1188,9 +1190,11 @@ async def asset_io(
         workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
         return await run(panorama, workspace, params["prompt"], path, params["quality"])
     if action == "generate":
-        params = pick(action, values, ["image"], {"resolution": None, "quality": None})
+        params = pick(action, values, ["image"], {"resolution": None, "quality": None, "views": None,
+                                                  "guide": None})
         workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
-        return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"])
+        return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"],
+                         params["views"], params["guide"])
     if action == "import":
         suffix = Path(path).suffix.lower()
         operation = {".fbx": "import_fbx", ".obj": "import_obj",
