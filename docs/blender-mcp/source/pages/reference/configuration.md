@@ -37,6 +37,9 @@ These are read by the MCP server. All must be absolute local paths.
 | `CAVI_TRELLIS2_MLX_PYTHON` | Python 3.11 or newer with Pillow; frames the image and runs the launcher |
 | `CAVI_TRELLIS2_MLX_AGENT` | `mlx-agent` launcher script |
 | `CAVI_TRELLIS2_MLX_MODEL` | Converted TRELLIS.2 model directory |
+| `CAVI_IMAGE_MLX_PYTHON` | Python 3.11 or newer with Pillow; wraps the panorama seam and runs the launcher |
+| `CAVI_IMAGE_MLX_AGENT` | `mlx-agent` launcher script |
+| `CAVI_IMAGE_MLX_MODEL` | Converted image-generation model directory for `generate` with `prompt` |
 
 Only the selected provider's paths are required. The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
 `HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS=4`. `triposg-mlx` and `trellis2-mlx` find

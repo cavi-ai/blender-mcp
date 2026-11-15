@@ -46,6 +46,7 @@ from .contracts import (
 )
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
+from .panorama import panorama
 from .paths import environment_path
 from .rig_models import (
     ClipTiming,
@@ -1142,6 +1143,7 @@ async def asset_io(
     preserve_instances: Annotated[StrictBool | None, Field(description="export: keep supported instancing")] = None,
     include_empties: Annotated[StrictBool | None, Field(description="export: empties")] = None,
     image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
+    prompt: Annotated[str | None, Field(max_length=1000, description="generate: 2:1 panorama PNG, not image")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
     quality: Annotated[Literal["fast", "default"] | None, Field(description='generate: MLX tier; fast is 2-4x quicker')] = None,
     lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
@@ -1160,7 +1162,7 @@ async def asset_io(
 ) -> AssetResult:
     """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
-              "include_empties": include_empties, "image": image, "resolution": resolution,
+              "include_empties": include_empties, "image": image, "prompt": prompt, "resolution": resolution,
               "quality": quality,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
@@ -1181,6 +1183,10 @@ async def asset_io(
         return await run(call, 'export_uv_assembly' if uv_layer is not None else 'export_assembly', path=path, lease_id=lease_id, **params)
     if action == 'export' and assembly is False:
         values.pop('assembly')
+    if action == "generate" and prompt is not None:
+        params = pick(action, values, ["prompt"], {"quality": None})
+        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
+        return await run(panorama, workspace, params["prompt"], path, params["quality"])
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None, "quality": None})
         workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
