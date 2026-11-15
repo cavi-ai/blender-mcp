@@ -1142,7 +1142,7 @@ async def asset_io(
     include_empties: Annotated[StrictBool | None, Field(description="export: empties")] = None,
     image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
-    quality: Annotated[Literal["fast", "default"] | None, Field(description='generate (MLX providers): fast about 2-4x quicker')] = None,
+    quality: Annotated[Literal["fast", "default"] | None, Field(description='generate: MLX tier; fast is 2-4x quicker')] = None,
     lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
     collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
     animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
