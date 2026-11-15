@@ -18,6 +18,7 @@ adds its lines under Unreleased and never edits a version.
 ### Fixed
 
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
+- Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.
 
 ## 0.57.0 - 2026-11-09
 

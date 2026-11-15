@@ -11,6 +11,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from cavi_blender_mcp import blender_bridge as bridge
 from cavi_blender_mcp import blender_geometry as geometry
 
+
+def even_density(mesh):
+    """Faces projected again after a fold keep the texel density of the rest of the surface.
+
+    The median UV length per metre is the same whether triangles count by their surface or by their UV area.
+    """
+    mesh.calc_loop_triangles()
+    loops = np.array([t.loops for t in mesh.loop_triangles]).ravel()
+    points = np.array([mesh.vertices[mesh.loops[i].vertex_index].co for i in loops]).reshape(-1, 3, 3)
+    layer = mesh.uv_layers.active.data
+    uvs = np.array([layer[i].uv for i in loops]).reshape(-1, 3, 2)
+    surface = np.linalg.norm(np.cross(points[:, 1] - points[:, 0], points[:, 2] - points[:, 0]), axis=1) / 2
+    edge, other = uvs[:, 1] - uvs[:, 0], uvs[:, 2] - uvs[:, 0]
+    mapped = np.abs(edge[:, 0] * other[:, 1] - edge[:, 1] * other[:, 0]) / 2
+    density = np.sqrt(mapped / surface)
+    order = np.argsort(density)
+    by_surface, by_uv = (density[order][np.searchsorted(share, share[-1] / 2)]
+                         for share in (np.cumsum(surface[order]), np.cumsum(mapped[order])))
+    print(f"{mesh.name} density: {by_surface:.3f} by surface, {by_uv:.3f} by UV area")
+    assert by_uv < 2 * by_surface, (mesh.name, by_surface, by_uv)
+
+
 bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1)
 lumpy = bpy.context.active_object
 lumpy.name = 'Lumpy'
@@ -56,6 +78,7 @@ packed = bridge.dispatch('inspect_uv_layout', {'names': [crowded.name],
     'texture_resolution': [2048, 2048], 'padding_pixels': 4})
 assert packed['unique_tile_ready'], packed
 assert packed['degenerate_triangles'] == 0, packed
+even_density(crowded.data)
 
 layers = crowded.data.uv_layers
 other = layers.new(name='OtherUV')
@@ -126,6 +149,7 @@ print(f"ramp: {folded['charts']} charts, overlaps {folded['overlap']['triangle_p
 assert folded['overlap']['triangle_pairs'] == 0, folded['overlap']
 assert folded['padding']['border_triangles_below_requested'] == 0, folded['padding']
 assert folded['unique_tile_ready'], folded
+even_density(spiral.data)
 
 # Decimation can weld corners onto each other; the collapsed faces are dissolved.
 welded = bmesh.new()
