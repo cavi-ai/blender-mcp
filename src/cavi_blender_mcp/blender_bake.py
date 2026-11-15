@@ -1,4 +1,4 @@
-"""Cycles-backed normal, AO, curvature, lightmap and vertex-color baking into workspace PNGs."""
+"""Cycles-backed normal, AO, curvature, lightmap, vertex-color and vertex-ORM baking into workspace PNGs."""
 
 import hashlib
 from pathlib import Path
@@ -13,6 +13,7 @@ MAX_HIGH_OBJECTS = 64
 MAX_RESOLUTION = 4096
 MAX_SAMPLES = 256
 COLOR_MAPS = {"lightmap", "vertex_color"}
+VERTEX_MAPS = {"vertex_color", "vertex_orm"}
 
 
 def triangles(value):
@@ -95,13 +96,13 @@ def bake(p):
     if not 0 < low_triangles <= MAX_LOW_TRIANGLES:
         raise ValueError(f"Low-poly target needs 1 to {MAX_LOW_TRIANGLES} triangles")
     mode = p.get("map")
-    if mode not in {"normal", "ao", "curvature", "lightmap", "vertex_color"}:
-        raise ValueError("map must be normal, ao, curvature, lightmap or vertex_color")
+    if mode not in {"normal", "ao", "curvature", "lightmap", *VERTEX_MAPS}:
+        raise ValueError("map must be normal, ao, curvature, lightmap, vertex_color or vertex_orm")
     high_names = p.get("high")
-    if high_names is not None and mode not in {"normal", "ao", "vertex_color"}:
-        raise ValueError("high applies to normal, ao and vertex_color bakes")
-    if high_names is None and mode == "vertex_color":
-        raise ValueError("vertex_color requires high-poly sources")
+    if high_names is not None and mode not in {"normal", "ao", *VERTEX_MAPS}:
+        raise ValueError("high applies to normal, ao, vertex_color and vertex_orm bakes")
+    if high_names is None and mode in VERTEX_MAPS:
+        raise ValueError(f"{mode} requires high-poly sources")
     if high_names is not None:
         if (not isinstance(high_names, list) or not 1 <= len(high_names) <= MAX_HIGH_OBJECTS
                 or len(set(high_names)) != len(high_names)):
@@ -114,6 +115,8 @@ def bake(p):
             raise ValueError("High-poly sources must not have modifiers or shape keys")
         if mode == "vertex_color" and not value.data.color_attributes:
             raise ValueError(f"High-poly source {value.name} has no color attribute")
+        if mode == "vertex_orm" and len(value.data.color_attributes) < 2:
+            raise ValueError(f"High-poly source {value.name} has no second color attribute")
     high_triangles = sum(triangles(value) for value in high)
     if high_triangles > MAX_HIGH_TRIANGLES:
         raise ValueError(f"High-poly sources are limited to {MAX_HIGH_TRIANGLES} triangles")
@@ -153,8 +156,9 @@ def bake(p):
     image = material = bake_low = paint = None
     sources, copies = high, []
     try:
-        if mode == "vertex_color":
+        if mode in VERTEX_MAPS:
             # Emit each source's render color attribute from private copies of the high meshes.
+            # vertex_orm renders the second attribute (glTF COLOR_1) on those copies instead.
             paint = bpy.data.materials.new("CAVI Bake Color")
             paint.use_nodes = True
             paint_nodes = paint.node_tree.nodes
@@ -177,6 +181,8 @@ def bake(p):
                 source.data.materials.append(paint)
                 source.material_slots[0].link = "DATA"
                 source.data.polygons.foreach_set("material_index", [0] * len(source.data.polygons))
+                if mode == "vertex_orm":
+                    source.data.color_attributes.render_color_index = 1
             sources = copies
         bake_low = low.copy()
         bake_low.data = low.data.copy()
@@ -268,7 +274,7 @@ def bake(p):
                 result = bpy.ops.object.bake(type="NORMAL")
             elif mode == "ao":
                 result = bpy.ops.object.bake(type="AO")
-            elif mode in {"curvature", "vertex_color"}:
+            elif mode in {"curvature", *VERTEX_MAPS}:
                 result = bpy.ops.object.bake(type="EMIT")
             else:
                 result = bpy.ops.object.bake(type="DIFFUSE",

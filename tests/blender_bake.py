@@ -105,6 +105,33 @@ try:
     assert {value.name: value.hide_render for value in scene.objects} == visibility
     assert not high.data.materials and high.data.color_attributes.get("Paint") is not None
 
+    refused("bake_map", "no second color attribute", map="vertex_orm", name="BakeLow",
+            path="bad-orm.png", high=["BakeHigh"])
+    # glTF COLOR_1 imports as the second byte color attribute: occlusion, roughness, metallic.
+    orm = (1.0, 0.7, 0.25)
+    channels = high.data.color_attributes.new("Color.001", "BYTE_COLOR", "POINT")
+    channels.data.foreach_set("color", [*orm, 1.0] * len(high.data.vertices))
+    meshes = set(bpy.data.meshes)
+    packed = edit("bake_map", map="vertex_orm", name="BakeLow", path="vertex_orm.png",
+                  high=["BakeHigh"], resolution=64, samples=1, margin=2,
+                  cage_extrusion=.1, max_ray_distance=.5)
+    assert packed["map"] == "vertex_orm" and packed["color_space"] == "Non-Color", packed
+    assert packed["selected_to_active"] and packed["high"] == ["BakeHigh"], packed
+    stored = bpy.data.images.load(str(root / "vertex_orm.png"))
+    try:
+        stored.colorspace_settings.name = "Non-Color"
+        pixels = np.empty(len(stored.pixels), np.float32)
+        stored.pixels.foreach_get(pixels)
+    finally:
+        bpy.data.images.remove(stored)
+    covered = pixels.reshape(-1, 4)[:, :3]
+    covered = covered[covered.max(axis=1) > 0.05]
+    assert len(covered) > 100, len(covered)
+    assert np.allclose(np.median(covered, axis=0), orm, atol=0.01), np.median(covered, axis=0)
+    assert set(bpy.data.objects) == objects and set(bpy.data.meshes) == meshes
+    assert set(bpy.data.materials) == materials and set(bpy.data.images) == images
+    assert high.data.color_attributes.render_color_index == 0
+
     bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=.35,
                                       major_segments=32, minor_segments=12)
     ao_target = bpy.context.object
