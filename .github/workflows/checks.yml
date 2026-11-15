@@ -202,14 +202,18 @@ jobs:
         env:
           BRANCH: ${{ steps.sync.outputs.branch }}
         run: |
+          body=$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1]))["moved"]; print("\n".join("- %s %s -> %s" % (r, (v["from"] or "new")[:7], v["to"][:7]) for r, v in m.items()))' "$RUNNER_TEMP/sync.json")
           if ! git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null; then
-            body=$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1]))["moved"]; print("\n".join("- %s %s -> %s" % (r, (v["from"] or "new")[:7], v["to"][:7]) for r, v in m.items()))' "$RUNNER_TEMP/sync.json")
             git switch -c "$BRANCH"
             git add -A -- .gitmodules pyproject.toml uv.lock servers plugin.json .claude-plugin .codex-plugin
             git commit -q -m "chore: pin servers to main"
             git push -q origin "$BRANCH"
-            for old in $(gh pr list --state open --json number,headRefName -q '.[] | select(.headRefName | startswith("bot/pin-servers-")) | .number'); do
-              gh pr close "$old" --delete-branch --comment "Superseded by a newer server pin."
+          fi
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')" ]; then
+            gh pr list --state open --json number,headRefName -q '.[] | select(.headRefName | startswith("bot/pin-servers-")) | "\(.number) \(.headRefName)"' | while read -r old head; do
+              if [ "$head" != "$BRANCH" ]; then
+                gh pr close "$old" --delete-branch --comment "Superseded by a newer server pin."
+              fi
             done
             gh pr create --head "$BRANCH" --title "chore: pin servers to main" --body "$body"
           fi
