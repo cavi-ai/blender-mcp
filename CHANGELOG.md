@@ -18,6 +18,7 @@ adds its lines under Unreleased and never edits a version.
 ### Fixed
 
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
+- `mesh_edit` `remesh_quad` collapses or separates edges QuadriFlow reads as zero length, so voxel-rebuilt meshes remesh.
 
 ## 0.57.0 - 2026-11-09
 

@@ -18,6 +18,7 @@ MAX_PARTS = 64
 SEAM_WEIGHT = 10.0
 RELAXATION = (("seams", SEAM_WEIGHT), ("seams_unweighted", 1.0), ("plain", None))
 TOLERANCE = 1.1
+QUADRIFLOW_TOLERANCE = 1e-4
 # CONCAVE/CONVEX packing takes seconds to minutes on few islands in Blender 5.2.
 PACK = {"margin_method": "FRACTION", "rotate": True, "rotate_method": "CARDINAL",
         "shape_method": "AABB"}
@@ -207,20 +208,75 @@ def decimate_to(p):
             "symmetry_axis": axis, "warnings": missed(value.name, result)}
 
 
+def close_edge(edge):
+    """QuadriFlow refuses edges whose endpoints match within 1e-4 on every axis."""
+    a, b = edge.verts
+    return all(abs(x - y) <= QUADRIFLOW_TOLERANCE for x, y in zip(a.co, b.co, strict=True))
+
+
+def collapsible(edge):
+    # Link condition: the endpoints share only the two opposite vertices, so the
+    # collapse keeps a closed manifold closed and manifold.
+    a, b = edge.verts
+    opposite = {v for face in edge.link_faces for v in face.verts} - {a, b}
+    ring = ({v for e in a.link_edges for v in e.verts}
+            & {v for e in b.link_edges for v in e.verts}) - {a, b}
+    return len(edge.link_faces) == 2 and ring == opposite
+
+
+def separate_close_vertices(bm):
+    """Collapse or separate QuadriFlow's zero-length edges; returns how many edges changed."""
+    if not any(close_edge(edge) for edge in bm.edges):
+        return 0
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    changed, progress = 0, True
+    while progress:
+        progress = False
+        for edge in [e for e in bm.edges if close_edge(e)]:
+            if edge.is_valid and close_edge(edge) and collapsible(edge):
+                bmesh.ops.collapse(bm, edges=[edge], uvs=True)
+                changed, progress = changed + 1, True
+    bm.normal_update()
+    # Edges the link condition keeps are pushed apart; positions move, topology does not.
+    for _ in range(8):
+        remaining = [edge for edge in bm.edges if close_edge(edge)]
+        if not remaining:
+            break
+        for edge in remaining:
+            a, b = edge.verts
+            offset = b.co - a.co
+            direction = offset.normalized() if offset.length > 1e-9 else a.normal
+            b.co = a.co + direction * 3 * QUADRIFLOW_TOLERANCE
+            changed += 1
+    return changed
+
+
 def remesh_quad(p):
     value, before = source(p["name"], 200000)
     faces = integer(p, "target_faces", None, 16, 100000)
     sharp, boundary = boolean(p, "preserve_sharp", False), boolean(p, "preserve_boundary", True)
-    with selected([value]), bpy.context.temp_override(
-        object=value, active_object=value, selected_objects=[value],
-        selected_editable_objects=[value],
-    ):
-        result = bpy.ops.object.quadriflow_remesh(
-            mode="FACES", target_faces=faces, use_preserve_sharp=sharp,
-            use_preserve_boundary=boundary, use_mesh_symmetry=False, smooth_normals=False,
-            seed=0)
-    if "FINISHED" not in result:
-        raise RuntimeError("QuadriFlow did not finish; the mesh must be manifold")
+    original, prepared = bmesh.new(), bmesh.new()
+    try:
+        original.from_mesh(value.data)
+        prepared.from_mesh(value.data)
+        separated = separate_close_vertices(prepared)
+        if separated:
+            prepared.to_mesh(value.data)
+        with selected([value]), bpy.context.temp_override(
+            object=value, active_object=value, selected_objects=[value],
+            selected_editable_objects=[value],
+        ):
+            result = bpy.ops.object.quadriflow_remesh(
+                mode="FACES", target_faces=faces, use_preserve_sharp=sharp,
+                use_preserve_boundary=boundary, use_mesh_symmetry=False, smooth_normals=False,
+                seed=0)
+        if "FINISHED" not in result:
+            if separated:
+                original.to_mesh(value.data)
+            raise RuntimeError("QuadriFlow did not finish; the mesh must be manifold")
+    finally:
+        original.free()
+        prepared.free()
     mesh = value.data
     quads = sum(len(face.vertices) == 4 for face in mesh.polygons)
     return {**info(value), "triangles_before": before, "faces_target": faces,

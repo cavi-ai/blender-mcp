@@ -113,6 +113,13 @@ blob = sphere("Blob", location=(0, 4, 0))
 quad = edit("remesh_quad", name="Blob", target_faces=600, preserve_sharp=False,
             preserve_boundary=True)
 assert quad["quad_ratio"] > 0.9 and 300 <= quad["faces"] <= 1200, quad
+# Generated and voxel-rebuilt meshes carry edges QuadriFlow reads as zero length.
+pinched = sphere("Pinched", location=(0, -4, 0))
+a, b = (pinched.data.vertices[index] for index in pinched.data.edges[40].vertices)
+b.co = a.co + Vector((5e-5, 0, 0))
+close = edit("remesh_quad", name="Pinched", target_faces=600, preserve_sharp=False,
+             preserve_boundary=True)
+assert close["quad_ratio"] > 0.9 and 300 <= close["faces"] <= 1200, close
 bpy.ops.mesh.primitive_grid_add(x_subdivisions=4, y_subdivisions=4, location=(0, 8, 0))
 bpy.context.object.name = "OpenGrid"
 try:
