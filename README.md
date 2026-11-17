@@ -1,57 +1,53 @@
 # Cavi Blender MCP
 
-**Bring your idea. Keep shaping it in Blender.**
+**Big ideas. Still editable.**
 
-[![PyPI version](https://img.shields.io/pypi/v/cavi-blender-mcp)](https://pypi.org/project/cavi-blender-mcp/) [![PyPI downloads](https://img.shields.io/pypi/dw/cavi-blender-mcp?label=PyPI%20downloads)](https://pypistats.org/packages/cavi-blender-mcp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/cavi-blender-mcp)](https://pypi.org/project/cavi-blender-mcp/) [![PyPI weekly downloads](https://img.shields.io/pypi/dw/cavi-blender-mcp?label=PyPI%20downloads%2Fweek)](https://pypistats.org/packages/cavi-blender-mcp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Cavi connects your agent to a real Blender project. Give it a direction, review the next pass, and keep working in the same editable scene. Your agent can inspect the project, change geometry and materials, show you a preview, and save or export the result.
+![A mole sculpts an armored llama balancing on red roller skates](media/blender-mcp-hero.png)
 
-![Night Watch Lantern: an indigo-and-brass harbor lantern framed by an oversized crescent](examples/creator-directed-revision/after.png)
+Give your assistant a direction, review the next pass and keep working in Blender. Cavi Blender MCP connects scene inspection, mesh and material edits, previews and export in one local workflow.
 
-## Give the lantern a night shift
+Try a request with your own working scene:
 
-The crescent stays. The rest needs to survive a harbor night.
+> Inspect this scene, refine the shape and materials, and show me a preview. Save the revision as a new Blender project so I can keep editing it.
 
-> Keep the oversized crescent and brass pivot. Make this feel like a working harbor signal: lower and widen the storm hood, give it a broader stance, protect the lamp with a ribbed guard, and use indigo enamel with a warmer amber light. Show me the revision before saving a new copy. Leave the parts editable.
-
-[Compare the two designs and open the Blender files →](examples/creator-directed-revision/README.md)
-
-Use the example as a starting point, or bring a working copy of your own project. You choose what to change and judge the result; the agent operates Blender through Cavi.
+You decide what to change and judge the result; your assistant operates Blender through Cavi.
 
 ## Install
 
-You need [uv](https://docs.astral.sh/uv/), **Python 3.15+** and **Blender**. Cavi targets macOS and Linux; native checks target Blender 5.2.3 LTS.
+You need [uv](https://docs.astral.sh/uv/), **Python 3.15+** and **Blender** on macOS or Linux. Native checks target Blender 5.2.3 LTS.
 
-Save the [starting scene](examples/creator-directed-revision/before.blend) as `before.blend` in `~/Documents/CaviBlender/`, the default workspace. Create that folder if needed. Install Cavi and start with this project:
+To use the current source, clone this repository and install its environment:
 
 ```bash
-uv tool install cavi-blender-mcp==0.57.0
-cavi-blender-mcp runtime start --project before.blend
+git clone https://github.com/cavi-ai/blender-mcp.git
+cd blender-mcp
+uv sync --locked
 ```
 
-Newly launched sessions use factory settings without loading or saving your usual preferences. An existing connected session may be reused; `start` will not replace a different connected project. See [project startup](https://github.com/cavi-ai/blender-mcp/blob/v0.57.0/docs/blender-mcp/source/pages/guides/runtime-and-headless.md) if you already use Cavi. Blender is found through `PATH`, `CAVI_BLENDER_BIN`, or the standard macOS application path.
+Place a working copy of your `.blend` file in `~/Documents/CaviBlender/`, the default workspace, then start the session and check its connection:
 
-Supervised background runs use MCP Core's owned-exec registration gate for startup, reconstruction and nested UV workers. See [supervised launches](docs/blender-mcp/source/pages/guides/runtime-and-headless.md#supervised-launches) for the private owner handoff and helper-launch contract.
+```bash
+.venv/bin/cavi-blender-mcp runtime start --project working-copy.blend
+.venv/bin/cavi-blender-mcp runtime status
+```
 
-Add Cavi to your agent's MCP configuration:
+Register the source environment's absolute `.venv/bin/cavi-blender-mcp` path as a local stdio server in your MCP client:
 
 ```json
 {
   "mcpServers": {
     "blender": {
-      "command": "cavi-blender-mcp"
+      "command": "/absolute/path/to/blender-mcp/.venv/bin/cavi-blender-mcp"
     }
   }
 }
 ```
 
-If your client does not inherit your shell's `PATH`, use the full path printed by `which cavi-blender-mcp`. The agent must support local stdio MCP servers.
+New sessions use factory settings without changing your usual preferences. An existing connected session may be reused; startup will not replace a different connected project. See [project startup](docs/blender-mcp/source/pages/guides/runtime-and-headless.md) and [installation](docs/blender-mcp/source/pages/introduction/installation.md) for options.
 
-Then ask your agent:
-
-> Inspect the lantern in the connected scene. Make the harbor-signal revision above, then show me a preview. Save the revised scene as a new `.blend` file and keep its parts editable.
-
-To work on your own asset, start Cavi with a working copy of that project instead. The [installation guide](https://github.com/cavi-ai/blender-mcp/blob/v0.57.0/docs/blender-mcp/source/pages/introduction/installation.md) covers the remaining setup options.
+For the published release, install `cavi-blender-mcp==0.57.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.57.0/docs/blender-mcp/source) for its supported features.
 
 ## Keep developing the asset
 
@@ -59,11 +55,12 @@ To work on your own asset, start Cavi with a working copy of that project instea
 | --- | --- |
 | [Understand the scene](docs/blender-mcp/source/pages/guides/scene-inspection.md) | Inspect objects, mesh quality, materials, UVs and rigs. |
 | [Revise the shape](docs/blender-mcp/source/pages/guides/mesh-preparation.md) | Edit meshes, apply modifiers and organize parts. |
+| [Refine a procedural asset](docs/blender-mcp/source/pages/guides/procedural-assets.md) | Adjust exposed Geometry Nodes inputs while keeping the authored node graph. |
 | [Develop the surface](docs/blender-mcp/source/pages/guides/materials-and-uvs.md) | Assign PBR materials and textures, inspect UVs and bake maps. |
 | [Judge the next pass](docs/blender-mcp/source/pages/guides/previews-and-review.md) | Produce PNG previews, lit Eevee views and review sheets. |
 | [Take the work onward](docs/blender-mcp/source/pages/guides/asset-import-export.md) | Save the project or export supported GLB, FBX, OBJ and USD assets. |
 
-For a narrower production example, [the material handoff](examples/material-texture-sets/README.md) follows a utility case's material assignments into Painter texture sets. [Local image-to-mesh generation](docs/blender-mcp/source/pages/guides/local-generation.md) is an optional route with separate model and worker setup.
+[Local image-to-mesh generation](docs/blender-mcp/source/pages/guides/local-generation.md) is an optional route with separate model and worker setup.
 
 ## Local work, explicit ownership
 
@@ -75,7 +72,7 @@ The default workspace is `~/Documents/CaviBlender`. See [configuration](docs/ble
 
 ## Documentation and development
 
-The first-use steps above install **0.57.0** and require **Python 3.15+**. [Tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.57.0/docs/blender-mcp/source) matches that version. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
+The source setup above follows this repository. The published package installs **0.57.0**; use its [tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.57.0/docs/blender-mcp/source) for that release. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
 
 The server publishes 20 tools over stdio. The [tool reference](docs/blender-mcp/source/pages/reference/tools.md) documents exact operations, bounds and response contracts.
 
