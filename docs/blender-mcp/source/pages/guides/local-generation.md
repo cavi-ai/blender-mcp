@@ -144,7 +144,8 @@ minutes and peaks near 18 GB of memory.
 
 `quality="fast"` trades detail for time on the two MLX providers.
 `triposg-mlx` then runs 25 steps on a 256³ grid with the adaptive denoiser
-cache, and `trellis2-mlx` runs 6 steps at resolution 512. `quality="default"`
+cache, and `trellis2-mlx` runs 6 steps at resolution 512 with at most 180,000
+faces. `quality="default"`
 is the setting described above. The other providers refuse `fast`.
 
 | Provider | `default` | `fast` |
