@@ -151,6 +151,47 @@ assert folded['padding']['border_triangles_below_requested'] == 0, folded['paddi
 assert folded['unique_tile_ready'], folded
 even_density(spiral.data)
 
+# A reduced scan pinches: a vertex merged into one two edges away joins parts of the surface at a point.
+# Island scaling moves such a vertex's corners a float step apart, which overlaps the faces meeting there.
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1)
+pinched = bpy.context.active_object
+pinched.name = 'Pinched'
+rng = np.random.default_rng(7)
+for vertex in pinched.data.vertices:
+    vertex.co *= 1 + 0.15 * rng.standard_normal()
+pinch = bmesh.new()
+pinch.from_mesh(pinched.data)
+pinch.verts.ensure_lookup_table()
+used = set()
+for index in rng.permutation(len(pinch.verts))[:480]:
+    vert = pinch.verts[int(index)]
+    ring = [edge.other_vert(vert) for edge in vert.link_edges]
+    far = [v for near in ring for v in (edge.other_vert(near) for edge in near.link_edges)
+           if v is not vert and v not in ring]
+    if not far or vert.index in used or far[0].index in used or len(used) >= 240:
+        continue
+    used.update((vert.index, far[0].index))
+    far[0].co = vert.co
+bmesh.ops.remove_doubles(pinch, verts=pinch.verts, dist=1e-7)
+bmesh.ops.dissolve_degenerate(pinch, edges=pinch.edges, dist=1e-7)
+pinch.to_mesh(pinched.data)
+pinch.free()
+bridge.dispatch('owned_edit', {'operation': 'unwrap_mesh', 'params': {
+    'lease_id': lease, 'name': 'Pinched', 'angle_limit_degrees': 66, 'island_margin': 8 / 2048,
+    'uv_layer': 'UVMap'}})
+joined = bridge.dispatch('inspect_uv_layout', {'names': ['Pinched'], 'texture_resolution': [2048, 2048],
+                                               'padding_pixels': 8})
+corners = {}
+for loop, row in zip(pinched.data.loops, pinched.data.uv_layers['UVMap'].data):
+    corners.setdefault(loop.vertex_index, set()).add(tuple(row.uv))
+split = [(vertex, a, b) for vertex, group in corners.items() for a in group for b in group
+         if a < b and math.dist(a, b) < 1e-6]
+print(f"pinched: {joined['triangles']} triangles, {joined['charts']} charts, overlaps "
+      f"{joined['overlap']['triangle_pairs']}, corners a float step apart {len(split)}")
+assert not split, split[:4]
+assert joined['overlap']['triangle_pairs'] == 0, joined['overlap']
+assert joined['unique_tile_ready'], joined
+
 # Decimation can weld corners onto each other; the collapsed faces are dissolved.
 welded = bmesh.new()
 a, b, c, d = (welded.verts.new(p) for p in ((0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)))
