@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from . import process_launch
+from .importing import MAX_BYTES, MAX_GEOMETRY
 from .paths import destination
 
 MLX_MAX_FACES = 500000
@@ -49,8 +50,8 @@ PROVIDERS = {
         },
         "vertex_colors": True,
         "guides": True,
-        # Triangle-corner attributes and the embedded material atlas must fit the 64 MiB GLB limit.
-        "fast_max_faces": 180000,
+        # Atlas export duplicates each triangle corner; also bound the embedded GLB.
+        "fast_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
 QUALITIES = ("fast", "default")
@@ -253,9 +254,8 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
         size = generated.stat().st_size
         if not size:
             raise RuntimeError("Reconstruction did not produce a GLB")
-        limit = 64 * 1024 * 1024
-        if size > limit:
-            raise RuntimeError(f"Reconstruction GLB is {size} bytes; maximum is {limit} bytes")
+        if size > MAX_BYTES:
+            raise RuntimeError(f"Reconstruction GLB is {size} bytes; maximum is {MAX_BYTES} bytes")
         # Publish without replacing an existing destination, even if another writer won the race.
         os.link(generated, target)
     return {**report, "path": str(target), "bytes": target.stat().st_size}

@@ -392,9 +392,9 @@ class Trellis2MlxTests(TripoSGMlxTests):
 
     def test_fast_draft_applies_and_enforces_face_cap(self):
         result = self.generate(quality="fast", FAKE_AGENT_QUALITY="fast")
-        self.assertEqual(result["faces"], 179990)
+        self.assertEqual(result["faces"], 166656)
         (self.work / "mesh.glb").unlink()
-        with self.assertRaisesRegex(RuntimeError, "180000 faces"):
+        with self.assertRaisesRegex(RuntimeError, "166666 faces"):
             self.generate("oversized", quality="fast", FAKE_AGENT_QUALITY="fast")
         self.assert_nothing_published()
 

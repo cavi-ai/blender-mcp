@@ -69,7 +69,7 @@ valid = (
     and out.parent.is_dir()
     and (arguments.steps, arguments.resolution, arguments.denoiser_cache) == tier
     and arguments.seed == 42
-    and arguments.max_faces == (180000 if trellis and os.environ.get("FAKE_AGENT_QUALITY") == "fast" else 500000)
+    and arguments.max_faces == (166666 if trellis and os.environ.get("FAKE_AGENT_QUALITY") == "fast" else 500000)
     and 1 <= arguments.timeout <= 600
 )
 if not valid:
