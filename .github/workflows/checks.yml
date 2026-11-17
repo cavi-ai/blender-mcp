@@ -13,6 +13,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  merged-pr:
+    # A main push whose exact tree passed this workflow on its merged pull request skips the suite steps.
+    # The suite job still runs and passes, so pin-consumers keeps its needs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      tested: ${{ steps.pr.outputs.tested }}
+    steps:
+      - id: pr
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)][0].head.sha // empty' || true)
+          [ -n "$head" ] || exit 0
+          tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha || true)
+          [ -n "$tree" ] && [ "$tree" = "$(gh api "repos/$GITHUB_REPOSITORY/commits/$head" --jq .commit.tree.sha || true)" ] || exit 0
+          workflow=${GITHUB_WORKFLOW_REF#"$GITHUB_REPOSITORY/"}
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=pull_request&status=success&head_sha=$head" --jq "[.workflow_runs[] | select(.path == \"${workflow%@*}\")] | length" || echo 0)
+          if [ "$passed" -gt 0 ]; then echo "tested=true" >> "$GITHUB_OUTPUT"; fi
+
   pin-guard:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -36,32 +61,43 @@ jobs:
           python3 "$RUNNER_TEMP/pin_guard.py" "$BASE" "$HEAD"
 
   python:
-    needs: [pin-guard]
+    needs: [pin-guard, merged-pr]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        if: needs.merged-pr.outputs.tested != 'true'
         with:
           persist-credentials: false
           fetch-depth: 0 # tags give the version and the documented release
       - uses: astral-sh/setup-uv@v7
+        if: needs.merged-pr.outputs.tested != 'true'
         with:
           python-version: '3.15'
-      - run: uv sync --locked --dev
-      - run: uv run --locked python -m unittest discover -s tests
-      - run: uv run --locked ruff check .
-      - run: uv run --locked python -m scripts.docs.build
-      - run: uv run --locked python -m scripts.docs.verify
-      - run: uv build
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv sync --locked --dev
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv run --locked python -m unittest discover -s tests
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv run --locked ruff check .
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv run --locked python -m scripts.docs.build
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv run --locked python -m scripts.docs.verify
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: uv build
       - name: Resolve the local-generation requirements
+        if: needs.merged-pr.outputs.tested != 'true'
         run: |
           uv venv --python 3.12 "$RUNNER_TEMP/neural"
           uv pip install --dry-run --python "$RUNNER_TEMP/neural" -r requirements-neural.txt
           uv pip install --dry-run --python "$RUNNER_TEMP/neural" -r requirements-triposg.txt
       - uses: actions/setup-node@v7
+        if: needs.merged-pr.outputs.tested != 'true'
         with:
           node-version: '22'
       - name: Build MCP Eval from main
+        if: needs.merged-pr.outputs.tested != 'true'
         run: |
           cargo install --locked --git https://github.com/cavi-ai/mcp-eval --branch main \
             --root "$RUNNER_TEMP/mcp-eval" mcpeval
@@ -79,8 +115,10 @@ jobs:
           PYTHON
           mkdir -p .tmp/evals/evaluator
           cp "$RUNNER_TEMP/mcp-eval/.crates2.json" .tmp/evals/evaluator/cargo-install.json
-      - run: npm run eval:protocol
+      - if: needs.merged-pr.outputs.tested != 'true'
+        run: npm run eval:protocol
       - name: Install Blender 5.2.3 LTS
+        if: needs.merged-pr.outputs.tested != 'true'
         env:
           BLENDER_ARCHIVE: blender-5.2.3-linux-x64.tar.xz
         run: |
@@ -90,59 +128,84 @@ jobs:
           tar -xf "$RUNNER_TEMP/$BLENDER_ARCHIVE" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/blender-5.2.3-linux-x64" >> "$GITHUB_PATH"
       - name: Evaluate native Blender
+        if: needs.merged-pr.outputs.tested != 'true'
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a npm run eval:core
       - name: Check saved project switching
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_open_project_mcp.py --blender "$(command -v blender)"
       - name: Check face-region modeling
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_mesh_regions_mcp.py --blender "$(command -v blender)"
       - name: Check selected-face UV layout
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_uv_regions_mcp.py --blender "$(command -v blender)"
       - name: Check seam-based UV layout
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_seam_uv_mcp.py --blender "$(command -v blender)"
       - name: Check selected-face texture density
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_uv_density_mcp.py --blender "$(command -v blender)"
       - name: Check source vertex translation
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_vertex_edit_mcp.py --blender "$(command -v blender)"
       - name: Check connected proportional editing
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_vertex_falloff_mcp.py --blender "$(command -v blender)"
       - name: Check symmetric source editing
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_vertex_symmetry_mcp.py --blender "$(command -v blender)"
       - name: Check source and posed surface picking
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_surface_pick_mcp.py --blender "$(command -v blender)"
       - name: Check rendered camera pixel picking
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_camera_pick_mcp.py --blender "$(command -v blender)"
       - name: Check scene surface discovery
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_scene_pick_mcp.py --blender "$(command -v blender)"
       - name: Check evaluated scene placement
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_scene_spatial_mcp.py --blender "$(command -v blender)"
       - name: Check rendered geometry identities
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_geometry_identity_mcp.py --blender "$(command -v blender)"
       - name: Check object deletion and shared data
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_object_delete_mcp.py --blender "$(command -v blender)"
       - name: Check source-face material assignment
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_face_material_mcp.py --blender "$(command -v blender)"
       - name: Check connected source-face queries
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_face_region_mcp.py --blender "$(command -v blender)"
       - name: Check source UV island editing
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_uv_island_mcp.py --blender "$(command -v blender)"
       - name: Check named modifier editing
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_modifier_mcp.py --blender "$(command -v blender)"
       - name: Check shader link editing
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_link_mcp.py --blender "$(command -v blender)"
       - name: Check native shader node creation
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_node_mcp.py --blender "$(command -v blender)"
       - name: Check native shader ramps
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_ramp_mcp.py --blender "$(command -v blender)"
       - name: Check existing shader node controls
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_control_mcp.py --blender "$(command -v blender)"
       - name: Check native shader group instances
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_group_mcp.py --blender "$(command -v blender)"
       - name: Check native shader function authoring
+        if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_shader_group_author_mcp.py --blender "$(command -v blender)"
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && needs.merged-pr.outputs.tested != 'true'
         with:
           name: mcp-eval-reports
           path: |
