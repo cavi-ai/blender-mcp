@@ -752,6 +752,7 @@ def add_modifier(p):
 
 # Float32 UVs land within 1e-4 px of a margin packed exactly at it; pack a thousandth wider.
 PACK_HEADROOM = 1.001
+UV_WELD = 1e-6  # UV units: sixteen float32 steps near 1, a sixtieth of a pixel at 16384.
 
 
 def folded_faces(mesh, layer):
@@ -882,6 +883,12 @@ def unwrap(p):
                 margin=margin * PACK_HEADROOM, scale=True, **PACK
             ):
                 raise RuntimeError("UV island packing did not finish")
+            # Island scaling can leave one vertex's corners a float32 step apart inside an island,
+            # so faces that only touch there overlap by a sliver; join them again.
+            if "FINISHED" not in bpy.ops.uv.remove_doubles(
+                threshold=UV_WELD, use_unselected=False, use_shared_vertex=True
+            ):
+                raise RuntimeError("UV corner welding did not finish")
 
         with selected([value]):
             bpy.ops.object.mode_set(mode="EDIT")

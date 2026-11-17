@@ -22,6 +22,7 @@ adds its lines under Unreleased and never edits a version.
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
 - `mesh_edit` `remesh_quad` collapses or separates edges QuadriFlow reads as zero length, so voxel-rebuilt meshes remesh.
 - Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.
+- Mesh unwrap joins UV corners that island scaling leaves a float step apart, so pinched surfaces pack without sliver overlaps.
 
 ## 0.57.0 - 2026-11-09
 
