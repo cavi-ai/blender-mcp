@@ -8,10 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
 PACKAGE = PROJECT["name"]
 (SCRIPT,) = PROJECT["scripts"]
-PAGES = {
-    ROOT / "README.md": "## Install",
-    ROOT / "docs/blender-mcp/source/pages/introduction/installation.md": "## Install the server",
-}
+README = ROOT / "README.md"
+INSTALL_GUIDE = ROOT / "docs/blender-mcp/source/pages/introduction/installation.md"
 
 
 def first_block(text, heading):
@@ -29,19 +27,26 @@ class PublishedRequirementsTest(unittest.TestCase):
 
 
 class InstallDocsTest(unittest.TestCase):
-    def test_install_starts_from_the_published_package(self):
-        for page, heading in PAGES.items():
-            block = first_block(page.read_text(), heading)
-            with self.subTest(page=page.name):
-                self.assertIn(f"uv tool install {PACKAGE}", block)
-                self.assertNotIn("git clone", block)
+    def test_readme_uses_the_current_source_environment(self):
+        text = README.read_text()
+        block = first_block(text, "## Install")
+        self.assertIn("git clone https://github.com/cavi-ai/blender-mcp.git", block)
+        self.assertIn("cd blender-mcp", block)
+        self.assertIn("uv sync --locked", block)
+        self.assertNotIn(f"uv tool install {PACKAGE}", block)
+        self.assertIn(f'"command": "/absolute/path/to/blender-mcp/.venv/bin/{SCRIPT}"', text)
+        self.assertIn(f".venv/bin/{SCRIPT} runtime start", text)
+        self.assertIn(f".venv/bin/{SCRIPT} runtime status", text)
+        self.assertNotIn(f'"command": "{SCRIPT}"', text)
 
-    def test_clients_run_the_installed_entry_point(self):
-        for page in PAGES:
-            text = page.read_text()
-            with self.subTest(page=page.name):
-                self.assertIn(f'"command": "{SCRIPT}"', text)
-                self.assertNotIn("/path/to/blender-mcp/.venv", text)
+    def test_published_guide_uses_the_installed_entry_point(self):
+        text = INSTALL_GUIDE.read_text()
+        block = first_block(text, "## Install the server")
+        self.assertIn(f"uv tool install {PACKAGE}", block)
+        self.assertNotIn("git clone", block)
+        self.assertIn(f'"command": "{SCRIPT}"', text)
+        self.assertNotIn("/path/to/blender-mcp/.venv", text)
+
 
 
 if __name__ == "__main__":
