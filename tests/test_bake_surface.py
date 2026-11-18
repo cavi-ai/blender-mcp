@@ -69,9 +69,9 @@ class BakeSurfaceTests(unittest.TestCase):
             "cage_extrusion": .01, "max_ray_distance": .1, "uv_layer": None,
             "isolate": True, "bit_depth": 16}))
         for arguments, message in [
-            ({"map": "vertex_color", "name": "Low", "path": "c.png"}, "requires: high"),
+            ({"map": "vertex_color", "name": "Low", "path": "c.png"}, "high is required for action"),
             ({"map": "vertex_color", "name": "Low", "path": "c.png", "high": ["High"],
-              "normal_space": "object"}, "does not accept: normal_space"),
+              "normal_space": "object"}, "Not valid for action=\\w+:\\snormal_space"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
                 asyncio.run(server.mcp.call_tool("bake", arguments))
@@ -79,7 +79,7 @@ class BakeSurfaceTests(unittest.TestCase):
 
     def test_vertex_orm_projects_from_required_high_sources(self):
         calls = self.capture()
-        with self.assertRaisesRegex(Exception, "requires: high"):
+        with self.assertRaisesRegex(Exception, "high is required for action"):
             asyncio.run(server.mcp.call_tool("bake", {"map": "vertex_orm", "name": "Low",
                                                       "path": "orm.png"}))
         asyncio.run(server.bake("vertex_orm", "Low", "orm.png", high=["High"], lease_id="L"))
@@ -108,11 +108,11 @@ class BakeSurfaceTests(unittest.TestCase):
         calls = self.capture()
         for arguments, message in [
             ({"map": "curvature", "name": "Low", "path": "c.png", "high": ["High"]},
-             "does not accept: high"),
+             "Not valid for action=\\w+:\\shigh"),
             ({"map": "lightmap", "name": "Low", "path": "l.png",
-             "cage_extrusion": 0.1}, "does not accept: cage_extrusion"),
+             "cage_extrusion": 0.1}, "Not valid for action=\\w+:\\scage_extrusion"),
             ({"map": "curvature", "name": "Low", "path": "c.png",
-             "normal_space": "object"}, "does not accept: normal_space"),
+             "normal_space": "object"}, "Not valid for action=\\w+:\\snormal_space"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
                 asyncio.run(server.mcp.call_tool("bake", arguments))
@@ -122,7 +122,7 @@ class BakeSurfaceTests(unittest.TestCase):
         calls = self.capture()
         for arguments, message in [
             ({"map": "ao", "name": "Low", "path": "a.png", "normal_space": "tangent"},
-             "does not accept: normal_space"),
+             "Not valid for action=\\w+:\\snormal_space"),
             ({"map": "normal", "name": "Low", "path": "a.png", "resolution": 32},
              "validation"),
             ({"map": "ao", "name": "Low", "path": "a.png", "samples": 0},

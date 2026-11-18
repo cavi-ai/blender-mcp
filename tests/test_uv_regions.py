@@ -51,7 +51,7 @@ class UVRegionTests(unittest.TestCase):
         self.assertEqual(args['expected_mesh_sha256'], 'a' * 64)
         with patch.object(server, 'call') as call:
             for action in ('unwrap', 'extrude_faces'):
-                with self.assertRaisesRegex(ValueError, 'does not accept: uv_region'):
+                with self.assertRaisesRegex(ValueError, 'Not valid for action=.*: uv_region'):
                     asyncio.run(server.mesh_edit(action, 'Panel', uv_region=spec))
             call.assert_not_called()
 

@@ -16,7 +16,7 @@ class CalibrationTests(unittest.TestCase):
         calibration=RetargetCalibration(root='Root',root_translation_scale=1.2)
         with patch.object(server,'BridgeClient',return_value=SimpleNamespace(call=call)):
             asyncio.run(server.rig_edit('retarget','Target',source='Source',source_action='Walk',action_name='NewWalk',calibration=calibration,lease_id='L'))
-            with self.assertRaisesRegex(ValueError,'does not accept: calibration'):
+            with self.assertRaisesRegex(ValueError,'Not valid for action=.*: calibration'):
                 asyncio.run(server.rig_edit('clear_pose','Target',calibration=calibration,lease_id='L'))
         self.assertEqual(calls[0]['params']['calibration']['root_translation_scale'],1.2)
         self.assertEqual(calls[0]['params']['calibration']['alignment_degrees'],(0,0,0))

@@ -49,12 +49,12 @@ class LevelSurfaceTests(unittest.TestCase):
     def test_level_parameters_are_checked_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.level_edit("terrain"), "requires: name"),
-            (server.level_edit("place"), "requires: placements"),
-            (server.level_edit("snap", names=["Rock"]), "requires: terrain"),
-            (server.level_edit("place", placements=[], size=(1, 1)), "does not accept: size"),
+            (server.level_edit("terrain"), "name is required for action"),
+            (server.level_edit("place"), "placements is required for action"),
+            (server.level_edit("snap", names=["Rock"]), "terrain is required for action"),
+            (server.level_edit("place", placements=[], size=(1, 1)), "Not valid for action=\\w+:\\ssize"),
             (server.level_edit("snap", names=["Rock"], terrain="T", name="X"),
-             "does not accept: name"),
+             "Not valid for action=\\w+:\\sname"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)

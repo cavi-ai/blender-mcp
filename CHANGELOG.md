@@ -11,6 +11,7 @@ adds its lines under Unreleased and never edits a version.
 
 - Requires MCP Core 0.1.4; Dependabot updates `uv.lock`.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
+- Argument errors use MCP Core's wording: `Not valid for action=<action>: <names>` and `<name> is required for action=<action>`.
 
 ### Fixed
 

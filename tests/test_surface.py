@@ -147,10 +147,10 @@ class SurfaceTests(unittest.TestCase):
     def test_action_parameters_are_checked_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.object_edit("create_primitive", "P"), "requires: kind"),
-            (server.object_edit("shade", "P", rgba=(1, 1, 1, 1)), "does not accept: rgba"),
-            (server.mesh_edit("modifier", "P", kind="bevel"), "requires: amount"),
-            (server.asset_io("save", "a.blend", names=["P"]), "does not accept: names"),
+            (server.object_edit("create_primitive", "P"), "kind is required for action"),
+            (server.object_edit("shade", "P", rgba=(1, 1, 1, 1)), "Not valid for action=\\w+:\\srgba"),
+            (server.mesh_edit("modifier", "P", kind="bevel"), "amount is required for action"),
+            (server.asset_io("save", "a.blend", names=["P"]), "Not valid for action=\\w+:\\snames"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)

@@ -86,7 +86,7 @@ class PanoramaTests(unittest.TestCase):
             patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
         ):
             report = asyncio.run(server.asset_io("generate", "sky.png", prompt="a sunny meadow", quality="fast"))
-            with self.assertRaisesRegex(ValueError, "does not accept: image"):
+            with self.assertRaisesRegex(ValueError, "Not valid for action=.*: image"):
                 asyncio.run(server.asset_io("generate", "other.png", prompt="meadow", image="input.png"))
         self.assertEqual((report["steps"], report["quality"]), (12, "fast"))
         self.assertTrue((self.work / "sky.png").is_file())

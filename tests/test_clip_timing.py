@@ -36,6 +36,6 @@ class ClipTimingTests(unittest.TestCase):
         for rate in (0, -1, True, float('inf'), '2'):
             with self.subTest(rate=rate), self.assertRaises(ValueError):
                 ClipTiming(start_frame=1, playback_rate=rate)
-        with self.assertRaisesRegex(ValueError, 'does not accept: timing'):
+        with self.assertRaisesRegex(ValueError, 'Not valid for action=.*: timing'):
             asyncio.run(server.rig_edit('clear_pose', 'Source', timing=ClipTiming(
                 start_frame=1, playback_rate=2), lease_id='L'))

@@ -1,26 +1,26 @@
 [
-  {"id":"node-controls-missing-node","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node_settings":{"normalize":true}},"kind":"invalid","modes":["protocol","native"],"error":"requires: node"},
-  {"id":"node-controls-missing-settings","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise"},"kind":"invalid","modes":["protocol","native"],"error":"requires: node_settings"},
+  {"id":"node-controls-missing-node","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node_settings":{"normalize":true}},"kind":"invalid","modes":["protocol","native"],"error":"node is required for action"},
+  {"id":"node-controls-missing-settings","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise"},"kind":"invalid","modes":["protocol","native"],"error":"node_settings is required for action"},
   {"id":"node-controls-empty","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise","node_settings":{}},"kind":"invalid","modes":["protocol","native"],"error":"requires nonempty node_settings"},
-  {"id":"node-controls-cross-action","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise","node_settings":{"normalize":true},"node_type":"ShaderNodeTexNoise"},"kind":"invalid","modes":["protocol","native"],"error":"set_node does not accept"},
+  {"id":"node-controls-cross-action","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise","node_settings":{"normalize":true},"node_type":"ShaderNodeTexNoise"},"kind":"invalid","modes":["protocol","native"],"error":"Not valid for action=set_node"},
   {"id":"spatial-pair-length","tool":"scene_info","arguments":{"spatial":["Roof"]},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"spatial-mixed-modes","tool":"scene_info","arguments":{"name":"Roof","spatial":["Roof","House"]},"kind":"invalid","modes":["protocol","native"],"error":"spatial excludes pagination"},
   {"id":"spatial-object-rejected","tool":"scene_info","arguments":{"spatial":{"subjects":["Roof"],"context":["House"],"max_triangles":1}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"spatial-object-context","tool":"scene_info","arguments":{"spatial":{"subjects":["Roof"]}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
-  {"id":"ramp-missing-node","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node_settings":{"interpolation":"LINEAR"}},"kind":"invalid","modes":["protocol","native"],"error":"requires: node"},
-  {"id":"ramp-missing-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette"},"kind":"invalid","modes":["protocol","native"],"error":"requires: node_settings"},
+  {"id":"ramp-missing-node","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node_settings":{"interpolation":"LINEAR"}},"kind":"invalid","modes":["protocol","native"],"error":"node is required for action"},
+  {"id":"ramp-missing-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette"},"kind":"invalid","modes":["protocol","native"],"error":"node_settings is required for action"},
   {"id":"ramp-empty-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{}},"kind":"invalid","modes":["protocol","native"],"error":"requires nonempty node_settings"},
-  {"id":"ramp-output-fields","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{"interpolation":"LINEAR"},"outputs":{"Color":[1,1,1,1]}},"kind":"invalid","modes":["protocol","native"],"error":"set_ramp does not accept"},
+  {"id":"ramp-output-fields","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{"interpolation":"LINEAR"},"outputs":{"Color":[1,1,1,1]}},"kind":"invalid","modes":["protocol","native"],"error":"Not valid for action=set_ramp"},
   {"id":"region-needs-name","tool":"scene_info","arguments":{"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"region requires a mesh name"},
   {"id":"region-excludes-face-page","tool":"scene_info","arguments":{"name":"EvalProp","faces":true,"region":{"seed":0}},"kind":"invalid","modes":["protocol","native"],"error":"excludes other inspection modes"},
   {"id":"region-seed-type","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":true}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"region-angle-range","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":0,"angle_limit_degrees":181}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"region-duplicate-boundaries","tool":"scene_info","arguments":{"name":"EvalProp","region":{"seed":0,"stop_at":["seam","seam"]}},"kind":"invalid","modes":["protocol","native"],"error":"boundaries must be unique"},
-  {"id":"face-material-missing","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","face_indices":[0]},"kind":"invalid","modes":["protocol","native"],"error":"requires: material_name"},
+  {"id":"face-material-missing","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","face_indices":[0]},"kind":"invalid","modes":["protocol","native"],"error":"material_name is required for action"},
   {"id":"face-material-duplicates","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0,0]},"kind":"invalid","modes":["protocol","native"],"error":"unique current indices"},
   {"id":"face-material-hash","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"expected_mesh_sha256":"bad"},"kind":"invalid","modes":["protocol","native"],"error":"pattern"},
-  {"id":"face-material-extra","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"offset":[0,0,1]},"kind":"invalid","modes":["protocol","native"],"error":"assign_faces does not accept"},
-  {"id": "delete-parameter", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "new_name": "Unused"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "delete does not accept"},
+  {"id":"face-material-extra","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"offset":[0,0,1]},"kind":"invalid","modes":["protocol","native"],"error":"Not valid for action=assign_faces"},
+  {"id": "delete-parameter", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "new_name": "Unused"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Not valid for action=delete"},
   {"id": "keyframe-no-channel", "tool": "object_edit", "arguments": {"action": "keyframe", "name": "EvalProp", "action_name": "Clip", "keyframes": [{"frame": 1}]}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
   {"id": "visibility-no-flag", "tool": "object_edit", "arguments": {"action": "visibility", "name": "EvalProp"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "visibility needs"},
   {"id": "primitive-unknown-kind", "tool": "object_edit", "arguments": {"action": "create_primitive", "name": "EvalShape", "kind": "teapot"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
@@ -31,7 +31,7 @@
   {"id": "rig-edit-bones-empty", "tool": "rig_edit", "arguments": {"action": "edit_bones", "name": "EvalRig"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "needs bones or names"},
   {"id": "stl-import-missing", "tool": "asset_io", "arguments": {"action": "import", "path": "missing.stl", "name": "MissingStl"}, "kind": "invalid", "modes": ["native"], "error": "STL does not exist"},
   {"id": "ply-export-empties", "tool": "asset_io", "arguments": {"action": "export", "path": "loose.ply", "names": ["BakeLow"], "include_empties": true}, "kind": "invalid", "modes": ["native"], "error": "include_empties applies to FBX, GLB and Alembic"},
-  {"id": "procedural-add-node-group", "tool": "geometry_nodes", "arguments": {"action": "add", "name": "EvalProp", "modifier": "Lift"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "requires: node_group"},
+  {"id": "procedural-add-node-group", "tool": "geometry_nodes", "arguments": {"action": "add", "name": "EvalProp", "modifier": "Lift"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "node_group is required for action"},
   {"id": "scatter-slope-range", "tool": "scatter", "arguments": {"name": "EvalProp", "collection": "Props", "density": 1, "max_slope_degrees": 120}, "kind": "invalid", "modes": ["protocol", "native"], "error": "less than or equal to 90"},
   {"id": "delete-boolean", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "recursive": "yes"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "boolean"},
   {"id": "delete-lease", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp"}, "kind": "safety", "modes": ["native"], "without_lease": true, "error": "lease_id"},
@@ -72,7 +72,7 @@
     "id": "move-vertices-needs-selection",
     "tool": "mesh_edit", "arguments": {"action":"move_vertices","name":"EvalProp","offset":[0,0,1]},
     "kind": "invalid", "modes": ["protocol", "native"],
-    "error": "requires: vertex_indices"
+    "error": "vertex_indices is required for action"
   },
   {
     "id": "move-vertices-rejects-duplicates",
@@ -175,7 +175,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: triangulate"
+    "error": "Not valid for action=save: triangulate"
   },
   {
     "id": "fbx-triangulate-bake-pair",
@@ -198,7 +198,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: triangulate"
+    "error": "Not valid for action=export: triangulate"
   },
   {
     "id": "edge-page-requires-name",
@@ -222,7 +222,7 @@
     "arguments": {"action": "set_seams", "name": "EvalProp", "edge_indices": [0]},
     "kind": "invalid",
     "modes": ["protocol", "native"],
-    "error": "requires: seam"
+    "error": "seam is required for action"
   },
   {
     "id": "seam-edit-duplicate-edges",
@@ -246,7 +246,7 @@
     "arguments": {"action": "unwrap_faces", "name": "EvalProp", "face_indices": [0]},
     "kind": "invalid",
     "modes": ["protocol", "native"],
-    "error": "requires: uv_region"
+    "error": "uv_region is required for action"
   },
   {
     "id": "unwrap-faces-invalid-region",
@@ -262,7 +262,7 @@
     "arguments": {"action": "unwrap", "name": "EvalProp", "uv_region": {"bounds": [0,0,1,1], "texture_resolution": [2048,1024], "margin_px": 8}},
     "kind": "invalid",
     "modes": ["protocol", "native"],
-    "error": "does not accept: uv_region"
+    "error": "Not valid for action=unwrap: uv_region"
   },
   {
     "id": "face-page-requires-name",
@@ -311,7 +311,7 @@
     "arguments": {"action": "open", "path": "source.blend", "names": ["Cube"]},
     "kind": "invalid",
     "modes": ["protocol", "native"],
-    "error": "does not accept: names"
+    "error": "Not valid for action=open: names"
   },
   {
     "id": "extract-faces-empty",
@@ -381,7 +381,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "facial-invalid-animation-target",
@@ -411,7 +411,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: animation_target"
+    "error": "Not valid for action=clear_pose: animation_target"
   },
   {
     "id": "nla-edit-empty-settings",
@@ -465,7 +465,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: strip_name"
+    "error": "strip_name is required for action"
   },
   {
     "id": "clip-timing-zero-rate",
@@ -698,7 +698,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: kind"
+    "error": "kind is required for action"
   },
   {
     "id": "object_edit-unrelated-parameter",
@@ -718,7 +718,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: rgba"
+    "error": "Not valid for action=shade: rgba"
   },
   {
     "id": "mesh_edit-missing-argument",
@@ -1297,7 +1297,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: uv_layer"
+    "error": "Not valid for action=modifier: uv_layer"
   },
   {
     "id": "set_color-shared-data",
@@ -1516,7 +1516,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: names",
+    "error": "Not valid for action=save: names",
     "absent": [
       "other.blend"
     ]
@@ -2657,7 +2657,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: target_faces"
+    "error": "Not valid for action=decimate_to: target_faces"
   },
   {
     "id": "decimate-to-both-targets",
@@ -2732,7 +2732,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: target_faces"
+    "error": "target_faces is required for action"
   },
   {
     "id": "remesh-quad-preserve",
@@ -2916,7 +2916,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: target_px_per_m"
+    "error": "target_px_per_m is required for action"
   },
   {
     "id": "texel-density-missing-layer",
@@ -3201,7 +3201,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "rename-existing",
@@ -3258,7 +3258,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: grid"
+    "error": "Not valid for action=add_socket: grid"
   },
   {
     "id": "add-socket-duplicate",
@@ -3471,7 +3471,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: names"
+    "error": "Not valid for action=export: names"
   },
   {
     "id": "export-axis-glb",
@@ -3812,7 +3812,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: operand"
+    "error": "operand is required for action"
   },
   {
     "id": "boolean-missing-operation",
@@ -3827,7 +3827,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: operation"
+    "error": "operation is required for action"
   },
   {
     "id": "join-missing-names",
@@ -3841,7 +3841,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: names"
+    "error": "names is required for action"
   },
   {
     "id": "array-missing-offset",
@@ -3856,7 +3856,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: offset"
+    "error": "offset is required for action"
   },
   {
     "id": "solidify-missing-thickness",
@@ -3870,7 +3870,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: thickness"
+    "error": "thickness is required for action"
   },
   {
     "id": "duplicate-missing-name",
@@ -3884,7 +3884,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "unparent-unrelated",
@@ -3899,7 +3899,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: new_name"
+    "error": "Not valid for action=unparent: new_name"
   },
   {
     "id": "move-to-collection-missing",
@@ -3913,7 +3913,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "duplicate-count-bound",
@@ -4441,7 +4441,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: bones"
+    "error": "bones is required for action"
   },
   {
     "id": "rig-create-missing-tail",
@@ -4479,7 +4479,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: names"
+    "error": "names is required for action"
   },
   {
     "id": "rig-weights-bound",
@@ -4738,7 +4738,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: poses"
+    "error": "poses is required for action"
   },
   {
     "id": "rig-keyframe-missing-action",
@@ -4767,7 +4767,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: action_name"
+    "error": "action_name is required for action"
   },
   {
     "id": "rig-keyframe-missing-keyframes",
@@ -4782,7 +4782,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: keyframes"
+    "error": "keyframes is required for action"
   },
   {
     "id": "rig-clear-pose-unrelated",
@@ -4806,7 +4806,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: poses"
+    "error": "Not valid for action=clear_pose: poses"
   },
   {
     "id": "rig-keyframe-success",
@@ -6037,7 +6037,7 @@
     "modes": [
       "native"
     ],
-    "error": "does not accept: high",
+    "error": "Not valid for action=curvature: high",
     "absent": [
       "eval-bad-curv.png"
     ]
@@ -6184,7 +6184,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "shape-key-remove-basis",
@@ -6535,7 +6535,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires"
+    "error": "is required for action"
   },
   {
     "id": "level-snap-missing",
@@ -6551,7 +6551,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires"
+    "error": "is required for action"
   },
   {
     "id": "level-terrain-name",
@@ -7505,7 +7505,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: expected_sha256"
+    "error": "expected_sha256 is required for action"
   },
   {
     "id": "library-invalid-source-sha",
@@ -7635,7 +7635,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: new_name"
+    "error": "new_name is required for action"
   },
   {
     "id": "instance-variant-rejects-linked",
@@ -7682,7 +7682,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "does not accept"
+    "error": "Not valid for action"
   },
   {
     "id": "shader-set-missing-node",
@@ -7698,7 +7698,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "requires: node"
+    "error": "node is required for action"
   },
   {
     "id": "shader-set-empty-inputs",
@@ -7729,7 +7729,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "does not accept"
+    "error": "Not valid for action"
   },
   {
     "id": "shader-image-needs-node",
@@ -7746,7 +7746,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "requires: node"
+    "error": "node is required for action"
   },
   {
     "id": "shader-image-needs-color-space",
@@ -7784,7 +7784,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "does not accept"
+    "error": "Not valid for action"
   },
   {
     "id": "shader-inspect-rejects-outputs",
@@ -7805,7 +7805,7 @@
     "modes": [
       "protocol"
     ],
-    "error": "does not accept"
+    "error": "Not valid for action"
   },
   {
     "id": "udim-empty-tiles",
@@ -7944,7 +7944,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: uv_transform"
+    "error": "uv_transform is required for action"
   },
   {
     "id": "uv-transform-empty",
@@ -8000,7 +8000,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: amount"
+    "error": "Not valid for action=uv_transform: amount"
   },
   {
     "id": "mesh-single-user-extra-parameter",
@@ -8017,7 +8017,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: components"
+    "error": "Not valid for action=make_single_user: components"
   },
   {
     "id": "mesh-single-user-missing-object",
@@ -8044,7 +8044,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: names"
+    "error": "names is required for action"
   },
   {
     "id": "material-variant-unrelated-control",
@@ -8062,7 +8062,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: roughness"
+    "error": "Not valid for action=make_unique: roughness"
   },
   {
     "id": "material-variant-shader-edit-parameter",
@@ -8080,7 +8080,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: node"
+    "error": "Not valid for action=make_unique: node"
   },
   {
     "id": "bake-shader-missing-source",
@@ -8110,7 +8110,7 @@
       "protocol",
       "native"
     ],
-    "error": "requires: high"
+    "error": "high is required for action"
   },
   {
     "id": "bake-shader-invalid-source",
@@ -8156,7 +8156,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: high"
+    "error": "Not valid for action=shader: high"
   },
   {
     "id": "bake-shader-invalid-png-precision",
@@ -8193,7 +8193,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: uv_layer"
+    "error": "Not valid for action=save: uv_layer"
   },
   {
     "id": "import-uv-argument",
@@ -8209,7 +8209,7 @@
       "protocol",
       "native"
     ],
-    "error": "does not accept: uv_layer"
+    "error": "Not valid for action=import: uv_layer"
   },
   {
     "id": "empty-export-uv",
@@ -8234,21 +8234,21 @@
   {"id": "region-uv-missing-layer", "tool": "scene_info", "arguments": {"name": "EvalProp", "region": {"seed": 0, "stop_at": ["uv"]}}, "error": "require uv_layer", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "region-uv-unused-layer", "tool": "scene_info", "arguments": {"name": "EvalProp", "region": {"seed": 0}, "uv_layer": "UVMap"}, "error": "exclude it", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "uv-identity-invalid", "tool": "mesh_edit", "arguments": {"action": "uv_transform", "name": "EvalProp", "expected_uv_sha256": "bad", "uv_transform": {"faces": [0]}}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]},
-  {"id": "uv-identity-unrelated-action", "tool": "mesh_edit", "arguments": {"action": "unwrap", "name": "EvalProp", "expected_uv_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "error": "does not accept: expected_uv_sha256", "kind": "invalid", "modes": ["protocol", "native"]},
-  {"id": "modifier-update-missing-name", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "amount": 0.1}, "error": "requires: modifier_name", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "uv-identity-unrelated-action", "tool": "mesh_edit", "arguments": {"action": "unwrap", "name": "EvalProp", "expected_uv_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "error": "Not valid for action=unwrap: expected_uv_sha256", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-update-missing-name", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "amount": 0.1}, "error": "modifier_name is required for action", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-update-missing-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel"}, "error": "requires: amount", "kind": "invalid", "modes": ["protocol", "native"]},
-  {"id": "modifier-remove-unused-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "amount": 0.1}, "error": "does not accept: amount", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-remove-unused-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "amount": 0.1}, "error": "Not valid for action=modifier_remove: amount", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-name-empty", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": ""}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-map-and-amount", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel", "amount": 0.1, "modifier_settings": {"segments": 8}}, "error": "exclusively", "kind": "invalid", "modes": ["protocol", "native"]},
-  {"id": "modifier-map-unused-action", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "modifier_settings": {"segments": 8}}, "error": "does not accept: modifier_settings", "kind": "invalid", "modes": ["protocol", "native"]},
+  {"id": "modifier-map-unused-action", "tool": "mesh_edit", "arguments": {"action": "modifier_remove", "name": "EvalProp", "modifier_name": "Bevel", "modifier_settings": {"segments": 8}}, "error": "Not valid for action=modifier_remove: modifier_settings", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "modifier-map-list", "tool": "mesh_edit", "arguments": {"action": "modifier_update", "name": "EvalProp", "modifier_name": "Bevel", "modifier_settings": []}, "error": "validation", "kind": "invalid", "modes": ["protocol", "native"]},
   {"id": "shader-connect-empty-bindings", "tool": "assign_material", "arguments": {"action": "connect", "material_name": "ArtistFinish", "node": "Surface", "inputs": {}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "1 to 32 socket bindings"},
   {"id": "shader-connect-malformed-binding", "tool": "assign_material", "arguments": {"action": "connect", "material_name": "ArtistFinish", "node": "Surface", "inputs": {"Color": {"node": "Tint"}}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Link bindings require"},
-  {"id": "shader-connect-rejects-defaults", "tool": "assign_material", "arguments": {"action": "connect", "material_name": "ArtistFinish", "node": "Surface", "inputs": {"Color": {"node": "Tint", "socket": "Color"}}, "outputs": {"Value": 1}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "does not accept"},
+  {"id": "shader-connect-rejects-defaults", "tool": "assign_material", "arguments": {"action": "connect", "material_name": "ArtistFinish", "node": "Surface", "inputs": {"Color": {"node": "Tint", "socket": "Color"}}, "outputs": {"Value": 1}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Not valid for action"},
   {"id": "shader-disconnect-rejects-replacement", "tool": "assign_material", "arguments": {"action": "disconnect", "material_name": "ArtistFinish", "node": "Surface", "inputs": {"Color": {"node": "Tint", "socket": "Color"}}, "update_existing": true}, "kind": "invalid", "modes": ["protocol", "native"], "error": "does not accept update_existing"},
-  {"id": "node-create-needs-type", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node": "Noise"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "requires: node_type"},
-  {"id": "node-create-needs-name", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node_type": "ShaderNodeMath"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "requires: node"},
-  {"id": "node-types-excludes-settings", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "node_types", "node_settings": {}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "does not accept"},
-  {"id": "node-create-excludes-links", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node": "Noise", "node_type": "ShaderNodeTexNoise", "inputs": {"Scale": 2}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "does not accept"},
-  {"id": "shader-input-excludes-node-type", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "set_inputs", "node": "Noise", "inputs": {"Scale": 2}, "node_type": "ShaderNodeTexNoise"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "does not accept"}
+  {"id": "node-create-needs-type", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node": "Noise"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "node_type is required for action"},
+  {"id": "node-create-needs-name", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node_type": "ShaderNodeMath"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "node is required for action"},
+  {"id": "node-types-excludes-settings", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "node_types", "node_settings": {}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Not valid for action"},
+  {"id": "node-create-excludes-links", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "create_node", "node": "Noise", "node_type": "ShaderNodeTexNoise", "inputs": {"Scale": 2}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Not valid for action"},
+  {"id": "shader-input-excludes-node-type", "tool": "assign_material", "arguments": {"material_name": "Glaze", "action": "set_inputs", "node": "Noise", "inputs": {"Scale": 2}, "node_type": "ShaderNodeTexNoise"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "Not valid for action"}
 ]

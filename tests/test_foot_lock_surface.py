@@ -40,7 +40,7 @@ class FootLockTests(unittest.TestCase):
                     lease_id="L",
                 )
             )
-            with self.assertRaisesRegex(ValueError, "does not accept: foot_locks"):
+            with self.assertRaisesRegex(ValueError, "Not valid for action=.*: foot_locks"):
                 asyncio.run(server.rig_edit("clear_pose", "Rig", foot_locks=[window], lease_id="L"))
         self.assertEqual(calls[0]["operation"], "lock_rig_contacts")
         self.assertEqual(calls[0]["params"]["foot_locks"][0]["pole"], (0, -1, 1))
