@@ -632,7 +632,8 @@ scene_unit_meters scale. Existing additional fields remain available.
 Anticipated failures keep readable text and add an error object with version, code,
 operation, outcome, retry_safe and next_action. INVALID_ARGUMENT and INPUT_NOT_FOUND
 identify local validation/input failures. Transport or protocol uncertainty uses
-OUTCOME_UNKNOWN and requires application/output inspection. retry_safe=false never
+OUTCOME_UNKNOWN with next_action scene_info, or session_control for ownership
+failures. retry_safe=false never
 authorizes an automatic mutation retry. Unexpected defects remain opaque.
 
 

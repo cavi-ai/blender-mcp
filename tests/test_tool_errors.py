@@ -50,6 +50,26 @@ class AnticipatedErrorTests(unittest.TestCase):
             asyncio.run(server.object_edit("rename", "A"))
 
 
+class RecoveryActionTests(unittest.IsolatedAsyncioTestCase):
+    async def reply(self, name, arguments):
+        from mcp.server.mcpserver import Context
+
+        return (await server.mcp.call_tool(name, arguments, Context(mcp_server=server.mcp))
+                ).structured_content["error"]
+
+    async def test_unknown_outcomes_name_the_blender_inspection_tool(self):
+        cases = (("scene_info", {}, "scene_info"),
+                 ("session_control", {"action": "inspect"}, "session_control"))
+        for name, arguments, action in cases:
+            with self.subTest(name=name), bridge_raising(BridgeOperationError("no diagnostic")):
+                error = await self.reply(name, arguments)
+            self.assertEqual((error["outcome"], error["next_action"]), ("unknown", action))
+
+    async def test_rejected_inputs_still_point_at_the_inputs(self):
+        error = await self.reply("object_edit", {"action": "rename", "name": "A"})
+        self.assertEqual((error["outcome"], error["next_action"]), ("rejected", "inspect_inputs"))
+
+
 class ServerInfoTests(unittest.TestCase):
     def test_reports_the_package_version(self):
         async def info():

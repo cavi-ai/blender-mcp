@@ -3,6 +3,7 @@ import json
 import string
 from collections import Counter
 
+from cavi_mcp_core.contracts import failure
 from cavi_mcp_core.schema import compact_schema
 from cavi_mcp_core.schema_refs import map_schema, preserve_structure
 from cavi_mcp_core.server import Server as CoreServer
@@ -106,6 +107,11 @@ def short_references(schema):
 
 
 class BlenderServer(CoreServer):
+    def failure(self, name, error):
+        # Ownership state is read through session_control; everything else through scene_info.
+        action = 'session_control' if name == 'session_control' else 'scene_info'
+        return failure(name, error, unknown_next_action=action)
+
     async def list_tools(self):
         tools = await super().list_tools()
         if not self.compact_schemas:
