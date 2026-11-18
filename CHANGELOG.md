@@ -7,6 +7,8 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+## 0.58.0 - 2026-11-18
+
 ### Added
 
 - `asset_io` generate `quality="fast"` runs the MLX providers with fewer steps (TripoSG also on a 256³ grid).
@@ -42,6 +44,8 @@ adds its lines under Unreleased and never edits a version.
 - Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.
 - Mesh unwrap joins UV corners that island scaling leaves a float step apart, so pinched surfaces pack without sliver overlaps.
 - `rig_edit` `retarget` without calibration keys child bones against their parent's pose at the same frame and keeps rotation keys in one quaternion hemisphere.
+- `mesh_edit` `uv_transform` with a density target reports the selected faces' materials instead of reading stale face data.
+- FBX and USD texture sidecars keep 8-bit sRGB image pixels and alpha as stored instead of applying a second color transfer.
 
 ## 0.57.0 - 2026-11-09
 

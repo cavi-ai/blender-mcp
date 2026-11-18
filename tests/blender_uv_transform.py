@@ -88,6 +88,12 @@ with tempfile.TemporaryDirectory() as folder:
         else:
             raise AssertionError('Injected write failure was ignored')
     assert before == uvs() and source == snapshot(), 'Partial UV write was not rolled back'
+    # Density matching updates the depsgraph; the report still names the face's own material.
+    mesh.polygons[1].material_index = 1
+    matched = edit({'faces':[1],'pivot':[.5,.5]}, target_px_per_m=128, uv_region={
+        'bounds':[.25,.25,.75,.75],'texture_resolution':[1024,1024],'margin_px':8,'allow_pinned':True})
+    assert matched['uv_transform']['materials'] == ['OtherFinish'], matched['uv_transform']
+    before = uvs()
     # Persist/reopen proves the edit is native mesh data rather than a cached report.
     bpy.ops.wm.save_as_mainfile(filepath=str(root/'face-uvs.blend'))
     bpy.ops.wm.open_mainfile(filepath=str(root/'face-uvs.blend'))
