@@ -248,26 +248,37 @@ def sidecar_copy(image, target):
                          "remap HDR/signed source values explicitly")
     # A float staging image avoids reducing loaded PNG16 sources to byte pixels.
     # save_render applies the required scene-linear -> sRGB transfer for color;
-    # Raw retains data-map samples. Source images and render profiles are untouched.
+    # Raw retains data-map samples; byte sRGB is saved without another transfer.
+    # Source images and render profiles are untouched.
     high_precision = image.is_float or image.depth > channels * 8
-    staging = bpy.data.images.new(f"cavi-sidecar-{target.stem}", width, height,
-                                  alpha=True, float_buffer=True)
-    scene = bpy.data.scenes.new("Cavi texture export")
     data_map = image.colorspace_settings.is_data
+    byte_srgb = not high_precision and image.colorspace_settings.name == "sRGB"
+    staging = bpy.data.images.new(f"cavi-sidecar-{target.stem}", width, height,
+                                  alpha=True, float_buffer=not byte_srgb)
+    scene = None
     try:
+        if byte_srgb:
+            staging.alpha_mode = "CHANNEL_PACKED"
         staging.pixels.foreach_set(values.ravel())
-        scene.render.image_settings.file_format = "PNG"
-        scene.render.image_settings.color_mode = "RGBA"
-        scene.render.image_settings.color_depth = "16" if high_precision else "8"
-        scene.render.dither_intensity = 0
-        scene.view_settings.view_transform = "Raw" if data_map else "Standard"
-        scene.view_settings.look = "None"
-        scene.view_settings.exposure = 0
-        scene.view_settings.gamma = 1
-        staging.save_render(str(target), scene=scene)
+        if byte_srgb:
+            staging.filepath_raw = str(target)
+            staging.file_format = "PNG"
+            staging.save()
+        else:
+            scene = bpy.data.scenes.new("Cavi texture export")
+            scene.render.image_settings.file_format = "PNG"
+            scene.render.image_settings.color_mode = "RGBA"
+            scene.render.image_settings.color_depth = "16" if high_precision else "8"
+            scene.render.dither_intensity = 0
+            scene.view_settings.view_transform = "Raw" if data_map else "Standard"
+            scene.view_settings.look = "None"
+            scene.view_settings.exposure = 0
+            scene.view_settings.gamma = 1
+            staging.save_render(str(target), scene=scene)
     finally:
         bpy.data.images.remove(staging)
-        bpy.data.scenes.remove(scene)
+        if scene is not None:
+            bpy.data.scenes.remove(scene)
     copy = bpy.data.images.load(str(target), check_existing=False)
     copy.colorspace_settings.name = "Non-Color" if data_map else "sRGB"
     return copy
