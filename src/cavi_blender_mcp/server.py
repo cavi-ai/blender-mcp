@@ -670,7 +670,7 @@ async def object_edit(
     action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
                     "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
-                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe"], Field(description="Action")],
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe", "visibility"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
     kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
     location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
@@ -701,6 +701,8 @@ async def object_edit(
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
     recursive: Annotated[StrictBool | None, Field(description='delete: descendants')] = None,
+    hide_viewport: Annotated[StrictBool | None, Field(description='visibility: viewport')] = None,
+    hide_render: Annotated[StrictBool | None, Field(description='visibility: render')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ObjectEditResult:
     """Create, transform or delete objects and branch data."""
@@ -710,7 +712,14 @@ async def object_edit(
               "origin": origin, "grid": grid, "new_name": new_name, "count": count,
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
-              "offsets": offsets, "recursive": recursive}
+              "offsets": offsets, "recursive": recursive, "hide_viewport": hide_viewport,
+              "hide_render": hide_render}
+
+    def visible():
+        params = pick(action, values, (), {"hide_viewport": None, "hide_render": None})
+        if hide_viewport is None and hide_render is None:
+            raise ValueError("visibility needs hide_viewport or hide_render")
+        return params
 
     def frames(kind, fields):
         if any(not isinstance(item, kind) for item in keyframes):
@@ -754,6 +763,7 @@ async def object_edit(
             **pick(action, values, ["action_name", "keyframes"]),
             "keyframes": frames(TransformKeyframe, "location/rotation_degrees/scale"),
         }),
+        "visibility": ("set_visibility", visible),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 

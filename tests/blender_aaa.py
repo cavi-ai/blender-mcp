@@ -322,6 +322,15 @@ refused("object_keyframe", "increasing", name="TurnCam", action_name="Other",
 assert "Other" not in bpy.data.actions
 bpy.data.actions.remove(bpy.data.actions["TurnCam_Spin"])
 bpy.data.objects.remove(camera)
+# Visibility: viewport sets the object flag and the view-layer eye; render is separate.
+hidden = edit("set_visibility", name="SM_Box", hide_viewport=True, hide_render=True)
+assert hidden["hide_viewport"] and hidden["hide_render"] and box.hide_get() and box.hide_render
+assert hidden["visibility_before"] == {"hide_viewport": False, "hide_render": False}, hidden
+shown = edit("set_visibility", name="SM_Box", hide_viewport=False)
+assert not shown["hide_viewport"] and shown["hide_render"] and not box.hide_get(), shown
+edit("set_visibility", name="SM_Box", hide_render=False)
+assert not box.hide_render and not box.hide_viewport
+refused("set_visibility", "boolean", name="SM_Box")
 edit("rename_object", name="SM_Box", new_name="SM_Crate_B")
 assert "SM_Crate_B" in bpy.data.objects and bpy.data.objects["SM_Crate_B"].data.name == "SM_Crate_B"
 refused("rename_object", "unique", name="SM_Crate_B", new_name="SM_Rock")

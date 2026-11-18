@@ -396,7 +396,10 @@ It takes only `name` and `lease_id`; `mesh_copy` reports whether a copy was need
 Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
 `add_socket`, `duplicate`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
-`shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`.
+`shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`,
+`visibility`.
+
+`visibility` sets `hide_viewport` (object flag and view-layer eye) and/or `hide_render`.
 
 `keyframe` keys `location`, `rotation_degrees` and `scale` of any object into a new
 `action_name` clip, 1–32 frames, with per-key `interpolation`.

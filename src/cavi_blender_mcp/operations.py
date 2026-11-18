@@ -113,6 +113,7 @@ OPERATIONS = frozenset(
         "rename_object",
         "add_socket",
         "object_keyframe",
+        "set_visibility",
         "export_asset",
         "review_sheet",
         "scatter",

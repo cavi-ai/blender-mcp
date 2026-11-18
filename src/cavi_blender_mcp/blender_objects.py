@@ -259,6 +259,27 @@ def move_to_collection(p):
     return {**info(value), "collection": collection.name}
 
 
+def visibility(p):
+    object_mode()
+    value = obj(p["name"])
+    changes = {key: p[key] for key in ("hide_viewport", "hide_render") if p.get(key) is not None}
+    if not changes or any(type(flag) is not bool for flag in changes.values()):
+        raise ValueError("visibility needs boolean hide_viewport or hide_render")
+    layer = bpy.context.view_layer
+    before = {"hide_viewport": value.hide_viewport or value.hide_get(view_layer=layer),
+              "hide_render": value.hide_render}
+    if "hide_render" in changes:
+        value.hide_render = changes["hide_render"]
+    if "hide_viewport" in changes:
+        # The viewport flag and the view-layer eye both hide it; set them together.
+        value.hide_viewport = changes["hide_viewport"]
+        if value.name in layer.objects:
+            value.hide_set(changes["hide_viewport"], view_layer=layer)
+    return {**info(value), "visibility_before": before,
+            "hide_viewport": value.hide_viewport or value.hide_get(view_layer=layer),
+            "hide_render": value.hide_render}
+
+
 KEY_CHANNELS = {"location": "location", "rotation_degrees": "rotation_euler", "scale": "scale"}
 INTERPOLATIONS = {"BEZIER", "LINEAR", "CONSTANT"}
 
@@ -345,4 +366,4 @@ HANDLERS = {"make_mesh_single_user": make_single_user,
             "snap_to_grid": snap_to_grid, "rename_object": rename, "add_socket": add_socket,
             "duplicate_object": duplicate, "parent_object": parent,
             "unparent_object": unparent, "move_to_collection": move_to_collection,
-            "object_keyframe": object_keyframe}
+            "object_keyframe": object_keyframe, "set_visibility": visibility}

@@ -60,7 +60,7 @@ RIG = frozenset({"create_armature", "bind_skin", "repair_weights"})
 ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})
 OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
-                     "move_to_collection", "object_keyframe"})
+                     "move_to_collection", "object_keyframe", "set_visibility"})
 MAX_MODIFIERS = 16
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"

@@ -27,6 +27,7 @@ Unrelated action parameters are refused before contacting Blender.
 | `shape_key_keyframe` | `new_name`, `action_name`, `keyframes` = 1–32 `{frame, value}` |
 | `shape_key_remove` | `new_name`; Basis cannot be removed |
 | `keyframe` | `action_name`, `keyframes` = 1–32 `{frame, location, rotation_degrees, scale, interpolation}` |
+| `visibility` | `hide_viewport`, `hide_render`; at least one |
 
 ## Transforms and origins
 
@@ -107,6 +108,12 @@ linear camera turntable:
 ```
 
 The previous action, transform and scene frame are restored on failure.
+
+## Visibility
+
+`visibility` hides or shows one object. `hide_viewport` sets both the object's
+viewport flag and its view-layer eye; `hide_render` excludes it from renders and
+bakes. The result reports `visibility_before` and the new flags.
 
 ## Related
 

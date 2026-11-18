@@ -94,6 +94,21 @@ class AAASurfaceTests(unittest.TestCase):
                     "keyframes": bad, "lease_id": "L"}))
         self.assertEqual(len(calls), 1)
 
+    def test_visibility_maps_viewport_and_render_flags(self):
+        calls = self.capture({"name": "Prop", "type": "MESH", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [1, 1, 1], "parent": None,
+                              "children": [], "collections": [], "modifiers": []})
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "visibility", "name": "Prop", "hide_render": True, "lease_id": "L"}))
+        self.assertEqual(self.inner(calls), [("set_visibility", {
+            "name": "Prop", "hide_viewport": None, "hide_render": True, "lease_id": "L"})])
+        for arguments in ({}, {"hide_viewport": True, "grid": 1}):
+            with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, "visibility"):
+                asyncio.run(server.object_edit("visibility", "Prop", lease_id="L", **arguments))
+        with self.assertRaisesRegex(ValueError, "does not accept"):
+            asyncio.run(server.object_edit("rename", "Prop", new_name="P", hide_render=True))
+
     def test_object_actions_map_to_bridge_operations(self):
         calls = self.capture()
         asyncio.run(server.object_edit("apply_transforms", "R", lease_id="L"))
