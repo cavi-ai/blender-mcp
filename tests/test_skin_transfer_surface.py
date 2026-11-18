@@ -38,7 +38,7 @@ class SkinTransferSurfaceTests(unittest.TestCase):
 
     def test_distance_and_loss_budgets_are_required_before_any_native_edit(self):
         for args in ({'max_distance_m': .02}, {'max_discarded_weight': .005}):
-            with self.subTest(args=args), self.assertRaisesRegex(ValueError, 'requires'):
+            with self.subTest(args=args), self.assertRaisesRegex(ValueError, 'is required for action=transfer_weights'):
                 asyncio.run(server.rig_edit('transfer_weights', 'Coat', source='Body',
                     new_name='CoatSkin', **args))
 
