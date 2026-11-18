@@ -16,6 +16,7 @@ adds its lines under Unreleased and never edits a version.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
 - `asset_io` generate with `prompt` writes a horizontally wrapping 2048×1024 panorama PNG from the local image model for `world.hdri`.
 - `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
+- `scene_info` `spatial` takes an object form with subject and context lists, `proposed_world_delta`, `min_clearance_m` and `samples_per_side`.
 
 ### Fixed
 

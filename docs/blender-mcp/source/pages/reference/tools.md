@@ -4,7 +4,10 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info(spatial=["Subject", "Context"])` evaluates one named subject mesh
-against one named context mesh without editing the scene. It returns metre world bounds, geometry/query
+against one named context mesh without editing the scene. The object form
+`{"subjects": [...], "context": [...]}` takes up to 32 subjects and 128 context
+meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects),
+`min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
 identities, bounded triangle intersection pairs and bidirectional sampled nearest
 surface gaps with fixed safety budgets. Bounds are broadphase only; sampled distances are not
 continuous clearance or solid-containment proofs. See [placement and surface

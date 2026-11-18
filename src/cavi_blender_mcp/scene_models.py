@@ -44,15 +44,18 @@ class CameraRay(Definition):
         return self
 
 
-class SpatialQuery(Definition):
+type Row = tuple[Number, Number, Number, Number]
+
+
+class SpatialSelector(Definition):
     subjects: Annotated[list[Name], Field(min_length=1, max_length=32)]
     context: Annotated[list[Name], Field(min_length=1, max_length=128)]
-    proposed_world_delta: tuple[tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number]] | None = None
+    proposed_world_delta: tuple[Row, Row, Row, Row] | None = None
     min_clearance_m: Annotated[Number, Field(ge=0)] = 0
     samples_per_side: Annotated[StrictInt, Field(ge=1, le=4096)] = 256
+
+
+class SpatialQuery(SpatialSelector):
     max_triangles: Annotated[StrictInt, Field(ge=1, le=200000)] = 100000
     max_pair_tests: Annotated[StrictInt, Field(ge=1, le=2000000)] = 1000000
     max_results: Annotated[StrictInt, Field(ge=1, le=256)] = 32

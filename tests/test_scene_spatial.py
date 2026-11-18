@@ -136,12 +136,24 @@ class SceneSpatialTests(unittest.TestCase):
         from cavi_blender_mcp.operations import LEASE_FREE
         self.assertIn('inspect_scene_spatial', LEASE_FREE)
 
+    def test_spatial_selector_forwards_lists_delta_clearance_and_sampling(self):
+        delta = [[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+        value = {'subjects': ['Shelter', 'Bench'], 'context': ['Town', 'Road'],
+                 'proposed_world_delta': delta, 'min_clearance_m': 0.05, 'samples_per_side': 64}
+        calls = []
+        def call(operation, params):
+            calls.append((operation, params))
+            return {'scope': 'scene_spatial_inspection', 'spatial': {}}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.mcp.call_tool('scene_info', {'spatial': value}))
+        self.assertEqual(calls, [('inspect_scene_spatial', self.model(**value).model_dump(mode='json'))])
+
     def test_public_spatial_selector_rejects_objects_tuning_and_wrong_pair_lengths(self):
         def forbidden(*_):
             raise AssertionError('Invalid public spatial input reached the native bridge')
         with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=forbidden)):
             for value in (['Shelter'], ['Shelter', 'Town', 'Extra'], ['', 'Town'],
-                          {'subjects': ['Shelter'], 'context': ['Town']},
+                          {'subjects': ['Shelter']},
                           {'subjects': ['Shelter'], 'context': ['Town'], 'max_triangles': 10}):
                 with self.subTest(value=value), self.assertRaisesRegex(Exception, 'validation'):
                     asyncio.run(server.mcp.call_tool('scene_info', {'spatial': value}))

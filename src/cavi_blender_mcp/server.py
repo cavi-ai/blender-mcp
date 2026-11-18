@@ -67,6 +67,7 @@ from .scene_models import (
     PreviewSettings,
     RenderSpec,
     SpatialQuery,
+    SpatialSelector,
     SurfaceRay,
     WorldSpec,
 )
@@ -254,7 +255,7 @@ async def scene_info(
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
     region: Annotated[FaceRegion | None, Field(description='Connected source-face page')] = None,
-    spatial: Annotated[tuple[SceneName, SceneName] | None, Field(description='Subject and context mesh names; evaluated placement')] = None,
+    spatial: Annotated[tuple[SceneName, SceneName] | SpatialSelector | None, Field(description='Subject and context mesh names, or lists with world delta and clearance; evaluated placement')] = None,
 ) -> SceneInfo:
     """Inspect objects, source topology or camera-picked scene surfaces."""
     if spatial is not None:
@@ -262,7 +263,8 @@ async def scene_info(
                 or faces is not None or edges is not None or uv_layer is not None
                 or vertices is not None or surface_ray is not None or region is not None):
             raise ValueError('spatial excludes pagination and all other scene_info modes')
-        query = SpatialQuery(subjects=[spatial[0]], context=[spatial[1]])
+        query = (SpatialQuery(**spatial.model_dump()) if isinstance(spatial, SpatialSelector)
+                 else SpatialQuery(subjects=[spatial[0]], context=[spatial[1]]))
         return await run(call, 'inspect_scene_spatial', **query.model_dump(mode='json'))
     if region is not None:
         if name is None or faces or edges or vertices or definition or surface_ray is not None:

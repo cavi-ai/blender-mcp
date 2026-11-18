@@ -33,6 +33,23 @@ surface points.
 
 The pair is ordered subject first, context second, and the names must differ.
 The context may be a combined mesh containing several buildings or props.
+
+To test several subjects, a proposed move, or a required gap, pass the object form:
+
+```json
+{
+  "spatial": {
+    "subjects": ["CanopyRoof", "CanopyPosts"],
+    "context": ["Town", "Road"],
+    "proposed_world_delta": [[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+    "min_clearance_m": 0.05,
+    "samples_per_side": 512
+  }
+}
+```
+
+`proposed_world_delta` is applied to the subjects' world matrices before testing,
+without moving them in the scene.
 This selector excludes pagination and all other `scene_info` inspection modes.
 
 Bounds overlap is a broadphase result. `intersections` tests triangles through
