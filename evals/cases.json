@@ -23,6 +23,7 @@
   {"id": "delete-parameter", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "new_name": "Unused"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "delete does not accept"},
   {"id": "keyframe-no-channel", "tool": "object_edit", "arguments": {"action": "keyframe", "name": "EvalProp", "action_name": "Clip", "keyframes": [{"frame": 1}]}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
   {"id": "visibility-no-flag", "tool": "object_edit", "arguments": {"action": "visibility", "name": "EvalProp"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "visibility needs"},
+  {"id": "primitive-unknown-kind", "tool": "object_edit", "arguments": {"action": "create_primitive", "name": "EvalShape", "kind": "teapot"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
   {"id": "delete-boolean", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "recursive": "yes"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "boolean"},
   {"id": "delete-lease", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp"}, "kind": "safety", "modes": ["native"], "without_lease": true, "error": "lease_id"},
   {"id": "scene-geometry-hash", "tool": "scene_info", "arguments": {"surface_ray": {"camera": "Hero", "pixel": [1, 1], "image_size": [64, 48], "max_distance_m": 5, "evaluated": true, "expected_geometry_sha256": "invalid"}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "pattern"},

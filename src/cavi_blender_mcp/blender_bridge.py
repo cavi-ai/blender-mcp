@@ -614,14 +614,26 @@ def create_primitive(p):
         "cylinder": bpy.ops.mesh.primitive_cylinder_add,
         "cone": bpy.ops.mesh.primitive_cone_add,
         "plane": bpy.ops.mesh.primitive_plane_add,
+        "torus": bpy.ops.mesh.primitive_torus_add,
+        "icosphere": bpy.ops.mesh.primitive_ico_sphere_add,
+        "grid": bpy.ops.mesh.primitive_grid_add,
+        "bezier_curve": bpy.ops.curve.primitive_bezier_curve_add,
+        "text": bpy.ops.object.text_add,
     }
     if p.get("kind") not in constructors:
         raise ValueError("Unknown primitive")
+    body = p.get("body")
+    if (p["kind"] == "text") != (body is not None):
+        raise ValueError("body is required for text primitives and refused otherwise")
+    if body is not None and (not isinstance(body, str) or not 1 <= len(body) <= 1024):
+        raise ValueError("body must be 1 to 1024 characters")
     location = vector(p.get("location") or [0, 0, 0])
     constructors[p["kind"]](location=location)
     value = bpy.context.object
     value.name = name
     value.data.name = name
+    if body is not None:
+        value.data.body = body
     root = bpy.context.scene.collection
     if root not in value.users_collection:
         root.objects.link(value)

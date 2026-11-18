@@ -94,6 +94,23 @@ class AAASurfaceTests(unittest.TestCase):
                     "keyframes": bad, "lease_id": "L"}))
         self.assertEqual(len(calls), 1)
 
+    def test_primitives_include_torus_grid_curve_and_text(self):
+        result = {"name": "P", "type": "MESH", "location": [0, 0, 0],
+                  "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ", "scale": [1, 1, 1],
+                  "dimensions": [1, 1, 1], "parent": None, "children": [], "collections": [],
+                  "modifiers": []}
+        calls = self.capture(result)
+        for kind in ("torus", "icosphere", "grid", "bezier_curve"):
+            asyncio.run(server.mcp.call_tool("object_edit", {
+                "action": "create_primitive", "name": kind, "kind": kind, "lease_id": "L"}))
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "create_primitive", "name": "Sign", "kind": "text", "body": "EXIT",
+            "lease_id": "L"}))
+        self.assertEqual([(op, params["kind"], params["body"]) for op, params in self.inner(calls)],
+                         [("create_primitive", kind, None) for kind in
+                          ("torus", "icosphere", "grid", "bezier_curve")]
+                         + [("create_primitive", "text", "EXIT")])
+
     def test_visibility_maps_viewport_and_render_flags(self):
         calls = self.capture({"name": "Prop", "type": "MESH", "location": [0, 0, 0],
                               "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",

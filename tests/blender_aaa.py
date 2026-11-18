@@ -331,6 +331,20 @@ assert not shown["hide_viewport"] and shown["hide_render"] and not box.hide_get(
 edit("set_visibility", name="SM_Box", hide_render=False)
 assert not box.hide_render and not box.hide_viewport
 refused("set_visibility", "boolean", name="SM_Box")
+# Primitives: torus, icosphere and grid meshes, a Bezier curve and a text object.
+shapes = {kind: edit("create_primitive", name=f"Prim_{kind}", kind=kind, location=[0, 0, -20])
+          for kind in ("torus", "icosphere", "grid", "bezier_curve")}
+assert [shapes[k]["type"] for k in shapes] == ["MESH", "MESH", "MESH", "CURVE"], shapes
+assert shapes["torus"]["vertices"] == 576 and shapes["icosphere"]["vertices"] == 42, shapes
+sign = edit("create_primitive", name="Prim_text", kind="text", body="EXIT")
+assert sign["type"] == "FONT" and bpy.data.objects["Prim_text"].data.body == "EXIT", sign
+refused("create_primitive", "body", name="Prim_bad", kind="text")
+refused("create_primitive", "body", name="Prim_bad", kind="cube", body="x")
+for kind in (*shapes, "text"):
+    item = bpy.data.objects[f"Prim_{kind}"]
+    data, item_type = item.data, item.type
+    bpy.data.objects.remove(item)
+    (bpy.data.meshes if item_type == "MESH" else bpy.data.curves).remove(data)
 edit("rename_object", name="SM_Box", new_name="SM_Crate_B")
 assert "SM_Crate_B" in bpy.data.objects and bpy.data.objects["SM_Crate_B"].data.name == "SM_Crate_B"
 refused("rename_object", "unique", name="SM_Crate_B", new_name="SM_Rock")

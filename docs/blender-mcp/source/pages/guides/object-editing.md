@@ -7,7 +7,7 @@ Unrelated action parameters are refused before contacting Blender.
 
 | Action | Parameters |
 | --- | --- |
-| `create_primitive` | `kind` = cube, sphere, cylinder, cone or plane; `location` |
+| `create_primitive` | `kind` = cube, sphere, cylinder, cone, plane, torus, icosphere, grid, bezier_curve or text; `location`; `body` for text |
 | `create_mesh` | `vertices`, `faces`; zero-based outward winding |
 | `transform` | `location`, `rotation_degrees` (XYZ Euler), `scale` |
 | `set_color` | `rgba`, `slot` (default 0) |

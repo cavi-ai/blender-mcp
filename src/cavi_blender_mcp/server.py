@@ -672,7 +672,9 @@ async def object_edit(
                     "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
                     "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe", "visibility"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
-    kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
+    kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane", "torus", "icosphere", "grid",
+                            "bezier_curve", "text"] | None, Field(description="create_primitive needs kind")] = None,
+    body: Annotated[str | None, Field(min_length=1, max_length=1024, description="create_primitive text: string")] = None,
     location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
     rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler angles")] = None,
     scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors")] = None,
@@ -713,7 +715,7 @@ async def object_edit(
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
               "offsets": offsets, "recursive": recursive, "hide_viewport": hide_viewport,
-              "hide_render": hide_render}
+              "hide_render": hide_render, "body": body}
 
     def visible():
         params = pick(action, values, (), {"hide_viewport": None, "hide_render": None})
@@ -727,8 +729,8 @@ async def object_edit(
         return [item.model_dump(mode="json", exclude_none=True) for item in keyframes]
 
     operation, params = {
-        "create_primitive": ("create_primitive",
-                             lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
+        "create_primitive": ("create_primitive", lambda: pick(action, values, ["kind"], {
+            "location": (0, 0, 0), "body": None})),
         "create_mesh": ("create_mesh", lambda: pick(action, values, ["vertices", "faces"])),
         "transform": ("transform_object", lambda: pick(action, values, (), {
             "location": None, "rotation_degrees": None, "scale": None})),
