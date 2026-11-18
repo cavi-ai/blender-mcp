@@ -3,12 +3,12 @@
 import hashlib
 import json
 import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
 
-from . import process_launch
+from cavi_mcp_core import proc
+
 from .importing import MAX_BYTES, MAX_GEOMETRY
 from .paths import destination
 
@@ -72,25 +72,14 @@ def run(command, env, timeout, deadline, describe=None):
     left = deadline - time.monotonic()
     try:
         if left <= 0:
-            raise subprocess.TimeoutExpired(command, timeout)
-        prepared = process_launch.command(command, env=env)
-        left = deadline - time.monotonic()
-        if left <= 0:
-            raise subprocess.TimeoutExpired(command, timeout)
-        result = subprocess.run(
-            prepared, env=env, capture_output=True, text=True, timeout=left, check=False
-        )
-    except subprocess.TimeoutExpired as exc:
+            raise TimeoutError
+        result = proc.run_sync(command, left, env=env)
+    except TimeoutError as exc:
         raise RuntimeError(
             f"Local reconstruction exceeded {timeout} seconds; no asset published"
         ) from exc
     if result.returncode:
-        detail = (
-            (describe and describe(result))
-            or result.stderr.strip()
-            or result.stdout.strip()
-            or "No worker diagnostics"
-        )
+        detail = (describe and describe(result)) or proc.diagnostics(result)
         raise RuntimeError(
             f"Local reconstruction failed (exit {result.returncode}): {detail[-2000:]}"
         )

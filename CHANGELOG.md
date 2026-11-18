@@ -12,6 +12,10 @@ adds its lines under Unreleased and never edits a version.
 - Requires MCP Core 0.1.4; Dependabot updates `uv.lock`.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
 
+### Fixed
+
+- `asset_io` generate workers run through MCP Core's bounded process runner: a timeout stops the worker's whole process group, and a worker that exits is no longer held by a background child keeping its output open.
+
 ## 0.58.0 - 2026-11-18
 
 ### Added
