@@ -18,12 +18,12 @@ class RuntimeToolTests(unittest.TestCase):
 
         from cavi_blender_mcp import server
         from cavi_blender_mcp.bridge_contract import expected_bridge
-        calls, generation = [], [1]
+        calls, generation = [], ['a1']
 
         def call(operation, params):
             calls.append((operation, params))
             if operation == 'runtime_restart':
-                generation[0] += 1
+                generation[0] = 'b2'
             return {'connected': True, 'pid': 7, 'generation': generation[0], 'version': '5.2.3',
                     'bridge': expected_bridge(), 'file': '', 'workspace': '/w', 'object_count': 0,
                     'dirty': False, 'background': True}
@@ -40,7 +40,7 @@ class RuntimeToolTests(unittest.TestCase):
                                  ('runtime_status', {})])
         status, restart = status.structured_content, restart.structured_content
         self.assertTrue(status['bridge_compatibility']['matches'])
-        self.assertEqual((restart['generation'], restart['restarted']), (2, True))
+        self.assertEqual((restart['generation'], restart['restarted']), ('b2', True))
 
 
 class RuntimeCliTests(unittest.TestCase):

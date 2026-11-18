@@ -136,7 +136,7 @@ class Ownership(VariantResult):
     lease_id: str | None = None
     connected: bool | None = None
     pid: int | None = None
-    generation: int | None = None
+    generation: str | None = None
     version: str | None = None
     bridge_compatibility: dict[str, Any] | None = None
     restarted: bool | None = None
