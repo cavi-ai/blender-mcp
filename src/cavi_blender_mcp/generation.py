@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from . import process_launch
+from .importing import MAX_BYTES, MAX_GEOMETRY
 from .paths import destination
 
 MLX_MAX_FACES = 500000
@@ -49,6 +50,8 @@ PROVIDERS = {
         },
         "vertex_colors": True,
         "guides": True,
+        # Atlas export duplicates each triangle corner; also bound the embedded GLB.
+        "fast_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
 QUALITIES = ("fast", "default")
@@ -108,6 +111,7 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         extra += ["--guide", str(guide)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
+    max_faces = settings.get("fast_max_faces", MLX_MAX_FACES) if quality == "fast" else MLX_MAX_FACES
     command = [
         configured["PYTHON"],
         configured["AGENT"],
@@ -124,7 +128,7 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         "--seed",
         "42",
         "--max-faces",
-        str(MLX_MAX_FACES),
+        str(max_faces),
         "--timeout",
         str(agent_timeout),
         "--json",
@@ -160,8 +164,8 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
                 report["guide_sha256"] = hashlib.sha256(guide.read_bytes()).hexdigest()
     except (ValueError, KeyError, TypeError) as exc:
         raise RuntimeError("mlx-agent returned no usable mesh result") from exc
-    if type(report["faces"]) is not int or not 0 < report["faces"] <= MLX_MAX_FACES:
-        raise RuntimeError(f"Reconstruction must have between 1 and {MLX_MAX_FACES} faces")
+    if type(report["faces"]) is not int or not 0 < report["faces"] <= max_faces:
+        raise RuntimeError(f"Reconstruction must have between 1 and {max_faces} faces")
     return report
 
 
@@ -245,8 +249,13 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
                 *arguments,
             ]
             report = json.loads(run(command, env, timeout, deadline).stdout)
-        if not generated.is_file() or not 0 < generated.stat().st_size <= 64 * 1024 * 1024:
-            raise RuntimeError("Reconstruction did not produce a bounded GLB")
+        if not generated.is_file():
+            raise RuntimeError("Reconstruction did not produce a GLB")
+        size = generated.stat().st_size
+        if not size:
+            raise RuntimeError("Reconstruction did not produce a GLB")
+        if size > MAX_BYTES:
+            raise RuntimeError(f"Reconstruction GLB is {size} bytes; maximum is {MAX_BYTES} bytes")
         # Publish without replacing an existing destination, even if another writer won the race.
         os.link(generated, target)
     return {**report, "path": str(target), "bytes": target.stat().st_size}

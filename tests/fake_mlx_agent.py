@@ -69,7 +69,7 @@ valid = (
     and out.parent.is_dir()
     and (arguments.steps, arguments.resolution, arguments.denoiser_cache) == tier
     and arguments.seed == 42
-    and arguments.max_faces == 500000
+    and arguments.max_faces == (166666 if trellis and os.environ.get("FAKE_AGENT_QUALITY") == "fast" else 500000)
     and 1 <= arguments.timeout <= 600
 )
 if not valid:
@@ -92,7 +92,10 @@ if mode == "error":
     reply("error", code=os.environ["FAKE_AGENT_CODE"], exit_code=2)
 glb = b"glTF" + struct.pack("<II", 2, 28) + bytes(16)
 if mode != "missing":
-    out.write_bytes(glb)
+    out.write_bytes(b"" if mode == "empty" else glb)
+    if mode == "oversized_file":
+        with out.open("r+b") as stream:
+            stream.truncate(64 * 1024 * 1024 + 1)
     (record / "mesh.glb").write_bytes(glb)
 if mode == "race":
     (out.parent.parent / "mesh.glb").write_bytes(b"other-writer")
@@ -103,7 +106,7 @@ data = {
     "seed": 42,
     "resolution": 512,
     "vertices": 249896,
-    "faces": 500001 if mode == "oversized" else 499990,
+    "faces": (arguments.max_faces + 1 if mode == "oversized" else arguments.max_faces - 10),
     "queries": [16777216, 12473832],
     "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
     "peak_memory_gb": 10.301,

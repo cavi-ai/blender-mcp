@@ -356,6 +356,7 @@ class TripoSGMlxTests(unittest.TestCase):
         for mode, detail in (
             ("garbage", "no usable mesh result"),
             ("missing", "did not produce"),
+            ("empty", "did not produce"),
             ("oversized", "500000"),
         ):
             with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, detail):
@@ -388,6 +389,19 @@ class Trellis2MlxTests(TripoSGMlxTests):
 
     def expected_frame(self, image):
         return neural_worker.prepare_image(image, background=None, extent=512)
+
+    def test_fast_draft_applies_and_enforces_face_cap(self):
+        result = self.generate(quality="fast", FAKE_AGENT_QUALITY="fast")
+        self.assertEqual(result["faces"], 166656)
+        (self.work / "mesh.glb").unlink()
+        with self.assertRaisesRegex(RuntimeError, "166666 faces"):
+            self.generate("oversized", quality="fast", FAKE_AGENT_QUALITY="fast")
+        self.assert_nothing_published()
+
+    def test_oversized_output_reports_actual_bytes(self):
+        with self.assertRaisesRegex(RuntimeError, "67108865.*67108864"):
+            self.generate("oversized_file")
+        self.assert_nothing_published()
 
     def test_an_opaque_plain_background_reaches_the_agent_as_alpha(self):
         opaque = Image.new("RGB", (600, 400), (255, 255, 255))
