@@ -10,7 +10,9 @@ cavi-blender-mcp runtime status
 cavi-blender-mcp runtime restart --lease-id <current-lease>
 ```
 
-Commands print JSON and exit nonzero on failure.
+Commands print JSON and exit nonzero on failure. MCP clients get the same status
+and restart reports from `session_control(action="status")` and
+`session_control(action="restart", lease_id=...)`.
 
 ## Start
 

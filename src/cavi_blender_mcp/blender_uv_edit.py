@@ -88,12 +88,16 @@ def transform(params, editable_mesh, info):
                 'reservation': reserved, 'mesh_sha256': digest,
                 'geometry_scope': 'unevaluated_world_linear', 'aggregate': 'area_weighted_rms'}
         cosine, sine = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+        # Rotate in texture pixels when the texture size is known, so texel shape survives.
+        aspect = 1.
+        if destination:
+            aspect = destination['texture_resolution'][0]/destination['texture_resolution'][1]
         after = []
         for index, uv in before:
             x, y = (uv[i]-pivot[i] for i in range(2))
             x, y = x*scale[0], y*scale[1]
-            target = (pivot[0]+cosine*x-sine*y+offset[0],
-                      pivot[1]+sine*x+cosine*y+offset[1])
+            target = (pivot[0]+cosine*x-sine*y/aspect+offset[0],
+                      pivot[1]+sine*x*aspect+cosine*y+offset[1])
             after.append((index, tuple(pair(target, 'transformed UV'))))
         if density is not None:
             rows, checked = review(surface, [uv for _, uv in after], destination, params['target_px_per_m'])

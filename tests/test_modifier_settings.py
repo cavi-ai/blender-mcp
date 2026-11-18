@@ -15,7 +15,10 @@ class ModifierSettingsTests(unittest.TestCase):
             ('BEVEL',{'offset_type':'OFFSET'},.02,{'width':.02}),
             ('DECIMATE',{'decimate_type':'COLLAPSE'},.5,{'ratio':.5}),
             ('SUBSURF',{},2,{'levels':2,'render_levels':2}),
-            ('REMESH',{'mode':'VOXEL'},.05,{'voxel_size':.05})]:
+            ('REMESH',{'mode':'VOXEL'},.05,{'voxel_size':.05}),
+            ('WELD',{},.001,{'merge_threshold':.001}),('DISPLACE',{},-.2,{'strength':-.2}),
+            ('SHRINKWRAP',{},0,{'offset':0}),('WEIGHTED_NORMAL',{},50,{'weight':50}),
+            ('DATA_TRANSFER',{},1,{'mix_factor':1})]:
             with self.subTest(kind=kind):self.assertEqual(update(kind,settings,amount),expected)
 
     def test_invalid_or_inactive_controls_are_rejected(self):
@@ -25,7 +28,8 @@ class ModifierSettingsTests(unittest.TestCase):
             ('DECIMATE',{'decimate_type':'COLLAPSE'},1.01),('DECIMATE',{'decimate_type':'DISSOLVE'},.5),
             ('SUBSURF',{},1.5),('REMESH',{'mode':'VOXEL'},.001),('REMESH',{'mode':'SMOOTH'},.1),
             ('ARMATURE',{},1),('BEVEL',{'offset_type':'OFFSET'},True),
-            ('BEVEL',{'offset_type':'OFFSET'},float('nan'))]:
+            ('BEVEL',{'offset_type':'OFFSET'},float('nan')),('WELD',{},0),('DISPLACE',{},0),
+            ('WEIGHTED_NORMAL',{},50.5),('DATA_TRANSFER',{},1.5),('SHRINKWRAP',{},101)]:
             with self.subTest(kind=kind,amount=amount),self.assertRaises(ValueError):update(kind,settings,amount)
 
     def test_stack_budget_covers_both_viewport_and_render_subdivision(self):
@@ -36,3 +40,6 @@ class ModifierSettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             stack_bound([4]*10000,[{'type':'SUBSURF','levels':1,'render_levels':3}])
         with self.assertRaises(ValueError):stack_bound([4]*6,[{'type':'NODES'}])
+        # Topology-preserving or reducing modifiers keep the bound.
+        self.assertEqual(stack_bound([4]*6,[{'type':kind} for kind in (
+            'WELD','DISPLACE','SHRINKWRAP','WEIGHTED_NORMAL','DATA_TRANSFER')]),12)

@@ -8,6 +8,7 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | Action | Use |
 | --- | --- |
 | `create` | New armature from 1–128 `bones` and an optional `location` |
+| `edit_bones` | Add or replace `bones` and remove `names` on an existing armature |
 | `bind` | Automatic weights from `name` armature to 1–16 `names` meshes |
 | `weights` | Clean, limit and normalize weights on one skinned mesh |
 | `assign_weights` | Set exact deform-bone weights on declared vertices |
@@ -74,6 +75,14 @@ and `roll_degrees`.
 Armatures require unique names, nonzero lengths, acyclic parents, and connected
 bones that meet their parent tail. Bone names are limited to 63 UTF-8 bytes and
 armatures to 128 bones.
+
+`edit_bones` takes full specifications: a listed bone that exists is moved,
+reparented and reflagged; a new name is added. The final hierarchy is checked
+before any edit, so moving a parent tail needs its connected children listed
+too. Removing a bone reparents its children to the nearest surviving ancestor,
+disconnected. Bones with nonzero skin weights on a mesh bound to the armature
+are refused. The armature must be local and single-user; a failed edit restores
+the previous bones.
 
 ## Binding and weights
 

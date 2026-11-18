@@ -25,3 +25,14 @@ def compatibility(actual):
                and actual.get('build') == expected['build'])
     return {'matches': matches, 'expected': expected, 'actual': actual,
             'next_action': None if matches else 'preserve_project_and_refresh_bridge'}
+
+
+def runtime_report(client, restart=False, lease_id=None):
+    restarted = client.call('runtime_restart', {'lease_id': lease_id}) if restart else None
+    result = client.call('runtime_status', {})
+    result['bridge_compatibility'] = compatibility(result.get('bridge'))
+    if restarted and result['generation'] != restarted['generation']:
+        raise RuntimeError('Bridge changed again after restart; inspect runtime status')
+    if restarted:
+        result['restarted'] = True
+    return result

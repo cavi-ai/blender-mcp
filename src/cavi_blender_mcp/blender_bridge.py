@@ -10,7 +10,7 @@ import secrets
 import tempfile
 import threading
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -27,9 +27,12 @@ from .importing import (
     MAX_BYTES,
     MAX_FBX_BYTES,
     MAX_GEOMETRY,
+    inspect_abc,
     inspect_fbx,
     inspect_glb,
     inspect_obj,
+    inspect_ply,
+    inspect_stl,
     inspect_usd,
     verify_expected_sha256,
 )
@@ -56,12 +59,13 @@ GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", 
                       "collision", "cleanup_mesh"})
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "extract_faces", "mirror_mesh",
                      "array_mesh", "solidify_mesh"})
-RIG = frozenset({"create_armature", "bind_skin", "repair_weights"})
+RIG = frozenset({"create_armature", "bind_skin", "repair_weights", "edit_armature"})
 ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})
 OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
-                     "move_to_collection"})
+                     "move_to_collection", "object_keyframe", "set_visibility"})
 MAX_MODIFIERS = 16
+MESH_FORMATS = {".fbx", ".glb", ".obj", ".stl", ".ply", ".abc"}
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"
 RENDERLESS = frozenset({"CAMERA", "LIGHT", "LIGHT_PROBE", "LIGHTPROBE", "SPEAKER"})
@@ -351,7 +355,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
     if hashlib.sha256(payload).hexdigest() != report["sha256"]:
         raise RuntimeError(f"{suffix.upper()} changed during preflight; inspect the source before retrying")
     pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
-             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+             "curves", "cameras", "lights", "armatures", "actions", "scenes", "cache_files"]
     previous = {key: set(getattr(bpy.data, key)) for key in pools}
     selection = list(bpy.context.selected_objects)
     active = bpy.context.view_layer.objects.active
@@ -439,7 +443,11 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
     except Exception:
         for key in pools:
             pool = getattr(bpy.data, key)
-            for item in set(pool) - previous[key]:
+            added = set(pool) - previous[key]
+            if not hasattr(pool, "remove"):
+                bpy.data.batch_remove(added)
+                continue
+            for item in added:
                 pool.remove(item, do_unlink=True)
         raise
     finally:
@@ -529,6 +537,57 @@ def import_usd(path, name):
         require_workspace=True, cleanup=_usd_cleanup)
 
 
+def _load_stl(path):
+    if "FINISHED" not in bpy.ops.wm.stl_import(
+        filepath=str(path), forward_axis="Y", up_axis="Z", global_scale=1.0,
+        use_scene_unit=False, use_mesh_validate=True):
+        raise RuntimeError("Blender did not finish importing the STL")
+
+
+def _load_ply(path):
+    if "FINISHED" not in bpy.ops.wm.ply_import(
+        filepath=str(path), forward_axis="Y", up_axis="Z", global_scale=1.0,
+        use_scene_unit=False, merge_verts=False, import_colors="SRGB"):
+        raise RuntimeError("Blender did not finish importing the PLY")
+
+
+def _load_abc(path):
+    if "FINISHED" not in bpy.ops.wm.alembic_import(
+        filepath=str(path), scale=1.0, set_frame_range=False, validate_meshes=True,
+        always_add_cache_reader=False, is_sequence=False, as_background_job=False):
+        raise RuntimeError("Blender did not finish importing the Alembic file")
+
+
+def _abc_cleanup(previous, collection):
+    # Static import of the current frame; cache readers would point at the temporary copy.
+    for item in collection.all_objects:
+        world = item.matrix_world.copy()
+        for modifier in [m for m in item.modifiers if m.type == "MESH_SEQUENCE_CACHE"]:
+            item.modifiers.remove(modifier)
+        for constraint in [c for c in item.constraints if c.type == "TRANSFORM_CACHE"]:
+            item.constraints.remove(constraint)
+        item.matrix_world = world
+    bpy.data.batch_remove(set(bpy.data.cache_files) - previous["cache_files"])
+
+
+def import_stl(path, name):
+    return _import_asset(
+        _load_stl, inspect_stl, path, name, ".stl", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False)
+
+
+def import_ply(path, name):
+    return _import_asset(
+        _load_ply, inspect_ply, path, name, ".ply", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False)
+
+
+def import_abc(path, name):
+    return _import_asset(
+        _load_abc, inspect_abc, path, name, ".abc", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False, cleanup=_abc_cleanup)
+
+
 def dispatch(operation, p):
     if operation == "owned_edit":
         inner, params = p.get("operation"), p.get("params")
@@ -614,14 +673,26 @@ def create_primitive(p):
         "cylinder": bpy.ops.mesh.primitive_cylinder_add,
         "cone": bpy.ops.mesh.primitive_cone_add,
         "plane": bpy.ops.mesh.primitive_plane_add,
+        "torus": bpy.ops.mesh.primitive_torus_add,
+        "icosphere": bpy.ops.mesh.primitive_ico_sphere_add,
+        "grid": bpy.ops.mesh.primitive_grid_add,
+        "bezier_curve": bpy.ops.curve.primitive_bezier_curve_add,
+        "text": bpy.ops.object.text_add,
     }
     if p.get("kind") not in constructors:
         raise ValueError("Unknown primitive")
+    body = p.get("body")
+    if (p["kind"] == "text") != (body is not None):
+        raise ValueError("body is required for text primitives and refused otherwise")
+    if body is not None and (not isinstance(body, str) or not 1 <= len(body) <= 1024):
+        raise ValueError("body must be 1 to 1024 characters")
     location = vector(p.get("location") or [0, 0, 0])
     constructors[p["kind"]](location=location)
     value = bpy.context.object
     value.name = name
     value.data.name = name
+    if body is not None:
+        value.data.body = body
     root = bpy.context.scene.collection
     if root not in value.users_collection:
         root.objects.link(value)
@@ -706,7 +777,31 @@ def add_modifier(p):
     if len(value.modifiers) >= MAX_MODIFIERS:
         raise ValueError(f"Modifier stack is limited to {MAX_MODIFIERS}; apply or remove some")
     amount = vector([p["amount"]], 1)[0]
-    if p["kind"] == "bevel" and 0 < amount <= 100:
+    from .modifier_settings import AMOUNTS
+
+    kinds = {"weld": "WELD", "displace": "DISPLACE", "shrinkwrap": "SHRINKWRAP",
+             "weighted_normal": "WEIGHTED_NORMAL", "data_transfer": "DATA_TRANSFER"}
+    native = kinds.get(p["kind"])
+    source = None
+    if (p.get("operand") is not None) != (native in ("SHRINKWRAP", "DATA_TRANSFER")):
+        raise ValueError("operand is required for shrinkwrap and data_transfer and refused otherwise")
+    if p.get("operand") is not None:
+        source = obj(p["operand"], mesh=True)
+        if source == value:
+            raise ValueError("Modifier source must be another mesh")
+    if native is not None and AMOUNTS[native][1](amount):
+        modifier = value.modifiers.new(native.replace("_", " ").title(), native)
+        setattr(modifier, AMOUNTS[native][0], int(amount) if native == "WEIGHTED_NORMAL" else amount)
+        if native == "SHRINKWRAP":
+            modifier.target = source
+        elif native == "DATA_TRANSFER":
+            modifier.object = source
+            modifier.use_loop_data = True
+            modifier.data_types_loops = {"CUSTOM_NORMAL"}
+            modifier.loop_mapping = "POLYINTERP_NEAREST"
+        elif native == "WEIGHTED_NORMAL":
+            modifier.keep_sharp = True
+    elif p["kind"] == "bevel" and 0 < amount <= 100:
         depsgraph = bpy.context.evaluated_depsgraph_get()
         evaluated = value.evaluated_get(depsgraph).data
         segments = 3
@@ -811,7 +906,7 @@ def planar_islands(mesh, layer, indices):
 def unwrap(p):
     import numpy as np
 
-    from .blender_geometry import PACK, integer, uv_triangles
+    from .blender_geometry import PACK, texture_size, uv_triangles
     from .uv_layout import validate_packed
 
     value = editable_mesh(p["name"])
@@ -820,7 +915,8 @@ def unwrap(p):
     if p.get("island_margin") is not None:
         margin = number(p["island_margin"], 0, 0.5, "island_margin")
     else:
-        resolution = integer(p, "texture_resolution", 1024, 1, 4096)
+        # The shorter side keeps at least margin_px on both axes.
+        resolution = min(texture_size(p.get("texture_resolution", 1024)))
         margin = number(p.get("margin_px", 4), 0, 64, "margin_px") / resolution
         if margin >= 0.25:
             raise ValueError("margin_px is too large for texture_resolution")
@@ -972,11 +1068,35 @@ def export_mesh(p):
     empties = p.get("include_empties", False)
     if type(preserve) is not bool or type(empties) is not bool:
         raise ValueError("preserve_instances and include_empties must be booleans")
-    if preserve and Path(p["path"]).suffix.lower() != ".fbx":
+    suffix = Path(p["path"]).suffix.lower()
+    if preserve and suffix != ".fbx":
         raise ValueError("preserve_instances applies to static FBX exports")
+    if empties and suffix in {".obj", ".stl", ".ply"}:
+        raise ValueError("include_empties applies to FBX, GLB and Alembic exports")
     selection = with_empties(objects) if empties else list(objects)
-    with output_file(p["path"], {".fbx", ".glb"}) as path, selected(selection):
-        if path.suffix.lower() == ".fbx":
+    library = None
+    with ExitStack() as stack:
+        path = stack.enter_context(output_file(p["path"], MESH_FORMATS))
+        if suffix == ".obj":
+            # Reserve the material library too; never clobber a neighbouring file.
+            library = stack.enter_context(output_file(str(Path(p["path"]).with_suffix(".mtl")), {".mtl"}))
+        stack.enter_context(selected(selection))
+        if suffix == ".obj":
+            result = bpy.ops.wm.obj_export(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                export_uv=True, export_normals=True, export_materials=True, path_mode="STRIP",
+                forward_axis="NEGATIVE_Z", up_axis="Y", global_scale=1.0)
+        elif suffix in {".stl", ".ply"}:
+            operator = bpy.ops.wm.stl_export if suffix == ".stl" else bpy.ops.wm.ply_export
+            result = operator(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                ascii_format=False, forward_axis="Y", up_axis="Z", global_scale=1.0)
+        elif suffix == ".abc":
+            frame = bpy.context.scene.frame_current
+            result = bpy.ops.wm.alembic_export(
+                filepath=str(path), selected=True, start=frame, end=frame,
+                export_hair=False, export_particles=False, as_background_job=False)
+        elif suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if preserve else nullcontext():
@@ -999,7 +1119,8 @@ def export_mesh(p):
         if "FINISHED" not in result:
             raise RuntimeError("Mesh export did not finish")
     return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
-            "preserve_instances": preserve, "include_empties": empties}
+            "preserve_instances": preserve, "include_empties": empties,
+            **({"material_library": str(library)} if library else {})}
 
 
 def save_project(p):
@@ -1146,6 +1267,10 @@ def _dispatch(operation, p):
         from .blender_asset_library import append, inspect
 
         return (inspect if operation == 'inspect_asset_library' else append)(p, _workspace)
+    if operation == 'attach_geometry_nodes':
+        from .blender_node_inputs import attach
+
+        return attach(p)
     if operation in {'inspect_geometry_nodes', 'set_geometry_inputs', 'snapshot_geometry'}:
         from .blender_node_inputs import inspect, set_inputs, snapshot
 
@@ -1210,6 +1335,9 @@ def _dispatch(operation, p):
         return import_obj(p["path"], p["name"])
     if operation == "import_usd":
         return import_usd(p["path"], p["name"])
+    if operation in {"import_stl", "import_ply", "import_abc"}:
+        return {"import_stl": import_stl, "import_ply": import_ply,
+                "import_abc": import_abc}[operation](p["path"], p["name"])
     if operation in {"shape_key_add", "shape_key_value", "shape_key_remove",
                      "shape_key_keyframe"}:
         from .blender_shape_keys import HANDLERS

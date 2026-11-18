@@ -33,9 +33,9 @@ def contact_frames(rig, action, window, frame_offset=0, frame_scale=1):
 def report(rig, action, windows, reference=None, frame_offset=0, frame_scale=1):
     if not isinstance(windows, list) or not 1 <= len(windows) <= 16:
         raise ValueError('contacts must contain 1 to 16 declared windows')
-    unit = bpy.context.scene.unit_settings.scale_length
-    if not math.isfinite(unit) or unit <= 0:
-        raise ValueError('Contact measurements need a finite positive metre scale')
+    from .blender_geometry import unit_scale
+
+    unit = unit_scale()
     result = []
     for window in windows:
         frames = contact_frames(rig, action, window, frame_offset, frame_scale)

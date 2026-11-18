@@ -82,6 +82,12 @@ async def exercise(root, env, parameters=None):
             assert result.is_error and result.structured_content['error']['outcome'] == 'rejected', result
             assert not (await call('scene_info', limit=1))['source_state']['dirty']
             assert await snapshot() == before
+        # Rotation runs in texture pixels, so a 2:1 texture keeps the texel shape.
+        rotated = await call('mesh_edit', **{**args, 'uv_transform': {
+            **args['uv_transform'], 'rotation_degrees': 90}})
+        density = rotated['uv_transform']['density']
+        assert math.isclose(density['before']['anisotropy_max'], density['after']['anisotropy_max'],
+                            rel_tol=1e-4), density
         densities = {}
         for target in (512, 1024):
             result = await call('mesh_edit', **{**args, 'target_px_per_m': target})

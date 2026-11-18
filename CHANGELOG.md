@@ -16,9 +16,27 @@ adds its lines under Unreleased and never edits a version.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
 - `asset_io` generate with `prompt` writes a horizontally wrapping 2048×1024 panorama PNG from the local image model for `world.hdri`.
 - `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
+- `assign_material` takes `occlusion_texture`, channel-packed `orm_texture` and `height_texture` with `height_scale`; GLB export writes the occlusion map.
+- `mesh_edit` `texel_density` and `unwrap` and the `review_sheet` texel heatmap take `texture_resolution` as `[width, height]`.
+- `scene_edit` render takes `end_frame` and `frame_step` to render numbered frame sequences.
+- `rig_edit` action `edit_bones` adds, moves, reparents and removes bones on an existing armature.
+- `asset_io` imports STL, PLY and Alembic and exports static OBJ (with MTL), STL, PLY and Alembic.
+- `geometry_nodes` action `add` attaches an existing node group as a new modifier; `scatter` takes `align_to_normal`, `max_slope_degrees` and `density_group`.
+- `mesh_edit` modifier kinds `weld`, `displace`, `weighted_normal`, and `shrinkwrap` and `data_transfer` from an `operand` mesh, with scalar updates.
+- `create_primitive` kinds `torus`, `icosphere`, `grid`, `bezier_curve` and `text` (with `body`).
+- `object_edit` action `visibility` sets `hide_viewport` and `hide_render` on one object.
+- `object_edit` action `keyframe` keys location, rotation and scale of any object, camera or light into a new action with per-key interpolation.
+- `session_control` actions `status` and `restart` report and restart the Blender bridge, as the `runtime` CLI does.
+- `scene_info` `spatial` takes an object form with subject and context lists, `proposed_world_delta`, `min_clearance_m` and `samples_per_side`.
 
 ### Fixed
 
+- `snap_to_grid` snaps the world position, rounding halves up on every axis, so parented objects land on the grid.
+- UV coverage and overlap count texel centres on a shared triangle edge once instead of dropping them.
+- `uv_transform` with a density target rotates in texture pixels, so non-square textures keep texel shape.
+- Image terrain interpolates heights linearly and averages pixels finer than the terrain grid instead of terracing and aliasing.
+- `scatter` density counts points per square metre in scenes whose unit is not one metre.
+- Spatial queries, picking, clearance, contacts, vertex falloff, skin transfer and motion checks measure a unitless scene as one metre per unit, matching FBX export.
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
 - `mesh_edit` `remesh_quad` collapses or separates edges QuadriFlow reads as zero length, so voxel-rebuilt meshes remesh.
 - Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.

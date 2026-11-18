@@ -13,8 +13,14 @@ from .textures import read_image
 CONFIG_TAG = "cavi_material_config"
 COLOR_TEXTURES = {"base_color_texture": "sRGB", "emission_texture": "sRGB"}
 NON_COLOR_TEXTURES = {"normal_texture": "Non-Color", "roughness_texture": "Non-Color",
-                      "metallic_texture": "Non-Color", "alpha_texture": "Non-Color"}
+                      "metallic_texture": "Non-Color", "alpha_texture": "Non-Color",
+                      "occlusion_texture": "Non-Color", "orm_texture": "Non-Color",
+                      "height_texture": "Non-Color"}
 TEXTURES = {**COLOR_TEXTURES, **NON_COLOR_TEXTURES}
+# orm_texture packs occlusion (R), roughness (G) and metallic (B) as in glTF.
+PACKED_BY_ORM = {"roughness_texture", "metallic_texture", "occlusion_texture"}
+# glTF exporters read ambient occlusion from this group's Occlusion input.
+GLTF_GROUP = "glTF Material Output"
 MAX_TOTAL_PIXELS = 32 * 1024 * 1024
 DEFAULTS = {
     "base_color": [1.0, 1.0, 1.0, 1.0],
@@ -28,6 +34,10 @@ DEFAULTS = {
     "emission_texture": None,
     "emission_strength": 0.0,
     "alpha_texture": None,
+    "occlusion_texture": None,
+    "orm_texture": None,
+    "height_texture": None,
+    "height_scale": 0.1,
     "alpha_mode": "opaque",
     "uv_scale": [1.0, 1.0],
     "uv_offset": [0.0, 0.0],
@@ -117,8 +127,11 @@ def overlay(params):
     if params.get("emission_strength") is not None:
         provided["emission_strength"] = bounded(params["emission_strength"], 0, 1000,
                                                 "emission_strength")
-    if params.get("alpha_texture") is not None:
-        provided["alpha_texture"] = path_name(params["alpha_texture"])
+    for key in ("alpha_texture", "occlusion_texture", "orm_texture", "height_texture"):
+        if params.get(key) is not None:
+            provided[key] = path_name(params[key])
+    if params.get("height_scale") is not None:
+        provided["height_scale"] = bounded(params["height_scale"], 0, 10, "height_scale")
     if params.get("alpha_mode") is not None:
         if params["alpha_mode"] not in {"opaque", "clip", "blend"}:
             raise ValueError("alpha_mode must be opaque, clip or blend")
@@ -145,6 +158,8 @@ def resolve_config(params, existing):
     if type(update) is not bool:
         raise ValueError("update_existing must be boolean")
     provided = overlay(params)
+    if "orm_texture" in provided and PACKED_BY_ORM & set(provided):
+        raise ValueError("orm_texture replaces roughness_texture, metallic_texture and occlusion_texture")
     if update:
         if existing is None:
             raise ValueError("Material does not exist; omit update_existing to create it")
@@ -157,6 +172,10 @@ def resolve_config(params, existing):
             raise ValueError("Material configuration is not readable") from exc
         if not isinstance(previous, dict):
             raise ValueError("Material configuration is not readable")
+        # A packed map and its separate maps replace each other on update.
+        replaced = PACKED_BY_ORM if "orm_texture" in provided else (
+            {"orm_texture"} if PACKED_BY_ORM & set(provided) else set())
+        previous = {key: value for key, value in previous.items() if key not in replaced}
         config = {**DEFAULTS, **previous, **provided}
     else:
         config = {**DEFAULTS, **provided}
@@ -196,6 +215,18 @@ def load_image(workspace, receipt, payload, color_space, folder, label):
     image.pack()
     image.filepath = stored_path(receipt["path"])
     return image
+
+
+def occlusion_input(tree):
+    group = bpy.data.node_groups.get(GLTF_GROUP)
+    if group is None:
+        group = bpy.data.node_groups.new(GLTF_GROUP, "ShaderNodeTree")
+        group.interface.new_socket("Occlusion", in_out="INPUT", socket_type="NodeSocketFloat")
+    node = tree.nodes.new("ShaderNodeGroup")
+    node.node_tree = group
+    if "Occlusion" not in node.inputs:
+        raise ValueError(f"Node group {GLTF_GROUP} needs an Occlusion input")
+    return node.inputs["Occlusion"]
 
 
 def apply_alpha(material, mode):
@@ -267,6 +298,20 @@ def build(material, config, workspace, receipts, created_images, discard=None):
         if "metallic_texture" in receipts:
             links.new(image("metallic_texture", "Metallic").outputs["Color"],
                       shader.inputs["Metallic"])
+        for key, label in (("orm_texture", "ORM"), ("occlusion_texture", "Occlusion")):
+            if key in receipts:
+                split = nodes.new("ShaderNodeSeparateColor")
+                links.new(image(key, label).outputs["Color"], split.inputs["Color"])
+                links.new(split.outputs["Red"], occlusion_input(tree))
+                if key == "orm_texture":
+                    links.new(split.outputs["Green"], shader.inputs["Roughness"])
+                    links.new(split.outputs["Blue"], shader.inputs["Metallic"])
+        if "height_texture" in receipts:
+            lift = nodes.new("ShaderNodeDisplacement")
+            lift.inputs["Midlevel"].default_value = .5
+            lift.inputs["Scale"].default_value = config["height_scale"]
+            links.new(image("height_texture", "Height").outputs["Color"], lift.inputs["Height"])
+            links.new(lift.outputs["Displacement"], output.inputs["Displacement"])
         if "emission_texture" in receipts:
             links.new(image("emission_texture", "Emission").outputs["Color"],
                       shader.inputs["Emission Color"])

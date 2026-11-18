@@ -26,10 +26,9 @@ def geometry(value, faces):
     vertex_ids = list(dict.fromkeys(v for p in polygons for v in p.vertices))
     vertex_map = {index: i for i, index in enumerate(vertex_ids)}
     matrix = value.matrix_world.to_3x3()
-    units = bpy.context.scene.unit_settings
-    unit_scale = 1. if units.system == 'NONE' else units.scale_length
-    if not math.isfinite(unit_scale) or unit_scale <= 0:
-        raise ValueError('Scene unit scale must be positive and finite')
+    from .blender_geometry import unit_scale as scene_unit_scale
+
+    unit_scale = scene_unit_scale()
     origin = mesh.vertices[vertex_ids[0]].co
     points = [list((matrix @ (mesh.vertices[i].co-origin))*unit_scale) for i in vertex_ids]
     if any(not math.isfinite(n) or abs(n) > 1e6 for point in points for n in point):

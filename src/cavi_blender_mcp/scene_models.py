@@ -44,15 +44,18 @@ class CameraRay(Definition):
         return self
 
 
-class SpatialQuery(Definition):
+type Row = tuple[Number, Number, Number, Number]
+
+
+class SpatialSelector(Definition):
     subjects: Annotated[list[Name], Field(min_length=1, max_length=32)]
     context: Annotated[list[Name], Field(min_length=1, max_length=128)]
-    proposed_world_delta: tuple[tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number],
-                                tuple[Number, Number, Number, Number]] | None = None
+    proposed_world_delta: tuple[Row, Row, Row, Row] | None = None
     min_clearance_m: Annotated[Number, Field(ge=0)] = 0
     samples_per_side: Annotated[StrictInt, Field(ge=1, le=4096)] = 256
+
+
+class SpatialQuery(SpatialSelector):
     max_triangles: Annotated[StrictInt, Field(ge=1, le=200000)] = 100000
     max_pair_tests: Annotated[StrictInt, Field(ge=1, le=2000000)] = 1000000
     max_results: Annotated[StrictInt, Field(ge=1, le=256)] = 32
@@ -133,6 +136,8 @@ class RenderSpec(Definition):
     gamma: Positive = 1
     denoise: StrictBool = True
     frame: Annotated[StrictInt | None, Field(ge=1, le=1000000)] = None
+    end_frame: Annotated[StrictInt | None, Field(ge=1, le=1000000, description='Sequence: frame to end_frame as <stem>_0001<ext>')] = None
+    frame_step: Annotated[StrictInt, Field(ge=1, le=1000)] = 1
     threads: Annotated[StrictInt, Field(ge=1, le=1024)] = 2
     cycles_time_limit: Annotated[Number, Field(ge=0)] = 120
     max_pixels: Annotated[StrictInt, Field(ge=1, le=4294967296)] = 16777216
@@ -144,4 +149,15 @@ class RenderSpec(Definition):
         if self.bit_depth not in {'png': {'8', '16'}, 'exr': {'16', '32'},
                                   'tiff': {'8', '16'}}[self.file_format]:
             raise ValueError('Bit depth does not match the output format')
+        if self.end_frame is None:
+            if self.frame_step != 1:
+                raise ValueError('frame_step needs end_frame')
+            return self
+        if self.frame is None or self.frame > self.end_frame:
+            raise ValueError('Sequences need frame <= end_frame')
+        count = len(range(self.frame, self.end_frame + 1, self.frame_step))
+        if count > 250:
+            raise ValueError('Sequences are limited to 250 frames')
+        if self.engine == 'cycles' and not 0 < self.cycles_time_limit * count <= 600:
+            raise ValueError('Cycles sequences need cycles_time_limit above 0 and at most 600 seconds across all frames')
         return self

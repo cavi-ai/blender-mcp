@@ -226,6 +226,40 @@ def set_inputs(params):
     return inspect({'name': value.name, 'modifier': item.name, 'instance': params.get('instance')})
 
 
+def attach(params):
+    from .blender_bridge import MAX_MODIFIERS
+    from .blender_scatter import MAX_INSTANCES
+
+    if bpy.context.mode != 'OBJECT':
+        raise ValueError('Switch Blender to Object Mode before this operation')
+    value = obj(params['name'], mesh=True)
+    if value.library and value.override_library is None:
+        raise ValueError('Linked object needs an editable local copy or library override')
+    group = bpy.data.node_groups.get(params.get('node_group') or '')
+    if group is None or group.bl_idname != 'GeometryNodeTree':
+        raise ValueError('node_group must name an existing Geometry Nodes group')
+    if not any(s.item_type == 'SOCKET' and s.in_out == 'OUTPUT' and s.socket_type == 'NodeSocketGeometry'
+               for s in group.interface.items_tree):
+        raise ValueError('node_group needs a Geometry output')
+    label = params.get('modifier') or group.name
+    if len(value.modifiers) >= MAX_MODIFIERS or label in value.modifiers:
+        raise ValueError(f'Modifier name must be new and the stack under {MAX_MODIFIERS}')
+    item = value.modifiers.new(label, 'NODES')
+    try:
+        item.node_group = group
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        triangles = triangle_count(value.evaluated_get(depsgraph).data)
+        instances = sum(1 for i in depsgraph.object_instances
+                        if i.is_instance and i.parent and i.parent.original == value)
+        if triangles > MAX_TRIANGLES or instances > MAX_INSTANCES:
+            raise ValueError(f'Evaluated result exceeds {MAX_TRIANGLES} triangles or {MAX_INSTANCES} instances')
+    except Exception:
+        value.modifiers.remove(item)
+        update(value)
+        raise
+    return inspect({'name': value.name, 'modifier': item.name})
+
+
 def snapshot(params):
     value = host(params['name'])
     name = new_name(params.get('new_name'))

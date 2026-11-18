@@ -4,6 +4,8 @@ import hashlib
 import json
 import math
 import time
+from contextlib import ExitStack
+from pathlib import Path
 
 import bpy
 from mathutils import Vector
@@ -11,8 +13,10 @@ from mathutils import Vector
 from .blender_bridge import info, obj, output_file, vector
 from .blender_images import packed_snapshot
 from .blender_rigging import label
+from .operations import MAX_TIMEOUT
 
 WORLD_TAG = 'cavi_managed_world'
+MAX_SEQUENCE_FRAMES = 250
 
 
 def environment_image(path, workspace, existing=None):
@@ -163,6 +167,82 @@ def world(spec, workspace):
             'source_color_space': image.colorspace_settings.name if image else None}
 
 
+def sequence(spec):
+    """Frames of a sequence render, or None for a still."""
+    end, step = spec.get('end_frame'), spec.get('frame_step', 1)
+    if end is None:
+        if step != 1:
+            raise ValueError('frame_step needs end_frame')
+        return None
+    start = spec['frame']
+    if (any(type(v) is not int for v in (start, end, step)) or step < 1
+            or not 1 <= start <= end):
+        raise ValueError('Sequences need integer frame <= end_frame and frame_step >= 1')
+    frames = list(range(start, end + 1, step))
+    if len(frames) > MAX_SEQUENCE_FRAMES:
+        raise ValueError(f'Sequences are limited to {MAX_SEQUENCE_FRAMES} frames')
+    if spec['engine'] == 'cycles' and not 0 < spec['cycles_time_limit'] * len(frames) <= MAX_TIMEOUT:
+        raise ValueError(f'Cycles sequences need cycles_time_limit above 0 and at most '
+                         f'{MAX_TIMEOUT} seconds across all frames')
+    return frames
+
+
+def configure(scene, spec, camera_object):
+    scene.camera = camera_object
+    if spec['engine'] == 'cycles':
+        scene.render.engine = 'CYCLES'
+        scene.cycles.device, scene.cycles.samples = spec['device'], spec['samples']
+        scene.cycles.use_denoising = spec['denoise']
+        scene.cycles.time_limit = spec['cycles_time_limit']
+    else:
+        try:
+            scene.render.engine = 'BLENDER_EEVEE'
+        except TypeError:
+            scene.render.engine = 'BLENDER_EEVEE_NEXT'
+        scene.eevee.taa_render_samples = spec['samples']
+    output = scene.render
+    output.resolution_x, output.resolution_y, output.resolution_percentage = spec['width'], spec['height'], 100
+    output.threads_mode, output.threads = 'FIXED', spec['threads']
+    output.film_transparent = spec['transparent']
+    output.image_settings.file_format = {'png': 'PNG', 'exr': 'OPEN_EXR', 'tiff': 'TIFF'}[
+        spec['file_format']]
+    output.image_settings.color_mode, output.image_settings.color_depth = 'RGBA', spec['bit_depth']
+    output.use_file_extension = True
+    scene.view_settings.view_transform = spec['view_transform']
+    scene.view_settings.exposure, scene.view_settings.gamma = spec['exposure'], spec['gamma']
+    scene['cavi_render_definition'] = json.dumps(spec, sort_keys=True)
+
+
+def render_frames(spec, scene, camera_object, frames, suffixes, started):
+    base = Path(spec['path'])
+    digits = max(4, len(str(frames[-1])))
+    with ExitStack() as stack:
+        # Reserve every frame file first; one existing file refuses the whole sequence.
+        paths = [stack.enter_context(output_file(
+            str(base.with_name(f'{base.stem}_{frame:0{digits}d}{base.suffix}')), suffixes))
+            for frame in frames]
+        configure(scene, spec, camera_object)
+        for frame, path in zip(frames, paths, strict=True):
+            scene.frame_set(frame)
+            scene.render.filepath = str(path)
+            if 'FINISHED' not in bpy.ops.render.render(write_still=True):
+                raise RuntimeError(f'Scene render did not finish at frame {frame}')
+    elapsed = time.monotonic()-started
+    records = []
+    for frame, path in zip(frames, paths, strict=True):
+        with path.open('rb') as stream:
+            records.append({'frame': frame, 'path': str(path), 'bytes': path.stat().st_size,
+                            'sha256': hashlib.file_digest(stream, 'sha256').hexdigest()})
+    return {'path': records[0]['path'], 'bytes': sum(item['bytes'] for item in records),
+            'engine': scene.render.engine, 'width': spec['width'], 'height': spec['height'],
+            'bit_depth': int(spec['bit_depth']), 'samples_requested': spec['samples'],
+            'elapsed_seconds': elapsed,
+            'cycles_sampling_may_have_hit_time_limit': spec['engine'] == 'cycles'
+            and elapsed >= spec['cycles_time_limit'] * len(frames),
+            'camera': camera_object.name, 'world': scene.world.name if scene.world else None,
+            'frames': records}
+
+
 def render(spec):
     width, height, samples = spec['width'], spec['height'], spec['samples']
     if any(type(v) is not int or v < 1 for v in (width, height, samples, spec['max_pixels'])):
@@ -182,34 +262,15 @@ def render(spec):
         preferences.refresh_devices()
         if not any(d.use and d.type != 'CPU' for d in preferences.devices):
             raise ValueError('No enabled Cycles GPU; configure a backend/device or select CPU')
+    frames = sequence(spec)
     started = time.monotonic()
+    if frames is not None:
+        return render_frames(spec, scene, camera_object, frames, suffixes[spec['file_format']], started)
     with output_file(spec['path'], suffixes[spec['file_format']]) as path:
-        scene.camera = camera_object
         if spec['frame'] is not None:
             scene.frame_set(spec['frame'])
-        if spec['engine'] == 'cycles':
-            scene.render.engine = 'CYCLES'
-            scene.cycles.device, scene.cycles.samples = spec['device'], samples
-            scene.cycles.use_denoising = spec['denoise']
-            scene.cycles.time_limit = spec['cycles_time_limit']
-        else:
-            try:
-                scene.render.engine = 'BLENDER_EEVEE'
-            except TypeError:
-                scene.render.engine = 'BLENDER_EEVEE_NEXT'
-            scene.eevee.taa_render_samples = samples
-        output = scene.render
-        output.resolution_x, output.resolution_y, output.resolution_percentage = width, height, 100
-        output.threads_mode, output.threads = 'FIXED', spec['threads']
-        output.film_transparent = spec['transparent']
-        output.image_settings.file_format = {'png': 'PNG', 'exr': 'OPEN_EXR', 'tiff': 'TIFF'}[
-            spec['file_format']]
-        output.image_settings.color_mode, output.image_settings.color_depth = 'RGBA', spec['bit_depth']
-        output.use_file_extension = True
-        output.filepath = str(path)
-        scene.view_settings.view_transform = spec['view_transform']
-        scene.view_settings.exposure, scene.view_settings.gamma = spec['exposure'], spec['gamma']
-        scene['cavi_render_definition'] = json.dumps(spec, sort_keys=True)
+        configure(scene, spec, camera_object)
+        scene.render.filepath = str(path)
         def projection():
             from .blender_camera_ray import snapshot
 

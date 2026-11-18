@@ -88,6 +88,35 @@ try:
     unbound.name = "UnboundMesh"
     refused("repair_weights", "armature", name="UnboundMesh")
 
+    def ends(bone):
+        return [tuple(round(v, 5) for v in point) for point in (bone.head_local, bone.tail_local)]
+
+    # Move a connected chain, add bones, then remove a middle bone.
+    edited = edit("edit_armature", name="TestRig", bones=[
+        {"name": "Spine", "parent": "Root", "head": [0, 0, 0], "tail": [0, 0.5, 1.5], "connect": True},
+        {"name": "Neck", "parent": "Spine", "head": [0, 0.5, 1.5], "tail": [0, 0.5, 1.8],
+         "connect": True},
+        {"name": "Skull", "parent": "Neck", "head": [0, 0.5, 1.8], "tail": [0, 0.5, 2.2],
+         "connect": True},
+    ])
+    assert edited["bone_count"] == 4, edited
+    assert ends(rig.data.bones["Spine"]) == [(0, 0, 0), (0, 0.5, 1.5)]
+    assert rig.data.bones["Skull"].parent.name == "Neck"
+    trimmed = edit("edit_armature", name="TestRig", names=["Neck"])
+    assert trimmed["bone_count"] == 3 and trimmed["removed"] == ["Neck"], trimmed
+    skull = rig.data.bones["Skull"]
+    assert skull.parent.name == "Spine" and not skull.use_connect
+    assert ends(skull) == [(0, 0.5, 1.8), (0, 0.5, 2.2)]
+    refused("edit_armature", "skin weights", name="TestRig", names=["Spine"])
+    refused("edit_armature", "cycle", name="TestRig", bones=[
+        {"name": "Root", "parent": "Skull", "head": [0, 0, -1], "tail": [0, 0, 0]}])
+    refused("edit_armature", "parent tail", name="TestRig", bones=[
+        {"name": "Root", "head": [0, 0, -1], "tail": [0, 0, 0.5]}])
+    refused("edit_armature", "missing parent", name="TestRig", bones=[
+        {"name": "Tail", "parent": "Neck", "head": [0, 0, 0], "tail": [0, -1, 0]}])
+    assert sorted(rig.data.bones.keys()) == ["Root", "Skull", "Spine"]
+    assert ends(rig.data.bones["Root"]) == [(0, 0, -1), (0, 0, 0)]
+
     for bones, message in [
         ([{"name": "A", "head": [0, 0, 0], "tail": [0, 0, 1]},
           {"name": "A", "head": [0, 0, 1], "tail": [0, 0, 2]}], "repeated"),

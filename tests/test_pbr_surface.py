@@ -30,7 +30,8 @@ class PBRSurfaceTests(unittest.TestCase):
                 "roughness_texture": None, "metallic_texture": None,
                 "normal_texture": None, "normal_strength": None,
                 "emission_texture": None, "emission_strength": None,
-                "alpha_texture": None, "alpha_mode": None, "uv_scale": None,
+                "alpha_texture": None, "occlusion_texture": None, "orm_texture": None,
+                "height_texture": None, "height_scale": None, "alpha_mode": None, "uv_scale": None,
                 "uv_offset": None, "uv_rotation_degrees": None,
                 "update_existing": False, "slot": 0, "lease_id": "L"}})])
 
@@ -55,6 +56,16 @@ class PBRSurfaceTests(unittest.TestCase):
         self.assertTrue(params["update_existing"])
         self.assertEqual(params["slot"], 1)
 
+    def test_packed_occlusion_and_height_maps_are_forwarded(self):
+        calls = self.capture()
+        asyncio.run(server.assign_material(["A"], "M", orm_texture="orm.png", height_texture="h.png",
+                                           height_scale=.05, lease_id="L"))
+        asyncio.run(server.assign_material(["A"], "N", occlusion_texture="ao.png", lease_id="L"))
+        packed, separate = (call[1]["params"] for call in calls)
+        self.assertEqual((packed["orm_texture"], packed["height_texture"], packed["height_scale"]),
+                         ("orm.png", "h.png", .05))
+        self.assertEqual((separate["occlusion_texture"], separate["orm_texture"]), ("ao.png", None))
+
     def test_material_inputs_are_validated_before_the_bridge(self):
         calls = self.capture()
         for arguments in (
@@ -64,6 +75,7 @@ class PBRSurfaceTests(unittest.TestCase):
             {"names": ["A"], "material_name": "M", "normal_strength": "1"},
             {"names": ["A"], "material_name": "M", "update_existing": "yes"},
             {"names": ["A"], "material_name": "M", "slot": 32},
+            {"names": ["A"], "material_name": "M", "height_scale": "0.1"},
         ):
             with self.assertRaisesRegex(Exception, "validation error"):
                 asyncio.run(server.mcp.call_tool("assign_material", arguments))

@@ -6,6 +6,7 @@
   {"id":"spatial-pair-length","tool":"scene_info","arguments":{"spatial":["Roof"]},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"spatial-mixed-modes","tool":"scene_info","arguments":{"name":"Roof","spatial":["Roof","House"]},"kind":"invalid","modes":["protocol","native"],"error":"spatial excludes pagination"},
   {"id":"spatial-object-rejected","tool":"scene_info","arguments":{"spatial":{"subjects":["Roof"],"context":["House"],"max_triangles":1}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
+  {"id":"spatial-object-context","tool":"scene_info","arguments":{"spatial":{"subjects":["Roof"]}},"kind":"invalid","modes":["protocol","native"],"error":"validation"},
   {"id":"ramp-missing-node","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node_settings":{"interpolation":"LINEAR"}},"kind":"invalid","modes":["protocol","native"],"error":"requires: node"},
   {"id":"ramp-missing-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette"},"kind":"invalid","modes":["protocol","native"],"error":"requires: node_settings"},
   {"id":"ramp-empty-settings","tool":"assign_material","arguments":{"action":"set_ramp","material_name":"Glaze","node":"Palette","node_settings":{}},"kind":"invalid","modes":["protocol","native"],"error":"requires nonempty node_settings"},
@@ -20,6 +21,18 @@
   {"id":"face-material-hash","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"expected_mesh_sha256":"bad"},"kind":"invalid","modes":["protocol","native"],"error":"pattern"},
   {"id":"face-material-extra","tool":"mesh_edit","arguments":{"action":"assign_faces","name":"EvalProp","material_name":"TrimFinish","face_indices":[0],"offset":[0,0,1]},"kind":"invalid","modes":["protocol","native"],"error":"assign_faces does not accept"},
   {"id": "delete-parameter", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "new_name": "Unused"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "delete does not accept"},
+  {"id": "keyframe-no-channel", "tool": "object_edit", "arguments": {"action": "keyframe", "name": "EvalProp", "action_name": "Clip", "keyframes": [{"frame": 1}]}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
+  {"id": "visibility-no-flag", "tool": "object_edit", "arguments": {"action": "visibility", "name": "EvalProp"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "visibility needs"},
+  {"id": "primitive-unknown-kind", "tool": "object_edit", "arguments": {"action": "create_primitive", "name": "EvalShape", "kind": "teapot"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
+  {"id": "modifier-shrinkwrap-operand", "tool": "mesh_edit", "arguments": {"action": "modifier", "name": "EvalProp", "kind": "shrinkwrap", "amount": 0}, "kind": "invalid", "modes": ["protocol", "native"], "error": "operand is required"},
+  {"id": "material-orm-conflict", "tool": "assign_material", "arguments": {"names": ["PBRTarget"], "material_name": "EvalOrm", "orm_texture": "orm.png", "roughness_texture": "rough.png"}, "kind": "invalid", "modes": ["native"], "error": "orm_texture replaces"},
+  {"id": "texel-density-size-range", "tool": "mesh_edit", "arguments": {"action": "texel_density", "name": "EvalProp", "target_px_per_m": 256, "texture_resolution": [2048, 8192]}, "kind": "invalid", "modes": ["protocol", "native"], "error": "validation"},
+  {"id": "render-sequence-time-limit", "tool": "scene_edit", "arguments": {"action": "render", "render": {"path": "shot.png", "camera": "Hero", "frame": 1, "end_frame": 10, "cycles_time_limit": 0}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "600 seconds"},
+  {"id": "rig-edit-bones-empty", "tool": "rig_edit", "arguments": {"action": "edit_bones", "name": "EvalRig"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "needs bones or names"},
+  {"id": "stl-import-missing", "tool": "asset_io", "arguments": {"action": "import", "path": "missing.stl", "name": "MissingStl"}, "kind": "invalid", "modes": ["native"], "error": "STL does not exist"},
+  {"id": "ply-export-empties", "tool": "asset_io", "arguments": {"action": "export", "path": "loose.ply", "names": ["BakeLow"], "include_empties": true}, "kind": "invalid", "modes": ["native"], "error": "include_empties applies to FBX, GLB and Alembic"},
+  {"id": "procedural-add-node-group", "tool": "geometry_nodes", "arguments": {"action": "add", "name": "EvalProp", "modifier": "Lift"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "requires: node_group"},
+  {"id": "scatter-slope-range", "tool": "scatter", "arguments": {"name": "EvalProp", "collection": "Props", "density": 1, "max_slope_degrees": 120}, "kind": "invalid", "modes": ["protocol", "native"], "error": "less than or equal to 90"},
   {"id": "delete-boolean", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp", "recursive": "yes"}, "kind": "invalid", "modes": ["protocol", "native"], "error": "boolean"},
   {"id": "delete-lease", "tool": "object_edit", "arguments": {"action": "delete", "name": "EvalProp"}, "kind": "safety", "modes": ["native"], "without_lease": true, "error": "lease_id"},
   {"id": "scene-geometry-hash", "tool": "scene_info", "arguments": {"surface_ray": {"camera": "Hero", "pixel": [1, 1], "image_size": [64, 48], "max_distance_m": 5, "evaluated": true, "expected_geometry_sha256": "invalid"}}, "kind": "invalid", "modes": ["protocol", "native"], "error": "pattern"},
@@ -2188,6 +2201,35 @@
       "native"
     ],
     "error": "validation"
+  },
+  {
+    "id": "session-runtime-status",
+    "tool": "session_control",
+    "arguments": {
+      "action": "status"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/connected",
+      "/generation",
+      "/bridge_compatibility"
+    ]
+  },
+  {
+    "id": "session-restart-lease",
+    "tool": "session_control",
+    "arguments": {
+      "action": "restart"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "restart takes only lease_id"
   },
   {
     "id": "session-stale-project",

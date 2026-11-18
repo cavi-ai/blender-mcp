@@ -11,7 +11,13 @@ class UVMathTests(unittest.TestCase):
     def test_adjacent_triangles_do_not_overlap(self):
         result = overlap(QUAD, 64)
         self.assertEqual(result["overlap_ratio"], 0)
-        self.assertEqual(result["covered_cells"], 32 * 32 - 32)
+        self.assertEqual(result["covered_cells"], 32 * 32)
+
+    def test_shared_edges_through_cell_centres_count_once(self):
+        anti = [[(0, 0), (1, 0), (0, 1)], [(1, 0), (1, 1), (0, 1)]]
+        for split in ([[(u * 2, v * 2) for u, v in tri] for tri in QUAD], anti,
+                      [list(reversed(tri)) for tri in anti]):
+            self.assertEqual(coverage(split, 4).tolist(), [[1] * 4] * 4, split)
 
     def test_stacked_islands_overlap_fully(self):
         result = overlap(QUAD + QUAD, 32)

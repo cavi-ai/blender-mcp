@@ -121,9 +121,9 @@ def inspect(p, find_object):
         raise ValueError('Invalid clearance frames, threshold or query budget')
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
-    meters = scene.unit_settings.scale_length
-    if not math.isfinite(meters) or meters <= 0:
-        raise ValueError('Scene metre scale must be positive and finite')
+    from .blender_geometry import unit_scale
+
+    meters = unit_scale()
     reports = [{'name': name, 'min_clearance_m': None, 'worst_frame': None,
                 'inside_samples': 0, 'violating_samples': 0, 'ambiguous_samples': 0,
                 'samples_checked': 0, 'worst_probe': None, 'violation_examples': []} for name in names]

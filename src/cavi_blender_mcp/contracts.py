@@ -121,15 +121,25 @@ class UVLayout(VariantResult):
         return schema
 
 
-class Ownership(Result):
-    active: bool
-    owner: str | None
-    project_id: str
-    claimed_project_id: str | None
-    expires_in: float
+class Ownership(VariantResult):
+    shapes = (('active', 'owner', 'project_id', 'claimed_project_id', 'expires_in'),
+              ('connected', 'pid', 'generation', 'version', 'bridge_compatibility'))
+    nullable_shape_fields = frozenset({'owner', 'claimed_project_id', 'idle_seconds',
+                                       'previous_owner', 'lease_id'})
+    active: bool | None = None
+    owner: str | None = None
+    project_id: str | None = None
+    claimed_project_id: str | None = None
+    expires_in: float | None = None
     idle_seconds: float | None = None
     previous_owner: str | None = None
     lease_id: str | None = None
+    connected: bool | None = None
+    pid: int | None = None
+    generation: str | None = None
+    version: str | None = None
+    bridge_compatibility: dict[str, Any] | None = None
+    restarted: bool | None = None
 
 
 class AssetResult(Result):
@@ -349,7 +359,7 @@ class MeshEditResult(ObjectFields):
     levels: list[Record] | None = None
     source_renamed: bool | None = None
     uv_layer: str | None = None
-    texture_resolution: int | None = None
+    texture_resolution: int | list[int] | None = None
     source: str | None = None
     shape: str | None = None
     count: int | None = None

@@ -49,6 +49,15 @@ def integer(p, key, default, low, high):
     return value
 
 
+def texture_size(value):
+    """Square size or [width, height] in pixels, as (width, height)."""
+    size = [value, value] if type(value) is int else value
+    if (not isinstance(size, (list, tuple)) or len(size) != 2
+            or any(type(v) is not int or not 1 <= v <= 4096 for v in size)):
+        raise ValueError("texture_resolution must be an integer or [width, height] from 1 to 4096")
+    return tuple(size)
+
+
 def layer_name(value, default=None):
     value = default if value is None else value
     if not isinstance(value, str) or not value.strip() or len(value.encode()) > 63:
@@ -460,7 +469,8 @@ def lightmap_uv(p):
 def texel_density(p):
     value, _ = source(p["name"], MAX_UV_TRIANGLES)
     target = number(p.get("target_px_per_m"), 0.01, 100000, "target_px_per_m")
-    size = integer(p, "texture_resolution", 1024, 1, 4096)
+    requested_size = p.get("texture_resolution", 1024)
+    size = texture_size(requested_size)
     pack = boolean(p, "pack", False)
     layers = value.data.uv_layers
     requested = p.get("uv_layer")
@@ -470,7 +480,7 @@ def texel_density(p):
         raise ValueError("UV layer does not exist; unwrap first")
     unit = unit_scale()
     points = world_triangles(value, unit)
-    before = density(points, uv_triangles(value.data, layer), (size, size))
+    before = density(points, uv_triangles(value.data, layer), size)
     if before is None:
         raise ValueError("Mesh has no mapped area in this UV layer")
     factor = target / before
@@ -490,10 +500,10 @@ def texel_density(p):
             lambda: bpy.ops.uv.pack_islands(margin=0.002, scale=False, **PACK),
         ])
         layer = value.data.uv_layers[label]
-    after = density(points, uv_triangles(value.data, layer), (size, size))
+    after = density(points, uv_triangles(value.data, layer), size)
     layer.data.foreach_get("uv", uv.ravel())
     low, high = uv.min(axis=0), uv.max(axis=0)
-    return {**info(value), "uv_layer": layer.name, "texture_resolution": size,
+    return {**info(value), "uv_layer": layer.name, "texture_resolution": requested_size,
             "target_px_per_m": target, "density_before": before, "density_after": after,
             "scale_factor": factor, "packed": pack,
             "uv_bounds": {"min": low.tolist(), "max": high.tolist()},

@@ -77,9 +77,9 @@ def compare(p, find_object):
     candidate_frames = mapped_frames(frames, scale, offset)
     scene = bpy.context.scene
     prior_frame, prior_subframe = scene.frame_current, scene.frame_subframe
-    meters = scene.unit_settings.scale_length
-    if not math.isfinite(meters) or meters <= 0:
-        raise ValueError('Scene metre scale must be positive and finite')
+    from .blender_geometry import unit_scale
+
+    meters = unit_scale()
     reports = [{**pair, 'max_error_m': 0., 'rms_error_m': 0., 'worst_source_frame': None,
                 'source_motion_m': 0., 'candidate_motion_m': 0.} for pair in pairs]
     squares, counts = [0.] * len(pairs), [0] * len(pairs)

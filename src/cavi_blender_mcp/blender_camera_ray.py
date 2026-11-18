@@ -45,7 +45,9 @@ def from_query(query):
         raise ValueError('Camera projection changed; capture or inspect the current view')
     origin,direction,span=pixel_ray(query['pixel'],view['image_size'],view['projection'],
         view['matrix_world'],view['type'],view['clip_start'],view['clip_end'])
-    unit=bpy.context.scene.unit_settings.scale_length
+    from .blender_geometry import unit_scale
+
+    unit=unit_scale()
     ray={'origin_world':origin,'direction_world':direction,
         'max_distance_m':min(query['max_distance_m'],span*unit),'evaluated':query.get('evaluated',False)}
     context={'query':dict(query),'projection':view,'identity_checked':expected is not None,

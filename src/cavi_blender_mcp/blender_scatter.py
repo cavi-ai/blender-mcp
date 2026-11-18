@@ -4,6 +4,7 @@ import math
 
 import bpy
 import numpy as np
+from mathutils import Vector
 
 from .blender_bridge import MAX_MODIFIERS, number, obj
 from .blender_geometry import MAX_TRIANGLES, triangle_count
@@ -26,7 +27,35 @@ def areas(value, mesh):
     return float(local.sum()), float(world.sum())
 
 
-def build(label, density, distance, seed, scale, jitter, realize):
+def filters(nodes, links, points, up, cos_slope, group):
+    """Slope selection against a local up vector and a vertex-group density factor."""
+    if up is not None:
+        normal, dot = nodes.new("GeometryNodeInputNormal"), nodes.new("ShaderNodeVectorMath")
+        dot.operation = "DOT_PRODUCT"
+        dot.inputs[1].default_value = up
+        compare = nodes.new("FunctionNodeCompare")
+        compare.data_type, compare.operation = "FLOAT", "GREATER_EQUAL"
+        compare.inputs[1].default_value = cos_slope
+        links.new(normal.outputs["Normal"], dot.inputs[0])
+        links.new(dot.outputs["Value"], compare.inputs[0])
+        links.new(compare.outputs["Result"], points.inputs["Selection"])
+    if group is not None:
+        weight = nodes.new("GeometryNodeInputNamedAttribute")
+        weight.data_type = "FLOAT"
+        weight.inputs["Name"].default_value = group
+        if points.distribute_method == "POISSON":
+            links.new(weight.outputs["Attribute"], points.inputs["Density Factor"])
+        else:
+            # Random mode has no factor socket; its density input takes the field directly.
+            scaled = nodes.new("ShaderNodeMath")
+            scaled.operation = "MULTIPLY"
+            scaled.inputs[1].default_value = points.inputs["Density"].default_value
+            links.new(weight.outputs["Attribute"], scaled.inputs[0])
+            links.new(scaled.outputs["Value"], points.inputs["Density"])
+
+
+def build(label, density, distance, seed, scale, jitter, realize, align=False, up=None,
+          cos_slope=None, group=None):
     tree = bpy.data.node_groups.new(label, "GeometryNodeTree")
     tree.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     tree.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
@@ -61,7 +90,16 @@ def build(label, density, distance, seed, scale, jitter, realize):
     links.new(points.outputs["Points"], place.inputs["Points"])
     links.new(spin.outputs["Value"], axis.inputs["Z"])
     links.new(axis.outputs["Vector"], euler.inputs["Euler"])
-    links.new(euler.outputs["Rotation"], place.inputs["Rotation"])
+    if align:
+        # Spin about the aligned local Z, so jitter never tilts instances off the normal.
+        turn = nodes.new("FunctionNodeRotateRotation")
+        turn.rotation_space = "LOCAL"
+        links.new(points.outputs["Rotation"], turn.inputs["Rotation"])
+        links.new(euler.outputs["Rotation"], turn.inputs["Rotate By"])
+        links.new(turn.outputs["Rotation"], place.inputs["Rotation"])
+    else:
+        links.new(euler.outputs["Rotation"], place.inputs["Rotation"])
+    filters(nodes, links, points, up, cos_slope, group)
     links.new(size.outputs["Value"], place.inputs["Scale"])
     links.new(pool.outputs["Instances"], place.inputs["Instance"])
     result = place.outputs["Instances"]
@@ -103,22 +141,39 @@ def scatter(p):
                 scale[1], 0.01, 100, "scale_range")):
         raise ValueError("scale_range must be [min, max] within 0.01-100")
     jitter = number(p.get("rotation_jitter_degrees", 360), 0, 360, "rotation_jitter_degrees")
-    realize = p.get("realize", False)
-    if type(realize) is not bool:
-        raise ValueError("realize must be boolean")
+    realize, align = p.get("realize", False), p.get("align_to_normal", False)
+    if type(realize) is not bool or type(align) is not bool:
+        raise ValueError("realize and align_to_normal must be boolean")
+    group = p.get("density_group")
+    if group is not None and target.vertex_groups.get(group) is None:
+        raise ValueError("density_group must name a vertex group on the target")
+    up = cos_slope = None
+    if p.get("max_slope_degrees") is not None:
+        slope = number(p["max_slope_degrees"], 0, 90, "max_slope_degrees")
+        linear = target.matrix_world.to_3x3()
+        lengths = [column.length for column in linear.transposed()]
+        # Local face normals keep world angles only under rotation and uniform scale.
+        if (min(lengths) <= 0 or max(lengths) - min(lengths) > 1e-6 * max(lengths)
+                or abs(abs(linear.determinant()) - lengths[0] ** 3) > 1e-6 * lengths[0] ** 3):
+            raise ValueError("max_slope_degrees needs a target with uniform scale and no shear")
+        up = tuple((linear.inverted() @ Vector((0, 0, 1))).normalized())
+        cos_slope = math.cos(math.radians(slope))
     local, world = areas(target, surface)
     if local <= 0 or world <= 0:
         raise ValueError("Target has no surface area")
-    estimate = int(world * density)
+    from .blender_geometry import unit_scale
+
+    area_m2 = world * unit_scale() ** 2
+    estimate = int(area_m2 * density)
     if estimate > MAX_INSTANCES:
         raise ValueError(f"About {estimate} instances exceed the {MAX_INSTANCES} budget")
     if realize and estimate * max(triangle_count(m.data) for m in members) > (
             MAX_REALIZED_TRIANGLES):
         raise ValueError(f"Realized scatter would exceed {MAX_REALIZED_TRIANGLES} triangles")
-    # Distribution runs in local space; convert world density and spacing.
+    # Distribution runs in local space; convert metre density and scene-unit spacing.
     stretch = math.sqrt(world / local)
-    tree, pool = build("CAVI Scatter", density * world / local, distance / stretch, seed,
-                       scale, jitter, realize)
+    tree, pool = build("CAVI Scatter", density * area_m2 / local, distance / stretch, seed,
+                       scale, jitter, realize, align, up, cos_slope, group)
     try:
         pool.inputs["Collection"].default_value = collection
         modifier = target.modifiers.new("CAVI Scatter", "NODES")
@@ -144,4 +199,5 @@ def scatter(p):
     return {"name": target.name, "modifier": modifier.name, "node_group": tree.name,
             "collection": collection.name, "estimated_instances": estimate,
             "instances": instances, "evaluated_triangles": triangles, "realize": realize,
-            "seed": seed}
+            "seed": seed, "align_to_normal": align, "max_slope_degrees": p.get("max_slope_degrees"),
+            "density_group": group}

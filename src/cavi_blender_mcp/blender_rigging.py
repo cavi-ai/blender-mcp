@@ -24,7 +24,8 @@ def label(value, field="name"):
     return value
 
 
-def bones(params):
+def bones(params, base=None):
+    """Parse bone specs and check the final hierarchy, including surviving base bones."""
     specs = params.get("bones")
     if not isinstance(specs, list) or not 1 <= len(specs) <= MAX_BONES:
         raise ValueError(f"bones must list 1 to {MAX_BONES} bone specifications")
@@ -50,8 +51,10 @@ def bones(params):
         roll = number(spec.get("roll_degrees", 0), -3600, 3600, "roll_degrees")
         parsed.append({"name": name, "head": head, "tail": tail, "parent": parent,
                        "connect": connect, "deform": deform, "roll_degrees": roll})
-    by_name = {spec["name"]: spec for spec in parsed}
-    for spec in parsed:
+    by_name = {**(base or {}), **{spec["name"]: spec for spec in parsed}}
+    if len(by_name) > MAX_BONES:
+        raise ValueError(f"Armatures are limited to {MAX_BONES} bones")
+    for spec in by_name.values():
         parent = spec["parent"]
         if parent is not None and parent not in by_name:
             raise ValueError(f"Bone {spec['name']} references missing parent {parent}")
@@ -101,12 +104,97 @@ def create_armature(p):
         bpy.data.armatures.remove(data)
         raise
     rolls = {spec["name"]: spec["roll_degrees"] for spec in specs}
-    return {**info(rig), "bone_count": len(data.bones),
-            "bones": [{"name": bone.name,
-                       "parent": bone.parent.name if bone.parent else None,
-                       "head": list(bone.head_local), "tail": list(bone.tail_local),
-                       "deform": bone.use_deform, "connect": bone.use_connect,
-                       "roll_degrees": rolls[bone.name]} for bone in data.bones]}
+    return {**info(rig), "bone_count": len(data.bones), "bones": bone_rows(data, rolls)}
+
+
+def bone_rows(data, rolls=None):
+    return [{"name": bone.name, "parent": bone.parent.name if bone.parent else None,
+             "head": list(bone.head_local), "tail": list(bone.tail_local),
+             "deform": bone.use_deform, "connect": bone.use_connect,
+             **({"roll_degrees": rolls[bone.name]} if rolls else {})} for bone in data.bones]
+
+
+def weighted(rig, name):
+    """First mesh skinned to rig with nonzero weight in the named vertex group."""
+    for mesh in bpy.data.objects:
+        group = mesh.vertex_groups.get(name) if mesh.type == "MESH" else None
+        if group is None or not any(m.type == "ARMATURE" and m.object == rig for m in mesh.modifiers):
+            continue
+        if any(g.group == group.index and g.weight > 0 for v in mesh.data.vertices for g in v.groups):
+            return mesh
+    return None
+
+
+def edit_armature(p):
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Switch Blender to Object Mode before editing bones")
+    rig = obj(p.get("name"))
+    if rig.type != "ARMATURE":
+        raise ValueError("name must be an armature object")
+    data = rig.data
+    if rig.library or data.library or data.users > 1:
+        raise ValueError("Bone edits need a local, single-user armature")
+    removed = p.get("names") or []
+    if (not isinstance(removed, list) or len(set(removed)) != len(removed)
+            or any(name not in data.bones for name in removed)):
+        raise ValueError("names must list existing bones once each")
+    for name in removed:
+        if (mesh := weighted(rig, name)) is not None:
+            raise ValueError(f"Bone {name} has skin weights on {mesh.name}; reassign them before removing it")
+
+    def survivor(bone):
+        while bone is not None and bone.name in removed:
+            bone = bone.parent
+        return bone
+
+    # Blender reparents children of a removed bone to its nearest surviving ancestor.
+    base = {}
+    for bone in data.bones:
+        if bone.name not in removed:
+            parent = survivor(bone.parent)
+            base[bone.name] = {"name": bone.name, "head": tuple(bone.head_local),
+                               "tail": tuple(bone.tail_local), "parent": parent and parent.name,
+                               "connect": bone.use_connect and parent == bone.parent}
+    specs = bones(p, base) if p.get("bones") else []
+    if not specs and not removed:
+        raise ValueError("Provide bones to add or move, or names to remove")
+    if any(spec["name"] in removed for spec in specs):
+        raise ValueError("A bone cannot be both edited and removed")
+    final = {**base, **{spec["name"]: spec for spec in specs}}
+    original, backup = data.name, data.copy()
+    try:
+        with selected([rig]):
+            bpy.ops.object.mode_set(mode="EDIT")
+            try:
+                edits = data.edit_bones
+                for name in removed:
+                    edits.remove(edits[name])
+                # Disconnect first; connected heads and parent tails move together.
+                for bone in edits:
+                    bone.use_connect = False
+                for spec in specs:
+                    bone = edits.get(spec["name"]) or edits.new(spec["name"])
+                    bone.head, bone.tail = spec["head"], spec["tail"]
+                    bone.use_deform = spec["deform"]
+                    bone.roll = math.radians(spec["roll_degrees"])
+                for name, spec in final.items():
+                    edits[name].parent = edits[spec["parent"]] if spec["parent"] else None
+                    edits[name].use_connect = spec["connect"]
+            finally:
+                bpy.ops.object.mode_set(mode="OBJECT")
+        if set(data.bones.keys()) != set(final) or any(
+                (Vector(data.bones[s["name"]].head_local) - Vector(s["head"])).length > 1e-4
+                or (Vector(data.bones[s["name"]].tail_local) - Vector(s["tail"])).length > 1e-4
+                for s in specs):
+            raise RuntimeError("Blender changed the requested bones")
+    except Exception:
+        rig.data = backup
+        bpy.data.armatures.remove(data)
+        backup.name = original
+        raise
+    bpy.data.armatures.remove(backup)
+    return {**info(rig), "bone_count": len(data.bones), "bones": bone_rows(data),
+            "removed": removed}
 
 
 def snapshot(mesh):
@@ -247,4 +335,4 @@ def repair_weights(p):
 
 
 HANDLERS = {"create_armature": create_armature, "bind_skin": bind_skin,
-            "repair_weights": repair_weights}
+            "repair_weights": repair_weights, "edit_armature": edit_armature}

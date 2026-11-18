@@ -214,6 +214,33 @@ class FbxPreflightTests(unittest.TestCase):
                     with self.subTest(name=name), self.assertRaisesRegex(ValueError, "workspace"):
                         inspect_fbx(root, name)
 
+    def test_stl_ply_and_alembic_headers_are_bounded(self):
+        from cavi_blender_mcp.importing import inspect_abc, inspect_ply, inspect_stl
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "binary.stl").write_bytes(b"solid " + b"\0" * 74 + struct.pack("<I", 2) + b"\0" * 100)
+            (root / "ascii.stl").write_text("solid s\nfacet normal 0 0 1\nendfacet\nendsolid s\n")
+            (root / "mesh.ply").write_bytes(b"ply\nformat binary_little_endian 1.0\nelement vertex 3\n"
+                                            b"property float x\nelement face 1\nend_header\n\0")
+            (root / "mesh.abc").write_bytes(b"Ogawa\xff\xff\0")
+            self.assertEqual([inspect_stl(root, name)[key] for name in ("binary.stl", "ascii.stl")
+                              for key in ("binary", "triangles")], [True, 2, False, 1])
+            report = inspect_ply(root, "mesh.ply")
+            self.assertEqual((report["encoding"], report["vertices"], report["faces"]),
+                             ("binary_little_endian", 3, 1))
+            self.assertEqual(inspect_abc(root, "mesh.abc")["format"], "abc")
+            (root / "short.stl").write_bytes(b"\0" * 84)
+            (root / "points.ply").write_bytes(b"ply\nformat ascii 1.0\nelement vertex 3\nend_header\n")
+            (root / "hdf5.abc").write_bytes(b"\x89HDF\r\n")
+            for inspect, name, text in ((inspect_stl, "short.stl", "STL"),
+                                        (inspect_ply, "points.ply", "faces"),
+                                        (inspect_abc, "hdf5.abc", "Ogawa"),
+                                        (inspect_stl, "mesh.ply", "STL file"),
+                                        (inspect_abc, "../mesh.abc", "Alembic|workspace")):
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, text):
+                    inspect(root, name)
+
 
 class ImportPreflightTests(unittest.TestCase):
     def test_node_cycles_are_refused_before_blender_traverses_them(self):

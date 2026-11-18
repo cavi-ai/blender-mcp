@@ -29,9 +29,9 @@ LOCK_KEYS = {"pole", "pole_angle_degrees", "blend_in_frames", "blend_out_frames"
 def prepare(rig, source, windows, name):
     if not isinstance(windows, list) or not 1 <= len(windows) <= 16:
         raise ValueError("foot_locks needs 1 to 16 declared windows")
-    unit = bpy.context.scene.unit_settings.scale_length
-    if not math.isfinite(unit) or unit <= 0:
-        raise ValueError("Contact locks need a finite positive metre scale")
+    from .blender_geometry import unit_scale
+
+    unit = unit_scale()
     parsed = []
     for index, spec in enumerate(windows):
         if not isinstance(spec, dict) or set(spec) - CONTACT_KEYS - LOCK_KEYS:

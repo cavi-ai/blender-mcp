@@ -54,10 +54,12 @@ def snapshot():
         placements.append(digest({'object':identity(value.original),'mesh':identity(value.original.data),
             'instance':instance,'geometry':meshes[key],
             'materials':[[slot.link,identity(slot.material)] for slot in value.material_slots]}))
+    from .blender_geometry import unit_scale
+
     scene=bpy.context.scene
     return {'available':True,'scope':'evaluated_view_layer_mesh_geometry',
         'sha256':digest({'version':1,'scene':scene.name,'view_layer':bpy.context.view_layer.name,
-            'scene_unit_meters':scene.unit_settings.scale_length,'placements':sorted(placements)}),
+            'scene_unit_meters':unit_scale(),'placements':sorted(placements)}),
         'geometry_counts':{'placements':len(placements),'unique_meshes':len(meshes),
             'vertices':vertices,'triangles':triangles},
         'not_checked':['shader_parameters','image_content','lighting','shader_opacity',

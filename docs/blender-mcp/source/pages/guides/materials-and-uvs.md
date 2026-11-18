@@ -42,6 +42,9 @@ mesh slots and packs bounded workspace PNG or JPEG maps.
 | `metallic_texture`, `metallic` | Non-Color map or scalar |
 | `emission_texture`, `emission_strength` | sRGB emission map and strength |
 | `alpha_texture`, `alpha_mode` | Non-Color alpha map and opaque, clip or blend mode |
+| `occlusion_texture` | Non-Color ambient occlusion map; the red channel is used |
+| `orm_texture` | Non-Color packed map: occlusion (R), roughness (G), metallic (B) |
+| `height_texture`, `height_scale` | Non-Color height map, mid-grey at rest, and its range in metres |
 | `uv_scale`, `uv_offset`, `uv_rotation_degrees` | One Mapping node for all maps |
 | `uv_layer` | Named UV map for texture coordinates and normal-map tangents; empty selects render-active UVs |
 | `update_existing` | Edit a material created by this tool and bound to the slot |
@@ -49,8 +52,14 @@ mesh slots and packs bounded workspace PNG or JPEG maps.
 | `instance` | Scene collection instance containing internal mesh targets |
 | `link_mode` | DATA binding or OBJECT override; updates preserve omitted modes |
 
-Base color and emission use sRGB. Normal, roughness, metallic and alpha use
-Non-Color.
+Base color and emission use sRGB. Normal, roughness, metallic, alpha, occlusion,
+packed ORM and height use Non-Color.
+
+Occlusion feeds the Occlusion input of a `glTF Material Output` node group, which
+GLB export writes as the occlusion texture; Blender renders ignore it. Height
+drives a Displacement node on the material output. `orm_texture` cannot be
+combined with `roughness_texture`, `metallic_texture` or `occlusion_texture` in one
+call; with `update_existing`, either form replaces the other.
 
 Use `uv_layer="BakeAtlas"` to preview maps baked to that atlas while preserving
 the mesh's active and render-active UV settings. The same named layer drives the

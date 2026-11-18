@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from .bridge_contract import runtime_report
 from .catalog import BlenderServer
 from .client import BridgeClient
 from .contracts import (
@@ -67,6 +68,7 @@ from .scene_models import (
     PreviewSettings,
     RenderSpec,
     SpatialQuery,
+    SpatialSelector,
     SurfaceRay,
     WorldSpec,
 )
@@ -99,7 +101,9 @@ LeaseId = str | None
 MUTATING = DESTRUCTIVE
 ADDITIVE = WRITES
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
-Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
+Pixels = Annotated[StrictInt, Field(ge=1, le=4096)]
+TextureSize = Pixels | tuple[Pixels, Pixels]
+Check =Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
 View = Literal["front", "back", "left", "right", "top", "persp"]
 Preserve = Literal["seams", "sharp", "boundary"]
 Step = Literal["merge", "delete_loose", "delete_fragments", "recalc_normals", "triangulate",
@@ -196,6 +200,21 @@ class ShapeKeyframe(BaseModel):
     value: Annotated[Number, Field(ge=0, le=1)]
 
 
+class TransformKeyframe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    frame: Annotated[StrictInt, Field(ge=1, le=1_000_000)]
+    location: Vector3 | None = None
+    rotation_degrees: Vector3 | None = None
+    scale: Vector3 | None = None
+    interpolation: Literal["BEZIER", "LINEAR", "CONSTANT"] = "BEZIER"
+
+    @model_validator(mode="after")
+    def keyed(self):
+        if self.location is None and self.rotation_degrees is None and self.scale is None:
+            raise ValueError("Object keyframes need location, rotation_degrees or scale")
+        return self
+
+
 class Placement(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: ObjectName
@@ -254,7 +273,7 @@ async def scene_info(
     vertices: Annotated[StrictBool | None, Field(description='Source vertices')] = None,
     surface_ray: Annotated[SurfaceRay | CameraRay | None, Field(description='World ray or camera pixel; range in metres')] = None,
     region: Annotated[FaceRegion | None, Field(description='Connected source-face page')] = None,
-    spatial: Annotated[tuple[SceneName, SceneName] | None, Field(description='Subject and context mesh names; evaluated placement')] = None,
+    spatial: Annotated[tuple[SceneName, SceneName] | SpatialSelector | None, Field(description='Subject and context mesh names, or lists with world delta and clearance; evaluated placement')] = None,
 ) -> SceneInfo:
     """Inspect objects, source topology or camera-picked scene surfaces."""
     if spatial is not None:
@@ -262,7 +281,8 @@ async def scene_info(
                 or faces is not None or edges is not None or uv_layer is not None
                 or vertices is not None or surface_ray is not None or region is not None):
             raise ValueError('spatial excludes pagination and all other scene_info modes')
-        query = SpatialQuery(subjects=[spatial[0]], context=[spatial[1]])
+        query = (SpatialQuery(**spatial.model_dump()) if isinstance(spatial, SpatialSelector)
+                 else SpatialQuery(subjects=[spatial[0]], context=[spatial[1]]))
         return await run(call, 'inspect_scene_spatial', **query.model_dump(mode='json'))
     if region is not None:
         if name is None or faces or edges or vertices or definition or surface_ray is not None:
@@ -422,14 +442,14 @@ async def compare_rig_motion(
 
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
-    action: Annotated[Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
+    action: Annotated[Literal["create", "edit_bones", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
                     "assign_weights", "transfer_weights", "bake", "contact_lock"], Field(description="Action")],
     name: Annotated[str, Field(description="Skin mesh/rig/clip; create: new")],
     location: Annotated[Vector3 | None, Field(description="World position")] = None,
-    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="Bones")] = None,
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; optional for bake/contact_lock")] = None,
+    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="Bones; edit_bones: add or replace")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; edit_bones: remove; optional for bake/contact_lock")] = None,
     max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="Influences")] = None,
     clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="Weight cutoff")] = None,
     normalize: Annotated[StrictBool | None, Field(description="Normalize")] = None,
@@ -514,6 +534,12 @@ async def rig_edit(
     elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
+        params["bones"] = [bone.model_dump() for bone in params["bones"]]
+    elif action == "edit_bones":
+        operation = "edit_armature"
+        params = pick(action, values, (), {"bones": [], "names": []})
+        if not params["bones"] and not params["names"]:
+            raise ValueError("edit_bones needs bones or names")
         params["bones"] = [bone.model_dump() for bone in params["bones"]]
     elif action == "bind":
         operation = "bind_skin"
@@ -621,16 +647,21 @@ async def render_preview(
 
 @mcp.tool(annotations=ADDITIVE)
 async def session_control(
-    action: Annotated[Literal["inspect", "claim", "renew", "release", "break"], Field(description="Action")],
+    action: Annotated[Literal["inspect", "claim", "renew", "release", "break", "status", "restart"], Field(description="Action")],
     owner: Annotated[str | None, Field(max_length=128, description="claim: owner")] = None,
     expected_project: Annotated[
         str | None, Field(description="project_id")
     ] = None,
-    lease_id: Annotated[str | None, Field(max_length=128, description="renew/release: lease")] = None,
+    lease_id: Annotated[str | None, Field(max_length=128, description="renew/release/restart: lease")] = None,
     ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600, description="Lease seconds")] = 600,
 ) -> Ownership:
     """Manage edit leases; claim returns lease_id. Break requires expected_project and 300s idle.
-    Lease changes never save/close/discard projects."""
+    Lease changes never save/close/discard projects. status/restart report the Blender bridge."""
+    if action in ("status", "restart"):
+        if (owner is not None or expected_project is not None or ttl_seconds != 600
+                or (lease_id is None) == (action == "restart")):
+            raise ValueError("status takes no other arguments; restart takes only lease_id")
+        return await run(lambda: runtime_report(BridgeClient(), action == "restart", lease_id))
     return await run(
         call,
         "session_control",
@@ -647,9 +678,11 @@ async def object_edit(
     action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
                     "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
-                    "shape_key_value", "shape_key_keyframe", "shape_key_remove"], Field(description="Action")],
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe", "visibility"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
-    kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
+    kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane", "torus", "icosphere", "grid",
+                            "bezier_curve", "text"] | None, Field(description="create_primitive needs kind")] = None,
+    body: Annotated[str | None, Field(min_length=1, max_length=1024, description="create_primitive text: string")] = None,
     location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
     rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler angles")] = None,
     scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors")] = None,
@@ -672,12 +705,14 @@ async def object_edit(
     linked: Annotated[StrictBool | None, Field(description="duplicate: linked; default false")] = None,
     create: Annotated[StrictBool | None, Field(description="move_to_collection: create missing; default true")] = None,
     value: Annotated[Number | None, Field(ge=0, le=1, description="Shape-key value; add default 0")] = None,
-    keyframes: Annotated[list[ShapeKeyframe] | None, Field(min_length=1, max_length=32, description="shape_key_keyframe needs frame/value pairs")] = None,
-    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_keyframe needs clip")] = None,
+    keyframes: Annotated[list[ShapeKeyframe | TransformKeyframe] | None, Field(min_length=1, max_length=32, description="shape_key_keyframe: frame/value; keyframe: frame with location/rotation_degrees/scale")] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_keyframe/keyframe: new clip")] = None,
     source: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_add: source mesh")] = None,
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
     recursive: Annotated[StrictBool | None, Field(description='delete: descendants')] = None,
+    hide_viewport: Annotated[StrictBool | None, Field(description='visibility: viewport')] = None,
+    hide_render: Annotated[StrictBool | None, Field(description='visibility: render')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ObjectEditResult:
     """Create, transform or delete objects and branch data."""
@@ -687,10 +722,23 @@ async def object_edit(
               "origin": origin, "grid": grid, "new_name": new_name, "count": count,
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
-              "offsets": offsets, "recursive": recursive}
+              "offsets": offsets, "recursive": recursive, "hide_viewport": hide_viewport,
+              "hide_render": hide_render, "body": body}
+
+    def visible():
+        params = pick(action, values, (), {"hide_viewport": None, "hide_render": None})
+        if hide_viewport is None and hide_render is None:
+            raise ValueError("visibility needs hide_viewport or hide_render")
+        return params
+
+    def frames(kind, fields):
+        if any(not isinstance(item, kind) for item in keyframes):
+            raise ValueError(f"{action} needs {fields} keyframes")
+        return [item.model_dump(mode="json", exclude_none=True) for item in keyframes]
+
     operation, params = {
-        "create_primitive": ("create_primitive",
-                             lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
+        "create_primitive": ("create_primitive", lambda: pick(action, values, ["kind"], {
+            "location": (0, 0, 0), "body": None})),
         "create_mesh": ("create_mesh", lambda: pick(action, values, ["vertices", "faces"])),
         "transform": ("transform_object", lambda: pick(action, values, (), {
             "location": None, "rotation_degrees": None, "scale": None})),
@@ -718,9 +766,14 @@ async def object_edit(
         "shape_key_value": ("shape_key_value", lambda: pick(action, values, ["new_name", "value"])),
         "shape_key_keyframe": ("shape_key_keyframe", lambda: {
             **pick(action, values, ["new_name", "action_name", "keyframes"]),
-            "keyframes": [item.model_dump() for item in keyframes],
+            "keyframes": frames(ShapeKeyframe, "frame/value"),
         }),
         "shape_key_remove": ("shape_key_remove", lambda: pick(action, values, ["new_name"])),
+        "keyframe": ("object_keyframe", lambda: {
+            **pick(action, values, ["action_name", "keyframes"]),
+            "keyframes": frames(TransformKeyframe, "location/rotation_degrees/scale"),
+        }),
+        "visibility": ("set_visibility", visible),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 
@@ -731,9 +784,11 @@ async def mesh_edit(
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
                     "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "assign_faces", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
-    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="Modifier")] = None,
+    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh", "weld", "displace", "shrinkwrap",
+                            "weighted_normal", "data_transfer"] | None, Field(description="Modifier")] = None,
     amount: Annotated[Number | None, Field(
-        description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1]; "
+        description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1], weld distance (0,1], "
+        "displace strength, shrinkwrap offset, weighted_normal weight 1-100, data_transfer mix (0,1]; "
         "move_vertices radius (m).")] = None,
     apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
     angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="Unwrap split angle")] = None,
@@ -751,13 +806,13 @@ async def mesh_edit(
     lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="Lightmap pixels")] = None,
     margin_px: Annotated[Number | None, Field(ge=0, le=64, description="Lightmap padding (px)")] = None,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="Density: pixels/metre")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
+    texture_resolution: Annotated[TextureSize | None, Field(description="Pixels or [width, height]")] = None,
     pack: Annotated[StrictBool | None, Field(description="Pack scaled UVs")] = None,
     shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="Collision shape")] = None,
     max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255, description="Hull vertices")] = None,
     merge_distance: Annotated[Number | None, Field(ge=0, le=1, description="Merge radius (scene units)")] = None,
     steps: Annotated[list[Step] | None, Field(max_length=5, description="Ordered cleanup")] = None,
-    operand: Annotated[str | None, Field(description="Operand mesh")] = None,
+    operand: Annotated[str | None, Field(description="Boolean operand; shrinkwrap/data_transfer source mesh")] = None,
     operation: Annotated[Literal["union", "difference", "intersect"] | None, Field(description="Boolean operation")] = None,
     solver: Annotated[Literal["exact", "fast"] | None, Field(description="Boolean solver")] = None,
     keep_operand: Annotated[StrictBool | None, Field(description="Keep boolean operand")] = None,
@@ -872,7 +927,9 @@ async def mesh_edit(
         return await run(call, 'extrude_faces', lease_id=lease_id, name=name, **params)
     if action == "modifier":
         operation = "add_modifier"
-        params = pick(action, values, ["kind", "amount"], {"apply": False})
+        params = pick(action, values, ["kind", "amount"], {"apply": False, "operand": None})
+        if (operand is not None) != (kind in ("shrinkwrap", "data_transfer")):
+            raise ValueError("operand is required for shrinkwrap and data_transfer and refused otherwise")
     elif action == "unwrap":
         operation = "unwrap_mesh"
         params = pick(action, values, (), {"angle_limit_degrees": 66, "island_margin": None,
@@ -968,6 +1025,10 @@ async def assign_material(
     emission_texture: Annotated[str | None, Field(description="assign: sRGB image")] = None,
     emission_strength: Annotated[Number | None, Field(description="assign: emission scale")] = None,
     alpha_texture: Annotated[str | None, Field(description="assign: Non-Color image")] = None,
+    occlusion_texture: Annotated[str | None, Field(description="assign: Non-Color AO image")] = None,
+    orm_texture: Annotated[str | None, Field(description="assign: packed AO/roughness/metallic in R/G/B")] = None,
+    height_texture: Annotated[str | None, Field(description="assign: Non-Color height image")] = None,
+    height_scale: Annotated[Number | None, Field(description="assign: height range in metres")] = None,
     alpha_mode: Annotated[Literal["opaque", "clip", "blend"] | None, Field(description="assign: transparency")] = None,
     uv_scale: Annotated[Vector2 | None, Field(description="assign: UV scale")] = None,
     uv_offset: Annotated[Vector2 | None, Field(description="assign: UV translation")] = None,
@@ -1000,7 +1061,9 @@ async def assign_material(
             'roughness': roughness, 'metallic': metallic, 'roughness_texture': roughness_texture,
             'metallic_texture': metallic_texture, 'normal_texture': normal_texture, 'normal_strength': normal_strength,
             'emission_texture': emission_texture, 'emission_strength': emission_strength,
-            'alpha_texture': alpha_texture, 'alpha_mode': alpha_mode, 'uv_scale': uv_scale,
+            'alpha_texture': alpha_texture, 'occlusion_texture': occlusion_texture,
+            'orm_texture': orm_texture, 'height_texture': height_texture, 'height_scale': height_scale,
+            'alpha_mode': alpha_mode, 'uv_scale': uv_scale,
             'uv_offset': uv_offset, 'uv_rotation_degrees': uv_rotation_degrees,
             'update_existing': update_existing, 'instance': instance, 'link_mode': link_mode,
             'uv_layer': uv_layer,
@@ -1065,6 +1128,8 @@ async def assign_material(
                      metallic_texture=metallic_texture, normal_texture=normal_texture,
                      normal_strength=normal_strength, emission_texture=emission_texture,
                      emission_strength=emission_strength, alpha_texture=alpha_texture,
+                     occlusion_texture=occlusion_texture, orm_texture=orm_texture,
+                     height_texture=height_texture, height_scale=height_scale,
                      alpha_mode=alpha_mode, uv_scale=uv_scale, uv_offset=uv_offset,
                      uv_rotation_degrees=uv_rotation_degrees,
                      update_existing=False if update_existing is None else update_existing,
@@ -1199,7 +1264,8 @@ async def asset_io(
         suffix = Path(path).suffix.lower()
         operation = {".fbx": "import_fbx", ".obj": "import_obj",
                      ".usd": "import_usd", ".usda": "import_usd",
-                     ".usdc": "import_usd"}.get(suffix, "import_mesh")
+                     ".usdc": "import_usd", ".stl": "import_stl", ".ply": "import_ply",
+                     ".abc": "import_abc"}.get(suffix, "import_mesh")
         if expected_sha256 is not None and suffix != ".glb":
             raise ValueError("expected_sha256 applies only to GLB imports")
         params = pick(action, values, ["name"], {"expected_sha256": None})
@@ -1262,18 +1328,22 @@ async def asset_library(
 
 @mcp.tool(annotations=MUTATING)
 async def geometry_nodes(
-    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy'], Field(description="Action")],
+    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy', 'add'], Field(description="Action")],
     name: Annotated[str, Field(description="Mesh")],
-    modifier: Annotated[str | None, Field(description="Geometry Nodes modifier")] = None,
+    modifier: Annotated[str | None, Field(description="Geometry Nodes modifier; add: new name")] = None,
+    node_group: Annotated[str | None, Field(min_length=1, max_length=63, description="add: existing Geometry Nodes group")] = None,
     inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs needs ID/value map")] = None,
     attributes: Annotated[dict[str, str | None] | None, Field(description="set_inputs: ID/attribute map; null disables")] = None,
     new_name: Annotated[str | None, Field(description="bake_copy needs output name")] = None,
     instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit procedural inputs or snapshot meshes; members via scene_info(definition=true)."""
+    """Inspect/edit procedural inputs, attach node groups or snapshot meshes; members via scene_info(definition=true)."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
-              'instance': instance}
+              'instance': instance, 'node_group': node_group}
+    if action == 'add':
+        params = pick(action, values, ['node_group'], {'modifier': None})
+        return await run(call, 'attach_geometry_nodes', name=name, lease_id=lease_id, **params)
     if action == 'inspect':
         params = pick(action, values, (), {'modifier': None, 'instance': None})
         scoped = params.pop('instance')
@@ -1300,7 +1370,7 @@ async def review_sheet(
     mode: Annotated[Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"], Field(description="Shading/diagnostic mode")] = "shaded",
     resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width")] = 1024,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_heatmap: target density; default 512")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
+    texture_resolution: Annotated[TextureSize | None, Field(description="Pixels or [width, height]")] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
 ) -> ImageReceipt:
     """Render a multi-view PNG; no lease. Heatmap: blue < target_px_per_m=512 (green) < red."""
@@ -1366,13 +1436,17 @@ async def scatter(
     scale_range: Annotated[tuple[Number, Number], Field(description="Scale bounds")] = (1, 1),
     rotation_jitter_degrees: Annotated[Number, Field(ge=0, le=360, description="Rotation jitter cap")] = 360,
     realize: Annotated[StrictBool, Field(description="Realize instances")] = False,
+    align_to_normal: Annotated[StrictBool, Field(description="Instance Z follows the surface normal; jitter spins about it")] = False,
+    max_slope_degrees: Annotated[Number | None, Field(ge=0, le=90, description="Skip faces steeper than this from world up")] = None,
+    density_group: Annotated[str | None, Field(min_length=1, max_length=63, description="Vertex group scaling density 0-1")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ScatterResult:
     """Scatter collection instances with fixed Geometry Nodes."""
     return await run(call, "scatter", lease_id=lease_id, name=name, collection=collection,
                      density=density, seed=seed, min_distance=min_distance,
                      scale_range=scale_range, rotation_jitter_degrees=rotation_jitter_degrees,
-                     realize=realize)
+                     realize=realize, align_to_normal=align_to_normal,
+                     max_slope_degrees=max_slope_degrees, density_group=density_group)
 
 
 def main():

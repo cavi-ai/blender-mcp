@@ -12,7 +12,7 @@ on the same object without applying transforms or changing scene references.
 
 | Action | Use |
 | --- | --- |
-| `modifier` | Add bevel, decimate, subdivision or voxel remesh; `apply` bakes it |
+| `modifier` | Add bevel, decimate, subdivision, voxel remesh, weld, displace, weighted normal, or shrinkwrap and data transfer (custom normals) from an `operand` mesh; `apply` bakes it |
 | `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
 | `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |
@@ -398,8 +398,9 @@ working surface. It does not save a project, bake textures or change seams.
 ### Whole-layer preparation and placement
 
 `unwrap` uses Smart UV Project then packing with `margin_px` (default 4) between
-islands at `texture_resolution` (default 1024); `island_margin` instead sets the
-margin as a fraction of the UV square. Faces that fold over their own island are
+islands at `texture_resolution` (default 1024, or `[width, height]`, where the
+shorter side sets the margin); `island_margin` instead sets the margin as a
+fraction of the UV square. Faces that fold over their own island are
 projected again at half the angle limit; any still folded become islands of their
 own. Packing that produces zero-area, nonfinite or out-of-tile UVs is rejected and
 the previous UV coordinates, pins, selection and layer flags are restored. Large
@@ -409,7 +410,8 @@ required pixel gutters after a successful unwrap.
 `decimate_to` dissolves faces collapsed onto coincident vertices. `lightmap_uv` creates
 `UVMap_Lightmap` when missing, keeps the render-active layer and rasterizes the
 overlap ratio. `texel_density` scales the layer around its UV bounds center;
-`pack=true` rearranges islands without rescaling.
+`pack=true` rearranges islands without rescaling. Its `texture_resolution` takes
+one size or `[width, height]`; density is the geometric mean of both axes.
 
 Use `uv_transform` to correct selected faces without re-unwrapping the asset:
 

@@ -160,6 +160,10 @@ assert abs(inspected["objects"][0]["mapping"]["density_area_weighted"] - 256) < 
 packed = edit("texel_density", name="SM_Floor", target_px_per_m=128, texture_resolution=1024,
               pack=True)
 assert abs(packed["density_after"] - 128) < 1e-3, packed
+# 2048x512 has the pixel area of 1024x1024, so density is unchanged before scaling.
+wide = edit("texel_density", name="SM_Floor", target_px_per_m=256, texture_resolution=[2048, 512])
+assert abs(wide["density_before"] - 128) < 1e-3 and abs(wide["density_after"] - 256) < 1e-3, wide
+assert wide["texture_resolution"] == [2048, 512], wide
 results["texel_density"] = [density["density_before"], density["density_after"]]
 
 # Collision: convex hull per loose part, primitives, hull vertex cap.
@@ -290,6 +294,61 @@ refused("set_origin", "location", name="SM_Box", origin="bounds_center", locatio
 box.location = (0.26, -0.74, 1.01)
 edit("snap_to_grid", name="SM_Box", grid=0.5)
 assert all(abs(a - b) < 1e-6 for a, b in zip(box.location, (0.5, -0.5, 1.0)))
+# Halves round up on every axis, and parented objects land on the world grid.
+box.location = (0.25, 0.75, -0.25)
+edit("snap_to_grid", name="SM_Box", grid=0.5)
+assert all(abs(a - b) < 1e-6 for a, b in zip(box.location, (0.5, 1.0, 0.0))), box.location
+pivot = bpy.data.objects.new("SnapPivot", None)
+bpy.context.scene.collection.objects.link(pivot)
+pivot.location, pivot.scale = (0.1, 0, 0), (2, 2, 2)
+box.parent, box.location = pivot, (0.3, 0.2, 0)
+bpy.context.view_layer.update()
+edit("snap_to_grid", name="SM_Box", grid=0.5)
+bpy.context.view_layer.update()
+assert (box.matrix_world.translation - Vector((0.5, 0.5, 0))).length < 1e-6, box.matrix_world
+box.parent = None
+bpy.data.objects.remove(pivot)
+box.location = (0.5, -0.5, 1.0)
+# Object keyframes: a linear half turn on a camera.
+camera = bpy.data.objects.new("TurnCam", bpy.data.cameras.new("TurnCam"))
+bpy.context.scene.collection.objects.link(camera)
+turn = edit("object_keyframe", name="TurnCam", action_name="TurnCam_Spin", keyframes=[
+    {"frame": 1, "rotation_degrees": [90, 0, 0], "interpolation": "LINEAR"},
+    {"frame": 49, "rotation_degrees": [90, 0, 180], "location": [0, -5, 1]}])
+assert turn["frames"] == [1, 49] and turn["channels"] == ["location", "rotation_degrees"], turn
+bpy.context.scene.frame_set(25)
+assert abs(math.degrees(camera.rotation_euler.z) - 90) < 1e-4, camera.rotation_euler
+bpy.context.scene.frame_set(1)
+refused("object_keyframe", "already exists", name="TurnCam", action_name="TurnCam_Spin",
+        keyframes=[{"frame": 1, "location": [0, 0, 0]}])
+refused("object_keyframe", "increasing", name="TurnCam", action_name="Other",
+        keyframes=[{"frame": 5, "location": [0, 0, 0]}, {"frame": 5, "location": [1, 0, 0]}])
+assert "Other" not in bpy.data.actions
+bpy.data.actions.remove(bpy.data.actions["TurnCam_Spin"])
+bpy.data.objects.remove(camera)
+# Visibility: viewport sets the object flag and the view-layer eye; render is separate.
+hidden = edit("set_visibility", name="SM_Box", hide_viewport=True, hide_render=True)
+assert hidden["hide_viewport"] and hidden["hide_render"] and box.hide_get() and box.hide_render
+assert hidden["visibility_before"] == {"hide_viewport": False, "hide_render": False}, hidden
+shown = edit("set_visibility", name="SM_Box", hide_viewport=False)
+assert not shown["hide_viewport"] and shown["hide_render"] and not box.hide_get(), shown
+edit("set_visibility", name="SM_Box", hide_render=False)
+assert not box.hide_render and not box.hide_viewport
+refused("set_visibility", "boolean", name="SM_Box")
+# Primitives: torus, icosphere and grid meshes, a Bezier curve and a text object.
+shapes = {kind: edit("create_primitive", name=f"Prim_{kind}", kind=kind, location=[0, 0, -20])
+          for kind in ("torus", "icosphere", "grid", "bezier_curve")}
+assert [shapes[k]["type"] for k in shapes] == ["MESH", "MESH", "MESH", "CURVE"], shapes
+assert shapes["torus"]["vertices"] == 576 and shapes["icosphere"]["vertices"] == 42, shapes
+sign = edit("create_primitive", name="Prim_text", kind="text", body="EXIT")
+assert sign["type"] == "FONT" and bpy.data.objects["Prim_text"].data.body == "EXIT", sign
+refused("create_primitive", "body", name="Prim_bad", kind="text")
+refused("create_primitive", "body", name="Prim_bad", kind="cube", body="x")
+for kind in (*shapes, "text"):
+    item = bpy.data.objects[f"Prim_{kind}"]
+    data, item_type = item.data, item.type
+    bpy.data.objects.remove(item)
+    (bpy.data.meshes if item_type == "MESH" else bpy.data.curves).remove(data)
 edit("rename_object", name="SM_Box", new_name="SM_Crate_B")
 assert "SM_Crate_B" in bpy.data.objects and bpy.data.objects["SM_Crate_B"].data.name == "SM_Crate_B"
 refused("rename_object", "unique", name="SM_Crate_B", new_name="SM_Rock")
@@ -360,7 +419,7 @@ pools = ("objects", "meshes", "materials", "images", "cameras")
 counts = {k: len(getattr(bpy.data, k)) for k in pools}
 hidden = {o.name: o.hide_render for o in bpy.context.scene.objects}
 for mode in ("shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"):
-    extra = {"target_px_per_m": 128, "texture_resolution": 1024} if mode == "texel_heatmap" else {}
+    extra = {"target_px_per_m": 128, "texture_resolution": [2048, 512]} if mode == "texel_heatmap" else {}
     sheet = bridge.dispatch("review_sheet", {"path": f"sheet-{mode}.png", "mode": mode,
                                              "names": ["SM_Floor", "SM_Crate"],
                                              "resolution": 384, **extra})
@@ -403,7 +462,50 @@ assert spread["estimated_instances"] == 200 and 50 < spread["instances"] <= 200,
 assert floor.modifiers[-1].type == "NODES"
 again = edit("scatter", name="SM_Floor", collection="Props", density=2, seed=7,
              min_distance=0.2, scale_range=[0.5, 1.5])
-flat = edit("scatter", name="SM_Crate", collection="Props", density=1, realize=True)
+# Density is per square metre: 100 square units at 10 m per unit is 10000 m².
+bpy.context.scene.unit_settings.scale_length = 10
+metric = edit("scatter", name="SM_Floor", collection="Props", density=0.01, seed=7)
+bpy.context.scene.unit_settings.scale_length = 1
+added = metric["instances"] - again["instances"]
+assert metric["estimated_instances"] == 100 and 80 <= added <= 120, (added, metric)
+# Normal alignment, a 30 degree slope cap and painted density on the +X half of a dome.
+dome = sphere("Dome", segments=32, rings=16, location=(0, 0, -40))
+paint = dome.vertex_groups.new(name="Paint")
+paint.add([v.index for v in dome.data.vertices if v.co.x > 1e-6], 1.0, "REPLACE")
+capped = edit("scatter", name="Dome", collection="Props", density=200, seed=3,
+              align_to_normal=True, max_slope_degrees=30, density_group="Paint")
+graph = bpy.context.evaluated_depsgraph_get()
+placed = [i.matrix_world.copy() for i in graph.object_instances
+          if i.is_instance and i.parent and i.parent.original == dome]
+axes = [m.col[2].to_3d().normalized() for m in placed]
+offsets = [(m.translation - dome.location).normalized() for m in placed]
+assert len(placed) > 20 and capped["align_to_normal"], (len(placed), capped)
+assert all(a.z >= math.cos(math.radians(30)) - 1e-3 for a in axes), min(a.z for a in axes)
+assert min(a.z for a in axes) < .97 and all(a.dot(o) > math.cos(math.radians(10))
+                                           for a, o in zip(axes, offsets, strict=True))
+assert all(m.translation.x >= -1e-4 for m in placed)
+dome.scale = (1, 1, 2)
+refused("scatter", "uniform scale", name="Dome", collection="Props", density=1,
+        max_slope_degrees=30)
+refused("scatter", "density_group", name="Dome", collection="Props", density=1,
+        density_group="Missing")
+dome.scale = (1, 1, 1)
+# Attach an existing Geometry Nodes group as a new modifier.
+lift = bpy.data.node_groups.new("Lift", "GeometryNodeTree")
+lift.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+lift.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+move = lift.nodes.new("GeometryNodeSetPosition")
+move.inputs["Offset"].default_value = (0, 0, 1)
+lift.links.new(lift.nodes.new("NodeGroupInput").outputs[0], move.inputs["Geometry"])
+lift.links.new(move.outputs["Geometry"], lift.nodes.new("NodeGroupOutput").inputs[0])
+edit("create_primitive", name="LiftBox", kind="cube", location=[0, 0, -60])
+attached = edit("attach_geometry_nodes", name="LiftBox", node_group="Lift")
+assert [(m["name"], m["node_group"]) for m in attached["modifiers"]] == [("Lift", "Lift")], attached
+lifted = bpy.data.objects["LiftBox"].evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+assert abs(min(v.co.z for v in lifted.vertices)) < 1e-6
+refused("attach_geometry_nodes", "must be new", name="LiftBox", node_group="Lift")
+refused("attach_geometry_nodes", "must name", name="LiftBox", node_group="Missing")
+flat =edit("scatter", name="SM_Crate", collection="Props", density=1, realize=True)
 assert flat["evaluated_triangles"] > tris(crate), flat
 refused("scatter", "budget", name="SM_Floor", collection="Props", density=10000)
 refused("scatter", "inside", name="Pebble", collection="Props", density=1)

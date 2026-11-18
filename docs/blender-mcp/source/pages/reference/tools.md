@@ -4,7 +4,10 @@ The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
 `scene_info(spatial=["Subject", "Context"])` evaluates one named subject mesh
-against one named context mesh without editing the scene. It returns metre world bounds, geometry/query
+against one named context mesh without editing the scene. The object form
+`{"subjects": [...], "context": [...]}` takes up to 32 subjects and 128 context
+meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects),
+`min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
 identities, bounded triangle intersection pairs and bidirectional sampled nearest
 surface gaps with fixed safety budgets. Bounds are broadphase only; sampled distances are not
 continuous clearance or solid-containment proofs. See [placement and surface
@@ -17,7 +20,8 @@ ranges, enum identifiers and read-only state. Scene-wide pages omit this detaile
 schema. `mesh_edit(action="modifier_update",
 name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
 in place: bevel width, collapse-decimation ratio, subdivision viewport/render
-levels, or voxel size. Other controls and stack order are retained. Percentage
+levels, voxel size, weld distance, displace strength, shrinkwrap offset, weighted
+normal weight or data transfer mix. Other controls and stack order are retained. Percentage
 bevels and other remesh/decimation modes require their own native controls and are
 rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
 size 0.005–1, matching modifier creation.
@@ -33,7 +37,8 @@ Native subdivision ranges apply to this form, subject to the geometry budget;
 the shorthand's fixed level range does not apply. Angle properties use radians.
 
 Updates check a conservative 500,000-triangle bound across bevel, decimate,
-subdivision and armature stacks before evaluating changed geometry. Unknown
+subdivision, armature, weld, displace, shrinkwrap, weighted normal and data
+transfer stacks before evaluating changed geometry. Unknown
 topology-changing modifiers cannot establish that bound. Remesh updates require
 a standalone modifier on a shape-key-free working mesh and at most two million
 bounding voxel or octree cells. Visibility-only disabling does not enlarge a
@@ -137,12 +142,13 @@ workspace and are hashed without conversion. See [native libraries](../guides/na
 
 ## geometry_nodes
 
-`inspect` is lease-free. `set_inputs` and `bake_copy` require a lease.
+`inspect` is lease-free. `set_inputs`, `bake_copy` and `add` require a lease.
 
 | Parameter | Used by |
 | --- | --- |
-| `name` | Existing procedural object |
-| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs` |
+| `name` | Existing procedural object; a mesh for `add` |
+| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs`; new modifier name for `add` |
+| `node_group` | `add`; existing Geometry Nodes group with a Geometry output |
 | `inputs` | Socket identifier to typed value; omitted values are preserved |
 | `attributes` | Socket identifier to attribute name; null disables attribute mode |
 | `new_name` | `bake_copy`; independent static mesh of the evaluated stack at the current frame |
@@ -152,6 +158,11 @@ Datablock values use `{name, id_type}` or null. Source node groups remain shared
 and unchanged; values belong to the named object's modifier. The full batch is
 validated before assignment; a native setter or value mismatch restores prior
 values. Inputs driven by animation still follow that animation when time changes.
+
+`add` attaches an existing node group as a new Geometry Nodes modifier, named
+`modifier` or the group name. The modifier is removed again when the evaluated
+mesh exceeds 500,000 triangles or 100,000 instances. The result is the `inspect`
+report for the new modifier.
 
 `bake_copy` preserves evaluated mesh layers, material slots and world transform.
 It reports fractional frame time, triangle counts and triangle usage per material
@@ -318,7 +329,7 @@ reported joints and morph combinations visually before accepting the asset.
 
 ## rig_edit
 
-Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
+Mutating. Actions: `create`, `edit_bones`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
 `nla_push`, `nla_edit`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
 
@@ -326,8 +337,8 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | --- | --- |
 | `name` | New armature, armature or skinned mesh |
 | `location` | `create` |
-| `bones` | `create`; 1–128 bone specifications |
-| `names` | `bind`; 1–16 mesh names |
+| `bones` | `create`; 1–128 bone specifications. `edit_bones`: bones to add or replace |
+| `names` | `bind`; 1–16 mesh names. `edit_bones`: 1–16 bones to remove |
 | `max_influences`, `clean_threshold`, `normalize` | `weights` |
 | `poses` | `pose`; 1–128 poses |
 | `keyframes`, `action_name` | `keyframe`; 1–32 frames |
@@ -369,13 +380,17 @@ Eevee requires material colors and at most 1024 pixels.
 ## session_control
 
 Lease-free. Inspects, claims, renews, releases or breaks edit ownership.
+`status` returns the same report as `cavi-blender-mcp runtime status`: process,
+bridge generation, Blender version and `bridge_compatibility`. `restart` replaces
+the bridge listener in the running Blender without touching scene data, then
+returns that report with `restarted: true`.
 
 | Parameter | Values |
 | --- | --- |
-| `action` | `inspect`, `claim`, `renew`, `release`, `break` |
+| `action` | `inspect`, `claim`, `renew`, `release`, `break`, `status`, `restart` |
 | `owner` | Claim label, at most 128 characters |
 | `expected_project` | Exact `project_id` from inspect, for claim and break |
-| `lease_id` | Claim token for renew and release |
+| `lease_id` | Claim token for renew, release and restart |
 | `ttl_seconds` | 30–3600, default 600 |
 
 [Guide](../guides/session-ownership.md)
@@ -389,7 +404,13 @@ It takes only `name` and `lease_id`; `mesh_copy` reports whether a copy was need
 Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
 `add_socket`, `duplicate`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
-`shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`.
+`shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`,
+`visibility`.
+
+`visibility` sets `hide_viewport` (object flag and view-layer eye) and/or `hide_render`.
+
+`keyframe` keys `location`, `rotation_degrees` and `scale` of any object into a new
+`action_name` clip, 1–32 frames, with per-key `interpolation`.
 
 [Guide](../guides/object-editing.md)
 
@@ -531,6 +552,9 @@ Mutating. Binds a PBR material to exact mesh slots.
 | `metallic_texture`, `metallic` | Non-Color map; 0–1 |
 | `emission_texture`, `emission_strength` | sRGB map; strength 0–1000 |
 | `alpha_texture`, `alpha_mode` | Non-Color map; opaque, clip or blend |
+| `occlusion_texture` | Non-Color map; red channel is ambient occlusion |
+| `orm_texture` | Non-Color map; occlusion, roughness, metallic in R, G, B |
+| `height_texture`, `height_scale` | Non-Color map; range 0–10 m, default 0.1 |
 | `uv_scale`, `uv_offset`, `uv_rotation_degrees` | One Mapping node |
 | `update_existing` | Boolean |
 | `slot` | 0–31, default 0 |
@@ -553,7 +577,8 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
 a lease. GLB import accepts an optional `expected_sha256` and rejects a source
-whose bytes differ from that hash before editing the scene. Export supports animated
+whose bytes differ from that hash before editing the scene. Import and static
+export also cover OBJ, STL, PLY and Alembic. Export supports animated
 FBX, GLB and USD output and FBX and USD
 texture sidecars with `textures=true`.
 `triangulate=true` triangulates temporary FBX exporter meshes; it defaults to
@@ -636,6 +661,13 @@ explicitly for larger images. `cycles_time_limit` limits Cycles sampling; it is
 not a wall-clock deadline for scene preparation or Eevee. The result reports elapsed
 seconds and whether Cycles may have reached its sampling limit. Requested sample
 count is not a claim about samples achieved when a time limit intervenes.
+
+`end_frame` renders a sequence from `frame` to `end_frame` every `frame_step`
+frames, up to 250 frames, as `<stem>_0001<ext>` beside `path`. Every frame file is
+reserved before rendering; an existing one refuses the whole sequence. Cycles
+sequences need `cycles_time_limit` above 0 and at most 600 seconds across all
+frames. The result lists each frame's path, bytes and SHA-256; `path` is the
+first frame and `bytes` the total.
 
 Cycles defaults to CPU. `device="GPU"` uses the app's configured enabled Cycles
 devices and refuses an unavailable GPU instead of silently falling back. Eevee uses

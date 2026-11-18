@@ -30,6 +30,21 @@ class AAASurfaceTests(unittest.TestCase):
     def inner(self, calls):
         return [(params["operation"], params["params"]) for _, params in calls]
 
+    def test_modifier_kinds_take_amount_and_source_operand(self):
+        calls = self.capture({"name": "R", "type": "MESH", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [1, 1, 1], "parent": None,
+                              "children": [], "collections": [], "modifiers": []})
+        for kind, amount, operand in (("weld", .001, None), ("displace", .1, None),
+                                      ("weighted_normal", 50, None), ("shrinkwrap", 0, "Body"),
+                                      ("data_transfer", 1, "Proxy")):
+            asyncio.run(server.mcp.call_tool("mesh_edit", {
+                "action": "modifier", "name": "R", "kind": kind, "amount": amount,
+                "lease_id": "L", **({"operand": operand} if operand else {})}))
+        self.assertEqual([(p["kind"], p["amount"], p["operand"]) for _, p in self.inner(calls)],
+                         [("weld", .001, None), ("displace", .1, None), ("weighted_normal", 50, None),
+                          ("shrinkwrap", 0, "Body"), ("data_transfer", 1, "Proxy")])
+
     def test_mesh_actions_translate_preserve_and_defaults(self):
         calls = self.capture()
         asyncio.run(server.mesh_edit("decimate_to", "R", target_triangles=100, lease_id="L"))
@@ -71,6 +86,61 @@ class AAASurfaceTests(unittest.TestCase):
                 asyncio.run(coroutine)
         self.assertEqual(calls, [])
 
+    def test_object_keyframes_map_transform_channels(self):
+        calls = self.capture({"name": "Camera", "type": "CAMERA", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [0, 0, 0], "parent": None,
+                              "children": [], "collections": [], "modifiers": [],
+                              "action": "Turntable", "frames": [1, 97]})
+        keys = [{"frame": 1, "rotation_degrees": (0, 0, 0), "interpolation": "LINEAR"},
+                {"frame": 97, "rotation_degrees": (0, 0, 360), "location": (0, 0, 1)}]
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "keyframe", "name": "Camera", "action_name": "Turntable",
+            "keyframes": keys, "lease_id": "L"}))
+        self.assertEqual(self.inner(calls), [("object_keyframe", {
+            "name": "Camera", "action_name": "Turntable", "keyframes": [
+                {"frame": 1, "rotation_degrees": [0, 0, 0], "interpolation": "LINEAR"},
+                {"frame": 97, "location": [0, 0, 1], "rotation_degrees": [0, 0, 360],
+                 "interpolation": "BEZIER"}], "lease_id": "L"})])
+        for bad in ([{"frame": 1}], [{"frame": 1, "value": 0.5}]):
+            with self.subTest(bad=bad), self.assertRaisesRegex(Exception, "keyframe"):
+                asyncio.run(server.mcp.call_tool("object_edit", {
+                    "action": "keyframe", "name": "Camera", "action_name": "Clip",
+                    "keyframes": bad, "lease_id": "L"}))
+        self.assertEqual(len(calls), 1)
+
+    def test_primitives_include_torus_grid_curve_and_text(self):
+        result = {"name": "P", "type": "MESH", "location": [0, 0, 0],
+                  "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ", "scale": [1, 1, 1],
+                  "dimensions": [1, 1, 1], "parent": None, "children": [], "collections": [],
+                  "modifiers": []}
+        calls = self.capture(result)
+        for kind in ("torus", "icosphere", "grid", "bezier_curve"):
+            asyncio.run(server.mcp.call_tool("object_edit", {
+                "action": "create_primitive", "name": kind, "kind": kind, "lease_id": "L"}))
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "create_primitive", "name": "Sign", "kind": "text", "body": "EXIT",
+            "lease_id": "L"}))
+        self.assertEqual([(op, params["kind"], params["body"]) for op, params in self.inner(calls)],
+                         [("create_primitive", kind, None) for kind in
+                          ("torus", "icosphere", "grid", "bezier_curve")]
+                         + [("create_primitive", "text", "EXIT")])
+
+    def test_visibility_maps_viewport_and_render_flags(self):
+        calls = self.capture({"name": "Prop", "type": "MESH", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [1, 1, 1], "parent": None,
+                              "children": [], "collections": [], "modifiers": []})
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "visibility", "name": "Prop", "hide_render": True, "lease_id": "L"}))
+        self.assertEqual(self.inner(calls), [("set_visibility", {
+            "name": "Prop", "hide_viewport": None, "hide_render": True, "lease_id": "L"})])
+        for arguments in ({}, {"hide_viewport": True, "grid": 1}):
+            with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, "visibility"):
+                asyncio.run(server.object_edit("visibility", "Prop", lease_id="L", **arguments))
+        with self.assertRaisesRegex(ValueError, "does not accept"):
+            asyncio.run(server.object_edit("rename", "Prop", new_name="P", hide_render=True))
+
     def test_object_actions_map_to_bridge_operations(self):
         calls = self.capture()
         asyncio.run(server.object_edit("apply_transforms", "R", lease_id="L"))
@@ -103,6 +173,14 @@ class AAASurfaceTests(unittest.TestCase):
         self.assertTrue(ops[3][1]["textures"])
         self.assertTrue(ops[4][1]["textures"])
         self.assertEqual(ops[5][1]["bake_pair"], {"high": ["H"], "low": ["R"]})
+
+    def test_texture_sizes_take_width_and_height(self):
+        calls = self.capture()
+        asyncio.run(server.mesh_edit("texel_density", "R", target_px_per_m=256,
+                                     texture_resolution=(2048, 512), lease_id="L"))
+        asyncio.run(server.mesh_edit("unwrap", "R", texture_resolution=512, lease_id="L"))
+        (_, density), (_, unwrap) = self.inner(calls)
+        self.assertEqual((density["texture_resolution"], unwrap["texture_resolution"]), ((2048, 512), 512))
 
     def test_review_sheet_needs_no_lease_and_scatter_is_owned(self):
         with tempfile.TemporaryDirectory() as folder:
