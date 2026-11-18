@@ -72,6 +72,26 @@ try:
         "resolution": 4, "location": [10, 0, 0], "lease_id": lease})
     assert mapped["source"] == "image" and mapped["triangles"] == 18, mapped
     assert mapped["image"]["width"] == 4 and mapped["image"]["height"] == 4
+    # A linear ramp stays linear between pixels: height 15 maps pixel (x, y) to 4y + x.
+    bridge.dispatch("create_terrain", {
+        "name": "RampTerrain", "image": "height.png", "size": [4, 4], "height": 15,
+        "resolution": 10, "location": [20, 0, 0], "lease_id": lease})
+    ramp = bpy.data.objects["RampTerrain"].data.vertices
+    error = max(abs(v.co.z - (4 * (i // 10) + i % 10) / 3) for i, v in enumerate(ramp))
+    assert error < 1e-4, error
+    # Single-pixel stripes average out instead of aliasing to one stripe colour.
+    stripes = bpy.data.images.new("Stripes", 33, 33)
+    stripes.pixels = [float((index // 4) % 33 % 2) if index % 4 < 3 else 1.0
+                      for index in range(33 * 33 * 4)]
+    stripes.filepath_raw = str(root / "stripes.png")
+    stripes.file_format = "PNG"
+    stripes.save()
+    bpy.data.images.remove(stripes)
+    bridge.dispatch("create_terrain", {
+        "name": "StripeTerrain", "image": "stripes.png", "size": [4, 4], "height": 1,
+        "resolution": 3, "location": [30, 0, 0], "lease_id": lease})
+    heights = [v.co.z for v in bpy.data.objects["StripeTerrain"].data.vertices]
+    assert all(.4 < z < .6 for z in heights), heights
 
     bpy.ops.mesh.primitive_cube_add(location=(0, 0, 100))
     prop = bpy.context.object

@@ -35,7 +35,7 @@ def smoothstep(value):
     return value * value * (3 - 2 * value)
 
 
-def sample(grid, resolution):
+def sample(grid, resolution, ease=smoothstep):
     height, width = grid.shape
     x = np.linspace(0, width - 1, resolution)
     y = np.linspace(0, height - 1, resolution)
@@ -43,11 +43,27 @@ def sample(grid, resolution):
     y0 = np.floor(y).astype(np.int64)
     x1 = np.minimum(x0 + 1, width - 1)
     y1 = np.minimum(y0 + 1, height - 1)
-    tx = smoothstep(x - x0)
-    ty = smoothstep(y - y0)
+    tx = ease(x - x0)
+    ty = ease(y - y0)
     top = grid[np.ix_(y0, x0)] * (1 - tx) + grid[np.ix_(y0, x1)] * tx
     bottom = grid[np.ix_(y1, x0)] * (1 - tx) + grid[np.ix_(y1, x1)] * tx
     return top * (1 - ty)[:, None] + bottom * ty[:, None]
+
+
+def prefilter(grid, resolution):
+    # Average across one output spacing so detail finer than the terrain grid cannot alias.
+    # Windows are truncated at the image border rather than padded.
+    for axis in (0, 1):
+        count, half = grid.shape[axis], (grid.shape[axis] - 1) // (resolution - 1) // 2
+        if half > 0:
+            total = np.insert(np.cumsum(grid, axis=axis, dtype=np.float64), 0, 0, axis=axis)
+            index = np.arange(count)
+            low, high = np.maximum(index - half, 0), np.minimum(index + half + 1, count)
+            shape = [1, 1]
+            shape[axis] = count
+            grid = ((np.take(total, high, axis=axis) - np.take(total, low, axis=axis))
+                    / (high - low).reshape(shape))
+    return grid
 
 
 def noise(resolution, seed, octaves, frequency):
@@ -84,7 +100,7 @@ def height_image(workspace, name, resolution):
             bpy.data.images.remove(image)
     grid = pixels.reshape(height, width, 4)
     luminance = (0.2126 * grid[:, :, 0] + 0.7152 * grid[:, :, 1] + 0.0722 * grid[:, :, 2])
-    return sample(luminance, resolution), receipt
+    return sample(prefilter(luminance, resolution), resolution, ease=lambda t: t), receipt
 
 
 def mesh_data(resolution, size, height, values):
