@@ -137,13 +137,14 @@ def retarget(p):
                     target_bone.matrix = (target.matrix_world.inverted()
                                           @ source.matrix_world
                                           @ source.pose.bones[src_bone].matrix)
+                    # Children resolve against the parent's pose from this frame, not the last one.
+                    bpy.context.view_layer.update()
             for src_bone, dst_bone in ordered:
                 target_bone = target.pose.bones[dst_bone]
-                if calibration:
-                    rotation = target_bone.rotation_quaternion
-                    if dst_bone in previous_rotations and rotation.dot(previous_rotations[dst_bone]) < 0:
-                        rotation.negate()
-                    previous_rotations[dst_bone] = rotation.copy()
+                rotation = target_bone.rotation_quaternion
+                if dst_bone in previous_rotations and rotation.dot(previous_rotations[dst_bone]) < 0:
+                    rotation.negate()
+                previous_rotations[dst_bone] = rotation.copy()
                 if not target_bone.keyframe_insert("location", frame=frame):
                     raise RuntimeError(f"Could not key {dst_bone} location")
                 if not target_bone.keyframe_insert("rotation_quaternion", frame=frame):
