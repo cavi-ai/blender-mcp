@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from .bridge_contract import runtime_report
 from .catalog import BlenderServer
 from .client import BridgeClient
 from .contracts import (
@@ -623,16 +624,21 @@ async def render_preview(
 
 @mcp.tool(annotations=ADDITIVE)
 async def session_control(
-    action: Annotated[Literal["inspect", "claim", "renew", "release", "break"], Field(description="Action")],
+    action: Annotated[Literal["inspect", "claim", "renew", "release", "break", "status", "restart"], Field(description="Action")],
     owner: Annotated[str | None, Field(max_length=128, description="claim: owner")] = None,
     expected_project: Annotated[
         str | None, Field(description="project_id")
     ] = None,
-    lease_id: Annotated[str | None, Field(max_length=128, description="renew/release: lease")] = None,
+    lease_id: Annotated[str | None, Field(max_length=128, description="renew/release/restart: lease")] = None,
     ttl_seconds: Annotated[StrictInt, Field(ge=30, le=3600, description="Lease seconds")] = 600,
 ) -> Ownership:
     """Manage edit leases; claim returns lease_id. Break requires expected_project and 300s idle.
-    Lease changes never save/close/discard projects."""
+    Lease changes never save/close/discard projects. status/restart report the Blender bridge."""
+    if action in ("status", "restart"):
+        if (owner is not None or expected_project is not None or ttl_seconds != 600
+                or (lease_id is None) == (action == "restart")):
+            raise ValueError("status takes no other arguments; restart takes only lease_id")
+        return await run(lambda: runtime_report(BridgeClient(), action == "restart", lease_id))
     return await run(
         call,
         "session_control",

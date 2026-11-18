@@ -3,7 +3,7 @@
 import argparse
 import json
 
-from .bridge_contract import compatibility
+from .bridge_contract import runtime_report
 from .client import BridgeClient
 from .runtime import start_runtime
 
@@ -36,16 +36,7 @@ def main(argv=None):
             print(json.dumps(client.call('open_project', {'path': args.project,
                 'lease_id': args.lease_id, 'expected_sha256': args.expected_sha256})))
             return 0
-        restarted = (
-            client.call("runtime_restart", {"lease_id": args.lease_id})
-            if args.action == "restart" else None
-        )
-        result = client.call("runtime_status")
-        result['bridge_compatibility'] = compatibility(result.get('bridge'))
-        if restarted and result["generation"] != restarted["generation"]:
-            raise RuntimeError("Bridge changed again after restart; inspect runtime status")
-        if restarted:
-            result["restarted"] = True
+        result = runtime_report(client, args.action == "restart", args.lease_id)
         print(json.dumps(result))
         return 0 if result['bridge_compatibility']['matches'] else 1
     except (ConnectionError, OSError, RuntimeError, ValueError) as exc:

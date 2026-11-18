@@ -372,13 +372,17 @@ Eevee requires material colors and at most 1024 pixels.
 ## session_control
 
 Lease-free. Inspects, claims, renews, releases or breaks edit ownership.
+`status` returns the same report as `cavi-blender-mcp runtime status`: process,
+bridge generation, Blender version and `bridge_compatibility`. `restart` replaces
+the bridge listener in the running Blender without touching scene data, then
+returns that report with `restarted: true`.
 
 | Parameter | Values |
 | --- | --- |
-| `action` | `inspect`, `claim`, `renew`, `release`, `break` |
+| `action` | `inspect`, `claim`, `renew`, `release`, `break`, `status`, `restart` |
 | `owner` | Claim label, at most 128 characters |
 | `expected_project` | Exact `project_id` from inspect, for claim and break |
-| `lease_id` | Claim token for renew and release |
+| `lease_id` | Claim token for renew, release and restart |
 | `ttl_seconds` | 30–3600, default 600 |
 
 [Guide](../guides/session-ownership.md)

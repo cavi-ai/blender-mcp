@@ -2191,6 +2191,35 @@
     "error": "validation"
   },
   {
+    "id": "session-runtime-status",
+    "tool": "session_control",
+    "arguments": {
+      "action": "status"
+    },
+    "kind": "success",
+    "modes": [
+      "native"
+    ],
+    "required": [
+      "/connected",
+      "/generation",
+      "/bridge_compatibility"
+    ]
+  },
+  {
+    "id": "session-restart-lease",
+    "tool": "session_control",
+    "arguments": {
+      "action": "restart"
+    },
+    "kind": "invalid",
+    "modes": [
+      "protocol",
+      "native"
+    ],
+    "error": "restart takes only lease_id"
+  },
+  {
     "id": "session-stale-project",
     "tool": "session_control",
     "arguments": {
