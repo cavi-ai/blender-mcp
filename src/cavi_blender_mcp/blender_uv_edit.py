@@ -64,6 +64,11 @@ def transform(params, editable_mesh, info):
         if sum(p.loop_total for p in polygons) > 60000:
             raise ValueError('Selected faces exceed 60000 UV loops')
         before = [(i, tuple(layer.data[i].uv)) for p in polygons for i in p.loop_indices]
+        # Read face data now: a depsgraph update makes these polygon references stale.
+        materials = list(dict.fromkeys(
+            value.material_slots[p.material_index].material.name
+            if p.material_index < len(value.material_slots) and value.material_slots[p.material_index].material
+            else None for p in polygons))
         density_target = params.get('target_px_per_m')
         destination = options(density_target, params.get('uv_region'), scale)
         digest = mesh_digest(mesh) if destination or params.get('expected_mesh_sha256') else None
@@ -102,10 +107,6 @@ def transform(params, editable_mesh, info):
         if density is not None:
             rows, checked = review(surface, [uv for _, uv in after], destination, params['target_px_per_m'])
             after = [(index, tuple(uv)) for (index, _), uv in zip(after, rows, strict=True)]
-        materials = list(dict.fromkeys(
-            value.material_slots[p.material_index].material.name
-            if p.material_index < len(value.material_slots) and value.material_slots[p.material_index].material
-            else None for p in polygons))
     try:
         write(layer, after)
         mesh.update()

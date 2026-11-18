@@ -44,6 +44,7 @@ adds its lines under Unreleased and never edits a version.
 - Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.
 - Mesh unwrap joins UV corners that island scaling leaves a float step apart, so pinched surfaces pack without sliver overlaps.
 - `rig_edit` `retarget` without calibration keys child bones against their parent's pose at the same frame and keeps rotation keys in one quaternion hemisphere.
+- `mesh_edit` `uv_transform` with a density target reports the selected faces' materials instead of reading stale face data.
 
 ## 0.57.0 - 2026-11-09
 
