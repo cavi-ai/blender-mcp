@@ -9,10 +9,12 @@ def _inside(tri, sign, px, py):
     a, b, c = tri[:, 0:1], tri[:, 1:2], tri[:, 2:3]
     inside = None
     for p, q in ((a, b), (b, c), (c, a)):
-        edge = ((q[..., 0] - p[..., 0]) * (py - p[..., 1])
-                - (q[..., 1] - p[..., 1]) * (px - p[..., 0])) * sign
-        # Strict: shared edges of adjacent triangles never count twice.
-        inside = edge > 1e-9 if inside is None else inside & (edge > 1e-9)
+        dx, dy = (q[..., 0] - p[..., 0]) * sign, (q[..., 1] - p[..., 1]) * sign
+        edge = dx * (py - p[..., 1]) - dy * (px - p[..., 0])
+        # Fill rule: a point on a shared edge belongs to exactly one of its triangles.
+        owns = (dy > 0) | ((dy == 0) & (dx < 0))
+        hit = (edge > 1e-9) | ((edge >= -1e-9) & owns)
+        inside = hit if inside is None else inside & hit
     return inside
 
 
