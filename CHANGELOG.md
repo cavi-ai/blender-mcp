@@ -16,6 +16,7 @@ adds its lines under Unreleased and never edits a version.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
 - `asset_io` generate with `prompt` writes a horizontally wrapping 2048×1024 panorama PNG from the local image model for `world.hdri`.
 - `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
+- `scene_edit` render takes `end_frame` and `frame_step` to render numbered frame sequences.
 - `rig_edit` action `edit_bones` adds, moves, reparents and removes bones on an existing armature.
 - `asset_io` imports STL, PLY and Alembic and exports static OBJ (with MTL), STL, PLY and Alembic.
 - `geometry_nodes` action `add` attaches an existing node group as a new modifier; `scatter` takes `align_to_normal`, `max_slope_degrees` and `density_group`.

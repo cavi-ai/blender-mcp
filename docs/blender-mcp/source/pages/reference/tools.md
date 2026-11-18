@@ -659,6 +659,13 @@ not a wall-clock deadline for scene preparation or Eevee. The result reports ela
 seconds and whether Cycles may have reached its sampling limit. Requested sample
 count is not a claim about samples achieved when a time limit intervenes.
 
+`end_frame` renders a sequence from `frame` to `end_frame` every `frame_step`
+frames, up to 250 frames, as `<stem>_0001<ext>` beside `path`. Every frame file is
+reserved before rendering; an existing one refuses the whole sequence. Cycles
+sequences need `cycles_time_limit` above 0 and at most 600 seconds across all
+frames. The result lists each frame's path, bytes and SHA-256; `path` is the
+first frame and `bytes` the total.
+
 Cycles defaults to CPU. `device="GPU"` uses the app's configured enabled Cycles
 devices and refuses an unavailable GPU instead of silently falling back. Eevee uses
 its native GPU renderer. Existing `render_preview` remains a separate temporary

@@ -27,3 +27,15 @@ class SceneAuthoringTests(unittest.TestCase):
         for values in ({'width':6000,'height':3000}, {'file_format':'png','bit_depth':'32'}):
             with self.subTest(values=values),self.assertRaises(ValidationError):
                 server.RenderSpec(path='hero.png',camera='Hero',**values)
+
+    def test_sequence_bounds_are_checked_before_render(self):
+        shot = server.RenderSpec(path='shot.png', camera='Hero', frame=1, end_frame=240, cycles_time_limit=2)
+        self.assertEqual((shot.end_frame, shot.frame_step), (240, 1))
+        for values, message in (({'frame_step': 2}, 'needs end_frame'),
+                                ({'end_frame': 3}, 'frame <= end_frame'),
+                                ({'frame': 5, 'end_frame': 3}, 'frame <= end_frame'),
+                                ({'frame': 1, 'end_frame': 251, 'engine': 'eevee'}, '250 frames'),
+                                ({'frame': 1, 'end_frame': 10}, '600 seconds'),
+                                ({'frame': 1, 'end_frame': 10, 'cycles_time_limit': 0}, '600 seconds')):
+            with self.subTest(values=values), self.assertRaisesRegex(ValidationError, message):
+                server.RenderSpec(path='shot.png', camera='Hero', **values)
