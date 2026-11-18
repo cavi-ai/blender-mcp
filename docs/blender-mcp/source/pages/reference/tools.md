@@ -552,6 +552,9 @@ Mutating. Binds a PBR material to exact mesh slots.
 | `metallic_texture`, `metallic` | Non-Color map; 0–1 |
 | `emission_texture`, `emission_strength` | sRGB map; strength 0–1000 |
 | `alpha_texture`, `alpha_mode` | Non-Color map; opaque, clip or blend |
+| `occlusion_texture` | Non-Color map; red channel is ambient occlusion |
+| `orm_texture` | Non-Color map; occlusion, roughness, metallic in R, G, B |
+| `height_texture`, `height_scale` | Non-Color map; range 0–10 m, default 0.1 |
 | `uv_scale`, `uv_offset`, `uv_rotation_degrees` | One Mapping node |
 | `update_existing` | Boolean |
 | `slot` | 0–31, default 0 |

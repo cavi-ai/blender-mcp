@@ -194,6 +194,44 @@ with tempfile.TemporaryDirectory() as folder:
                        for name in binding["images"]}
     assert imported_images, imported_report
 
+    # Channel-packed ORM, separate occlusion and height maps.
+    image("orm.png", (1, .5, .25, 1))
+    image("height.png", (.5, .5, .5, 1))
+    for label, x in (("OrmCube", 4), ("AoCube", 8)):
+        bpy.ops.mesh.primitive_cube_add(location=(x, 0, 0))
+        bpy.context.object.name = label
+    orm = assign(names=["OrmCube"], material_name="ORM", orm_texture="orm.png",
+                 height_texture="height.png", height_scale=.05)
+    assert set(orm["textures"]) == {"orm_texture", "height_texture"}, orm
+    tree = bpy.data.materials["ORM"].node_tree
+    shader = next(node for node in tree.nodes if node.type == "BSDF_PRINCIPLED")
+    assert [shader.inputs[name].links[0].from_socket.name
+            for name in ("Roughness", "Metallic")] == ["Green", "Blue"]
+    surface = next(node for node in tree.nodes if node.type == "OUTPUT_MATERIAL")
+    lift = surface.inputs["Displacement"].links[0].from_node
+    assert lift.type == "DISPLACEMENT" and math.isclose(lift.inputs["Scale"].default_value, .05,
+                                                         rel_tol=1e-6)
+    ao = assign(names=["AoCube"], material_name="AO", roughness_texture="rough.png",
+                occlusion_texture="orm.png")
+    assert set(ao["textures"]) == {"roughness_texture", "occlusion_texture"}, ao
+    try:
+        assign(names=["AoCube"], material_name="Mixed", orm_texture="orm.png",
+               metallic_texture="metal.png")
+    except ValueError as exc:
+        assert "orm_texture replaces" in str(exc), exc
+    else:
+        raise AssertionError("orm_texture combined with metallic_texture")
+    swapped = assign(names=["AoCube"], material_name="AO", update_existing=True,
+                     orm_texture="orm.png")
+    assert set(swapped["textures"]) == {"orm_texture"}, swapped
+    bridge.dispatch("export_mesh", {"names": ["OrmCube"], "path": "orm.glb", "lease_id": lease})
+    data = (root / "orm.glb").read_bytes()
+    length = struct.unpack("<I", data[12:16])[0]
+    packed_material = next(item for item in json.loads(data[20:20 + length])["materials"]
+                           if item["name"] == "ORM")
+    assert "occlusionTexture" in packed_material, packed_material
+    assert "metallicRoughnessTexture" in packed_material["pbrMetallicRoughness"], packed_material
+
     print(json.dumps({
         "maps": sorted(loaded),
         "updated": True,

@@ -16,6 +16,7 @@ adds its lines under Unreleased and never edits a version.
 - `bake` map `vertex_orm` projects the high-poly second color attribute (glTF `COLOR_1`) into a Non-Color occlusion, roughness and metallic PNG.
 - `asset_io` generate with `prompt` writes a horizontally wrapping 2048×1024 panorama PNG from the local image model for `world.hdri`.
 - `asset_io` generate with `trellis2-mlx` takes `views` (more images of the object) and a `guide` GLB that sets the shape and frame.
+- `assign_material` takes `occlusion_texture`, channel-packed `orm_texture` and `height_texture` with `height_scale`; GLB export writes the occlusion map.
 - `mesh_edit` `texel_density` and `unwrap` and the `review_sheet` texel heatmap take `texture_resolution` as `[width, height]`.
 - `scene_edit` render takes `end_frame` and `frame_step` to render numbered frame sequences.
 - `rig_edit` action `edit_bones` adds, moves, reparents and removes bones on an existing armature.
