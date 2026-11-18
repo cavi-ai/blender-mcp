@@ -1,3 +1,4 @@
+import asyncio
 import errno
 import os
 import tempfile
@@ -87,6 +88,39 @@ class RuntimeStartTests(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, "different Blender project"),
             ):
                 start_runtime("requested.blend")
+
+    def test_blender_override_expands_the_home_directory(self):
+        from cavi_blender_mcp.runtime import start_runtime
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            binary = root / "blender"
+            binary.write_text("binary")
+            binary.chmod(0o700)
+            calls = []
+
+            def spawn(command, **kwargs):
+                calls.append(command)
+                return SimpleNamespace(pid=123)
+
+            with (
+                patch.dict(os.environ, {"HOME": str(root), "CAVI_BLENDER_BIN": "~/blender",
+                                       "CAVI_BLENDER_WORKSPACE": str(root),
+                                       "CAVI_BLENDER_CONNECTION": str(root / "connection.json")}),
+                patch("cavi_blender_mcp.runtime.subprocess.Popen", side_effect=spawn),
+            ):
+                start_runtime()
+            self.assertEqual(calls[0][0], str(binary))
+
+    def test_a_relative_workspace_is_refused(self):
+        from cavi_blender_mcp import server
+
+        with (
+            patch.dict(os.environ, {"CAVI_BLENDER_WORKSPACE": "relative/assets"}),
+            patch.object(server, "generate", side_effect=AssertionError("generated")),
+            self.assertRaisesRegex(ValueError, "CAVI_BLENDER_WORKSPACE must be an absolute path"),
+        ):
+            asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png"))
 
     def test_missing_binary_does_not_launch_anything(self):
         from cavi_blender_mcp.runtime import start_runtime

@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from cavi_mcp_core import proc
+from cavi_mcp_core import workspace as core_workspace
 
 from .importing import MAX_BYTES, MAX_GEOMETRY
 from .paths import destination
@@ -160,10 +161,11 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
 
 def inside(workspace, relative, suffixes, limit, message):
     """An existing workspace file with an accepted suffix and size, else ``ValueError(message)``."""
-    resolved = (workspace / relative).resolve()
-    if (Path(relative).is_absolute() or not resolved.is_relative_to(workspace)
-            or resolved.suffix.lower() not in suffixes or not resolved.is_file()
-            or not 0 < resolved.stat().st_size <= limit):
+    try:
+        resolved = core_workspace.input_file(workspace, relative, suffixes)
+    except ValueError:
+        raise ValueError(message) from None
+    if not 0 < resolved.stat().st_size <= limit:
         raise ValueError(message)
     return resolved
 
@@ -181,13 +183,8 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
     if quality != "default" and "quality" not in settings:
         raise ValueError("Quality tiers apply only to the triposg-mlx and trellis2-mlx providers")
     workspace = Path(workspace).resolve()
-    source = (workspace / image).resolve()
-    if Path(image).is_absolute() or not source.is_relative_to(workspace):
-        raise ValueError("Input image must remain inside the workspace")
-    if source.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"} or not source.is_file():
-        raise ValueError("Provide an existing PNG, JPEG or WebP image")
-    if not 0 < source.stat().st_size <= 16 * 1024 * 1024:
-        raise ValueError("Input image must be at most 16 MiB")
+    source = inside(workspace, image, IMAGES, 16 * 1024 * 1024,
+                    "Input image must be a workspace PNG, JPEG or WebP image of at most 16 MiB")
     views = list(views or ())
     if (views or guide is not None) and not settings.get("guides"):
         raise ValueError("Views and guides apply only to the trellis2-mlx provider")

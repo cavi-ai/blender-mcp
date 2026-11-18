@@ -48,7 +48,6 @@ from .contracts import (
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .panorama import panorama
-from .paths import environment_path
 from .rig_models import (
     ClipTiming,
     Constraint,
@@ -61,6 +60,7 @@ from .rig_models import (
     VertexWeights,
 )
 from .rig_models import Name as RigName
+from .runtime import workspace_root
 from .scene_models import (
     CameraRay,
     CameraSpec,
@@ -1246,12 +1246,12 @@ async def asset_io(
         values.pop('assembly')
     if action == "generate" and prompt is not None:
         params = pick(action, values, ["prompt"], {"quality": None})
-        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
+        workspace = workspace_root()
         return await run(panorama, workspace, params["prompt"], path, params["quality"])
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None, "quality": None, "views": None,
                                                   "guide": None})
-        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
+        workspace = workspace_root()
         return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"],
                          params["views"], params["guide"])
     if action == "import":
