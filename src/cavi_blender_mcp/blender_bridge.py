@@ -10,7 +10,7 @@ import secrets
 import tempfile
 import threading
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -27,9 +27,12 @@ from .importing import (
     MAX_BYTES,
     MAX_FBX_BYTES,
     MAX_GEOMETRY,
+    inspect_abc,
     inspect_fbx,
     inspect_glb,
     inspect_obj,
+    inspect_ply,
+    inspect_stl,
     inspect_usd,
     verify_expected_sha256,
 )
@@ -62,6 +65,7 @@ OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", 
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
                      "move_to_collection", "object_keyframe", "set_visibility"})
 MAX_MODIFIERS = 16
+MESH_FORMATS = {".fbx", ".glb", ".obj", ".stl", ".ply", ".abc"}
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"
 RENDERLESS = frozenset({"CAMERA", "LIGHT", "LIGHT_PROBE", "LIGHTPROBE", "SPEAKER"})
@@ -351,7 +355,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
     if hashlib.sha256(payload).hexdigest() != report["sha256"]:
         raise RuntimeError(f"{suffix.upper()} changed during preflight; inspect the source before retrying")
     pools = ["objects", "collections", "meshes", "materials", "images", "node_groups",
-             "curves", "cameras", "lights", "armatures", "actions", "scenes"]
+             "curves", "cameras", "lights", "armatures", "actions", "scenes", "cache_files"]
     previous = {key: set(getattr(bpy.data, key)) for key in pools}
     selection = list(bpy.context.selected_objects)
     active = bpy.context.view_layer.objects.active
@@ -439,7 +443,11 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
     except Exception:
         for key in pools:
             pool = getattr(bpy.data, key)
-            for item in set(pool) - previous[key]:
+            added = set(pool) - previous[key]
+            if not hasattr(pool, "remove"):
+                bpy.data.batch_remove(added)
+                continue
+            for item in added:
                 pool.remove(item, do_unlink=True)
         raise
     finally:
@@ -527,6 +535,57 @@ def import_usd(path, name):
         _load_usd, inspect_usd, path, name, Path(path).suffix.lower(), MAX_BYTES,
         animations_allowed=False, shape_keys_allowed=False,
         require_workspace=True, cleanup=_usd_cleanup)
+
+
+def _load_stl(path):
+    if "FINISHED" not in bpy.ops.wm.stl_import(
+        filepath=str(path), forward_axis="Y", up_axis="Z", global_scale=1.0,
+        use_scene_unit=False, use_mesh_validate=True):
+        raise RuntimeError("Blender did not finish importing the STL")
+
+
+def _load_ply(path):
+    if "FINISHED" not in bpy.ops.wm.ply_import(
+        filepath=str(path), forward_axis="Y", up_axis="Z", global_scale=1.0,
+        use_scene_unit=False, merge_verts=False, import_colors="SRGB"):
+        raise RuntimeError("Blender did not finish importing the PLY")
+
+
+def _load_abc(path):
+    if "FINISHED" not in bpy.ops.wm.alembic_import(
+        filepath=str(path), scale=1.0, set_frame_range=False, validate_meshes=True,
+        always_add_cache_reader=False, is_sequence=False, as_background_job=False):
+        raise RuntimeError("Blender did not finish importing the Alembic file")
+
+
+def _abc_cleanup(previous, collection):
+    # Static import of the current frame; cache readers would point at the temporary copy.
+    for item in collection.all_objects:
+        world = item.matrix_world.copy()
+        for modifier in [m for m in item.modifiers if m.type == "MESH_SEQUENCE_CACHE"]:
+            item.modifiers.remove(modifier)
+        for constraint in [c for c in item.constraints if c.type == "TRANSFORM_CACHE"]:
+            item.constraints.remove(constraint)
+        item.matrix_world = world
+    bpy.data.batch_remove(set(bpy.data.cache_files) - previous["cache_files"])
+
+
+def import_stl(path, name):
+    return _import_asset(
+        _load_stl, inspect_stl, path, name, ".stl", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False)
+
+
+def import_ply(path, name):
+    return _import_asset(
+        _load_ply, inspect_ply, path, name, ".ply", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False)
+
+
+def import_abc(path, name):
+    return _import_asset(
+        _load_abc, inspect_abc, path, name, ".abc", MAX_BYTES,
+        animations_allowed=False, shape_keys_allowed=False, cleanup=_abc_cleanup)
 
 
 def dispatch(operation, p):
@@ -1008,11 +1067,35 @@ def export_mesh(p):
     empties = p.get("include_empties", False)
     if type(preserve) is not bool or type(empties) is not bool:
         raise ValueError("preserve_instances and include_empties must be booleans")
-    if preserve and Path(p["path"]).suffix.lower() != ".fbx":
+    suffix = Path(p["path"]).suffix.lower()
+    if preserve and suffix != ".fbx":
         raise ValueError("preserve_instances applies to static FBX exports")
+    if empties and suffix in {".obj", ".stl", ".ply"}:
+        raise ValueError("include_empties applies to FBX, GLB and Alembic exports")
     selection = with_empties(objects) if empties else list(objects)
-    with output_file(p["path"], {".fbx", ".glb"}) as path, selected(selection):
-        if path.suffix.lower() == ".fbx":
+    library = None
+    with ExitStack() as stack:
+        path = stack.enter_context(output_file(p["path"], MESH_FORMATS))
+        if suffix == ".obj":
+            # Reserve the material library too; never clobber a neighbouring file.
+            library = stack.enter_context(output_file(str(Path(p["path"]).with_suffix(".mtl")), {".mtl"}))
+        stack.enter_context(selected(selection))
+        if suffix == ".obj":
+            result = bpy.ops.wm.obj_export(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                export_uv=True, export_normals=True, export_materials=True, path_mode="STRIP",
+                forward_axis="NEGATIVE_Z", up_axis="Y", global_scale=1.0)
+        elif suffix in {".stl", ".ply"}:
+            operator = bpy.ops.wm.stl_export if suffix == ".stl" else bpy.ops.wm.ply_export
+            result = operator(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                ascii_format=False, forward_axis="Y", up_axis="Z", global_scale=1.0)
+        elif suffix == ".abc":
+            frame = bpy.context.scene.frame_current
+            result = bpy.ops.wm.alembic_export(
+                filepath=str(path), selected=True, start=frame, end=frame,
+                export_hair=False, export_particles=False, as_background_job=False)
+        elif suffix == ".fbx":
             from .export_instances import instance_meshes
 
             with instance_meshes(objects) if preserve else nullcontext():
@@ -1035,7 +1118,8 @@ def export_mesh(p):
         if "FINISHED" not in result:
             raise RuntimeError("Mesh export did not finish")
     return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
-            "preserve_instances": preserve, "include_empties": empties}
+            "preserve_instances": preserve, "include_empties": empties,
+            **({"material_library": str(library)} if library else {})}
 
 
 def save_project(p):
@@ -1250,6 +1334,9 @@ def _dispatch(operation, p):
         return import_obj(p["path"], p["name"])
     if operation == "import_usd":
         return import_usd(p["path"], p["name"])
+    if operation in {"import_stl", "import_ply", "import_abc"}:
+        return {"import_stl": import_stl, "import_ply": import_ply,
+                "import_abc": import_abc}[operation](p["path"], p["name"])
     if operation in {"shape_key_add", "shape_key_value", "shape_key_remove",
                      "shape_key_keyframe"}:
         from .blender_shape_keys import HANDLERS

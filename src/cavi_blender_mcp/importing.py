@@ -610,3 +610,76 @@ def inspect_usd(workspace, name):
                 raise ValueError("USD assets are limited to 128 references")
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "format": "usd", "binary": binary, "asset_references": references}
+
+
+def workspace_bytes(workspace, name, suffix, label):
+    root = Path(workspace).expanduser().resolve(strict=True)
+    try:
+        path = (root / name).resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise ValueError(f"{label} does not exist inside the workspace") from exc
+    if Path(name).is_absolute() or not path.is_relative_to(root):
+        raise ValueError("Input must stay inside the workspace")
+    if path.suffix.lower() != suffix or not path.is_file():
+        raise ValueError(f"Input must be a {label} file")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_BYTES + 1)
+    if not 0 < len(data) <= MAX_BYTES:
+        raise ValueError(f"{label} must be at most 64 MiB")
+    return path, data
+
+
+def receipt(path, data, kind, **fields):
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+            "format": kind, **fields}
+
+
+def inspect_stl(workspace, name):
+    path, data = workspace_bytes(workspace, name, ".stl", "STL")
+    count = struct.unpack_from("<I", data, 80)[0] if len(data) >= 84 else -1
+    binary = len(data) == 84 + 50 * count
+    if binary:
+        triangles = count
+    else:
+        try:
+            text = data.decode("ascii").lower()
+        except UnicodeDecodeError as exc:
+            raise ValueError("Expected an ASCII or binary STL file") from exc
+        if not text.lstrip().startswith("solid"):
+            raise ValueError("Expected an ASCII or binary STL file")
+        triangles = text.count("endfacet")
+    if not 0 < triangles <= MAX_GEOMETRY:
+        raise ValueError("STL needs 1 to 500000 triangles")
+    return receipt(path, data, "stl", binary=binary, triangles=triangles)
+
+
+PLY_ENCODINGS = {"ascii", "binary_little_endian", "binary_big_endian"}
+
+
+def inspect_ply(workspace, name):
+    path, data = workspace_bytes(workspace, name, ".ply", "PLY")
+    end = data.find(b"end_header", 0, 65536)
+    try:
+        lines = data[:max(end, 0)].decode("ascii").splitlines()
+    except UnicodeDecodeError as exc:
+        raise ValueError("Expected an ASCII PLY header") from exc
+    if end < 0 or not lines or lines[0].strip() != "ply":
+        raise ValueError("Expected a PLY header")
+    encoding, counts = None, {}
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == "format" and parts[1] in PLY_ENCODINGS:
+            encoding = parts[1]
+        elif len(parts) == 3 and parts[0] == "element" and parts[2].isdigit():
+            counts[parts[1]] = int(parts[2])
+    vertices, faces = counts.get("vertex", 0), counts.get("face", 0)
+    if encoding is None or not 0 < vertices <= MAX_GEOMETRY or not 0 < faces <= MAX_GEOMETRY:
+        raise ValueError("PLY needs a format, 1 to 500000 vertices and 1 to 500000 faces")
+    return receipt(path, data, "ply", encoding=encoding, vertices=vertices, faces=faces)
+
+
+def inspect_abc(workspace, name):
+    path, data = workspace_bytes(workspace, name, ".abc", "Alembic")
+    if not data.startswith(b"Ogawa"):
+        raise ValueError("Expected an Ogawa Alembic file")
+    return receipt(path, data, "abc")

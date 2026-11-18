@@ -14,8 +14,8 @@ need a `lease_id`. Generation does not.
 }
 ```
 
-The suffix selects the importer: `.glb`, `.fbx`, `.obj`, `.usd`, `.usda` or
-`.usdc`.
+The suffix selects the importer: `.glb`, `.fbx`, `.obj`, `.usd`, `.usda`,
+`.usdc`, `.stl`, `.ply` or `.abc`.
 
 Imports:
 
@@ -32,6 +32,9 @@ Imports:
 | FBX | Static, skinned, animated, ASCII or binary | Shape keys, cameras, lights, external textures |
 | OBJ | Static mesh and materials | External or missing MTL/textures |
 | USD | Static, materials, armatures, skinned meshes | Animation clips, blendshapes, cameras, lights, external texture paths |
+| STL | ASCII or binary triangles, Z up | Empty files, more than 500,000 triangles |
+| PLY | ASCII or binary meshes with vertex colors, Z up | Point clouds, more than 500,000 vertices or faces |
+| Alembic | Ogawa meshes at the current frame; cache readers are removed | HDF5 archives, curves, cameras, lights |
 
 Textures must be packed or resolve inside the workspace, depending on the
 format. Source files are capped at 64 MiB.
@@ -50,7 +53,11 @@ format. Source files are capped at 64 MiB.
 }
 ```
 
-Formats are `.fbx`, `.glb`, `.usd`, `.usda` and `.usdc`.
+Formats are `.fbx`, `.glb`, `.usd`, `.usda`, `.usdc`, `.obj`, `.stl`, `.ply`
+and `.abc`. OBJ, STL, PLY and Alembic write the evaluated meshes as static
+geometry and take only `names` and, for Alembic, `include_empties`. OBJ also
+writes `<stem>.mtl` and refuses an existing one. STL and PLY are binary and Z up;
+Alembic writes the current frame.
 
 - `lods=true` adds every `<base>_LODn` sibling.
 - `collision=true` adds `UCX_`, `UBX_` or `USP_` objects.

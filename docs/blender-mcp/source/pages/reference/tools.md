@@ -574,7 +574,8 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
 a lease. GLB import accepts an optional `expected_sha256` and rejects a source
-whose bytes differ from that hash before editing the scene. Export supports animated
+whose bytes differ from that hash before editing the scene. Import and static
+export also cover OBJ, STL, PLY and Alembic. Export supports animated
 FBX, GLB and USD output and FBX and USD
 texture sidecars with `textures=true`.
 `triangulate=true` triangulates temporary FBX exporter meshes; it defaults to
