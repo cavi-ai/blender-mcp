@@ -19,6 +19,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- `scatter` density counts points per square metre in scenes whose unit is not one metre.
 - Spatial queries, picking, clearance, contacts, vertex falloff, skin transfer and motion checks measure a unitless scene as one metre per unit, matching FBX export.
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
 - `mesh_edit` `remesh_quad` collapses or separates edges QuadriFlow reads as zero length, so voxel-rebuilt meshes remesh.

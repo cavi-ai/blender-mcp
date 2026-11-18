@@ -403,7 +403,13 @@ assert spread["estimated_instances"] == 200 and 50 < spread["instances"] <= 200,
 assert floor.modifiers[-1].type == "NODES"
 again = edit("scatter", name="SM_Floor", collection="Props", density=2, seed=7,
              min_distance=0.2, scale_range=[0.5, 1.5])
-flat = edit("scatter", name="SM_Crate", collection="Props", density=1, realize=True)
+# Density is per square metre: 100 square units at 10 m per unit is 10000 m².
+bpy.context.scene.unit_settings.scale_length = 10
+metric = edit("scatter", name="SM_Floor", collection="Props", density=0.01, seed=7)
+bpy.context.scene.unit_settings.scale_length = 1
+added = metric["instances"] - again["instances"]
+assert metric["estimated_instances"] == 100 and 80 <= added <= 120, (added, metric)
+flat =edit("scatter", name="SM_Crate", collection="Props", density=1, realize=True)
 assert flat["evaluated_triangles"] > tris(crate), flat
 refused("scatter", "budget", name="SM_Floor", collection="Props", density=10000)
 refused("scatter", "inside", name="Pebble", collection="Props", density=1)

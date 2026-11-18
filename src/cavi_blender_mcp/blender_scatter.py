@@ -109,15 +109,18 @@ def scatter(p):
     local, world = areas(target, surface)
     if local <= 0 or world <= 0:
         raise ValueError("Target has no surface area")
-    estimate = int(world * density)
+    from .blender_geometry import unit_scale
+
+    area_m2 = world * unit_scale() ** 2
+    estimate = int(area_m2 * density)
     if estimate > MAX_INSTANCES:
         raise ValueError(f"About {estimate} instances exceed the {MAX_INSTANCES} budget")
     if realize and estimate * max(triangle_count(m.data) for m in members) > (
             MAX_REALIZED_TRIANGLES):
         raise ValueError(f"Realized scatter would exceed {MAX_REALIZED_TRIANGLES} triangles")
-    # Distribution runs in local space; convert world density and spacing.
+    # Distribution runs in local space; convert metre density and scene-unit spacing.
     stretch = math.sqrt(world / local)
-    tree, pool = build("CAVI Scatter", density * world / local, distance / stretch, seed,
+    tree, pool = build("CAVI Scatter", density * area_m2 / local, distance / stretch, seed,
                        scale, jitter, realize)
     try:
         pool.inputs["Collection"].default_value = collection
