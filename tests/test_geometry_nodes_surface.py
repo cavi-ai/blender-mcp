@@ -24,6 +24,23 @@ class GeometryNodesSurfaceTests(unittest.TestCase):
         self.assertEqual(calls[1][1]['params']['lease_id'], 'L')
         self.assertEqual(calls[1][1]['operation'], 'snapshot_geometry')
 
+    def test_attach_and_scatter_controls_reach_the_bridge(self):
+        calls = []
+        def call(operation, params):
+            calls.append((operation, params))
+            return {'name': 'Ground', 'modifiers': []}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.geometry_nodes('add', 'Ground', node_group='Rocks', lease_id='L'))
+            asyncio.run(server.scatter('Ground', 'Props', 1, align_to_normal=True,
+                                       max_slope_degrees=30, density_group='Paint', lease_id='L'))
+            with self.assertRaises(ValueError):
+                asyncio.run(server.geometry_nodes('add', 'Ground', lease_id='L'))
+        self.assertEqual(calls[0][1], {'operation': 'attach_geometry_nodes', 'params': {
+            'name': 'Ground', 'node_group': 'Rocks', 'modifier': None, 'lease_id': 'L'}})
+        scatter = calls[1][1]['params']
+        self.assertEqual((scatter['align_to_normal'], scatter['max_slope_degrees'],
+                          scatter['density_group']), (True, 30, 'Paint'))
+
     def test_inspection_does_not_mutate(self):
         calls = []
         def call(operation, params):

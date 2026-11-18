@@ -1311,18 +1311,22 @@ async def asset_library(
 
 @mcp.tool(annotations=MUTATING)
 async def geometry_nodes(
-    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy'], Field(description="Action")],
+    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy', 'add'], Field(description="Action")],
     name: Annotated[str, Field(description="Mesh")],
-    modifier: Annotated[str | None, Field(description="Geometry Nodes modifier")] = None,
+    modifier: Annotated[str | None, Field(description="Geometry Nodes modifier; add: new name")] = None,
+    node_group: Annotated[str | None, Field(min_length=1, max_length=63, description="add: existing Geometry Nodes group")] = None,
     inputs: Annotated[dict[str, JsonValue] | None, Field(description="set_inputs needs ID/value map")] = None,
     attributes: Annotated[dict[str, str | None] | None, Field(description="set_inputs: ID/attribute map; null disables")] = None,
     new_name: Annotated[str | None, Field(description="bake_copy needs output name")] = None,
     instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit procedural inputs or snapshot meshes; members via scene_info(definition=true)."""
+    """Inspect/edit procedural inputs, attach node groups or snapshot meshes; members via scene_info(definition=true)."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
-              'instance': instance}
+              'instance': instance, 'node_group': node_group}
+    if action == 'add':
+        params = pick(action, values, ['node_group'], {'modifier': None})
+        return await run(call, 'attach_geometry_nodes', name=name, lease_id=lease_id, **params)
     if action == 'inspect':
         params = pick(action, values, (), {'modifier': None, 'instance': None})
         scoped = params.pop('instance')
@@ -1415,13 +1419,17 @@ async def scatter(
     scale_range: Annotated[tuple[Number, Number], Field(description="Scale bounds")] = (1, 1),
     rotation_jitter_degrees: Annotated[Number, Field(ge=0, le=360, description="Rotation jitter cap")] = 360,
     realize: Annotated[StrictBool, Field(description="Realize instances")] = False,
+    align_to_normal: Annotated[StrictBool, Field(description="Instance Z follows the surface normal; jitter spins about it")] = False,
+    max_slope_degrees: Annotated[Number | None, Field(ge=0, le=90, description="Skip faces steeper than this from world up")] = None,
+    density_group: Annotated[str | None, Field(min_length=1, max_length=63, description="Vertex group scaling density 0-1")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ScatterResult:
     """Scatter collection instances with fixed Geometry Nodes."""
     return await run(call, "scatter", lease_id=lease_id, name=name, collection=collection,
                      density=density, seed=seed, min_distance=min_distance,
                      scale_range=scale_range, rotation_jitter_degrees=rotation_jitter_degrees,
-                     realize=realize)
+                     realize=realize, align_to_normal=align_to_normal,
+                     max_slope_degrees=max_slope_degrees, density_group=density_group)
 
 
 def main():

@@ -142,12 +142,13 @@ workspace and are hashed without conversion. See [native libraries](../guides/na
 
 ## geometry_nodes
 
-`inspect` is lease-free. `set_inputs` and `bake_copy` require a lease.
+`inspect` is lease-free. `set_inputs`, `bake_copy` and `add` require a lease.
 
 | Parameter | Used by |
 | --- | --- |
-| `name` | Existing procedural object |
-| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs` |
+| `name` | Existing procedural object; a mesh for `add` |
+| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs`; new modifier name for `add` |
+| `node_group` | `add`; existing Geometry Nodes group with a Geometry output |
 | `inputs` | Socket identifier to typed value; omitted values are preserved |
 | `attributes` | Socket identifier to attribute name; null disables attribute mode |
 | `new_name` | `bake_copy`; independent static mesh of the evaluated stack at the current frame |
@@ -157,6 +158,11 @@ Datablock values use `{name, id_type}` or null. Source node groups remain shared
 and unchanged; values belong to the named object's modifier. The full batch is
 validated before assignment; a native setter or value mismatch restores prior
 values. Inputs driven by animation still follow that animation when time changes.
+
+`add` attaches an existing node group as a new Geometry Nodes modifier, named
+`modifier` or the group name. The modifier is removed again when the evaluated
+mesh exceeds 500,000 triangles or 100,000 instances. The result is the `inspect`
+report for the new modifier.
 
 `bake_copy` preserves evaluated mesh layers, material slots and world transform.
 It reports fractional frame time, triangle counts and triangle usage per material

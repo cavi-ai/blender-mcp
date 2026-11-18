@@ -464,6 +464,43 @@ metric = edit("scatter", name="SM_Floor", collection="Props", density=0.01, seed
 bpy.context.scene.unit_settings.scale_length = 1
 added = metric["instances"] - again["instances"]
 assert metric["estimated_instances"] == 100 and 80 <= added <= 120, (added, metric)
+# Normal alignment, a 30 degree slope cap and painted density on the +X half of a dome.
+dome = sphere("Dome", segments=32, rings=16, location=(0, 0, -40))
+paint = dome.vertex_groups.new(name="Paint")
+paint.add([v.index for v in dome.data.vertices if v.co.x > 1e-6], 1.0, "REPLACE")
+capped = edit("scatter", name="Dome", collection="Props", density=200, seed=3,
+              align_to_normal=True, max_slope_degrees=30, density_group="Paint")
+graph = bpy.context.evaluated_depsgraph_get()
+placed = [i.matrix_world.copy() for i in graph.object_instances
+          if i.is_instance and i.parent and i.parent.original == dome]
+axes = [m.col[2].to_3d().normalized() for m in placed]
+offsets = [(m.translation - dome.location).normalized() for m in placed]
+assert len(placed) > 20 and capped["align_to_normal"], (len(placed), capped)
+assert all(a.z >= math.cos(math.radians(30)) - 1e-3 for a in axes), min(a.z for a in axes)
+assert min(a.z for a in axes) < .97 and all(a.dot(o) > math.cos(math.radians(10))
+                                           for a, o in zip(axes, offsets, strict=True))
+assert all(m.translation.x >= -1e-4 for m in placed)
+dome.scale = (1, 1, 2)
+refused("scatter", "uniform scale", name="Dome", collection="Props", density=1,
+        max_slope_degrees=30)
+refused("scatter", "density_group", name="Dome", collection="Props", density=1,
+        density_group="Missing")
+dome.scale = (1, 1, 1)
+# Attach an existing Geometry Nodes group as a new modifier.
+lift = bpy.data.node_groups.new("Lift", "GeometryNodeTree")
+lift.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+lift.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+move = lift.nodes.new("GeometryNodeSetPosition")
+move.inputs["Offset"].default_value = (0, 0, 1)
+lift.links.new(lift.nodes.new("NodeGroupInput").outputs[0], move.inputs["Geometry"])
+lift.links.new(move.outputs["Geometry"], lift.nodes.new("NodeGroupOutput").inputs[0])
+edit("create_primitive", name="LiftBox", kind="cube", location=[0, 0, -60])
+attached = edit("attach_geometry_nodes", name="LiftBox", node_group="Lift")
+assert [(m["name"], m["node_group"]) for m in attached["modifiers"]] == [("Lift", "Lift")], attached
+lifted = bpy.data.objects["LiftBox"].evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+assert abs(min(v.co.z for v in lifted.vertices)) < 1e-6
+refused("attach_geometry_nodes", "must be new", name="LiftBox", node_group="Lift")
+refused("attach_geometry_nodes", "must name", name="LiftBox", node_group="Missing")
 flat =edit("scatter", name="SM_Crate", collection="Props", density=1, realize=True)
 assert flat["evaluated_triangles"] > tris(crate), flat
 refused("scatter", "budget", name="SM_Floor", collection="Props", density=10000)

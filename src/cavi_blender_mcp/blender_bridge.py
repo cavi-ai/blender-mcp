@@ -1182,6 +1182,10 @@ def _dispatch(operation, p):
         from .blender_asset_library import append, inspect
 
         return (inspect if operation == 'inspect_asset_library' else append)(p, _workspace)
+    if operation == 'attach_geometry_nodes':
+        from .blender_node_inputs import attach
+
+        return attach(p)
     if operation in {'inspect_geometry_nodes', 'set_geometry_inputs', 'snapshot_geometry'}:
         from .blender_node_inputs import inspect, set_inputs, snapshot
 

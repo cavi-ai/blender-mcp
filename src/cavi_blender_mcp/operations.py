@@ -33,6 +33,7 @@ OPERATIONS = frozenset(
         "export_uv_asset",
         "set_geometry_inputs",
         "snapshot_geometry",
+        "attach_geometry_nodes",
         "compare_rig_motion",
         "inspect_skin_clearance",
         "create_primitive",

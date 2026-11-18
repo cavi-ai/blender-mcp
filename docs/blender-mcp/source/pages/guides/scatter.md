@@ -17,6 +17,9 @@ The node graph is code-defined. Callers cannot supply arbitrary node trees.
 | `scale_range` | `[min, max]` within 0.01–100 |
 | `rotation_jitter_degrees` | Z rotation range, 0–360 |
 | `realize` | Convert instances to geometry |
+| `align_to_normal` | Instance Z follows the face normal; jitter spins about that axis |
+| `max_slope_degrees` | Skip faces steeper than this from world up, 0–90; needs uniform scale |
+| `density_group` | Target vertex group whose weight scales density from 0 to 1 |
 
 ## Budgets
 
@@ -27,7 +30,8 @@ The node graph is code-defined. Callers cannot supply arbitrary node trees.
 - Realized output is capped at 2,000,000 triangles.
 
 The result reports the modifier, node group, collection, estimated and evaluated
-instance counts, evaluated triangles when realized, and the seed.
+instance counts, evaluated triangles when realized, the seed, and the alignment,
+slope and density group settings.
 
 ## Related
 
