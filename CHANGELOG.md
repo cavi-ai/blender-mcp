@@ -7,6 +7,8 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+## 0.58.0 - 2026-11-18
+
 ### Added
 
 - `asset_io` generate `quality="fast"` runs the MLX providers with fewer steps (TripoSG also on a 256³ grid).

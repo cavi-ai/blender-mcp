@@ -25,8 +25,9 @@ external asset download or remote inference.
 - **Materials**: PBR slot assignment with packed workspace textures, UV
   transforms, alpha modes and material QA.
 - **Baking**: normal and ambient-occlusion maps into a new workspace PNG.
-- **Assets**: bounded GLB, FBX, OBJ and USD import; static, skinned and animated
-  FBX, GLB and USD export; Unity, Unreal and Godot axis presets; LOD groups,
+- **Assets**: bounded GLB, FBX, OBJ, USD, STL, PLY and Alembic import; static,
+  skinned and animated FBX, GLB and USD export; static OBJ, STL, PLY and Alembic
+  export; Unity, Unreal and Godot axis presets; LOD groups,
   collision naming and bake pairs.
 - **Rigging**: armature creation, automatic skin binding, weight repair, pose
   authoring, action creation, animation QA and retargeting.
