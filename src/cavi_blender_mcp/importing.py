@@ -580,9 +580,12 @@ def inspect_usd(workspace, name):
 
 def workspace_bytes(workspace, name, suffixes, label, limit=MAX_BYTES):
     """A workspace file's path and bytes; refuses escapes, other types and changes while read."""
+    root = Path(workspace).expanduser()
     try:
-        path = core_workspace.input_file(Path(workspace).expanduser(), name, suffixes)
+        path = core_workspace.input_file(root, name, suffixes)
     except ValueError:
+        if isinstance(name, str) and not (root / name).exists():
+            raise ValueError(f"{label} does not exist inside the workspace") from None
         raise ValueError(f"Input must be a {label} file inside the workspace "
                          f"({', '.join(sorted(suffixes))})") from None
     if not 0 < path.stat().st_size <= limit:

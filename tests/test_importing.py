@@ -237,6 +237,7 @@ class FbxPreflightTests(unittest.TestCase):
                                         (inspect_ply, "points.ply", "faces"),
                                         (inspect_abc, "hdf5.abc", "Ogawa"),
                                         (inspect_stl, "mesh.ply", "STL file"),
+                                        (inspect_stl, "missing.stl", "STL does not exist inside the workspace"),
                                         (inspect_abc, "../mesh.abc", "Alembic|workspace")):
                 with self.subTest(name=name), self.assertRaisesRegex(ValueError, text):
                     inspect(root, name)
