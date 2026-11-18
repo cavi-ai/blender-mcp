@@ -19,6 +19,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- `uv_transform` with a density target rotates in texture pixels, so non-square textures keep texel shape.
 - Image terrain interpolates heights linearly and averages pixels finer than the terrain grid instead of terracing and aliasing.
 - `scatter` density counts points per square metre in scenes whose unit is not one metre.
 - Spatial queries, picking, clearance, contacts, vertex falloff, skin transfer and motion checks measure a unitless scene as one metre per unit, matching FBX export.
