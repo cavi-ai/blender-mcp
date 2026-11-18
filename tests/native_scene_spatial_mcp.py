@@ -78,10 +78,11 @@ async def exercise(root, env, parameters=None):
                 raise AssertionError('Internal spatial validation did not reject invalid input')
         for value in (['Unknown', 'Above'], ['Shelter', 'Shelter'], ['Shelter'],
                       ['Shelter', 'Above', 'Crossing'],
-                      {'subjects': ['Shelter'], 'context': ['Above']},
                       {'subjects': ['Shelter'], 'context': ['Above'], 'max_triangles': 1}):
             result = await client.call_tool('scene_info', {'spatial': value})
             assert result.is_error, result
+        selector = await call('scene_info', spatial={'subjects': ['Shelter'], 'context': ['Above']})
+        assert selector['spatial'] == original, selector
         assert not (await call('scene_info', limit=1))['source_state']['dirty']
         assert hashlib.sha256((root/'initial.blend').read_bytes()).hexdigest() == initial_hash
         owner = await call('session_control', action='inspect')
