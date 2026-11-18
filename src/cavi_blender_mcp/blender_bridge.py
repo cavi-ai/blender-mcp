@@ -31,6 +31,7 @@ from .importing import (
     inspect_glb,
     inspect_obj,
     inspect_usd,
+    verify_expected_sha256,
 )
 from .lease import Lease
 from .operations import (
@@ -341,9 +342,10 @@ def install_collection(name, objects, scene):
 
 def _import_asset(loader, inspector, path, name, suffix, maximum, *,
                   animations_allowed, shape_keys_allowed, require_workspace=False,
-                  temp_root=None, cleanup=None):
+                  temp_root=None, cleanup=None, expected_sha256=None):
     check_import_name(name)
     report = inspector(_workspace, path)
+    verify_expected_sha256(expected_sha256, report["sha256"])
     with Path(report["path"]).open("rb") as stream:
         payload = stream.read(maximum + 1)
     if hashlib.sha256(payload).hexdigest() != report["sha256"]:
@@ -456,10 +458,11 @@ def _load_glb(path):
         raise RuntimeError("Blender did not finish importing the GLB")
 
 
-def import_glb(path, name):
+def import_glb(path, name, expected_sha256=None):
     return _import_asset(
         _load_glb, inspect_glb, path, name, ".glb", MAX_BYTES,
-        animations_allowed=True, shape_keys_allowed=True, temp_root=_workspace)
+        animations_allowed=True, shape_keys_allowed=True, temp_root=_workspace,
+        expected_sha256=expected_sha256)
 
 
 def _load_fbx(path):
@@ -1200,7 +1203,7 @@ def _dispatch(operation, p):
                     'instance': p['instance']}
         return assign(p, _workspace, obj)
     if operation == "import_mesh":
-        return import_glb(p["path"], p["name"])
+        return import_glb(p["path"], p["name"], p.get("expected_sha256"))
     if operation == "import_fbx":
         return import_fbx(p["path"], p["name"])
     if operation == "import_obj":

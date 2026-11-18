@@ -106,6 +106,25 @@ class OpenProjectTests(unittest.TestCase):
 
 
 class OpenSurfaceTests(unittest.TestCase):
+    def test_import_hash_routes_only_to_glb(self):
+        import asyncio
+
+        from cavi_blender_mcp import server
+        bridge = Mock(return_value={"path": "asset.glb"})
+        with patch.object(server, "BridgeClient", return_value=SimpleNamespace(call=bridge)):
+            asyncio.run(server.asset_io("import", "asset.glb", name="Asset", expected_sha256="a" * 64, lease_id="L"))
+            bridge.assert_called_once_with("owned_edit", {"operation": "import_mesh", "params": {
+                "lease_id": "L", "path": "asset.glb", "name": "Asset", "expected_sha256": "a" * 64}})
+            bridge.reset_mock()
+            asyncio.run(server.asset_io("import", "asset.glb", name="Asset", lease_id="L"))
+            bridge.assert_called_once_with("owned_edit", {"operation": "import_mesh", "params": {
+                "lease_id": "L", "path": "asset.glb", "name": "Asset"}})
+            bridge.reset_mock()
+            for path in ("asset.fbx", "asset.obj", "asset.usd", "asset.gltf"):
+                with self.subTest(path=path), self.assertRaisesRegex(ValueError, "only to GLB"):
+                    asyncio.run(server.asset_io("import", path, name="Asset", expected_sha256="a" * 64, lease_id="L"))
+            bridge.assert_not_called()
+
     def test_owned_routing_and_timeout(self):
         import asyncio
 
