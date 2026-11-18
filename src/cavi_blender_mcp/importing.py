@@ -8,6 +8,8 @@ import re
 import struct
 from pathlib import Path
 
+from .blender_errors import PreflightRejected
+
 MAX_BYTES = 64 * 1024 * 1024
 MAX_FBX_BYTES = 64 * 1024 * 1024
 MAX_GEOMETRY = 500_000
@@ -23,6 +25,13 @@ MAX_MORPH_TARGETS = 64
 MAX_TOTAL_MORPH_TARGETS = 256
 TARGET_ATTRIBUTES = {"POSITION", "NORMAL", "TANGENT"}
 
+
+def verify_expected_sha256(expected, actual):
+    if expected is not None:
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise PreflightRejected("expected_sha256 must be a lowercase SHA-256")
+        if expected != actual:
+            raise PreflightRejected("GLB does not match expected_sha256")
 
 def image_size(data):
     if len(data) >= 24 and data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":

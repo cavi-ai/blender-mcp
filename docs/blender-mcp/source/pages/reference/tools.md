@@ -552,7 +552,9 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 ## asset_io
 
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
-a lease. Export supports animated FBX, GLB and USD output and FBX and USD
+a lease. GLB import accepts an optional `expected_sha256` and rejects a source
+whose bytes differ from that hash before editing the scene. Export supports animated
+FBX, GLB and USD output and FBX and USD
 texture sidecars with `textures=true`.
 `triangulate=true` triangulates temporary FBX exporter meshes; it defaults to
 false and is unavailable for other formats or bake pairs.

@@ -5,6 +5,17 @@ import unittest
 from pathlib import Path
 
 
+class ImportHashTests(unittest.TestCase):
+    def test_expected_hash_rejects_invalid_or_different_values(self):
+        from cavi_blender_mcp.blender_errors import PreflightRejected
+        from cavi_blender_mcp.importing import verify_expected_sha256
+
+        verify_expected_sha256(None, "a" * 64)
+        verify_expected_sha256("a" * 64, "a" * 64)
+        for expected in ("bad", "A" * 64, "b" * 64, 42):
+            with self.subTest(expected=expected), self.assertRaises(PreflightRejected):
+                verify_expected_sha256(expected, "a" * 64)
+
 def write_glb(path, document, binary=b"\x00" * 44):
     payload = json.dumps(document).encode()
     payload += b" " * (-len(payload) % 4)

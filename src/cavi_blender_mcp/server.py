@@ -1160,7 +1160,7 @@ async def asset_io(
     axis: Annotated[Literal["unity", "unreal", "godot"] | None, Field(description='export: axes (default unity)')] = None,
     uv_layer: Annotated[str | None, Field(min_length=1,max_length=63, description='export: UV0 (FBX/GLB)/st (USD), via temporary data')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
-    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='open: optional target SHA-256')] = None,
+    expected_sha256: Annotated[str | None, Field(pattern='^[0-9a-f]{64}$', description='GLB import/open hash')] = None,
 ) -> AssetResult:
     """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
@@ -1200,8 +1200,12 @@ async def asset_io(
         operation = {".fbx": "import_fbx", ".obj": "import_obj",
                      ".usd": "import_usd", ".usda": "import_usd",
                      ".usdc": "import_usd"}.get(suffix, "import_mesh")
-        return await run(call, operation, lease_id=lease_id, path=path,
-                         **pick(action, values, ["name"]))
+        if expected_sha256 is not None and suffix != ".glb":
+            raise ValueError("expected_sha256 applies only to GLB imports")
+        params = pick(action, values, ["name"], {"expected_sha256": None})
+        if params["expected_sha256"] is None:
+            params.pop("expected_sha256")
+        return await run(call, operation, lease_id=lease_id, path=path, **params)
     if action == "save":
         pick(action, values)
         return await run(call, "save_project", lease_id=lease_id, path=path)
