@@ -101,7 +101,9 @@ LeaseId = str | None
 MUTATING = DESTRUCTIVE
 ADDITIVE = WRITES
 Names = Annotated[list[str], Field(min_length=1, max_length=256)]
-Check = Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
+Pixels = Annotated[StrictInt, Field(ge=1, le=4096)]
+TextureSize = Pixels | tuple[Pixels, Pixels]
+Check =Literal["naming", "topology", "lightmap", "transforms", "origin", "materials"]
 View = Literal["front", "back", "left", "right", "top", "persp"]
 Preserve = Literal["seams", "sharp", "boundary"]
 Step = Literal["merge", "delete_loose", "delete_fragments", "recalc_normals", "triangulate",
@@ -804,7 +806,7 @@ async def mesh_edit(
     lightmap_resolution: Annotated[StrictInt | None, Field(ge=16, le=4096, description="Lightmap pixels")] = None,
     margin_px: Annotated[Number | None, Field(ge=0, le=64, description="Lightmap padding (px)")] = None,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="Density: pixels/metre")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
+    texture_resolution: Annotated[TextureSize | None, Field(description="Pixels or [width, height]")] = None,
     pack: Annotated[StrictBool | None, Field(description="Pack scaled UVs")] = None,
     shape: Annotated[Literal["convex", "box", "sphere"] | None, Field(description="Collision shape")] = None,
     max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255, description="Hull vertices")] = None,
@@ -1360,7 +1362,7 @@ async def review_sheet(
     mode: Annotated[Literal["shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"], Field(description="Shading/diagnostic mode")] = "shaded",
     resolution: Annotated[StrictInt, Field(ge=256, le=2048, description="Sheet width")] = 1024,
     target_px_per_m: Annotated[Number | None, Field(gt=0, le=100000, description="texel_heatmap: target density; default 512")] = None,
-    texture_resolution: Annotated[StrictInt | None, Field(ge=1, le=4096, description="Pixels")] = None,
+    texture_resolution: Annotated[TextureSize | None, Field(description="Pixels or [width, height]")] = None,
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
 ) -> ImageReceipt:
     """Render a multi-view PNG; no lease. Heatmap: blue < target_px_per_m=512 (green) < red."""

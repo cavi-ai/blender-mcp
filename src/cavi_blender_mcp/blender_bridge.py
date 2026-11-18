@@ -906,7 +906,7 @@ def planar_islands(mesh, layer, indices):
 def unwrap(p):
     import numpy as np
 
-    from .blender_geometry import PACK, integer, uv_triangles
+    from .blender_geometry import PACK, texture_size, uv_triangles
     from .uv_layout import validate_packed
 
     value = editable_mesh(p["name"])
@@ -915,7 +915,8 @@ def unwrap(p):
     if p.get("island_margin") is not None:
         margin = number(p["island_margin"], 0, 0.5, "island_margin")
     else:
-        resolution = integer(p, "texture_resolution", 1024, 1, 4096)
+        # The shorter side keeps at least margin_px on both axes.
+        resolution = min(texture_size(p.get("texture_resolution", 1024)))
         margin = number(p.get("margin_px", 4), 0, 64, "margin_px") / resolution
         if margin >= 0.25:
             raise ValueError("margin_px is too large for texture_resolution")

@@ -359,7 +359,7 @@ class MeshEditResult(ObjectFields):
     levels: list[Record] | None = None
     source_renamed: bool | None = None
     uv_layer: str | None = None
-    texture_resolution: int | None = None
+    texture_resolution: int | list[int] | None = None
     source: str | None = None
     shape: str | None = None
     count: int | None = None

@@ -46,7 +46,7 @@ def face_density(value, layer, resolution, unit):
     uv_sum = np.bincount(owners, uv, count)
     valid = (world_sum > 1e-12) & (uv_sum > 1e-12)
     result = np.full(count, np.nan)
-    result[valid] = np.sqrt(resolution * resolution * uv_sum[valid] / world_sum[valid])
+    result[valid] = np.sqrt(resolution[0] * resolution[1] * uv_sum[valid] / world_sum[valid])
     return result
 
 
@@ -127,10 +127,10 @@ def prepare(meshes, mode, params, stack, radius):
         return shown, stats
     target = params.get("target_px_per_m")
     target = number(512 if target is None else target, 0.01, 100000, "target_px_per_m")
+    from .blender_geometry import texture_size
+
     size = params.get("texture_resolution")
-    size = 1024 if size is None else size
-    if type(size) is not int or not 1 <= size <= 4096:
-        raise ValueError("texture_resolution must be an integer from 1 to 4096")
+    size = texture_size(1024 if size is None else size)
     shading.color_type = "VERTEX"
     unit = unit_scale()
     low = high = on = 0

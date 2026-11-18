@@ -160,6 +160,10 @@ assert abs(inspected["objects"][0]["mapping"]["density_area_weighted"] - 256) < 
 packed = edit("texel_density", name="SM_Floor", target_px_per_m=128, texture_resolution=1024,
               pack=True)
 assert abs(packed["density_after"] - 128) < 1e-3, packed
+# 2048x512 has the pixel area of 1024x1024, so density is unchanged before scaling.
+wide = edit("texel_density", name="SM_Floor", target_px_per_m=256, texture_resolution=[2048, 512])
+assert abs(wide["density_before"] - 128) < 1e-3 and abs(wide["density_after"] - 256) < 1e-3, wide
+assert wide["texture_resolution"] == [2048, 512], wide
 results["texel_density"] = [density["density_before"], density["density_after"]]
 
 # Collision: convex hull per loose part, primitives, hull vertex cap.
@@ -415,7 +419,7 @@ pools = ("objects", "meshes", "materials", "images", "cameras")
 counts = {k: len(getattr(bpy.data, k)) for k in pools}
 hidden = {o.name: o.hide_render for o in bpy.context.scene.objects}
 for mode in ("shaded", "wireframe", "uv_checker", "texel_heatmap", "matcap"):
-    extra = {"target_px_per_m": 128, "texture_resolution": 1024} if mode == "texel_heatmap" else {}
+    extra = {"target_px_per_m": 128, "texture_resolution": [2048, 512]} if mode == "texel_heatmap" else {}
     sheet = bridge.dispatch("review_sheet", {"path": f"sheet-{mode}.png", "mode": mode,
                                              "names": ["SM_Floor", "SM_Crate"],
                                              "resolution": 384, **extra})

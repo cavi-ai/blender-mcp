@@ -174,6 +174,14 @@ class AAASurfaceTests(unittest.TestCase):
         self.assertTrue(ops[4][1]["textures"])
         self.assertEqual(ops[5][1]["bake_pair"], {"high": ["H"], "low": ["R"]})
 
+    def test_texture_sizes_take_width_and_height(self):
+        calls = self.capture()
+        asyncio.run(server.mesh_edit("texel_density", "R", target_px_per_m=256,
+                                     texture_resolution=(2048, 512), lease_id="L"))
+        asyncio.run(server.mesh_edit("unwrap", "R", texture_resolution=512, lease_id="L"))
+        (_, density), (_, unwrap) = self.inner(calls)
+        self.assertEqual((density["texture_resolution"], unwrap["texture_resolution"]), ((2048, 512), 512))
+
     def test_review_sheet_needs_no_lease_and_scatter_is_owned(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'sheet.png'

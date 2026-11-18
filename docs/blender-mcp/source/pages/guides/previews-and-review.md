@@ -56,7 +56,8 @@ Modes:
 | `texel_heatmap` | Blue below, green on and red above a target density |
 | `matcap` | Material capture lighting |
 
-`target_px_per_m` and `texture_resolution` apply only to `texel_heatmap`.
+`target_px_per_m` and `texture_resolution` (one size or `[width, height]`) apply
+only to `texel_heatmap`.
 `uv_layer` applies to `texel_heatmap` and `uv_checker`.
 
 Source meshes are bounded to 500,000 triangles. Copy-based modes are bounded to
