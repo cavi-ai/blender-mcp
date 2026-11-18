@@ -19,6 +19,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- `snap_to_grid` snaps the world position, rounding halves up on every axis, so parented objects land on the grid.
 - UV coverage and overlap count texel centres on a shared triangle edge once instead of dropping them.
 - `uv_transform` with a density target rotates in texture pixels, so non-square textures keep texel shape.
 - Image terrain interpolates heights linearly and averages pixels finer than the terrain grid instead of terracing and aliasing.

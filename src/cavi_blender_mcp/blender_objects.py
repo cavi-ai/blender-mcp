@@ -127,7 +127,12 @@ def snap_to_grid(p):
     value = obj(p["name"])
     grid = number(p.get("grid"), 0.001, 100, "grid")
     before = list(value.location)
-    value.location = [round(c / grid) * grid for c in value.location]
+    bpy.context.view_layer.update()
+    # Snap the world position with halves rounded up; rotation and scale stay untouched.
+    world = value.matrix_world.translation
+    delta = Vector([math.floor(c / grid + 0.5) * grid for c in world]) - world
+    parent = (value.matrix_world @ value.matrix_basis.inverted_safe()).to_3x3()
+    value.location += parent.inverted_safe() @ delta
     return {**info(value), "grid": grid, "location_before": before}
 
 

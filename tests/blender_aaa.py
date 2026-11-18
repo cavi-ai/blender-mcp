@@ -290,6 +290,21 @@ refused("set_origin", "location", name="SM_Box", origin="bounds_center", locatio
 box.location = (0.26, -0.74, 1.01)
 edit("snap_to_grid", name="SM_Box", grid=0.5)
 assert all(abs(a - b) < 1e-6 for a, b in zip(box.location, (0.5, -0.5, 1.0)))
+# Halves round up on every axis, and parented objects land on the world grid.
+box.location = (0.25, 0.75, -0.25)
+edit("snap_to_grid", name="SM_Box", grid=0.5)
+assert all(abs(a - b) < 1e-6 for a, b in zip(box.location, (0.5, 1.0, 0.0))), box.location
+pivot = bpy.data.objects.new("SnapPivot", None)
+bpy.context.scene.collection.objects.link(pivot)
+pivot.location, pivot.scale = (0.1, 0, 0), (2, 2, 2)
+box.parent, box.location = pivot, (0.3, 0.2, 0)
+bpy.context.view_layer.update()
+edit("snap_to_grid", name="SM_Box", grid=0.5)
+bpy.context.view_layer.update()
+assert (box.matrix_world.translation - Vector((0.5, 0.5, 0))).length < 1e-6, box.matrix_world
+box.parent = None
+bpy.data.objects.remove(pivot)
+box.location = (0.5, -0.5, 1.0)
 edit("rename_object", name="SM_Box", new_name="SM_Crate_B")
 assert "SM_Crate_B" in bpy.data.objects and bpy.data.objects["SM_Crate_B"].data.name == "SM_Crate_B"
 refused("rename_object", "unique", name="SM_Crate_B", new_name="SM_Rock")
