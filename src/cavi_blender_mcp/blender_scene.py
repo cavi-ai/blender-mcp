@@ -10,6 +10,7 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+from . import core_workspace
 from .blender_bridge import info, obj, output_file, vector
 from .blender_images import packed_snapshot
 from .blender_rigging import label
@@ -121,10 +122,11 @@ def world(spec, workspace):
     if value is not None and not value.get(WORLD_TAG):
         raise ValueError('World name belongs to an authored graph; choose a new managed world name')
     if spec['hdri'] is not None:
-        path = (workspace / spec['hdri']).resolve(strict=True)
-        if (not path.is_relative_to(workspace) or not path.is_file()
-                or path.suffix.lower() not in {'.exr', '.hdr', '.png', '.tif', '.tiff', '.jpg'}):
-            raise ValueError('HDRI must be a supported workspace image')
+        try:
+            path = core_workspace.input_file(
+                workspace, spec['hdri'], {'.exr', '.hdr', '.png', '.tif', '.tiff', '.jpg'})
+        except ValueError:
+            raise ValueError('HDRI must be a supported workspace image') from None
         previous = value.node_tree.nodes.get('CaviEnvironment') if value else None
         image, fingerprint = environment_image(path, workspace,
                                                previous.image if previous else None)
