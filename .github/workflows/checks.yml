@@ -123,7 +123,7 @@ jobs:
           BLENDER_ARCHIVE: blender-5.2.3-linux-x64.tar.xz
         run: |
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/$BLENDER_ARCHIVE" \
-            "https://mirror.blender.org/release/Blender5.2/$BLENDER_ARCHIVE"
+            "https://ftp.halifax.rwth-aachen.de/blender/release/Blender5.2/$BLENDER_ARCHIVE"
           echo "78486c018b4443efe5e75ab54c290ed8c15abafd249b862c2c9ce2530a918eec  $RUNNER_TEMP/$BLENDER_ARCHIVE" | sha256sum --check
           tar -xf "$RUNNER_TEMP/$BLENDER_ARCHIVE" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/blender-5.2.3-linux-x64" >> "$GITHUB_PATH"
