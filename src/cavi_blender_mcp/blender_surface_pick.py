@@ -111,7 +111,9 @@ def inspect(p):
                     raise ValueError('Surface picking exceeds the evaluated geometry budget')
                 if topology(mesh) != topology(source):
                     raise ValueError('Evaluated topology differs from the source; source indices are unavailable')
-            unit = bpy.context.scene.unit_settings.scale_length
+            from .blender_geometry import unit_scale
+
+            unit = unit_scale()
             matrix = np.asarray((evaluated or value).matrix_world,dtype=np.float64)
             report = {**cast(mesh,matrix,spec,unit,camera_query),
                 'geometry':'evaluated_current_frame' if evaluated else 'source_mesh',

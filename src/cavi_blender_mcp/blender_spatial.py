@@ -140,9 +140,9 @@ def inspect(params):
             raise ValueError('Inspect spatial placement in Object Mode')
         bpy.context.view_layer.update()
         graph = bpy.context.evaluated_depsgraph_get()
-        unit = bpy.context.scene.unit_settings.scale_length
-        if not math.isfinite(unit) or unit <= 0:
-            raise ValueError('Scene unit scale must be positive and finite')
+        from .blender_geometry import unit_scale
+
+        unit = unit_scale()
         parts, geometry, metadata = {}, {}, {}
         remaining = spec['max_triangles']
         remaining_vertices = 500000

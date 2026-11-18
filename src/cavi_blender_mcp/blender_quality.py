@@ -262,11 +262,9 @@ def inspect(params, find_object):
         triangle_budget += sum(max(0, len(face.vertices) - 2) for face in value.data.polygons)
         if triangle_budget > MAX_TRIANGLES:
             raise ValueError(f"Inspection is bounded to {MAX_TRIANGLES} total triangles")
-    units = bpy.context.scene.unit_settings
-    # Match Blender's FBX exporter: unitless scenes export one unit as one metre.
-    unit_scale = 1.0 if units.system == "NONE" else units.scale_length
-    if not math.isfinite(unit_scale) or unit_scale <= 0:
-        raise ValueError("Scene unit scale must be positive and finite")
+    from .blender_geometry import unit_scale as scene_unit_scale
+
+    unit_scale = scene_unit_scale()
     bpy.context.view_layer.update()
     result, materials, images = [], set(), {}
     for value in objects:
@@ -358,7 +356,7 @@ def inspect(params, find_object):
         "frame": bpy.context.scene.frame_current,
         "file": bpy.data.filepath,
         "dirty": bpy.data.is_dirty,
-        "unit_system": units.system,
+        "unit_system": bpy.context.scene.unit_settings.system,
         "texture_resolution": list(resolution),
         "density_unit": "pixels_per_meter",
         "scene_unit_meters": unit_scale,

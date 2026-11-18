@@ -37,7 +37,9 @@ def move(p):
         falloff, weights, symmetry, vectors = None, None, None, None
         if radius is not None or symmetric:
             linear = [list(row) for row in value.matrix_world.to_3x3()]
-            unit = bpy.context.scene.unit_settings.scale_length
+            from .blender_geometry import unit_scale
+
+            unit = unit_scale()
             seeds = selected
             positions = [tuple(v.co) for v in mesh.vertices]
             edges = (tuple(e.vertices) for e in mesh.edges)

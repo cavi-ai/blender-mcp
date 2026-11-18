@@ -19,6 +19,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- Spatial queries, picking, clearance, contacts, vertex falloff, skin transfer and motion checks measure a unitless scene as one metre per unit, matching FBX export.
 - Mesh cleanup's merge step dissolves faces thinner than the merge distance.
 - `mesh_edit` `remesh_quad` collapses or separates edges QuadriFlow reads as zero length, so voxel-rebuilt meshes remesh.
 - Mesh unwrap gives faces projected again after a fold the texel density of the rest of the surface.

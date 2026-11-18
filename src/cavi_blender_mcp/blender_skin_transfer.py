@@ -69,9 +69,9 @@ def transfer(p):
         if any(source_quality[key] for key in ('unweighted_vertices', 'unnormalized_vertices',
                                              'invalid_vertices')):
             raise ValueError('Source deform weights must be finite, weighted and normalized')
-        meters = bpy.context.scene.unit_settings.scale_length
-        if not math.isfinite(meters) or meters <= 0:
-            raise ValueError('Scene metre scale must be positive and finite')
+        from .blender_geometry import unit_scale
+
+        meters = unit_scale()
         origin = np.asarray(source.matrix_world.translation, dtype=np.float64)
         source_points, target_points = world_vertices(source, origin), world_vertices(target, origin)
         source.data.calc_loop_triangles()

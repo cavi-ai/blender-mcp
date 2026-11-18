@@ -393,9 +393,11 @@ def inspect(params, find_object):
                              if "root_motion" in requested or "loop" in requested else (None, None))
             checks_report = {}
             if "root_motion" in requested:
+                from .blender_geometry import unit_scale
+
                 checks_report["root_motion"] = root_motion_report(
                     rig, action, frames, poses, worlds,
-                    bpy.context.scene.unit_settings.system, bpy.context.scene.unit_settings.scale_length)
+                    bpy.context.scene.unit_settings.system, unit_scale())
             if "loop" in requested:
                 checks_report["loop"] = loop_report(rig, frames, poses)
             if "deformation" in requested:

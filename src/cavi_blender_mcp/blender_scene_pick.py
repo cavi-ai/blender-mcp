@@ -1,6 +1,4 @@
 """Nearest evaluated mesh discovery in the current view layer, including instances."""
-import math
-
 import bpy
 import numpy as np
 
@@ -22,9 +20,9 @@ def inspect(p):
         bpy.context.view_layer.update()
         ray,camera=from_query(p['surface_ray'])
         graph=bpy.context.evaluated_depsgraph_get()
-        unit=bpy.context.scene.unit_settings.scale_length
-        if not math.isfinite(unit) or unit<=0:
-            raise ValueError('Scene unit scale must be positive and finite')
+        from .blender_geometry import unit_scale
+
+        unit=unit_scale()
         result={'scope':'scene_surface_pick','surface_pick':{'hit':False}}
         best=None
         triangles=vertices=0

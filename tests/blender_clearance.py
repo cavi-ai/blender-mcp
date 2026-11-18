@@ -97,4 +97,9 @@ scene.unit_settings.scale_length = .01
 result = inspect(min_clearance_m=.001)
 assert result['passed'] and abs(result['garments'][0]['min_clearance_m']-.002) < 1e-8
 assert not inspect(min_clearance_m=.003)['passed']
+# Unitless scenes measure one unit as one metre, as Blender's FBX export does.
+scene.unit_settings.system = 'NONE'
+result = inspect(min_clearance_m=.1)
+assert result['scene_unit_meters'] == 1 and abs(result['garments'][0]['min_clearance_m']-.2) < 1e-6, result
+scene.unit_settings.system = 'METRIC'
 print('Native garment clearance: signed gaps, animation, centres, component union, units and restoration passed')
