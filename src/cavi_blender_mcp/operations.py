@@ -112,6 +112,7 @@ OPERATIONS = frozenset(
         "snap_to_grid",
         "rename_object",
         "add_socket",
+        "object_keyframe",
         "export_asset",
         "review_sheet",
         "scatter",

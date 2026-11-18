@@ -259,8 +259,90 @@ def move_to_collection(p):
     return {**info(value), "collection": collection.name}
 
 
+KEY_CHANNELS = {"location": "location", "rotation_degrees": "rotation_euler", "scale": "scale"}
+INTERPOLATIONS = {"BEZIER", "LINEAR", "CONSTANT"}
+
+
+def keyframes(value):
+    if not isinstance(value, list) or not 1 <= len(value) <= 32:
+        raise ValueError("keyframes must list 1 to 32 frames")
+    parsed, last = [], 0
+    for item in value:
+        if not isinstance(item, dict) or set(item) - {*KEY_CHANNELS, "frame", "interpolation"}:
+            raise ValueError("keyframes contain an unsupported entry")
+        frame, interpolation = item.get("frame"), item.get("interpolation", "BEZIER")
+        if type(frame) is not int or not last < frame <= 1000000:
+            raise ValueError("keyframe frames must be strictly increasing integers from 1")
+        if interpolation not in INTERPOLATIONS:
+            raise ValueError(f"interpolation must be one of {sorted(INTERPOLATIONS)}")
+        channels = {key: vector(item[key]) for key in KEY_CHANNELS if item.get(key) is not None}
+        if not channels or ("scale" in channels and 0 in channels["scale"]):
+            raise ValueError("Each keyframe needs location, rotation_degrees or a nonzero scale")
+        parsed.append((frame, interpolation, channels))
+        last = frame
+    return parsed
+
+
+def object_keyframe(p):
+    with preflight():
+        object_mode()
+        value = obj(p["name"])
+        label = p.get("action_name")
+        if not isinstance(label, str) or not label.strip() or len(label.encode()) > 63:
+            raise ValueError("action_name must be nonempty and at most 63 UTF-8 bytes")
+        if label in bpy.data.actions:
+            raise ValueError("Action name already exists")
+        sequence = keyframes(p.get("keyframes"))
+        if (value.rotation_mode in {"QUATERNION", "AXIS_ANGLE"}
+                and any("rotation_degrees" in channels for _, _, channels in sequence)):
+            raise ValueError("rotation_degrees keys need an Euler rotation mode")
+    animation = value.animation_data or value.animation_data_create()
+    previous = (animation.action, animation.action_slot, value.matrix_basis.copy())
+    frame = bpy.context.scene.frame_current
+    action = None
+    try:
+        action = bpy.data.actions.new(label)
+        animation.action = action
+        for number_, _, channels in sequence:
+            for key, path in KEY_CHANNELS.items():
+                if key in channels:
+                    data = channels[key]
+                    setattr(value, path, [math.radians(c) for c in data] if key == "rotation_degrees" else data)
+                    if not value.keyframe_insert(path, frame=number_):
+                        raise RuntimeError(f"Could not key {key} at frame {number_}")
+        modes = {number_: interpolation for number_, interpolation, _ in sequence}
+        for layer in action.layers:
+            for strip in layer.strips:
+                for bag in getattr(strip, "channelbags", ()):
+                    for curve in bag.fcurves:
+                        for point in curve.keyframe_points:
+                            point.interpolation = modes[round(point.co.x)]
+        action.use_frame_range = True
+        action.frame_start, action.frame_end = sequence[0][0], sequence[-1][0]
+    except Exception:
+        if action is not None:
+            animation.action = previous[0]
+            if previous[0] is not None and previous[1] is not None:
+                try:
+                    animation.action_slot = previous[1]
+                except (TypeError, RuntimeError):
+                    pass
+            bpy.data.actions.remove(action)
+        value.matrix_basis = previous[2]
+        raise
+    finally:
+        bpy.context.scene.frame_set(frame)
+    slot = animation.action_slot
+    return {**info(value), "action": action.name, "action_slot": slot.identifier if slot else None,
+            "frame_range": [sequence[0][0], sequence[-1][0]],
+            "frames": [number_ for number_, _, _ in sequence],
+            "channels": [key for key in KEY_CHANNELS
+                         if any(key in channels for _, _, channels in sequence)]}
+
+
 HANDLERS = {"make_mesh_single_user": make_single_user,
             "apply_transforms": apply_transforms, "set_origin": set_origin,
             "snap_to_grid": snap_to_grid, "rename_object": rename, "add_socket": add_socket,
             "duplicate_object": duplicate, "parent_object": parent,
-            "unparent_object": unparent, "move_to_collection": move_to_collection}
+            "unparent_object": unparent, "move_to_collection": move_to_collection,
+            "object_keyframe": object_keyframe}

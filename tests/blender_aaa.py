@@ -305,6 +305,23 @@ assert (box.matrix_world.translation - Vector((0.5, 0.5, 0))).length < 1e-6, box
 box.parent = None
 bpy.data.objects.remove(pivot)
 box.location = (0.5, -0.5, 1.0)
+# Object keyframes: a linear half turn on a camera.
+camera = bpy.data.objects.new("TurnCam", bpy.data.cameras.new("TurnCam"))
+bpy.context.scene.collection.objects.link(camera)
+turn = edit("object_keyframe", name="TurnCam", action_name="TurnCam_Spin", keyframes=[
+    {"frame": 1, "rotation_degrees": [90, 0, 0], "interpolation": "LINEAR"},
+    {"frame": 49, "rotation_degrees": [90, 0, 180], "location": [0, -5, 1]}])
+assert turn["frames"] == [1, 49] and turn["channels"] == ["location", "rotation_degrees"], turn
+bpy.context.scene.frame_set(25)
+assert abs(math.degrees(camera.rotation_euler.z) - 90) < 1e-4, camera.rotation_euler
+bpy.context.scene.frame_set(1)
+refused("object_keyframe", "already exists", name="TurnCam", action_name="TurnCam_Spin",
+        keyframes=[{"frame": 1, "location": [0, 0, 0]}])
+refused("object_keyframe", "increasing", name="TurnCam", action_name="Other",
+        keyframes=[{"frame": 5, "location": [0, 0, 0]}, {"frame": 5, "location": [1, 0, 0]}])
+assert "Other" not in bpy.data.actions
+bpy.data.actions.remove(bpy.data.actions["TurnCam_Spin"])
+bpy.data.objects.remove(camera)
 edit("rename_object", name="SM_Box", new_name="SM_Crate_B")
 assert "SM_Crate_B" in bpy.data.objects and bpy.data.objects["SM_Crate_B"].data.name == "SM_Crate_B"
 refused("rename_object", "unique", name="SM_Crate_B", new_name="SM_Rock")

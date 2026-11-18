@@ -26,6 +26,7 @@ Unrelated action parameters are refused before contacting Blender.
 | `shape_key_value` | `new_name`, `value` |
 | `shape_key_keyframe` | `new_name`, `action_name`, `keyframes` = 1–32 `{frame, value}` |
 | `shape_key_remove` | `new_name`; Basis cannot be removed |
+| `keyframe` | `action_name`, `keyframes` = 1–32 `{frame, location, rotation_degrees, scale, interpolation}` |
 
 ## Transforms and origins
 
@@ -84,6 +85,28 @@ positions from another mesh with the same vertex count.
 `shape_key_keyframe` creates a new action atomically with 1–32 strictly
 increasing frames and values from 0 to 1. Values are applied and keyed in order;
 the previous action, value and scene frame are restored on failure.
+
+## Object keyframes
+
+`keyframe` animates any object, including cameras and lights, into a new action.
+Each of the 1–32 strictly increasing frames keys at least one of `location` (parent
+space), XYZ Euler `rotation_degrees` or nonzero `scale`. `interpolation`
+(`BEZIER`, `LINEAR` or `CONSTANT`) sets the curve from that key to the next. A
+linear camera turntable:
+
+```json
+{
+  "action": "keyframe",
+  "name": "Camera",
+  "action_name": "Camera_Turntable",
+  "keyframes": [
+    {"frame": 1, "rotation_degrees": [90, 0, 0], "interpolation": "LINEAR"},
+    {"frame": 97, "rotation_degrees": [90, 0, 360]}
+  ]
+}
+```
+
+The previous action, transform and scene frame are restored on failure.
 
 ## Related
 

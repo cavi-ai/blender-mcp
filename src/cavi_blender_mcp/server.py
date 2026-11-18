@@ -198,6 +198,21 @@ class ShapeKeyframe(BaseModel):
     value: Annotated[Number, Field(ge=0, le=1)]
 
 
+class TransformKeyframe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    frame: Annotated[StrictInt, Field(ge=1, le=1_000_000)]
+    location: Vector3 | None = None
+    rotation_degrees: Vector3 | None = None
+    scale: Vector3 | None = None
+    interpolation: Literal["BEZIER", "LINEAR", "CONSTANT"] = "BEZIER"
+
+    @model_validator(mode="after")
+    def keyed(self):
+        if self.location is None and self.rotation_degrees is None and self.scale is None:
+            raise ValueError("Object keyframes need location, rotation_degrees or scale")
+        return self
+
+
 class Placement(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: ObjectName
@@ -655,7 +670,7 @@ async def object_edit(
     action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
                     "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
-                    "shape_key_value", "shape_key_keyframe", "shape_key_remove"], Field(description="Action")],
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
     kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane"] | None, Field(description="create_primitive needs kind")] = None,
     location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
@@ -680,8 +695,8 @@ async def object_edit(
     linked: Annotated[StrictBool | None, Field(description="duplicate: linked; default false")] = None,
     create: Annotated[StrictBool | None, Field(description="move_to_collection: create missing; default true")] = None,
     value: Annotated[Number | None, Field(ge=0, le=1, description="Shape-key value; add default 0")] = None,
-    keyframes: Annotated[list[ShapeKeyframe] | None, Field(min_length=1, max_length=32, description="shape_key_keyframe needs frame/value pairs")] = None,
-    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_keyframe needs clip")] = None,
+    keyframes: Annotated[list[ShapeKeyframe | TransformKeyframe] | None, Field(min_length=1, max_length=32, description="shape_key_keyframe: frame/value; keyframe: frame with location/rotation_degrees/scale")] = None,
+    action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_keyframe/keyframe: new clip")] = None,
     source: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_add: source mesh")] = None,
     offsets: Annotated[list[Annotated[list[Number], Field(min_length=4, max_length=4)]] | None,
                        Field(max_length=10000, description="shape_key_add: vertex index/XYZ deltas")] = None,
@@ -696,6 +711,12 @@ async def object_edit(
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
               "offsets": offsets, "recursive": recursive}
+
+    def frames(kind, fields):
+        if any(not isinstance(item, kind) for item in keyframes):
+            raise ValueError(f"{action} needs {fields} keyframes")
+        return [item.model_dump(mode="json", exclude_none=True) for item in keyframes]
+
     operation, params = {
         "create_primitive": ("create_primitive",
                              lambda: pick(action, values, ["kind"], {"location": (0, 0, 0)})),
@@ -726,9 +747,13 @@ async def object_edit(
         "shape_key_value": ("shape_key_value", lambda: pick(action, values, ["new_name", "value"])),
         "shape_key_keyframe": ("shape_key_keyframe", lambda: {
             **pick(action, values, ["new_name", "action_name", "keyframes"]),
-            "keyframes": [item.model_dump() for item in keyframes],
+            "keyframes": frames(ShapeKeyframe, "frame/value"),
         }),
         "shape_key_remove": ("shape_key_remove", lambda: pick(action, values, ["new_name"])),
+        "keyframe": ("object_keyframe", lambda: {
+            **pick(action, values, ["action_name", "keyframes"]),
+            "keyframes": frames(TransformKeyframe, "location/rotation_degrees/scale"),
+        }),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 

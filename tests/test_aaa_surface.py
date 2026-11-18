@@ -71,6 +71,29 @@ class AAASurfaceTests(unittest.TestCase):
                 asyncio.run(coroutine)
         self.assertEqual(calls, [])
 
+    def test_object_keyframes_map_transform_channels(self):
+        calls = self.capture({"name": "Camera", "type": "CAMERA", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [0, 0, 0], "parent": None,
+                              "children": [], "collections": [], "modifiers": [],
+                              "action": "Turntable", "frames": [1, 97]})
+        keys = [{"frame": 1, "rotation_degrees": (0, 0, 0), "interpolation": "LINEAR"},
+                {"frame": 97, "rotation_degrees": (0, 0, 360), "location": (0, 0, 1)}]
+        asyncio.run(server.mcp.call_tool("object_edit", {
+            "action": "keyframe", "name": "Camera", "action_name": "Turntable",
+            "keyframes": keys, "lease_id": "L"}))
+        self.assertEqual(self.inner(calls), [("object_keyframe", {
+            "name": "Camera", "action_name": "Turntable", "keyframes": [
+                {"frame": 1, "rotation_degrees": [0, 0, 0], "interpolation": "LINEAR"},
+                {"frame": 97, "location": [0, 0, 1], "rotation_degrees": [0, 0, 360],
+                 "interpolation": "BEZIER"}], "lease_id": "L"})])
+        for bad in ([{"frame": 1}], [{"frame": 1, "value": 0.5}]):
+            with self.subTest(bad=bad), self.assertRaisesRegex(Exception, "keyframe"):
+                asyncio.run(server.mcp.call_tool("object_edit", {
+                    "action": "keyframe", "name": "Camera", "action_name": "Clip",
+                    "keyframes": bad, "lease_id": "L"}))
+        self.assertEqual(len(calls), 1)
+
     def test_object_actions_map_to_bridge_operations(self):
         calls = self.capture()
         asyncio.run(server.object_edit("apply_transforms", "R", lease_id="L"))
