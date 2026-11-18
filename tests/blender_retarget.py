@@ -3,6 +3,7 @@
 import json
 import sys
 import tempfile
+from itertools import pairwise
 from pathlib import Path
 
 import bpy
@@ -95,6 +96,34 @@ try:
         "action": "MappedWalk", "checks": ["root_motion"], "samples": 4})
     assert abs(inspected["animation_checks"]["root_motion"]["root_bones"][0]
                ["displacement"] - 2) < 1e-3
+
+    edit("keyframe_rig", name="SourceRig", action_name="Bend", keyframes=[
+        {"frame": 1, "poses": [{"bone": "Root", "rotation_degrees": [0, 0, 0]},
+                               {"bone": "Spine", "rotation_degrees": [0, 0, 0]}]},
+        {"frame": 11, "poses": [{"bone": "Root", "rotation_degrees": [270, 0, 0]},
+                                {"bone": "Spine", "rotation_degrees": [0, 0, 60]}]},
+    ])
+    edit("retarget_rig", name="TargetRig", source="SourceRig",
+         source_action="Bend", action_name="BendCopy")
+    worst = 0.0
+    for sample in range(1, 12):
+        bpy.context.scene.frame_set(sample)
+        bpy.context.view_layer.update()
+        for bone in ("Root", "Spine"):
+            expected = source.matrix_world @ source.pose.bones[bone].matrix
+            actual = target.matrix_world @ target.pose.bones[bone].matrix
+            worst = max(worst, max(abs(a - b) for r, s in zip(expected, actual, strict=True)
+                                   for a, b in zip(r, s, strict=True)))
+    keyed = bpy.data.actions["BendCopy"].layers[0].strips[0].channelbags[0].fcurves
+    hemisphere = {}
+    for bone in ("Root", "Spine"):
+        curves = sorted((c for c in keyed if c.data_path == f'pose.bones["{bone}"].rotation_quaternion'),
+                        key=lambda c: c.array_index)
+        keys = list(zip(*(c.keyframe_points for c in curves), strict=True))
+        hemisphere[bone] = min(sum(a.co.y * b.co.y for a, b in zip(p, q, strict=True))
+                               for p, q in pairwise(keys))
+    assert worst < 1e-4 and min(hemisphere.values()) >= 0, (
+        f"retargeted pose error {worst}; consecutive quaternion key dots {hemisphere}")
 
     before_actions = set(bpy.data.actions)
     refused("retarget_rig", "different", name="SourceRig", source="SourceRig",
