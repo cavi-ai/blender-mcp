@@ -29,7 +29,9 @@ class AnticipatedErrorTests(unittest.TestCase):
 
     def test_validation_reaches_the_caller(self):
         self.assert_reports("object_edit", {"action": "rename", "name": "A"},
-                            "rename requires: new_name")
+                            "new_name is required for action=rename")
+        self.assert_reports("object_edit", {"action": "rename", "name": "A", "new_name": "B",
+                                            "grid": 1}, "Not valid for action=rename: grid")
 
     def test_bridge_failures_reach_the_caller(self):
         for exc in (BridgeOperationError("Object not found: A"),
@@ -46,8 +48,28 @@ class AnticipatedErrorTests(unittest.TestCase):
         self.assertNotIn("internal detail", str(caught.exception))
 
     def test_decorated_tools_stay_directly_callable(self):
-        with self.assertRaisesRegex(ValueError, "requires: new_name"):
+        with self.assertRaisesRegex(ValueError, "new_name is required for action=rename"):
             asyncio.run(server.object_edit("rename", "A"))
+
+
+class RecoveryActionTests(unittest.IsolatedAsyncioTestCase):
+    async def reply(self, name, arguments):
+        from mcp.server.mcpserver import Context
+
+        return (await server.mcp.call_tool(name, arguments, Context(mcp_server=server.mcp))
+                ).structured_content["error"]
+
+    async def test_unknown_outcomes_name_the_blender_inspection_tool(self):
+        cases = (("scene_info", {}, "scene_info"),
+                 ("session_control", {"action": "inspect"}, "session_control"))
+        for name, arguments, action in cases:
+            with self.subTest(name=name), bridge_raising(BridgeOperationError("no diagnostic")):
+                error = await self.reply(name, arguments)
+            self.assertEqual((error["outcome"], error["next_action"]), ("unknown", action))
+
+    async def test_rejected_inputs_still_point_at_the_inputs(self):
+        error = await self.reply("object_edit", {"action": "rename", "name": "A"})
+        self.assertEqual((error["outcome"], error["next_action"]), ("rejected", "inspect_inputs"))
 
 
 class ServerInfoTests(unittest.TestCase):

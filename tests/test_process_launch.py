@@ -14,6 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from cavi_mcp_core import proc
+
 from cavi_blender_mcp import generation, runtime, uv_worker
 
 OWNER = 'CAVI_MCP_PROCESS_OWNER'
@@ -87,11 +89,14 @@ class OwnedLaunchTests(unittest.TestCase):
     def test_reconstruction_refusal_stops_before_the_worker_launch(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()
-            with backend(root), patch.dict(os.environ, {OWNER:str(root/'owner.json')}), \
-                    patch.object(generation.subprocess, 'run', side_effect=AssertionError('ungated worker')), \
-                    self.assertRaisesRegex(RuntimeError, 'registration refused'):
-                generation.run([sys.executable, '-c', 'raise SystemExit(0)'], dict(os.environ),
-                               10, time.monotonic()+10)
+            owner, marker = root/'owner.json', root/'launched'
+            owner.write_text('{}')
+            owner.chmod(0o600)
+            with patch.dict(os.environ, {OWNER:str(owner)}), \
+                    self.assertRaisesRegex(ValueError, 'Invalid process owner configuration'):
+                generation.run([sys.executable, '-c', f'open({str(marker)!r}, "w")'],
+                               dict(os.environ), 10, time.monotonic()+10)
+            self.assertFalse(marker.exists(), 'A refused worker was launched')
 
     def test_runtime_refusal_stops_before_blender_launch(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -193,18 +198,12 @@ class OwnedLaunchTests(unittest.TestCase):
                 runtime.start_runtime(background=True)
             self.assertEqual(observed,[123])
 
-    def test_reconstruction_passes_the_registered_command_to_its_runner(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder).resolve()
-            def spawned(command, **kwargs):
-                self.assertEqual(command, ['registered','worker','input'])
-                self.assertEqual(kwargs['env'][OWNER], str(root/'owner.json'))
-                return SimpleNamespace(returncode=0, stdout='{}', stderr='')
-            with backend(root, 'def command(args, **kwargs): return ["registered", *args]'), \
-                    patch.dict(os.environ, {OWNER:str(root/'owner.json')}), \
-                    patch.object(generation.subprocess, 'run', side_effect=spawned):
-                result = generation.run(['worker','input'], dict(os.environ), 10, time.monotonic()+10)
-                self.assertEqual(result.returncode, 0)
+    def test_reconstruction_runs_the_registered_command(self):
+        def registered(args, **kwargs):
+            return [sys.executable, '-c', 'import sys; print(" ".join(sys.argv[1:]))', *args]
+        with patch.object(proc.owned_exec, 'command', side_effect=registered):
+            result = generation.run(['worker','input'], dict(os.environ), 10, time.monotonic()+10)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'worker input'))
 
     def test_embedded_uv_uses_the_host_gate_without_importing_host_packages(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -232,13 +231,10 @@ class OwnedLaunchTests(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'handoff'):
             launch.command(['native-blender'], env=dict(os.environ))
 
-    def test_expired_reconstruction_budget_after_gate_preparation_never_launches(self):
-        clock = [9.0]
-        def prepared(command, **kwargs):
-            clock[0] = 11.0
-            return ['registered', *command]
-        with patch.object(generation.time, 'monotonic', side_effect=lambda: clock[0]), \
-                patch.object(generation.process_launch, 'command', side_effect=prepared), \
-                patch.object(generation.subprocess, 'run', side_effect=AssertionError('expired worker launched')), \
-                self.assertRaisesRegex(RuntimeError, 'exceeded'):
-            generation.run(['worker'], dict(os.environ), 10, 10.0)
+    def test_expired_reconstruction_budget_never_launches(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = Path(folder)/'launched'
+            with self.assertRaisesRegex(RuntimeError, 'exceeded'):
+                generation.run([sys.executable, '-c', f'open({str(marker)!r}, "w")'],
+                               dict(os.environ), 10, time.monotonic()-1)
+            self.assertFalse(marker.exists(), 'An expired worker was launched')

@@ -27,7 +27,7 @@ uncertain failures leave existing sessions untouched.
 - `--background` launches headless Blender. The bridge blocks its main thread on
   the request queue and removes its connection file on SIGTERM.
 - `CAVI_BLENDER_BIN` overrides executable discovery. Otherwise the CLI uses
-  Blender on `PATH` or the standard macOS installation.
+  the standard macOS installation, then Blender on `PATH`.
 
 Launch acceptance does not prove readiness. Require a successful status check
 before asset operations.

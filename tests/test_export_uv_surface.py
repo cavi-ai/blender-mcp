@@ -23,5 +23,5 @@ class ExportUvSurfaceTests(unittest.TestCase):
     def test_uv_layer_is_not_silently_accepted_by_other_actions(self):
         for action,path,args in [('save','scene.blend',{}),('import','hero.fbx',{'name':'Loaded'}),
                                  ('export','pair.fbx',{'bake_pair':server.BakePair(low=['Low'],high=['High'])})]:
-            with self.subTest(action=action),self.assertRaisesRegex(ValueError,'does not accept: uv_layer'):
+            with self.subTest(action=action),self.assertRaisesRegex(ValueError,'Not valid for action=.*: uv_layer'):
                 asyncio.run(server.asset_io(action,path,uv_layer='Atlas',**args))

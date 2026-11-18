@@ -52,18 +52,18 @@ class ShapeKeySurfaceTests(unittest.TestCase):
     def test_shape_key_parameters_are_checked_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.object_edit("shape_key_add", "Cube"), "requires: new_name"),
+            (server.object_edit("shape_key_add", "Cube"), "new_name is required for action"),
             (server.object_edit("shape_key_value", "Cube", new_name="Smile"),
-             "requires: value"),
+             "value is required for action"),
             (server.object_edit("shape_key_keyframe", "Cube", new_name="Smile",
-                                action_name="Action"), "requires: keyframes"),
+                                action_name="Action"), "keyframes is required for action"),
             (server.object_edit("shape_key_keyframe", "Cube", new_name="Smile",
                                 keyframes=[server.ShapeKeyframe(frame=1, value=0)]),
-             "requires: action_name"),
+             "action_name is required for action"),
             (server.object_edit("shape_key_remove", "Cube", new_name="Smile",
-                                value=.5), "does not accept: value"),
+                                value=.5), "Not valid for action=\\w+:\\svalue"),
             (server.object_edit("shape_key_add", "Cube", new_name="Smile",
-                                action_name="Action"), "does not accept: action_name"),
+                                action_name="Action"), "Not valid for action=\\w+:\\saction_name"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)

@@ -2,31 +2,31 @@
 
 import os
 import secrets
-import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
+from cavi_mcp_core import apps
+from cavi_mcp_core import workspace as core_workspace
+
 from . import process_launch
 from .client import BridgeClient
-from .paths import environment_path
+
+BLENDER = Path("/Applications/Blender.app/Contents/MacOS/Blender")
+
+
+def workspace_root():
+    """The configured workspace; ``CAVI_BLENDER_WORKSPACE`` must be an absolute path."""
+    return core_workspace.root("CAVI_BLENDER_WORKSPACE",
+                               default=Path.home() / "Documents/CaviBlender")
 
 
 def start_runtime(project=None, background=False):
     owned = bool(os.environ.get(process_launch.OWNER))
     if owned and not background:
         raise RuntimeError("Supervised Blender launches require background mode")
-    workspace = environment_path(
-        "CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender"
-    ).resolve()
-    source = None
-    if project is not None:
-        source = (workspace / project).resolve()
-        if Path(project).is_absolute() or not source.is_relative_to(workspace):
-            raise ValueError("Project must stay inside the workspace")
-        if source.suffix.lower() != ".blend" or not source.is_file():
-            raise ValueError("Project must be an existing workspace .blend file")
+    workspace = workspace_root()
+    source = None if project is None else core_workspace.input_file(workspace, project, {".blend"})
     client = BridgeClient()
     try:
         scene = client.call("scene_info", {"limit": 1})
@@ -45,11 +45,10 @@ def start_runtime(project=None, background=False):
                 "workspace": scene.get("workspace"), "file": scene.get("file"),
                 "version": scene.get("version"), "bridge": scene.get("bridge"),
                 "object_count": scene.get("total", len(scene.get("objects", [])))}
-    configured = os.environ.get("CAVI_BLENDER_BIN")
-    default = "/Applications/Blender.app/Contents/MacOS/Blender" if sys.platform == "darwin" else ""
-    executable = configured or shutil.which("blender") or default
-    if not executable or not Path(executable).is_file() or not os.access(executable, os.X_OK):
+    executable = apps.find_executable(BLENDER, "blender", "CAVI_BLENDER_BIN", None).path
+    if executable is None or not os.access(executable, os.X_OK):
         raise FileNotFoundError("Blender is unavailable; set CAVI_BLENDER_BIN to its executable")
+    executable = str(executable)
     connection = client.config.expanduser().resolve()
     connection.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     workspace.mkdir(parents=True, exist_ok=True)

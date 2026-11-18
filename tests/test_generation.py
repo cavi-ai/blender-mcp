@@ -1,15 +1,17 @@
 import asyncio
+import contextlib
 import hashlib
 import os
-import subprocess
+import signal
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import patch
 
+from cavi_mcp_core import proc
 from PIL import Image
 
 from cavi_blender_mcp import generation, neural_worker, server
@@ -85,11 +87,11 @@ class GenerationTests(unittest.TestCase):
             work = Path(root)
             (work / "input.png").write_bytes(b"input")
 
-            def complete(command, **kwargs):
+            def complete(command, timeout, **kwargs):
                 Path(command[3]).write_bytes(b"generated-glb")
-                return SimpleNamespace(returncode=0, stdout='{"triangles": 12}', stderr="")
+                return proc.Result(0, '{"triangles": 12}', "")
 
-            with self.configured(work), patch("subprocess.run", side_effect=complete):
+            with self.configured(work), patch.object(proc, "run_sync", side_effect=complete):
                 report = generate(work, "input.png", "mesh.glb", 128)
             self.assertEqual(report["triangles"], 12)
             self.assertEqual((work / "mesh.glb").read_bytes(), b"generated-glb")
@@ -101,7 +103,7 @@ class GenerationTests(unittest.TestCase):
             (work / "input.png").write_bytes(b"input")
             with (
                 self.configured(work),
-                patch("subprocess.run", side_effect=subprocess.TimeoutExpired("worker", 180)),
+                patch.object(proc, "run_sync", side_effect=TimeoutError("worker")),
                 self.assertRaisesRegex(RuntimeError, "180 seconds"),
             ):
                 generate(work, "input.png", "mesh.glb", 128)
@@ -110,7 +112,7 @@ class GenerationTests(unittest.TestCase):
 
     def test_worker_failure_reports_exit_and_preserves_diagnostics(self):
         for code, stderr, stdout, detail in (
-            (-9, "", "", "No worker diagnostics"),
+            (-9, "", "", "no diagnostics"),
             (2, " import failed ", "", "import failed"),
             (3, " ", "encoder stopped", "encoder stopped"),
         ):
@@ -118,13 +120,14 @@ class GenerationTests(unittest.TestCase):
                 work = Path(root)
                 (work / "input.png").write_bytes(b"input")
 
-                def fail(command, exit_code=code, worker_stdout=stdout, worker_stderr=stderr, **kwargs):
+                def fail(command, timeout, *, exit_code=code, worker_stdout=stdout,
+                         worker_stderr=stderr, **kwargs):
                     Path(command[3]).write_bytes(b"partial-glb")
-                    return SimpleNamespace(returncode=exit_code, stdout=worker_stdout, stderr=worker_stderr)
+                    return proc.Result(exit_code, worker_stdout, worker_stderr)
 
                 with (
                     self.configured(work),
-                    patch("subprocess.run", side_effect=fail),
+                    patch.object(proc, "run_sync", side_effect=fail),
                     self.assertRaisesRegex(RuntimeError, f"exit {code}.*{detail}"),
                 ):
                     generate(work, "input.png", "mesh.glb", 128)
@@ -187,7 +190,7 @@ class GenerationTests(unittest.TestCase):
             runtime = {f"CAVI_TRIPOSG_{key}": str(work) for key in ("PYTHON", "SOURCE", "WEIGHTS")}
             with (
                 patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": "triposg", **runtime}),
-                patch("subprocess.run", side_effect=subprocess.TimeoutExpired("worker", 600)),
+                patch.object(proc, "run_sync", side_effect=TimeoutError("worker")),
                 self.assertRaisesRegex(RuntimeError, "600 seconds"),
             ):
                 generate(work, "input.png", "mesh.glb")
@@ -199,18 +202,60 @@ class GenerationTests(unittest.TestCase):
             work = Path(root)
             (work / "input.png").write_bytes(b"input")
 
-            def race(command, **kwargs):
+            def race(command, timeout, **kwargs):
                 Path(command[3]).write_bytes(b"generated-glb")
                 (work / "mesh.glb").write_bytes(b"other-writer")
-                return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+                return proc.Result(0, "{}", "")
 
             with (
                 self.configured(work),
-                patch("subprocess.run", side_effect=race),
+                patch.object(proc, "run_sync", side_effect=race),
                 self.assertRaises(FileExistsError),
             ):
                 generate(work, "input.png", "mesh.glb", 128)
             self.assertEqual((work / "mesh.glb").read_bytes(), b"other-writer")
+
+
+class WorkerProcessTests(unittest.TestCase):
+    def background(self, script, timeout):
+        """Run a worker that leaves a sleeping child; return the run outcome and its pid."""
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        marker = Path(root.name) / "child.pid"
+        command = ["/bin/sh", "-c", f'sleep 30 & echo $! > "{marker}"; {script}']
+        try:
+            outcome = generation.run(command, dict(os.environ), timeout, time.monotonic() + timeout)
+        except RuntimeError as exc:
+            outcome = exc
+        child = int(marker.read_text())
+        self.addCleanup(_kill, child)
+        return outcome, child
+
+    def test_timeout_stops_the_worker_and_its_children(self):
+        outcome, child = self.background("wait", 1)
+        self.assertRegex(str(outcome), "exceeded 1 seconds")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and _alive(child):
+            time.sleep(.05)
+        self.assertFalse(_alive(child), "The worker's child outlived the timeout")
+
+    def test_a_finished_worker_is_not_held_by_a_background_child(self):
+        outcome, _child = self.background("echo done", 5)
+        self.assertNotIsInstance(outcome, RuntimeError, outcome)
+        self.assertEqual((outcome.returncode, outcome.stdout.strip()), (0, "done"))
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _kill(pid):
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(pid, signal.SIGKILL)
 
 
 class TripoSGMlxTests(unittest.TestCase):

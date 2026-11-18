@@ -8,6 +8,7 @@ import re
 import struct
 from pathlib import Path
 
+from . import core_files, core_workspace
 from .blender_errors import PreflightRejected
 
 MAX_BYTES = 64 * 1024 * 1024
@@ -59,14 +60,7 @@ def image_size(data):
 
 
 def inspect_glb(workspace, name):
-    root = Path(workspace).expanduser().resolve(strict=True)
-    path = (root / name).resolve()
-    if Path(name).is_absolute() or not path.is_relative_to(root):
-        raise ValueError("Input must stay inside the workspace")
-    if path.suffix.lower() != ".glb" or not path.is_file():
-        raise ValueError("Input must be a GLB file")
-    with path.open("rb") as stream:
-        data = stream.read(MAX_BYTES + 1)
+    path, data = workspace_bytes(workspace, name, {".glb"}, "GLB")
     if not 20 <= len(data) <= MAX_BYTES:
         raise ValueError("GLB must be at most 64 MiB")
     magic, version, size = struct.unpack("<4sII", data[:12])
@@ -471,17 +465,7 @@ def inspect_glb(workspace, name):
 
 
 def inspect_fbx(workspace, name):
-    root = Path(workspace).expanduser().resolve(strict=True)
-    try:
-        path = (root / name).resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        raise ValueError("FBX does not exist inside the workspace") from exc
-    if Path(name).is_absolute() or not path.is_relative_to(root):
-        raise ValueError("Input must stay inside the workspace")
-    if path.suffix.lower() != ".fbx" or not path.is_file():
-        raise ValueError("Input must be an FBX file")
-    with path.open("rb") as stream:
-        data = stream.read(MAX_FBX_BYTES + 1)
+    path, data = workspace_bytes(workspace, name, {".fbx"}, "FBX", MAX_FBX_BYTES)
     if not 27 <= len(data) <= MAX_FBX_BYTES:
         raise ValueError("FBX must be at most 64 MiB")
     binary = data.startswith(b"Kaydara FBX Binary")
@@ -494,16 +478,7 @@ def inspect_fbx(workspace, name):
 
 def inspect_obj(workspace, name):
     root = Path(workspace).expanduser().resolve(strict=True)
-    try:
-        path = (root / name).resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        raise ValueError("OBJ does not exist inside the workspace") from exc
-    if Path(name).is_absolute() or not path.is_relative_to(root):
-        raise ValueError("Input must stay inside the workspace")
-    if path.suffix.lower() != ".obj" or not path.is_file():
-        raise ValueError("Input must be an OBJ file")
-    with path.open("rb") as stream:
-        data = stream.read(MAX_BYTES + 1)
+    path, data = workspace_bytes(root, name, {".obj"}, "OBJ")
     if not 0 < len(data) <= MAX_BYTES:
         raise ValueError("OBJ must be at most 64 MiB")
     try:
@@ -564,17 +539,8 @@ def inspect_obj(workspace, name):
 
 def inspect_usd(workspace, name):
     root = Path(workspace).expanduser().resolve(strict=True)
-    try:
-        path = (root / name).resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        raise ValueError("USD does not exist inside the workspace") from exc
-    if Path(name).is_absolute() or not path.is_relative_to(root):
-        raise ValueError("Input must stay inside the workspace")
+    path, data = workspace_bytes(root, name, {".usd", ".usda", ".usdc"}, "USD")
     suffix = path.suffix.lower()
-    if suffix not in {".usd", ".usda", ".usdc"} or not path.is_file():
-        raise ValueError("Input must be a USD file")
-    with path.open("rb") as stream:
-        data = stream.read(MAX_BYTES + 1)
     if not 0 < len(data) <= MAX_BYTES:
         raise ValueError("USD must be at most 64 MiB")
     binary = data.startswith(b"PXR-USDC")
@@ -612,21 +578,19 @@ def inspect_usd(workspace, name):
             "format": "usd", "binary": binary, "asset_references": references}
 
 
-def workspace_bytes(workspace, name, suffix, label):
-    root = Path(workspace).expanduser().resolve(strict=True)
+def workspace_bytes(workspace, name, suffixes, label, limit=MAX_BYTES):
+    """A workspace file's path and bytes; refuses escapes, other types and changes while read."""
+    root = Path(workspace).expanduser()
     try:
-        path = (root / name).resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        raise ValueError(f"{label} does not exist inside the workspace") from exc
-    if Path(name).is_absolute() or not path.is_relative_to(root):
-        raise ValueError("Input must stay inside the workspace")
-    if path.suffix.lower() != suffix or not path.is_file():
-        raise ValueError(f"Input must be a {label} file")
-    with path.open("rb") as stream:
-        data = stream.read(MAX_BYTES + 1)
-    if not 0 < len(data) <= MAX_BYTES:
-        raise ValueError(f"{label} must be at most 64 MiB")
-    return path, data
+        path = core_workspace.input_file(root, name, suffixes)
+    except ValueError:
+        if isinstance(name, str) and not (root / name).exists():
+            raise ValueError(f"{label} does not exist inside the workspace") from None
+        raise ValueError(f"Input must be a {label} file inside the workspace "
+                         f"({', '.join(sorted(suffixes))})") from None
+    if not 0 < path.stat().st_size <= limit:
+        raise ValueError(f"{label} must be at most {limit // (1024 * 1024)} MiB")
+    return path, core_files.read_bytes(path, limit)
 
 
 def receipt(path, data, kind, **fields):
@@ -635,7 +599,7 @@ def receipt(path, data, kind, **fields):
 
 
 def inspect_stl(workspace, name):
-    path, data = workspace_bytes(workspace, name, ".stl", "STL")
+    path, data = workspace_bytes(workspace, name, {".stl"}, "STL")
     count = struct.unpack_from("<I", data, 80)[0] if len(data) >= 84 else -1
     binary = len(data) == 84 + 50 * count
     if binary:
@@ -657,7 +621,7 @@ PLY_ENCODINGS = {"ascii", "binary_little_endian", "binary_big_endian"}
 
 
 def inspect_ply(workspace, name):
-    path, data = workspace_bytes(workspace, name, ".ply", "PLY")
+    path, data = workspace_bytes(workspace, name, {".ply"}, "PLY")
     end = data.find(b"end_header", 0, 65536)
     try:
         lines = data[:max(end, 0)].decode("ascii").splitlines()
@@ -679,7 +643,7 @@ def inspect_ply(workspace, name):
 
 
 def inspect_abc(workspace, name):
-    path, data = workspace_bytes(workspace, name, ".abc", "Alembic")
+    path, data = workspace_bytes(workspace, name, {".abc"}, "Alembic")
     if not data.startswith(b"Ogawa"):
         raise ValueError("Expected an Ogawa Alembic file")
     return receipt(path, data, "abc")

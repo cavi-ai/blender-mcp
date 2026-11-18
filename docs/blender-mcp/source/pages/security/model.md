@@ -25,7 +25,8 @@ the file and use only trusted local clients.
 - Output files are reserved exclusively before Blender writes them. Existing
   files are never overwritten.
 - Imports must resolve inside the workspace. Sources are copied to a private
-  temporary file and their SHA-256 is checked before Blender reads them.
+  temporary file and their SHA-256 is checked before Blender reads them. A
+  source that changes while it is read is refused.
 - Imported textures must be packed or resolve inside the workspace, depending on
   the format.
 - There is no arbitrary Python tool.

@@ -140,7 +140,7 @@ class OpenSurfaceTests(unittest.TestCase):
             bridge.reset_mock()
             for args in ({'action': 'save', 'expected_sha256': 'a' * 64},
                          {'action': 'open', 'names': ['Cube']}):
-                with self.assertRaisesRegex(ValueError, 'does not accept'):
+                with self.assertRaisesRegex(ValueError, 'Not valid for action'):
                     asyncio.run(server.asset_io(path='target.blend', **args))
             bridge.assert_not_called()
         self.assertNotIn('open_project', LEASE_FREE)

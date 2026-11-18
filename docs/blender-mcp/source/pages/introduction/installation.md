@@ -31,8 +31,8 @@ workspace (`~/Documents/CaviBlender` by default), then select that file at launc
 cavi-blender-mcp runtime start --project working-copy.blend
 ```
 
-New sessions use `blender` from `PATH`, `CAVI_BLENDER_BIN`, or on macOS
-`/Applications/Blender.app`, with factory settings and no user preference changes.
+New sessions use `CAVI_BLENDER_BIN`, then on macOS `/Applications/Blender.app`,
+then `blender` from `PATH`, with factory settings and no user preference changes.
 An existing connected session may be reused; `--project` refuses to replace a
 different connected project. The bridge grants access to scene contents, so use
 it only with trusted local MCP clients and projects you intend to edit.

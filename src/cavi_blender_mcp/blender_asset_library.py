@@ -6,6 +6,8 @@ from pathlib import Path
 
 import bpy
 
+from . import core_workspace
+
 KINDS = {'objects': ('Object', 'OBJECT'), 'collections': ('Collection', 'COLLECTION'),
          'materials': ('Material', 'MATERIAL'), 'node_groups': ('NodeTree', 'NODETREE')}
 
@@ -16,13 +18,10 @@ def digest(path):
 
 
 def source(workspace, name):
-    root = Path(workspace).resolve(strict=True)
-    if not isinstance(name, str) or Path(name).is_absolute():
-        raise ValueError('Library path must be relative to the workspace')
-    path = (root/name).resolve(strict=True)
-    if not path.is_relative_to(root) or path.suffix.lower() != '.blend' or not path.is_file():
-        raise ValueError('Library must be a workspace .blend file')
-    return path
+    try:
+        return core_workspace.input_file(workspace, name, {'.blend'})
+    except ValueError:
+        raise ValueError('Library must be a workspace .blend file') from None
 
 
 def catalog(path, kind):

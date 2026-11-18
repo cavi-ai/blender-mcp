@@ -68,19 +68,19 @@ class AAASurfaceTests(unittest.TestCase):
     def test_new_actions_refuse_foreign_parameters_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.mesh_edit("decimate_to", "R", target_faces=10), "does not accept"),
-            (server.mesh_edit("remesh_quad", "R"), "requires: target_faces"),
+            (server.mesh_edit("decimate_to", "R", target_faces=10), "Not valid for action"),
+            (server.mesh_edit("remesh_quad", "R"), "target_faces is required for action"),
             (server.mesh_edit("remesh_quad", "R", target_faces=99, preserve=["seams"]),
              "preserve accepts only"),
             (server.mesh_edit("decimate_to", "R", preserve=["sharp"]), "preserve accepts only"),
-            (server.mesh_edit("texel_density", "R"), "requires: target_px_per_m"),
-            (server.mesh_edit("collision", "R", steps=["merge"]), "does not accept: steps"),
-            (server.object_edit("rename", "R"), "requires: new_name"),
-            (server.object_edit("snap_to_grid", "R", new_name="x"), "does not accept"),
-            (server.object_edit("apply_transforms", "R", grid=1), "does not accept: grid"),
+            (server.mesh_edit("texel_density", "R"), "target_px_per_m is required for action"),
+            (server.mesh_edit("collision", "R", steps=["merge"]), "Not valid for action=\\w+:\\ssteps"),
+            (server.object_edit("rename", "R"), "new_name is required for action"),
+            (server.object_edit("snap_to_grid", "R", new_name="x"), "Not valid for action"),
+            (server.object_edit("apply_transforms", "R", grid=1), "Not valid for action=\\w+:\\sgrid"),
             (server.asset_io("export", "a.fbx", names=["R"],
                              bake_pair=server.BakePair(high=["H"], low=["R"])),
-             "does not accept: names"),
+             "Not valid for action=\\w+:\\snames"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)
@@ -138,7 +138,7 @@ class AAASurfaceTests(unittest.TestCase):
         for arguments in ({}, {"hide_viewport": True, "grid": 1}):
             with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, "visibility"):
                 asyncio.run(server.object_edit("visibility", "Prop", lease_id="L", **arguments))
-        with self.assertRaisesRegex(ValueError, "does not accept"):
+        with self.assertRaisesRegex(ValueError, "Not valid for action"):
             asyncio.run(server.object_edit("rename", "Prop", new_name="P", hide_render=True))
 
     def test_object_actions_map_to_bridge_operations(self):

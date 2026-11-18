@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import anyio
-from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES
+from cavi_mcp_core.server import DESTRUCTIVE, READ_ONLY, WRITES, need, reject_foreign
 from cavi_mcp_core.server import Server as CoreServer
 from mcp.server.mcpserver import Image
 from mcp.server.mcpserver.exceptions import UnexpectedToolError
@@ -48,7 +48,6 @@ from .contracts import (
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .panorama import panorama
-from .paths import environment_path
 from .rig_models import (
     ClipTiming,
     Constraint,
@@ -61,6 +60,7 @@ from .rig_models import (
     VertexWeights,
 )
 from .rig_models import Name as RigName
+from .runtime import workspace_root
 from .scene_models import (
     CameraRay,
     CameraSpec,
@@ -249,14 +249,8 @@ def png_result(path):
 def pick(action, values, required=(), defaults=None):
     """Keep only parameters used by the action; refuse unrelated or missing ones."""
     defaults = defaults or {}
-    allowed = set(required) | set(defaults)
-    extra = sorted(k for k, v in values.items() if v is not None and k not in allowed)
-    if extra:
-        raise ValueError(f"{action} does not accept: {', '.join(extra)}")
-    missing = [k for k in required if values.get(k) is None]
-    if missing:
-        raise ValueError(f"{action} requires: {', '.join(missing)}")
-    chosen = {k: values[k] for k in required}
+    reject_foreign(action, values, set(required) | set(defaults))
+    chosen = {k: need(values.get(k), k, action) for k in required}
     chosen.update({k: defaults[k] if values.get(k) is None else values[k] for k in defaults})
     return chosen
 
@@ -1252,12 +1246,12 @@ async def asset_io(
         values.pop('assembly')
     if action == "generate" and prompt is not None:
         params = pick(action, values, ["prompt"], {"quality": None})
-        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
+        workspace = workspace_root()
         return await run(panorama, workspace, params["prompt"], path, params["quality"])
     if action == "generate":
         params = pick(action, values, ["image"], {"resolution": None, "quality": None, "views": None,
                                                   "guide": None})
-        workspace = environment_path("CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender").resolve()
+        workspace = workspace_root()
         return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"],
                          params["views"], params["guide"])
     if action == "import":

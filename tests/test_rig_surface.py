@@ -44,7 +44,7 @@ class RigSurfaceTests(unittest.TestCase):
         self.assertEqual(first, "edit_armature")
         self.assertEqual((moved["bones"][0]["parent"], moved["names"]), ("Spine", ["Tail"]))
         self.assertEqual((removed["bones"], removed["names"]), ([], ["Tail"]))
-        for arguments, message in (({}, "needs bones or names"), ({"location": (0, 0, 0)}, "does not accept")):
+        for arguments, message in (({}, "needs bones or names"), ({"location": (0, 0, 0)}, "Not valid for action")):
             with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(server.rig_edit("edit_bones", "Rig", lease_id="L", **arguments))
 
@@ -71,13 +71,13 @@ class RigSurfaceTests(unittest.TestCase):
     def test_action_parameters_are_checked_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.rig_edit("create", "Rig"), "requires: bones"),
-            (server.rig_edit("bind", "Rig"), "requires: names"),
+            (server.rig_edit("create", "Rig"), "bones is required for action"),
+            (server.rig_edit("bind", "Rig"), "names is required for action"),
             (server.rig_edit("bind", "Rig", names=["A"], location=(0, 0, 0)),
-             "does not accept: location"),
-            (server.rig_edit("weights", "Mesh", names=["A"]), "does not accept: names"),
+             "Not valid for action=\\w+:\\slocation"),
+            (server.rig_edit("weights", "Mesh", names=["A"]), "Not valid for action=\\w+:\\snames"),
             (server.rig_edit("weights", "Mesh", bones=[server.BoneSpec(
-                name="Root", head=(0, 0, 0), tail=(0, 0, 1))]), "does not accept: bones"),
+                name="Root", head=(0, 0, 0), tail=(0, 0, 1))]), "Not valid for action=\\w+:\\sbones"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)
@@ -110,14 +110,14 @@ class RigSurfaceTests(unittest.TestCase):
         pose = server.PoseSpec(bone="Spine", rotation_degrees=(0, 0, 45))
         keyframe = server.KeyframeSpec(frame=1, poses=[pose])
         for coroutine, message in [
-            (server.rig_edit("pose", "Rig"), "requires: poses"),
+            (server.rig_edit("pose", "Rig"), "poses is required for action"),
             (server.rig_edit("keyframe", "Rig", keyframes=[keyframe]),
-             "requires: action_name"),
+             "action_name is required for action"),
             (server.rig_edit("keyframe", "Rig", action_name="Walk"),
-             "requires: keyframes"),
-            (server.rig_edit("clear_pose", "Rig", poses=[pose]), "does not accept: poses"),
+             "keyframes is required for action"),
+            (server.rig_edit("clear_pose", "Rig", poses=[pose]), "Not valid for action=\\w+:\\sposes"),
             (server.rig_edit("pose", "Rig", poses=[pose], keyframes=[keyframe]),
-             "does not accept: keyframes"),
+             "Not valid for action=\\w+:\\skeyframes"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)
@@ -143,7 +143,7 @@ class RigSurfaceTests(unittest.TestCase):
         for operation, params in self.inner(calls):
             self.assertEqual(operation, "export_asset")
             self.assertTrue(params["animations"])
-        with self.assertRaisesRegex(ValueError, "does not accept: animations"):
+        with self.assertRaisesRegex(ValueError, "Not valid for action=\\w+:\\sanimations"):
             asyncio.run(server.asset_io("export", "p.fbx", lease_id="L",
                                         bake_pair=server.BakePair(high=["H"], low=["L"]),
                                         animations=True))
@@ -182,14 +182,14 @@ class RigSurfaceTests(unittest.TestCase):
         calls = self.capture()
         for coroutine, message in [
             (server.rig_edit("retarget", "Target", source_action="Walk",
-                             action_name="Retargeted"), "requires: source"),
+                             action_name="Retargeted"), "source is required for action"),
             (server.rig_edit("retarget", "Target", source="Source",
-                             action_name="Retargeted"), "requires: source_action"),
+                             action_name="Retargeted"), "source_action is required for action"),
             (server.rig_edit("retarget", "Target", source="Source",
-                             source_action="Walk"), "requires: action_name"),
+                             source_action="Walk"), "action_name is required for action"),
             (server.rig_edit("retarget", "Target", source="Source",
                              source_action="Walk", action_name="Retargeted",
-                             keyframes=[]), "does not accept: keyframes"),
+                             keyframes=[]), "Not valid for action=\\w+:\\skeyframes"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)
@@ -236,12 +236,12 @@ class RigSurfaceTests(unittest.TestCase):
         calls = self.capture()
         for coroutine, message in [
             (server.rig_edit("rename_action", "Rig", action_name="Walk"),
-             "requires: new_name"),
-            (server.rig_edit("delete_action", "Rig"), "requires: action_name"),
+             "new_name is required for action"),
+            (server.rig_edit("delete_action", "Rig"), "action_name is required for action"),
             (server.rig_edit("nla_remove", "Rig", strip_name="Walk",
                              track_name="Track", action_name="Walk"),
-             "does not accept: action_name"),
-            (server.rig_edit("set_action", "Rig", poses=[]), "does not accept: poses"),
+             "Not valid for action=\\w+:\\saction_name"),
+            (server.rig_edit("set_action", "Rig", poses=[]), "Not valid for action=\\w+:\\sposes"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)

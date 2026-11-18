@@ -71,17 +71,17 @@ class ComposeSurfaceTests(unittest.TestCase):
     def test_composition_parameters_are_checked_before_the_bridge(self):
         calls = self.capture()
         for coroutine, message in [
-            (server.mesh_edit("boolean", "A", operation="union"), "requires: operand"),
-            (server.mesh_edit("boolean", "A", operand="B"), "requires: operation"),
-            (server.mesh_edit("join", "A"), "requires: names"),
+            (server.mesh_edit("boolean", "A", operation="union"), "operand is required for action"),
+            (server.mesh_edit("boolean", "A", operand="B"), "operation is required for action"),
+            (server.mesh_edit("join", "A"), "names is required for action"),
             (server.mesh_edit("join", "A", names=["B"], by="materials"),
-             "does not accept: by"),
-            (server.mesh_edit("mirror", "A", thickness=.1), "does not accept: thickness"),
-            (server.mesh_edit("array", "A", count=2), "requires: offset"),
-            (server.mesh_edit("solidify", "A"), "requires: thickness"),
-            (server.object_edit("duplicate", "A"), "requires: new_name"),
-            (server.object_edit("unparent", "A", new_name="B"), "does not accept: new_name"),
-            (server.object_edit("move_to_collection", "A"), "requires: new_name"),
+             "Not valid for action=\\w+:\\sby"),
+            (server.mesh_edit("mirror", "A", thickness=.1), "Not valid for action=\\w+:\\sthickness"),
+            (server.mesh_edit("array", "A", count=2), "offset is required for action"),
+            (server.mesh_edit("solidify", "A"), "thickness is required for action"),
+            (server.object_edit("duplicate", "A"), "new_name is required for action"),
+            (server.object_edit("unparent", "A", new_name="B"), "Not valid for action=\\w+:\\snew_name"),
+            (server.object_edit("move_to_collection", "A"), "new_name is required for action"),
         ]:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(coroutine)

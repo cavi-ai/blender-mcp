@@ -2,6 +2,7 @@
 import re
 from pathlib import Path
 
+from . import core_workspace
 from .blender_errors import preflight
 from .source_identity import LoadedSource
 
@@ -23,13 +24,10 @@ def open_project(p, workspace, loaded_source, identity):
         raw = p.get('path')
         if not isinstance(raw, str) or not raw.strip():
             raise ValueError('Open requires an existing workspace .blend path')
-        root = Path(workspace).resolve()
         try:
-            target = (root / raw).resolve(strict=True)
-        except (OSError, ValueError) as exc:
-            raise ValueError('Open requires an existing workspace .blend file') from exc
-        if not target.is_relative_to(root) or target.suffix.lower() != '.blend' or not target.is_file():
-            raise ValueError('Open requires an existing workspace .blend file')
+            target = core_workspace.input_file(workspace, raw, {'.blend'})
+        except ValueError:
+            raise ValueError('Open requires an existing workspace .blend file') from None
         expected = p.get('expected_sha256')
         if expected is not None and (not isinstance(expected, str) or not re.fullmatch('[0-9a-f]{64}', expected)):
             raise ValueError('expected_sha256 must be a lowercase SHA-256')

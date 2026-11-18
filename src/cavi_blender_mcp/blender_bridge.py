@@ -17,6 +17,7 @@ from pathlib import Path
 import bpy
 from mathutils import Euler, Quaternion, Vector
 
+from . import core_workspace
 from .blender_errors import PreflightRejected
 from .bridge_contract import expected_bridge
 from .geometry import validate_mesh
@@ -44,7 +45,7 @@ from .operations import (
     MAX_TIMEOUT,
     SOURCE_PRESERVING,
 )
-from .paths import destination, environment_path
+from .paths import destination
 from .presets import AXIS_PRESETS
 
 _server = None
@@ -1723,8 +1724,8 @@ def register():
             raise RuntimeError(
                 "Another Blender bridge owns this connection; choose CAVI_BLENDER_CONNECTION explicitly"
             )
-    _workspace = environment_path(
-        "CAVI_BLENDER_WORKSPACE", Path.home() / "Documents/CaviBlender"
+    _workspace = core_workspace.root(
+        "CAVI_BLENDER_WORKSPACE", default=Path.home() / "Documents/CaviBlender"
     )
     _workspace.mkdir(parents=True, exist_ok=True)
     _workspace = _workspace.resolve()
