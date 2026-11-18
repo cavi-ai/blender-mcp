@@ -11,7 +11,12 @@ FIELDS={
     'BEVEL':('width','width_pct','segments','profile','offset_type','limit_method','angle_limit','use_clamp_overlap','harden_normals'),
     'DECIMATE':('ratio','decimate_type','iterations','angle_limit','use_collapse_triangulate'),
     'SUBSURF':('levels','render_levels','subdivision_type','show_only_control_edges','use_limit_surface'),
-    'REMESH':('mode','voxel_size','octree_depth','scale','adaptivity','use_smooth_shade','use_remove_disconnected','threshold')}
+    'REMESH':('mode','voxel_size','octree_depth','scale','adaptivity','use_smooth_shade','use_remove_disconnected','threshold'),
+    'WELD':('merge_threshold','mode','loose_edges'),
+    'DISPLACE':('strength','mid_level','direction','space'),
+    'SHRINKWRAP':('offset','wrap_method','wrap_mode','use_negative_direction','use_positive_direction'),
+    'WEIGHTED_NORMAL':('weight','mode','thresh','keep_sharp','use_face_influence'),
+    'DATA_TRANSFER':('mix_factor','mix_mode','loop_mapping','use_object_transform')}
 
 
 def control_schema(modifier):

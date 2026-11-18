@@ -718,7 +718,31 @@ def add_modifier(p):
     if len(value.modifiers) >= MAX_MODIFIERS:
         raise ValueError(f"Modifier stack is limited to {MAX_MODIFIERS}; apply or remove some")
     amount = vector([p["amount"]], 1)[0]
-    if p["kind"] == "bevel" and 0 < amount <= 100:
+    from .modifier_settings import AMOUNTS
+
+    kinds = {"weld": "WELD", "displace": "DISPLACE", "shrinkwrap": "SHRINKWRAP",
+             "weighted_normal": "WEIGHTED_NORMAL", "data_transfer": "DATA_TRANSFER"}
+    native = kinds.get(p["kind"])
+    source = None
+    if (p.get("operand") is not None) != (native in ("SHRINKWRAP", "DATA_TRANSFER")):
+        raise ValueError("operand is required for shrinkwrap and data_transfer and refused otherwise")
+    if p.get("operand") is not None:
+        source = obj(p["operand"], mesh=True)
+        if source == value:
+            raise ValueError("Modifier source must be another mesh")
+    if native is not None and AMOUNTS[native][1](amount):
+        modifier = value.modifiers.new(native.replace("_", " ").title(), native)
+        setattr(modifier, AMOUNTS[native][0], int(amount) if native == "WEIGHTED_NORMAL" else amount)
+        if native == "SHRINKWRAP":
+            modifier.target = source
+        elif native == "DATA_TRANSFER":
+            modifier.object = source
+            modifier.use_loop_data = True
+            modifier.data_types_loops = {"CUSTOM_NORMAL"}
+            modifier.loop_mapping = "POLYINTERP_NEAREST"
+        elif native == "WEIGHTED_NORMAL":
+            modifier.keep_sharp = True
+    elif p["kind"] == "bevel" and 0 < amount <= 100:
         depsgraph = bpy.context.evaluated_depsgraph_get()
         evaluated = value.evaluated_get(depsgraph).data
         segments = 3

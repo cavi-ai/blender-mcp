@@ -20,7 +20,8 @@ ranges, enum identifiers and read-only state. Scene-wide pages omit this detaile
 schema. `mesh_edit(action="modifier_update",
 name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
 in place: bevel width, collapse-decimation ratio, subdivision viewport/render
-levels, or voxel size. Other controls and stack order are retained. Percentage
+levels, voxel size, weld distance, displace strength, shrinkwrap offset, weighted
+normal weight or data transfer mix. Other controls and stack order are retained. Percentage
 bevels and other remesh/decimation modes require their own native controls and are
 rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
 size 0.005–1, matching modifier creation.
@@ -36,7 +37,8 @@ Native subdivision ranges apply to this form, subject to the geometry budget;
 the shorthand's fixed level range does not apply. Angle properties use radians.
 
 Updates check a conservative 500,000-triangle bound across bevel, decimate,
-subdivision and armature stacks before evaluating changed geometry. Unknown
+subdivision, armature, weld, displace, shrinkwrap, weighted normal and data
+transfer stacks before evaluating changed geometry. Unknown
 topology-changing modifiers cannot establish that bound. Remesh updates require
 a standalone modifier on a shape-key-free working mesh and at most two million
 bounding voxel or octree cells. Visibility-only disabling does not enlarge a

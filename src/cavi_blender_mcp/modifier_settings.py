@@ -9,9 +9,20 @@ def controls(values,schema):
     return native_controls(values,schema,subject='modifier',parameter='modifier_settings')
 
 
+# Kinds whose amount drives one control and whose evaluation never adds faces.
+AMOUNTS={
+    'WELD':('merge_threshold',lambda a:0<a<=1),
+    'DISPLACE':('strength',lambda a:a!=0 and abs(a)<=100),
+    'SHRINKWRAP':('offset',lambda a:abs(a)<=100),
+    'WEIGHTED_NORMAL':('weight',lambda a:a==int(a) and 1<=a<=100),
+    'DATA_TRANSFER':('mix_factor',lambda a:0<a<=1)}
+
+
 def update(kind,settings,amount):
     if type(amount) not in (float,int) or not math.isfinite(amount):
         raise ValueError('Modifier amount must be finite')
+    if kind in AMOUNTS and AMOUNTS[kind][1](amount):
+        return {AMOUNTS[kind][0]:int(amount) if kind=='WEIGHTED_NORMAL' else amount}
     if kind=='BEVEL' and settings.get('offset_type')!='PERCENT' and 0<amount<=100:
         return {'width':amount}
     if kind=='DECIMATE' and settings.get('decimate_type')=='COLLAPSE' and 0<amount<=1:
@@ -36,7 +47,7 @@ def stack_bound(face_sizes,stack):
         elif kind=='SUBSURF':
             levels=max(row['levels'],row['render_levels'])
             if levels>0:triangles*=6*4**(levels-1)
-        elif kind not in ('ARMATURE','DECIMATE'):
+        elif kind not in ('ARMATURE','DECIMATE',*AMOUNTS):
             raise ValueError('Cannot bound this modifier stack; use a bounded working mesh')
         if triangles>500000:
             raise ValueError('Modifier stack exceeds the conservative 500000-triangle budget')

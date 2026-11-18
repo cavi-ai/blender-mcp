@@ -109,6 +109,27 @@ edit("create_mesh", name="Dense", vertices=grid, faces=triangles)
 edit("add_modifier", name="Dense", kind="subdivision", amount=2)
 refused("add_modifier", "Bevel would exceed", name="Dense", kind="bevel", amount=0.001)
 
+# Topology-preserving kinds; shrinkwrap and data transfer read another mesh.
+edit("create_primitive", name="Shell", kind="icosphere")
+edit("create_primitive", name="Core", kind="sphere")
+for kind, amount, operand in (("weld", .001, None), ("displace", .05, None),
+                              ("weighted_normal", 50, None), ("shrinkwrap", .01, "Core"),
+                              ("data_transfer", 1, "Core")):
+    edit("add_modifier", name="Shell", kind=kind, amount=amount,
+         **({"operand": operand} if operand else {}))
+shell = bpy.data.objects["Shell"]
+assert [m.type for m in shell.modifiers] == [
+    "WELD", "DISPLACE", "WEIGHTED_NORMAL", "SHRINKWRAP", "DATA_TRANSFER"], shell.modifiers[:]
+assert shell.modifiers[3].target.name == "Core" and shell.modifiers[4].object.name == "Core"
+wrapped = shell.evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+assert all(.98 < v.co.length < 1.02 for v in wrapped.vertices)
+edit("update_modifier", name="Shell", modifier_name="Displace", amount=.1)
+assert math.isclose(shell.modifiers["Displace"].strength, .1, rel_tol=1e-6)
+refused("add_modifier", "operand", name="Shell", kind="shrinkwrap", amount=0)
+refused("add_modifier", "operand", name="Shell", kind="weld", amount=.001, operand="Core")
+refused("add_modifier", "Invalid modifier or amount", name="Shell", kind="weighted_normal",
+        amount=0.5)
+
 # Preview needs no lease; orthographic, clip range and isolation of non-mesh renderables.
 text = bpy.data.objects.new("Label", bpy.data.curves.new("Label", "FONT"))
 curve = bpy.data.objects.new("Path", bpy.data.curves.new("Path", "CURVE"))

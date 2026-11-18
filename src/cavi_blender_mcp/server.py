@@ -776,9 +776,11 @@ async def mesh_edit(
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
                     "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "assign_faces", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
-    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh"] | None, Field(description="Modifier")] = None,
+    kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh", "weld", "displace", "shrinkwrap",
+                            "weighted_normal", "data_transfer"] | None, Field(description="Modifier")] = None,
     amount: Annotated[Number | None, Field(
-        description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1]; "
+        description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1], weld distance (0,1], "
+        "displace strength, shrinkwrap offset, weighted_normal weight 1-100, data_transfer mix (0,1]; "
         "move_vertices radius (m).")] = None,
     apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
     angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="Unwrap split angle")] = None,
@@ -802,7 +804,7 @@ async def mesh_edit(
     max_hull_vertices: Annotated[StrictInt | None, Field(ge=4, le=255, description="Hull vertices")] = None,
     merge_distance: Annotated[Number | None, Field(ge=0, le=1, description="Merge radius (scene units)")] = None,
     steps: Annotated[list[Step] | None, Field(max_length=5, description="Ordered cleanup")] = None,
-    operand: Annotated[str | None, Field(description="Operand mesh")] = None,
+    operand: Annotated[str | None, Field(description="Boolean operand; shrinkwrap/data_transfer source mesh")] = None,
     operation: Annotated[Literal["union", "difference", "intersect"] | None, Field(description="Boolean operation")] = None,
     solver: Annotated[Literal["exact", "fast"] | None, Field(description="Boolean solver")] = None,
     keep_operand: Annotated[StrictBool | None, Field(description="Keep boolean operand")] = None,
@@ -917,7 +919,9 @@ async def mesh_edit(
         return await run(call, 'extrude_faces', lease_id=lease_id, name=name, **params)
     if action == "modifier":
         operation = "add_modifier"
-        params = pick(action, values, ["kind", "amount"], {"apply": False})
+        params = pick(action, values, ["kind", "amount"], {"apply": False, "operand": None})
+        if (operand is not None) != (kind in ("shrinkwrap", "data_transfer")):
+            raise ValueError("operand is required for shrinkwrap and data_transfer and refused otherwise")
     elif action == "unwrap":
         operation = "unwrap_mesh"
         params = pick(action, values, (), {"angle_limit_degrees": 66, "island_margin": None,

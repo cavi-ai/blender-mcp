@@ -12,7 +12,7 @@ on the same object without applying transforms or changing scene references.
 
 | Action | Use |
 | --- | --- |
-| `modifier` | Add bevel, decimate, subdivision or voxel remesh; `apply` bakes it |
+| `modifier` | Add bevel, decimate, subdivision, voxel remesh, weld, displace, weighted normal, or shrinkwrap and data transfer (custom normals) from an `operand` mesh; `apply` bakes it |
 | `extrude_faces` | Extrude exact source-face regions by a local-space vector |
 | `unwrap` | Smart UV Project and island packing |
 | `unwrap_faces` | Pack selected source faces into an explicit UV rectangle |

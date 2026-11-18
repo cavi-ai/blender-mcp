@@ -30,6 +30,21 @@ class AAASurfaceTests(unittest.TestCase):
     def inner(self, calls):
         return [(params["operation"], params["params"]) for _, params in calls]
 
+    def test_modifier_kinds_take_amount_and_source_operand(self):
+        calls = self.capture({"name": "R", "type": "MESH", "location": [0, 0, 0],
+                              "rotation_degrees": [0, 0, 0], "rotation_mode": "XYZ",
+                              "scale": [1, 1, 1], "dimensions": [1, 1, 1], "parent": None,
+                              "children": [], "collections": [], "modifiers": []})
+        for kind, amount, operand in (("weld", .001, None), ("displace", .1, None),
+                                      ("weighted_normal", 50, None), ("shrinkwrap", 0, "Body"),
+                                      ("data_transfer", 1, "Proxy")):
+            asyncio.run(server.mcp.call_tool("mesh_edit", {
+                "action": "modifier", "name": "R", "kind": kind, "amount": amount,
+                "lease_id": "L", **({"operand": operand} if operand else {})}))
+        self.assertEqual([(p["kind"], p["amount"], p["operand"]) for _, p in self.inner(calls)],
+                         [("weld", .001, None), ("displace", .1, None), ("weighted_normal", 50, None),
+                          ("shrinkwrap", 0, "Body"), ("data_transfer", 1, "Proxy")])
+
     def test_mesh_actions_translate_preserve_and_defaults(self):
         calls = self.capture()
         asyncio.run(server.mesh_edit("decimate_to", "R", target_triangles=100, lease_id="L"))
