@@ -329,7 +329,7 @@ reported joints and morph combinations visually before accepting the asset.
 
 ## rig_edit
 
-Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
+Mutating. Actions: `create`, `edit_bones`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
 `nla_push`, `nla_edit`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
 
@@ -337,8 +337,8 @@ Mutating. Actions: `create`, `bind`, `weights`, `pose`, `keyframe`,
 | --- | --- |
 | `name` | New armature, armature or skinned mesh |
 | `location` | `create` |
-| `bones` | `create`; 1–128 bone specifications |
-| `names` | `bind`; 1–16 mesh names |
+| `bones` | `create`; 1–128 bone specifications. `edit_bones`: bones to add or replace |
+| `names` | `bind`; 1–16 mesh names. `edit_bones`: 1–16 bones to remove |
 | `max_influences`, `clean_threshold`, `normalize` | `weights` |
 | `poses` | `pose`; 1–128 poses |
 | `keyframes`, `action_name` | `keyframe`; 1–32 frames |

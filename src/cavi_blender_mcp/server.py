@@ -440,14 +440,14 @@ async def compare_rig_motion(
 
 @mcp.tool(annotations=MUTATING)
 async def rig_edit(
-    action: Annotated[Literal["create", "bind", "weights", "pose", "keyframe", "clear_pose",
+    action: Annotated[Literal["create", "edit_bones", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
                     "assign_weights", "transfer_weights", "bake", "contact_lock"], Field(description="Action")],
     name: Annotated[str, Field(description="Skin mesh/rig/clip; create: new")],
     location: Annotated[Vector3 | None, Field(description="World position")] = None,
-    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="Bones")] = None,
-    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; optional for bake/contact_lock")] = None,
+    bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="Bones; edit_bones: add or replace")] = None,
+    names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; edit_bones: remove; optional for bake/contact_lock")] = None,
     max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="Influences")] = None,
     clean_threshold: Annotated[Number | None, Field(ge=0, le=1, description="Weight cutoff")] = None,
     normalize: Annotated[StrictBool | None, Field(description="Normalize")] = None,
@@ -532,6 +532,12 @@ async def rig_edit(
     elif action == "create":
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
+        params["bones"] = [bone.model_dump() for bone in params["bones"]]
+    elif action == "edit_bones":
+        operation = "edit_armature"
+        params = pick(action, values, (), {"bones": [], "names": []})
+        if not params["bones"] and not params["names"]:
+            raise ValueError("edit_bones needs bones or names")
         params["bones"] = [bone.model_dump() for bone in params["bones"]]
     elif action == "bind":
         operation = "bind_skin"

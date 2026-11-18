@@ -35,6 +35,19 @@ class RigSurfaceTests(unittest.TestCase):
             "connect": False, "deform": True, "roll_degrees": 0}])
         self.assertEqual(calls[0][0], "owned_edit")
 
+    def test_edit_bones_maps_moves_and_removals(self):
+        calls = self.capture()
+        bone = server.BoneSpec(name="Neck", head=(0, 0, 1), tail=(0, 0, 2), parent="Spine")
+        asyncio.run(server.rig_edit("edit_bones", "Rig", bones=[bone], names=["Tail"], lease_id="L"))
+        asyncio.run(server.rig_edit("edit_bones", "Rig", names=["Tail"], lease_id="L"))
+        (first, moved), (_, removed) = self.inner(calls)
+        self.assertEqual(first, "edit_armature")
+        self.assertEqual((moved["bones"][0]["parent"], moved["names"]), ("Spine", ["Tail"]))
+        self.assertEqual((removed["bones"], removed["names"]), ([], ["Tail"]))
+        for arguments, message in (({}, "needs bones or names"), ({"location": (0, 0, 0)}, "does not accept")):
+            with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, message):
+                asyncio.run(server.rig_edit("edit_bones", "Rig", lease_id="L", **arguments))
+
     def test_bind_and_weight_defaults(self):
         calls = self.capture()
         asyncio.run(server.rig_edit("bind", "Rig", names=["A", "B"], lease_id="L"))

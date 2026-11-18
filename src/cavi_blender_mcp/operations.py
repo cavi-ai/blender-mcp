@@ -98,6 +98,7 @@ OPERATIONS = frozenset(
         "unparent_object",
         "move_to_collection",
         "create_armature",
+        "edit_armature",
         "bind_skin",
         "repair_weights",
         "add_constraint",
