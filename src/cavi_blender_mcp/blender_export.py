@@ -11,6 +11,7 @@ import numpy as np
 
 from .blender_bridge import obj, output_file, selected, with_empties
 from .blender_export_uv import promote
+from .blender_rigging import MAX_ARMATURE_BONES
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base
 from .presets import AXIS_PRESETS, USD_AXES
 
@@ -400,8 +401,9 @@ def export_asset(p):
                     raise ValueError('Bake bone constraints before exporting baked animation')
         actions = []
         for rig in armatures:
-            if len(rig.data.bones) > 128:
-                raise ValueError("Animated exports are limited to 128 bones per armature")
+            if len(rig.data.bones) > MAX_ARMATURE_BONES:
+                raise ValueError(
+                    f"Animated exports are limited to {MAX_ARMATURE_BONES} bones per armature")
             linked = actions_for(rig)
             if len(linked) > 32:
                 raise ValueError("Animated exports are limited to 32 actions")

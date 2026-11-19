@@ -14,7 +14,7 @@ adds its lines under Unreleased and never edits a version.
 ### Changed
 
 - Requires MCP Core 0.1.4; Dependabot updates `uv.lock`.
-- Armatures hold up to 512 bones for editing and posing; a call still takes up to 128 bone specifications. `bind` counts deform bones toward its 64-bone limit.
+- Armatures hold up to 512 bones for editing, posing and animated export; a call still takes up to 128 bone specifications. `bind` counts deform bones toward its 64-bone limit.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
 - Argument errors use MCP Core's wording: `Not valid for action=<action>: <names>` and `<name> is required for action=<action>`.
 - The server refuses a relative `CAVI_BLENDER_WORKSPACE`; `runtime start` expands `~` in `CAVI_BLENDER_BIN` and prefers the macOS app over `PATH`.

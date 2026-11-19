@@ -50,6 +50,9 @@ use.
    deform bones.
 5. Pose and key the generated controls (for example `torso` or `hand_ik.L`) with
    `pose` and `keyframe`.
+6. Export the skinned mesh with `asset_io` `export`, `animations: true`, to FBX
+   or GLB. The file holds every rig bone, and the deform bones carry the motion
+   of the keyed controls.
 
 ## Facial performance layers
 
