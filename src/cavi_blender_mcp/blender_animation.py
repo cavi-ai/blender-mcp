@@ -6,8 +6,8 @@ import bpy
 from mathutils import Euler
 
 from .blender_bridge import info, obj, vector
+from .blender_rigging import MAX_ARMATURE_BONES
 
-MAX_BONES = 512
 MAX_POSES = 128
 MAX_FRAMES = 32
 MAX_TOTAL_POSES = 2048
@@ -23,8 +23,8 @@ def rig(params):
     value = obj(params.get("name"))
     if value.type != "ARMATURE":
         raise ValueError("name must be an armature object")
-    if len(value.data.bones) > MAX_BONES:
-        raise ValueError(f"Pose authoring is limited to {MAX_BONES} bones")
+    if len(value.data.bones) > MAX_ARMATURE_BONES:
+        raise ValueError(f"Pose authoring is limited to {MAX_ARMATURE_BONES} bones")
     return value
 
 

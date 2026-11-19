@@ -32,7 +32,7 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 ## Rigify rigs
 
 Rigify is Blender's bundled auto-rigging add-on. The session enables it on first
-use.
+use; in your own Blender it then shows as enabled in Preferences > Add-ons.
 
 1. Call `metarig` with `name`, a `template` and the character mesh as `source`.
    `basic_human` has 29 bones and no fingers or face; `human` adds fingers and

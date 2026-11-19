@@ -3,10 +3,12 @@
 Blender MCP {{PRODUCT_VERSION}} gives MCP clients typed, bounded control of a
 Blender session. It has two parts:
 
-- **The MCP server**: a stdio server that publishes 14 tools and forwards
+- **The MCP server**: a stdio server that publishes 20 tools and forwards
   requests to the bridge.
 - **The Blender bridge**: a Python module loaded inside Blender that executes
-  operations on Blender's main thread.
+  operations on Blender's main thread. `cavi-blender-mcp runtime start` loads it
+  into a background Blender; the Blender extension loads it into your own
+  interactive Blender.
 
 Everything runs on the local machine. The bridge binds only to IPv4 loopback and
 requires a random session token. There is no arbitrary Python tool, telemetry,
@@ -23,14 +25,20 @@ external asset download or remote inference.
   QuadriFlow remeshing, lightmap packing, texel-density correction, collision
   hulls, cleanup, booleans, joins, splits, mirrors, arrays and shells.
 - **Materials**: PBR slot assignment with packed workspace textures, UV
-  transforms, alpha modes and material QA.
-- **Baking**: normal and ambient-occlusion maps into a new workspace PNG.
+  transforms, alpha modes, shader node authoring and material QA.
+- **Baking**: normal, ambient-occlusion, curvature, lightmap, vertex color,
+  vertex ORM and shader socket maps into a new workspace PNG; shader socket
+  maps can also write EXR.
 - **Assets**: bounded GLB, FBX, OBJ, USD, STL, PLY and Alembic import; static,
   skinned and animated FBX, GLB and USD export; static OBJ, STL, PLY and Alembic
   export; Unity, Unreal and Godot axis presets; LOD groups,
   collision naming and bake pairs.
-- **Rigging**: armature creation, automatic skin binding, weight repair, pose
-  authoring, action creation, animation QA and retargeting.
+- **Rigging**: armature creation, Rigify metarigs and generated rigs, automatic
+  skin binding, weight repair, pose authoring, action creation, animation QA,
+  motion comparison, skin clearance and retargeting.
+- **Scenes**: cameras, lights, world lighting and final renders.
+- **Procedural assets**: Geometry Nodes inputs and static bakes, and appending
+  objects, collections, materials and node groups from workspace `.blend` files.
 - **Previews**: isolated PNG previews, lit Eevee previews and multi-view review
   sheets.
 - **Levels**: bounded terrain meshes, bulk placement and surface snapping.
