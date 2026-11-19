@@ -304,6 +304,9 @@ class RigEditResult(ObjectFields):
     armature: str | None = None
     bone_count: int | None = None
     bones: list[Record] | None = None
+    template: str | None = None
+    metarig: str | None = None
+    deform_bones: list[str] | None = None
     bindings: int | None = None
     meshes: list[Record] | None = None
     action: str | None = None

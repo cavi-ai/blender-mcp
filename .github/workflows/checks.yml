@@ -135,6 +135,9 @@ jobs:
       - name: Check saved project switching
         if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_open_project_mcp.py --blender "$(command -v blender)"
+      - name: Check Rigify rig generation
+        if: needs.merged-pr.outputs.tested != 'true'
+        run: blender --background --factory-startup --python-exit-code 1 --python tests/blender_rigify.py
       - name: Check face-region modeling
         if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_mesh_regions_mcp.py --blender "$(command -v blender)"

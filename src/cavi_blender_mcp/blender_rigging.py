@@ -9,6 +9,7 @@ from .blender_bridge import info, new_name, number, obj, selected, vector
 from .blender_rig import weights
 
 MAX_BONES = 128
+MAX_ARMATURE_BONES = 512
 MAX_BIND_BONES = 64
 MAX_BIND_MESHES = 16
 MAX_BIND_VERTICES = 50000
@@ -52,8 +53,8 @@ def bones(params, base=None):
         parsed.append({"name": name, "head": head, "tail": tail, "parent": parent,
                        "connect": connect, "deform": deform, "roll_degrees": roll})
     by_name = {**(base or {}), **{spec["name"]: spec for spec in parsed}}
-    if len(by_name) > MAX_BONES:
-        raise ValueError(f"Armatures are limited to {MAX_BONES} bones")
+    if len(by_name) > MAX_ARMATURE_BONES:
+        raise ValueError(f"Armatures are limited to {MAX_ARMATURE_BONES} bones")
     for spec in by_name.values():
         parent = spec["parent"]
         if parent is not None and parent not in by_name:
@@ -229,8 +230,9 @@ def bind_skin(p):
     if (not isinstance(names, list) or not 1 <= len(names) <= MAX_BIND_MESHES
             or len(set(names)) != len(names)):
         raise ValueError(f"names must list 1 to {MAX_BIND_MESHES} unique meshes")
-    if len(rig.data.bones) > MAX_BIND_BONES:
-        raise ValueError(f"Binding is limited to {MAX_BIND_BONES} bones")
+    # Automatic weights solve one heat field per deform bone; control bones cost nothing.
+    if sum(bone.use_deform for bone in rig.data.bones) > MAX_BIND_BONES:
+        raise ValueError(f"Binding is limited to {MAX_BIND_BONES} deform bones")
     meshes = [obj(name, mesh=True) for name in names]
     if any(mesh is rig for mesh in meshes):
         raise ValueError("The armature cannot bind itself")

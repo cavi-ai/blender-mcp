@@ -48,6 +48,24 @@ class RigSurfaceTests(unittest.TestCase):
             with self.subTest(arguments=arguments), self.assertRaisesRegex(ValueError, message):
                 asyncio.run(server.rig_edit("edit_bones", "Rig", lease_id="L", **arguments))
 
+    def test_rigify_metarig_and_generation_map_to_owned_operations(self):
+        calls = self.capture()
+        asyncio.run(server.rig_edit("metarig", "Meta", template="basic_human", source="Body", lease_id="L"))
+        asyncio.run(server.rig_edit("generate_rig", "Meta", new_name="BodyRig", lease_id="L"))
+        self.assertEqual(self.inner(calls), [
+            ("add_metarig", {"lease_id": "L", "name": "Meta", "template": "basic_human",
+                             "location": None, "source": "Body"}),
+            ("generate_rigify", {"lease_id": "L", "name": "Meta", "new_name": "BodyRig"})])
+        for action, arguments, message in (
+                ("metarig", {}, "template is required for action=metarig"),
+                ("metarig", {"template": "human", "source": "Body", "location": (0, 0, 0)},
+                 "location or source, not both"),
+                ("generate_rig", {}, "new_name is required for action=generate_rig"),
+                ("generate_rig", {"new_name": "R", "template": "human"}, "Not valid for action=generate_rig: template"),
+                ("create", {"template": "human"}, "Not valid for action=create")):
+            with self.subTest(action=action, arguments=arguments), self.assertRaisesRegex(ValueError, message):
+                asyncio.run(server.rig_edit(action, "Meta", lease_id="L", **arguments))
+
     def test_bind_and_weight_defaults(self):
         calls = self.capture()
         asyncio.run(server.rig_edit("bind", "Rig", names=["A", "B"], lease_id="L"))
