@@ -15,9 +15,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import bpy
+from cavi_mcp_core import workspace as core_workspace
 from mathutils import Euler, Quaternion, Vector
 
-from . import core_workspace
 from .blender_errors import PreflightRejected
 from .bridge_contract import expected_bridge
 from .geometry import validate_mesh

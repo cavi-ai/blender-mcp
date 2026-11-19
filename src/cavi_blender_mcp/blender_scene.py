@@ -8,9 +8,9 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import bpy
+from cavi_mcp_core import workspace as core_workspace
 from mathutils import Vector
 
-from . import core_workspace
 from .blender_bridge import info, obj, output_file, vector
 from .blender_images import packed_snapshot
 from .blender_rigging import label
