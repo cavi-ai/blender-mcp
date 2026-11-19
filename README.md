@@ -16,7 +16,7 @@ You decide what to change and judge the result; your assistant operates Blender 
 
 ## Install
 
-You need [uv](https://docs.astral.sh/uv/), **Python 3.15+** and **Blender** on macOS or Linux. Native checks target Blender 5.2.3 LTS.
+You need [uv](https://docs.astral.sh/uv/), **Python 3.15+** and **Blender** on macOS or Linux. Native checks target Blender 5.3.0.
 
 To use the current source, clone this repository and install its environment:
 
