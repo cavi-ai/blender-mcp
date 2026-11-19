@@ -98,6 +98,7 @@ class UVLayout(VariantResult):
     complete: bool
     objects: list[dict[str, Any]]
     not_checked: list[str]
+    dirty: bool | None = None
     unique_tile_ready: bool | None = None
     texture_resolution: list[int] | None = None
     overlap: dict[str, Any] | None = None
@@ -142,6 +143,12 @@ class Ownership(VariantResult):
     restarted: bool | None = None
 
 
+class BakePairFile(Result):
+    path: str
+    bytes: int
+    objects: list[str]
+
+
 class AssetResult(Result):
     sha256: str | None = None
     project_id: str | None = None
@@ -152,6 +159,8 @@ class AssetResult(Result):
     objects: list[str | dict[str, Any]] | None = None
     axis: str | None = None
     pairs: int | None = None
+    low: BakePairFile | None = None
+    high: BakePairFile | None = None
     textures: int | list[dict[str, Any]] | None = None
 
 

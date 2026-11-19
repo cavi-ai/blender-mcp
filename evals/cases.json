@@ -558,7 +558,8 @@
     "required": [
       "/overlap/triangle_pairs",
       "/padding/requested_pixels",
-      "/unique_tile_ready"
+      "/unique_tile_ready",
+      "/dirty"
     ]
   },
   {
@@ -3445,6 +3446,7 @@
         "AAA_Pair_high"
       ]
     },
+    "required": ["/low/path", "/low/bytes", "/high/path", "/high/bytes"],
     "files": [
       "pair_low.fbx",
       "pair_high.fbx"
