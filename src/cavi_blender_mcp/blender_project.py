@@ -2,7 +2,8 @@
 import re
 from pathlib import Path
 
-from . import core_workspace
+from cavi_mcp_core import workspace as core_workspace
+
 from .blender_errors import preflight
 from .source_identity import LoadedSource
 

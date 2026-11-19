@@ -5,8 +5,7 @@ import json
 from pathlib import Path
 
 import bpy
-
-from . import core_workspace
+from cavi_mcp_core import workspace as core_workspace
 
 KINDS = {'objects': ('Object', 'OBJECT'), 'collections': ('Collection', 'COLLECTION'),
          'materials': ('Material', 'MATERIAL'), 'node_groups': ('NodeTree', 'NODETREE')}

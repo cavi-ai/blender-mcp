@@ -8,7 +8,9 @@ import re
 import struct
 from pathlib import Path
 
-from . import core_files, core_workspace
+from cavi_mcp_core import files as core_files
+from cavi_mcp_core import workspace as core_workspace
+
 from .blender_errors import PreflightRejected
 
 MAX_BYTES = 64 * 1024 * 1024
