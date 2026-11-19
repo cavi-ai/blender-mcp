@@ -90,6 +90,8 @@ adds its lines under Unreleased and never edits a version.
 - Inspect per-tile dimensions and packed file hashes, with a source-manifest fingerprint.
 - Retain mixed tile sizes, native precision and logical tile paths through material-library handoff.
 - Reuse unchanged sets and refresh changed tiles without altering other image users.
+- The server type, failure contract and schema compaction come from `cavi-mcp-core`; unknown tool names return a `TOOL_NOT_FOUND` failure.
+- TripoSG image-to-3D providers on Apple Silicon, CUDA or CPU, and through mlx-agent as `triposg-mlx`, selected with `CAVI_GENERATION_PROVIDER`.
 
 ## 0.55.0 - 2026-11-04
 
@@ -208,16 +210,6 @@ adds its lines under Unreleased and never edits a version.
 - Bake fractional frames and driven shape weights onto independent export copies.
 - Preserve subframe GLB keys and export a sampled active FBX take with import identity metadata.
 - Accept bounded FBX shape-key imports.
-
-## Unreleased
-
-### Changed
-
-- The server type, failure contract and schema compaction come from `cavi-mcp-core`; unknown tool names return a `TOOL_NOT_FOUND` failure.
-
-### Added
-
-- TripoSG image-to-3D providers on Apple Silicon, CUDA or CPU, and through mlx-agent as `triposg-mlx`, selected with `CAVI_GENERATION_PROVIDER`.
 
 ## 0.36.0 - 2026-11-03
 
