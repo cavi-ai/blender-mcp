@@ -2,9 +2,9 @@
 
 **Big ideas. Still editable.**
 
-[![PyPI version](https://img.shields.io/pypi/v/cavi-blender-mcp)](https://pypi.org/project/cavi-blender-mcp/) [![PyPI weekly downloads](https://img.shields.io/pypi/dw/cavi-blender-mcp?label=PyPI%20downloads%2Fweek)](https://pypistats.org/packages/cavi-blender-mcp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 ![A mole sculpts an armored llama balancing on red roller skates](media/blender-mcp-hero.png)
+
+[![PyPI version](https://img.shields.io/pypi/v/cavi-blender-mcp)](https://pypi.org/project/cavi-blender-mcp/) [![PyPI weekly downloads](https://img.shields.io/pypi/dw/cavi-blender-mcp?label=PyPI%20downloads%2Fweek)](https://pypistats.org/packages/cavi-blender-mcp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Give your assistant a direction, review the next pass and keep working in Blender. Cavi Blender MCP connects scene inspection, mesh and material edits, previews and export in one local workflow.
 
