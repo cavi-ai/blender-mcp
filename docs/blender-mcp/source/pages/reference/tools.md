@@ -231,7 +231,8 @@ raw static or skinned source UVs. Object ranges and selected UV layer indices
 identify every reported triangle. Selection, geometry, UVs and edit ownership
 are unchanged. Each object also reports its full source triangle count and used
 material slots with per-slot counts, allowing callers to check texture-set
-coverage. UV readiness applies only to the selected faces.
+coverage. UV readiness applies only to the selected faces. The `dirty` field reports
+whether the current Blender file has unsaved changes.
 
 Triangle intersections use polygon clipping, including subpixel overlaps;
 shared edges have zero overlap area. `overlap.pairwise_area_pixels2` sums areas
@@ -589,6 +590,8 @@ writes deform bones only (FBX and USD keep their non-deform ancestors).
 false and is unavailable for other formats or bake pairs.
 `uv_layer` exports a named map as UV0 for FBX/GLB or `st` for USD, including
 evaluated assemblies. `uv_maps` records the mapping; source data is restored.
+Bake-pair exports return `low` and `high` records with each output path, byte
+count, and exported object names.
 `generate` takes `quality` `fast` or `default` (the default) with the
 `triposg-mlx` and `trellis2-mlx` providers. With `trellis2-mlx` it also takes
 `views` (up to five more workspace images) and `guide` (a workspace GLB that

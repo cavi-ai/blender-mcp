@@ -48,3 +48,24 @@ class CoverageSurfaceTests(unittest.TestCase):
                 UVLayout.model_validate(record)
             for schema in schemas:
                 self.assertFalse(Draft202012Validator(schema).is_valid(record))
+
+    def test_uv_dirty_and_bake_pair_result_fields_are_advertised(self):
+        from cavi_blender_mcp.contracts import AssetResult
+
+        schemas = [UVLayout.model_json_schema(), compact_schema(UVLayout.model_json_schema(), output=True)]
+        for schema in schemas:
+            self.assertIn('dirty', schema['properties'])
+            Draft202012Validator(schema).validate({'scope': 'source_uv_one_texture_set', 'complete': True,
+                'objects': [], 'not_checked': [], 'unique_tile_ready': True, 'texture_resolution': [1024, 1024],
+                'overlap': {}, 'padding': {}, 'dirty': True})
+            Draft202012Validator(schema).validate({'scope': 'source_uv_udim_coverage', 'complete': True,
+                'objects': [], 'not_checked': [], 'coverage': {}, 'dirty': False})
+        asset = AssetResult.model_json_schema()
+        for role in ('low', 'high'):
+            self.assertIn(role, asset['properties'])
+        record = {'axis': 'preset', 'pairs': 1, 'low': {'path': 'low.fbx', 'bytes': 8, 'objects': ['A_low']},
+                  'high': {'path': 'high.fbx', 'bytes': 10, 'objects': ['A_high']}}
+        Draft202012Validator(asset).validate(record)
+        self.assertEqual(AssetResult.model_validate(record).model_dump(mode='json'), record)
+        bad = {**record, 'low': {'path': 'low.fbx', 'bytes': 'bad', 'objects': ['A_low']}}
+        self.assertFalse(Draft202012Validator(asset).is_valid(bad))
