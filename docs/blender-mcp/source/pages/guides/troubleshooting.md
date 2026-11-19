@@ -11,13 +11,13 @@ whether it executed.
 
 ## The bridge is not running
 
-`Blender bridge is not running; start Blender with the bridge` means no private
-connection file was found.
+``Blender bridge is not running; run `cavi-blender-mcp runtime start` `` means no
+private connection file was found. With `removed a stale connection file`, the
+file named a Blender process that has exited, and the server removed it.
 
 - Run `cavi-blender-mcp runtime start`, or from a source checkout start Blender
   with `scripts/start_bridge.py`.
 - Confirm the MCP server and Blender use the same `CAVI_BLENDER_CONNECTION`.
-- If a stale pid was found, the connection file is removed automatically.
 
 ## Connection failed or outcome is unknown
 

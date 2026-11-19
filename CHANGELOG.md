@@ -15,6 +15,7 @@ adds its lines under Unreleased and never edits a version.
 - The server refuses a relative `CAVI_BLENDER_WORKSPACE`; `runtime start` expands `~` in `CAVI_BLENDER_BIN` and prefers the macOS app over `PATH`.
 - The Blender bridge resolves workspace inputs and reads import and texture sources with byte-identical copies of MCP Core's `workspace` and `files` modules; a source that changes while read is refused.
 - Native checks and CI target Blender 5.3.0 and Node.js 26.
+- An offline bridge error names `cavi-blender-mcp runtime start`.
 
 ### Fixed
 
