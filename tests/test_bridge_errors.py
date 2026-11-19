@@ -150,6 +150,14 @@ class BridgeErrorTests(unittest.TestCase):
         self.assertFalse(config.exists())
 
     @unittest.skipIf(os.name == "nt", "POSIX pid check")
+    def test_offline_bridge_names_the_start_command(self):
+        missing = Path(self.folder) / "missing.json"
+        for config in (missing, connection(self.folder, port=1, pid=dead_pid())):
+            with self.subTest(config=config.name), self.assertRaisesRegex(
+                    ConnectionError, "run `cavi-blender-mcp runtime start`"):
+                BridgeClient(config).call("scene_info")
+
+    @unittest.skipIf(os.name == "nt", "POSIX pid check")
     def test_runtime_start_replaces_stale_connection(self):
         from types import SimpleNamespace
 

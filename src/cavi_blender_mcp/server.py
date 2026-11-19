@@ -80,9 +80,11 @@ mcp = BlenderServer(
     "cavi-blender-mcp",
     package="cavi-blender-mcp",
     instructions=(
-        "Inspect the scene before editing. Saves and exports refuse existing paths. "
-        "Paths are relative to the Blender session workspace. Claim session_control ownership "
-        "before edits and pass lease_id. Never retry an uncertain mutation."
+        "Call scene_info first; if the bridge is not running, `cavi-blender-mcp runtime start` "
+        "launches Blender with it. Before edits, call session_control inspect, claim its "
+        "project_id and pass lease_id. Paths are relative to the Blender session workspace; "
+        "saves and exports refuse existing paths. Check edits with render_preview or "
+        "review_sheet. Never retry an uncertain mutation; follow next_action."
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
