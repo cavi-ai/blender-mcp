@@ -9,6 +9,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Added
 
+- `cavi-blender-mcp extension install` installs and enables a Blender extension that starts the bridge in your own interactive Blender, with your preferences and add-ons; `extension build` writes the archive for Install from Disk. The extension loads the installed server package, so its bridge build identity matches the server.
 - `rig_edit` `metarig` adds a Rigify `basic_human`, `human` or `basic_quadruped` metarig fitted to a `source` mesh; `generate_rig` generates a named rig from it with Blender's bundled Rigify and lists its deform bones.
 
 ### Changed

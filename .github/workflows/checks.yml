@@ -132,6 +132,11 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a npm run eval:core
+      - name: Check the extension in interactive Blender
+        if: needs.merged-pr.outputs.tested != 'true'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a uv run --locked python tests/native_extension_mcp.py --blender "$(command -v blender)"
       - name: Check saved project switching
         if: needs.merged-pr.outputs.tested != 'true'
         run: uv run --locked python tests/native_open_project_mcp.py --blender "$(command -v blender)"

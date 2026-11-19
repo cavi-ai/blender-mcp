@@ -21,6 +21,14 @@ def workspace_root():
                                default=Path.home() / "Documents/CaviBlender")
 
 
+def blender_executable():
+    """Blender from ``CAVI_BLENDER_BIN``, the macOS app or ``PATH``."""
+    executable = apps.find_executable(BLENDER, "blender", "CAVI_BLENDER_BIN", None).path
+    if executable is None or not os.access(executable, os.X_OK):
+        raise FileNotFoundError("Blender is unavailable; set CAVI_BLENDER_BIN to its executable")
+    return str(executable)
+
+
 def start_runtime(project=None, background=False):
     owned = bool(os.environ.get(process_launch.OWNER))
     if owned and not background:
@@ -45,10 +53,7 @@ def start_runtime(project=None, background=False):
                 "workspace": scene.get("workspace"), "file": scene.get("file"),
                 "version": scene.get("version"), "bridge": scene.get("bridge"),
                 "object_count": scene.get("total", len(scene.get("objects", [])))}
-    executable = apps.find_executable(BLENDER, "blender", "CAVI_BLENDER_BIN", None).path
-    if executable is None or not os.access(executable, os.X_OK):
-        raise FileNotFoundError("Blender is unavailable; set CAVI_BLENDER_BIN to its executable")
-    executable = str(executable)
+    executable = blender_executable()
     connection = client.config.expanduser().resolve()
     connection.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     workspace.mkdir(parents=True, exist_ok=True)

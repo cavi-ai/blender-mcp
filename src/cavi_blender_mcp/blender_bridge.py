@@ -1744,6 +1744,11 @@ def register():
     bpy.app.timers.register(pump, persistent=True)
 
 
+def serving_workspace():
+    """The bridge workspace while the listener runs, else None."""
+    return _workspace if _server is not None else None
+
+
 def unregister():
     global _server
     if _server is not None:

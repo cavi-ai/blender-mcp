@@ -7,6 +7,8 @@ cavi-blender-mcp runtime start [--project PATH] [--background]
 cavi-blender-mcp runtime status
 cavi-blender-mcp runtime restart --lease-id LEASE
 cavi-blender-mcp runtime open --project PATH --lease-id LEASE [--expected-sha256 HASH]
+cavi-blender-mcp extension install
+cavi-blender-mcp extension build [--output FOLDER]
 ```
 
 | Command | Result |
@@ -17,9 +19,16 @@ cavi-blender-mcp runtime open --project PATH --lease-id LEASE [--expected-sha256
 | `runtime status` | Reports connection, pid, generation, version, file, workspace, object count, dirty state and background mode |
 | `runtime restart --lease-id LEASE` | Replaces the bridge listener and credentials without restarting Blender |
 | `runtime open --project PATH --lease-id LEASE` | Opens a saved workspace `.blend` in the connected session, preserving its UI layout |
+| `extension install` | Installs and enables the bridge extension in Blender's `user_default` repository |
+| `extension build --output FOLDER` | Writes `cavi_blender_mcp-<version>.zip` for Install from Disk; refuses an existing archive |
 
 `--background` applies only to `start`; `--expected-sha256` applies only to `open`.
+`--output` applies only to `extension build` and defaults to the current folder.
 Commands print JSON and exit nonzero on failure.
+
+The extension starts the bridge in every interactive Blender session and never
+in background runs. It loads the installed server package by path; see
+[Use your own Blender](../introduction/installation.md#use-your-own-blender).
 
 `open` requires a current lease and refuses unsaved edits or a current source
 that changed on disk. Save edits to a new `.blend` first. The optional hash
@@ -40,7 +49,7 @@ refresh an MCP client's cached tool catalog.
 
 | Variable | Purpose |
 | --- | --- |
-| `CAVI_BLENDER_BIN` | Blender executable for `runtime start` |
+| `CAVI_BLENDER_BIN` | Blender executable for `runtime start` and `extension install` |
 | `CAVI_BLENDER_CONNECTION` | Private connection file |
 | `CAVI_BLENDER_WORKSPACE` | Workspace for saves, exports, previews and imports |
 
