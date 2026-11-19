@@ -7,24 +7,18 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
-### Added
-
-- `asset_io` export `deform_only` with `animations` writes only deform bones: GLB keeps the deform bones, FBX and USD also their non-deform ancestors. A Rigify `basic_human` rig exports 35 bones to GLB and 56 to FBX or USD instead of 222.
-
-### Changed
-
-- The native evaluation's context floor is 28.
-
-## 0.59.0 - 2026-11-18
+## 0.59.0 - 2026-11-19
 
 ### Added
 
 - `cavi-blender-mcp extension install` installs and enables a Blender extension that starts the bridge in your own interactive Blender, with your preferences and add-ons; `extension build` writes the archive for Install from Disk. The extension loads the installed server package, so its bridge build identity matches the server.
 - `rig_edit` `metarig` adds a Rigify `basic_human`, `human` or `basic_quadruped` metarig fitted to a `source` mesh; `generate_rig` generates a named rig from it with Blender's bundled Rigify and lists its deform bones.
+- `asset_io` export `deform_only` with `animations` writes only deform bones: GLB keeps the deform bones, FBX and USD also their non-deform ancestors. A Rigify `basic_human` rig exports 35 bones to GLB and 56 to FBX or USD instead of 222.
 
 ### Changed
 
 - Requires MCP Core 0.1.5; Dependabot updates `uv.lock`.
+- The native evaluation's context floor is 28.
 - Armatures hold up to 512 bones for editing, posing and animated export; a call still takes up to 128 bone specifications. `bind` counts deform bones toward its 64-bone limit.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
 - Argument errors use MCP Core's wording: `Not valid for action=<action>: <names>` and `<name> is required for action=<action>`.
