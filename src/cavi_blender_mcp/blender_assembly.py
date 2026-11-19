@@ -1,6 +1,5 @@
 """Export current evaluated collection-instance mesh surfaces without editing source data."""
 
-import shutil
 from contextlib import contextmanager, nullcontext
 
 import bpy
@@ -94,16 +93,11 @@ def export(params):
     if type(triangulate) is not bool or (triangulate and suffix != '.fbx'):
         raise ValueError('triangulate must be boolean and applies only to FBX exports')
     with output_file(path_text, {'.glb', '.fbx'}) as path, evaluated_meshes(params['names']) as (objects, report):
-        directory = sidecars(path) if textures else None
-        try:
+        with sidecars(path) if textures else nullcontext() as directory:
             with prepared_images(objects, directory) if textures else nullcontext():
                 uv_result=write(path, objects, objects, preset, False, False, textures=textures,
                                 uv_layer=params.get('uv_layer'), triangulate=triangulate)
             files = texture_receipt(directory) if directory else []
-        except Exception:
-            if directory:
-                shutil.rmtree(directory, ignore_errors=True)
-            raise
         return {**report,**uv_result, 'path': str(path), 'bytes': path.stat().st_size,
                 'roots': params['names'], 'textures': files,
                 'scope': 'evaluated_static_assembly_current_frame',

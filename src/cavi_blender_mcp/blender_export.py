@@ -2,12 +2,12 @@
 
 import math
 import re
-import shutil
 from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 
 import bpy
 import numpy as np
+from cavi_mcp_core import workspace as core_workspace
 
 from .blender_bridge import obj, output_file, selected, with_empties
 from .blender_export_uv import promote
@@ -289,7 +289,6 @@ def prepared_images(objects, directory):
     # Exports read PNG copies; the scene's images are never saved, re-pathed or reloaded.
     copies, swapped = {}, []
     try:
-        directory.mkdir()
         for index, image in enumerate(used_images(objects)):
             safe = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(image.name).stem) or "image"
             copies[image] = sidecar_copy(image, directory / f"{index:02d}-{safe}.png")
@@ -304,11 +303,14 @@ def prepared_images(objects, directory):
             bpy.data.images.remove(copy)
 
 
+@contextmanager
 def sidecars(path):
+    """A new `<stem>.fbm` texture folder beside the export, removed again if the export fails."""
     directory = path.with_suffix(".fbm")
     if directory.exists():
         raise FileExistsError(f"Refusing to overwrite {directory.name}")
-    return directory
+    with core_workspace.new_output_directory(path.parent, directory.name) as created:
+        yield created
 
 
 def texture_receipt(directory):
@@ -421,18 +423,13 @@ def export_asset(p):
                    if any(modifier.type == "ARMATURE" for modifier in item.modifiers)]
         selected_objects = objects + armatures
         selection = with_empties(selected_objects) if empties else selected_objects
-        with output_file(p["path"], FORMATS) as path:
-            directory = sidecars(path) if textures else None
-            try:
-                with prepared_images(objects, directory) if textures else nullcontext():
-                    sampled = write(path, objects, selection, preset, False, empties,
-                          animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step,
-                          uv_layer=p.get('uv_layer'), triangulate=triangulate)
-                    files = texture_receipt(directory) if directory else []
-            except Exception:
-                if directory is not None:
-                    shutil.rmtree(directory, ignore_errors=True)
-                raise
+        with (output_file(p["path"], FORMATS) as path,
+              sidecars(path) if textures else nullcontext() as directory,
+              prepared_images(objects, directory) if textures else nullcontext()):
+            sampled = write(path, objects, selection, preset, False, empties,
+                  animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step,
+                  uv_layer=p.get('uv_layer'), triangulate=triangulate)
+            files = texture_receipt(directory) if directory else []
         return {**sampled, "path": str(path), "bytes": path.stat().st_size, "axis": preset,
                 "objects": [item.name for item in selected_objects],
                 "armatures": [item.name for item in armatures],
@@ -443,18 +440,13 @@ def export_asset(p):
                 "shape_key_animations": shape_key_animations,
                 "textures": files}
     selection = with_empties(objects) if empties else list(objects)
-    with output_file(p["path"], FORMATS) as path:
-        directory = sidecars(path) if textures else None
-        try:
-            with prepared_images(objects, directory) if textures else nullcontext():
-                sampled=write(path, meshes if instances else objects, selection, preset,
-                      instances, empties, textures=textures,uv_layer=p.get('uv_layer'),uv_objects=meshes,
-                      triangulate=triangulate)
-                files = texture_receipt(directory) if directory else []
-        except Exception:
-            if directory is not None:
-                shutil.rmtree(directory, ignore_errors=True)
-            raise
+    with (output_file(p["path"], FORMATS) as path,
+          sidecars(path) if textures else nullcontext() as directory,
+          prepared_images(objects, directory) if textures else nullcontext()):
+        sampled=write(path, meshes if instances else objects, selection, preset,
+              instances, empties, textures=textures,uv_layer=p.get('uv_layer'),uv_objects=meshes,
+              triangulate=triangulate)
+        files = texture_receipt(directory) if directory else []
     return {**sampled,"path": str(path), "bytes": path.stat().st_size, "axis": preset,
             "textures": files,
             "objects": [item.name for item in objects],

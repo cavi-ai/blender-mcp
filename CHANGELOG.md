@@ -17,6 +17,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- A failed texture-sidecar export removes its new `.fbm` folder through MCP Core, including one left without write permission, and names anything it cannot remove.
 - `asset_io` generate workers run through MCP Core's bounded process runner: a timeout stops the worker's whole process group, and a worker that exits is no longer held by a background child keeping its output open.
 
 ## 0.58.0 - 2026-11-18

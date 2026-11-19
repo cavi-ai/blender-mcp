@@ -85,6 +85,21 @@ try:
     assert not (root / "existing.fbx").exists() and not (root / "existing.usdc").exists()
     refused("model.glb", "FBX", names=["SidecarCube"], textures=True)
 
+    # A failed export removes its new texture folder, even one left without write permission.
+    from unittest.mock import patch
+
+    from cavi_blender_mcp import blender_export
+
+    def interrupted(path, *args, **kwargs):
+        partial = path.with_suffix(".fbm")
+        (partial / "partial.bin").write_bytes(b"x")
+        partial.chmod(0o500)
+        raise RuntimeError("export interrupted")
+
+    with patch.object(blender_export, "write", interrupted):
+        refused("interrupted.fbx", "export interrupted", names=["SidecarCube"], textures=True)
+    assert not (root / "interrupted.fbm").exists() and not (root / "interrupted.fbx").exists()
+
     try:
         bridge.dispatch("export_asset", {
             "names": ["SidecarCube"], "path": "unowned.fbx", "textures": True})
