@@ -45,7 +45,7 @@ Register the source environment's absolute `.venv/bin/cavi-blender-mcp` path as 
 }
 ```
 
-New sessions use factory settings without changing your usual preferences. An existing connected session may be reused; startup will not replace a different connected project. See [project startup](docs/blender-mcp/source/pages/guides/runtime-and-headless.md) and [installation](docs/blender-mcp/source/pages/introduction/installation.md) for options.
+New sessions use factory settings without changing your usual preferences. An existing connected session may be reused; startup will not replace a different connected project. To work in your own Blender instead, run `cavi-blender-mcp extension install` with Blender closed; see [Use your own Blender](docs/blender-mcp/source/pages/introduction/installation.md#use-your-own-blender). See [project startup](docs/blender-mcp/source/pages/guides/runtime-and-headless.md) and [installation](docs/blender-mcp/source/pages/introduction/installation.md) for options.
 
 For the published release, install `cavi-blender-mcp==0.58.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.58.0/docs/blender-mcp/source) for its supported features.
 

@@ -9,7 +9,7 @@ and the MCP server's environment when both processes read it.
 | --- | --- | --- |
 | `CAVI_BLENDER_WORKSPACE` | `~/Documents/CaviBlender` | Workspace for saves, exports, previews, imports and generated assets; an absolute path |
 | `CAVI_BLENDER_CONNECTION` | `~/.cavi/blender-mcp/connection.json` | Private connection file with loopback port, token and pid |
-| `CAVI_BLENDER_BIN` | The standard macOS app path, or Blender on `PATH` | Executable used by `runtime start` |
+| `CAVI_BLENDER_BIN` | The standard macOS app path, or Blender on `PATH` | Executable used by `runtime start` and `extension install` |
 
 The workspace is created when missing. Save, export, preview and bake paths must
 remain inside it, including through symbolic links. Existing files are refused

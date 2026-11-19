@@ -40,6 +40,43 @@ it only with trusted local MCP clients and projects you intend to edit.
 See [Run a dedicated session](../guides/runtime-and-headless.md) for project
 startup, `--background`, separate connections, status and restart.
 
+## Use your own Blender
+
+To work in your usual Blender, with your preferences and add-ons, close Blender
+and install the extension:
+
+```bash
+cavi-blender-mcp extension install
+```
+
+The command installs and enables the CAVI Blender MCP extension in Blender's
+`user_default` repository through Blender's own extension command. Close Blender
+first: a running Blender saves its preferences when it quits and would disable
+the extension again. To install from Blender instead, build the archive and
+choose **Edit > Preferences > Get Extensions > Install from Disk**:
+
+```bash
+cavi-blender-mcp extension build --output ~/Downloads
+```
+
+Every interactive Blender session then starts the bridge once its window opens.
+Background runs, such as command-line renders, never start it. `runtime start`
+and `scene_info` connect to that session instead of launching another Blender.
+The **CAVI** tab in the 3D Viewport sidebar shows whether the bridge is running,
+its workspace, and Start and Stop buttons. One session owns the connection at a
+time; a second Blender shows the refusal in that tab.
+
+The extension contains no bridge code. It loads the server package that built
+it, so `runtime status` reports a matching bridge. Restart Blender after
+upgrading the server, and run `extension install` again if the server moves.
+
+Your preferences, add-ons and auto-run setting for embedded scripts apply in
+this session, unlike `runtime start`, which uses factory settings with auto-run
+disabled. Blender opened from the Dock or a desktop launcher does not read shell
+variables, so the bridge uses the default workspace and connection unless
+Blender's environment sets `CAVI_BLENDER_WORKSPACE` and `CAVI_BLENDER_CONNECTION`
+to the same values as the MCP server's.
+
 ## Register the MCP server
 
 Register the stdio server in your client:

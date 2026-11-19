@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import subprocess
 
 from .bridge_contract import runtime_report
 from .client import BridgeClient
@@ -18,7 +19,14 @@ def main(argv=None):
     runtime.add_argument("--expected-sha256", help="Expected saved source hash (runtime open only)")
     runtime.add_argument("--background", action="store_true",
                          help="Start headless Blender (runtime start only)")
+    extension = commands.add_parser(
+        "extension", help="Build or install the Blender extension that starts the bridge")
+    extension.add_argument("action", choices=("build", "install"))
+    extension.add_argument("--output", default=".",
+                           help="Folder for the built archive (extension build only)")
     args = parser.parse_args(argv)
+    if args.command == "extension":
+        return extension_command(args)
     if args.project is not None and args.action not in {"start", "open"}:
         parser.error("--project is only supported by runtime start/open")
     if args.expected_sha256 is not None and args.action != 'open':
@@ -45,6 +53,21 @@ def main(argv=None):
             reason = "Reopen the dedicated Blender session with the updated start_bridge.py once"
         print(json.dumps({"connected": False, "reason": reason}))
         return 1
+
+
+def extension_command(args):
+    from . import extension
+
+    try:
+        if args.action == "build":
+            result = {"archive": str(extension.build(args.output)), "version": extension.version()}
+        else:
+            result = extension.install()
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(json.dumps({"reason": str(exc)}))
+        return 1
+    print(json.dumps(result))
+    return 0
 
 
 if __name__ == "__main__":

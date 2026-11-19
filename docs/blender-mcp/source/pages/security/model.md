@@ -18,6 +18,14 @@ on the same trusted machine and that scene contents are not hostile.
 A process that can read the connection file can issue bridge requests. Protect
 the file and use only trusted local clients.
 
+## Sessions
+
+- `runtime start` launches Blender with factory settings and auto-run of
+  embedded scripts disabled.
+- The extension runs the bridge in your own Blender, where your add-ons share
+  the process and your preferences decide whether opened files may run embedded
+  scripts.
+
 ## Filesystem
 
 - Saves, exports, previews, baked maps and generated assets must resolve inside

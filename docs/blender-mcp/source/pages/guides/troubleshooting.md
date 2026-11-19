@@ -16,6 +16,8 @@ connection file was found.
 
 - Run `cavi-blender-mcp runtime start`, or from a source checkout start Blender
   with `scripts/start_bridge.py`.
+- With the extension installed, open Blender, or press **Start Bridge** in the
+  3D Viewport sidebar's **CAVI** tab, which also shows why a start was refused.
 - Confirm the MCP server and Blender use the same `CAVI_BLENDER_CONNECTION`.
 - If a stale pid was found, the connection file is removed automatically.
 
