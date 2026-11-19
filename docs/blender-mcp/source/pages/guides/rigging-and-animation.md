@@ -52,7 +52,8 @@ use; in your own Blender it then shows as enabled in Preferences > Add-ons.
    `pose` and `keyframe`.
 6. Export the skinned mesh with `asset_io` `export`, `animations: true`, to FBX
    or GLB. The file holds every rig bone, and the deform bones carry the motion
-   of the keyed controls.
+   of the keyed controls. Add `deform_only: true` for a game engine: GLB then
+   holds the 35 deform bones, FBX 56.
 
 ## Facial performance layers
 

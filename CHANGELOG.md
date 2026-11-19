@@ -7,6 +7,14 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- `asset_io` export `deform_only` with `animations` writes only deform bones: GLB keeps the deform bones, FBX and USD also their non-deform ancestors. A Rigify `basic_human` rig exports 35 bones to GLB and 56 to FBX or USD instead of 222.
+
+### Changed
+
+- The native evaluation's context floor is 28.
+
 ## 0.59.0 - 2026-11-18
 
 ### Added

@@ -583,7 +583,8 @@ a lease. GLB import accepts an optional `expected_sha256` and rejects a source
 whose bytes differ from that hash before editing the scene. Import and static
 export also cover OBJ, STL, PLY and Alembic. Export supports animated
 FBX, GLB and USD output and FBX and USD
-texture sidecars with `textures=true`.
+texture sidecars with `textures=true`. With `animations=true`, `deform_only=true`
+writes deform bones only (FBX and USD keep their non-deform ancestors).
 `triangulate=true` triangulates temporary FBX exporter meshes; it defaults to
 false and is unavailable for other formats or bake pairs.
 `uv_layer` exports a named map as UV0 for FBX/GLB or `st` for USD, including

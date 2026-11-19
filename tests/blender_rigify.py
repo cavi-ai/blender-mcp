@@ -32,6 +32,34 @@ def refused(operation, message, **params):
     assert set(bpy.data.objects) == before, f"{operation} left objects behind"
 
 
+def usd_safe(name):
+    return name.replace("-", "_").replace(".", "_")
+
+
+def reimported(path):
+    """USD-safe bone names, DEF-spine travel and clip frames of an exported rig, imported and removed."""
+    before = set(bpy.data.objects)
+    importer = {".fbx": bpy.ops.import_scene.fbx, ".glb": bpy.ops.import_scene.gltf,
+                ".usdc": bpy.ops.wm.usd_import}[Path(path).suffix]
+    importer(filepath=str(bridge._workspace / path))
+    try:
+        armatures = [item for item in set(bpy.data.objects) - before if item.type == "ARMATURE"]
+        assert len(armatures) == 1, armatures
+        bones = {usd_safe(bone.name): bone.name for bone in armatures[0].data.bones}
+        names = set(bones)
+        assert "DEF_spine" in names, (path, sorted(names))
+        clip = armatures[0].animation_data.action
+        assert clip is not None, path
+        spine = []
+        for frame in clip.frame_range:
+            bpy.context.scene.frame_set(int(frame))
+            spine.append(armatures[0].matrix_world @ armatures[0].pose.bones[bones["DEF_spine"]].head)
+        return names, (spine[1] - spine[0]).length, tuple(clip.frame_range)
+    finally:
+        for item in set(bpy.data.objects) - before:
+            bpy.data.objects.remove(item, do_unlink=True)
+
+
 def bone_bounds(rig):
     points = [rig.matrix_world @ point for bone in rig.data.bones
               for point in (bone.head_local, bone.tail_local)]
@@ -89,19 +117,20 @@ try:
         animated = call("export_asset", names=["Body"], path=path, animations=True)
         assert animated["armatures"] == ["BodyRig"] and animated["skinned_meshes"] == ["Body"]
         assert [clip["name"] for clip in animated["animations"]] == ["Bob"], animated
-    before = set(bpy.data.objects)
-    bpy.ops.import_scene.fbx(filepath=str(bridge._workspace / "bob.fbx"))
-    imported = [item for item in set(bpy.data.objects) - before if item.type == "ARMATURE"]
-    assert len(imported) == 1 and len(imported[0].data.bones) == rig["bone_count"], imported
-    clip = imported[0].animation_data.action
-    assert clip is not None and tuple(clip.frame_range) == (1, 9), clip
-    spine = []
-    for frame in (1, 9):
-        bpy.context.scene.frame_set(frame)
-        spine.append(imported[0].matrix_world @ imported[0].pose.bones["DEF-spine"].head)
-    assert abs((spine[1] - spine[0]).length - 0.1) < 1e-3, spine
-    for item in set(bpy.data.objects) - before:
-        bpy.data.objects.remove(item, do_unlink=True)
+    bones, travel, frames = reimported("bob.fbx")
+    assert len(bones) == rig["bone_count"] and frames == (1, 9), (len(bones), frames)
+    assert abs(travel - 0.1) < 1e-3, travel
+
+    refused("export_asset", "animations", names=["Body"], path="static.fbx", deform_only=True)
+    lean = {}
+    for path in ("lean.fbx", "lean.glb", "lean.usdc"):
+        exported = call("export_asset", names=["Body"], path=path, animations=True, deform_only=True)
+        assert exported["armatures"] == ["BodyRig"], exported
+        bones, travel, _ = reimported(path)
+        assert {usd_safe(name) for name in rig["deform_bones"]} <= bones, (path, sorted(bones))
+        assert len(bones) < rig["bone_count"], (path, len(bones))
+        assert abs(travel - 0.1) < 1e-3, (path, travel)
+        lean[path] = len(bones)
 
     full = call("add_metarig", name="FullMeta", template="human", location=[3, 0, 0])
     assert full["bone_count"] > 128 and list(bpy.data.objects["FullMeta"].location) == [3, 0, 0]
@@ -109,6 +138,6 @@ try:
     assert edited["bone_count"] == full["bone_count"] - 1, edited
 
     print(json.dumps({"metarig_bones": meta["bone_count"], "rig_bones": rig["bone_count"],
-                      "deform_bones": len(rig["deform_bones"])}))
+                      "deform_bones": len(rig["deform_bones"]), "deform_only_export": lean}))
 finally:
     folder.cleanup()
