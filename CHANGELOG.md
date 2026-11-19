@@ -22,6 +22,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Fixed
 
+- `rig_edit` `constraint` accepts a constraint without `type` as `IK`, as its schema states; the schema no longer carries a discriminator mapping to definitions it does not contain.
 - `asset_io` generate workers run through MCP Core's bounded process runner: a timeout stops the worker's whole process group, and a worker that exits is no longer held by a background child keeping its output open.
 
 ## 0.58.0 - 2026-11-18

@@ -39,7 +39,8 @@ class LimitRotationSpec(ConstraintSpec):
     owner_space: Literal['WORLD', 'POSE', 'LOCAL', 'LOCAL_WITH_PARENT'] = 'LOCAL'
 
 
-Constraint = Annotated[IKConstraintSpec | LimitRotationSpec, Field(discriminator='type')]
+# Each branch's `type` literal keeps the union exclusive, and an omitted `type` takes its default.
+Constraint = IKConstraintSpec | LimitRotationSpec
 
 
 class VertexWeights(BaseModel):

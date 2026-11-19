@@ -65,7 +65,7 @@ try:
     assert rig["bone_count"] == len(generated.data.bones)
     assert rig["deform_bones"] == sorted(b.name for b in generated.data.bones if b.use_deform)
     assert rig["deform_bones"] and all(name.startswith("DEF-") for name in rig["deform_bones"])
-    assert rig["metarig"] == "BodyMeta"
+    assert rig["source"] == "BodyMeta"
     assert "BodyRig" in bpy.context.scene.objects
 
     bound = call("bind_skin", name="BodyRig", names=["Body"])

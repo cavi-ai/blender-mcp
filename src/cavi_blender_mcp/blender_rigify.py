@@ -72,7 +72,7 @@ def add_metarig(p):
         raise
     meta.location = position
     bpy.context.view_layer.update()
-    return {**info(meta), "template": template, "bone_count": len(data.bones),
+    return {**info(meta), "bone_count": len(data.bones),
             "bones": bone_rows(data)}
 
 
@@ -105,7 +105,7 @@ def generate_rigify(p):
         meta.data.rigify_rig_basename, meta.data.rigify_target_rig = settings
         raise RuntimeError(f"Rigify could not generate {meta.name}: {exc}") from exc
     deform = sorted(bone.name for bone in rig.data.bones if bone.use_deform)
-    return {**info(rig), "metarig": meta.name, "bone_count": len(rig.data.bones),
+    return {**info(rig), "source": meta.name, "bone_count": len(rig.data.bones),
             "deform_bones": deform}
 
 
