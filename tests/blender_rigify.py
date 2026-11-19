@@ -82,6 +82,27 @@ try:
     exported = call("export_asset", names=["Body"], path="body.fbx")
     assert exported["bytes"] > 0 and (bridge._workspace / "body.fbx").is_file()
 
+    call("keyframe_rig", name="BodyRig", action_name="Bob", keyframes=[
+        {"frame": 1, "poses": [{"bone": "torso", "location": [0, 0, 0]}]},
+        {"frame": 9, "poses": [{"bone": "torso", "location": [0, 0, 0.1]}]}])
+    for path in ("bob.fbx", "bob.glb"):
+        animated = call("export_asset", names=["Body"], path=path, animations=True)
+        assert animated["armatures"] == ["BodyRig"] and animated["skinned_meshes"] == ["Body"]
+        assert [clip["name"] for clip in animated["animations"]] == ["Bob"], animated
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=str(bridge._workspace / "bob.fbx"))
+    imported = [item for item in set(bpy.data.objects) - before if item.type == "ARMATURE"]
+    assert len(imported) == 1 and len(imported[0].data.bones) == rig["bone_count"], imported
+    clip = imported[0].animation_data.action
+    assert clip is not None and tuple(clip.frame_range) == (1, 9), clip
+    spine = []
+    for frame in (1, 9):
+        bpy.context.scene.frame_set(frame)
+        spine.append(imported[0].matrix_world @ imported[0].pose.bones["DEF-spine"].head)
+    assert abs((spine[1] - spine[0]).length - 0.1) < 1e-3, spine
+    for item in set(bpy.data.objects) - before:
+        bpy.data.objects.remove(item, do_unlink=True)
+
     full = call("add_metarig", name="FullMeta", template="human", location=[3, 0, 0])
     assert full["bone_count"] > 128 and list(bpy.data.objects["FullMeta"].location) == [3, 0, 0]
     edited = call("edit_armature", name="FullMeta", names=["breast.L"])

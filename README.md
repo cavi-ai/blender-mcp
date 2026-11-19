@@ -47,7 +47,7 @@ Register the source environment's absolute `.venv/bin/cavi-blender-mcp` path as 
 
 New sessions use factory settings without changing your usual preferences. An existing connected session may be reused; startup will not replace a different connected project. To work in your own Blender instead, run `cavi-blender-mcp extension install` with Blender closed; see [Use your own Blender](docs/blender-mcp/source/pages/introduction/installation.md#use-your-own-blender). See [project startup](docs/blender-mcp/source/pages/guides/runtime-and-headless.md) and [installation](docs/blender-mcp/source/pages/introduction/installation.md) for options.
 
-For the published release, install `cavi-blender-mcp==0.58.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.58.0/docs/blender-mcp/source) for its supported features.
+For the published release, install `cavi-blender-mcp==0.59.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.59.0/docs/blender-mcp/source) for its supported features.
 
 ## Keep developing the asset
 
@@ -57,6 +57,7 @@ For the published release, install `cavi-blender-mcp==0.58.0` with `uv tool inst
 | [Revise the shape](docs/blender-mcp/source/pages/guides/mesh-preparation.md) | Edit meshes, apply modifiers and organize parts. |
 | [Refine a procedural asset](docs/blender-mcp/source/pages/guides/procedural-assets.md) | Adjust exposed Geometry Nodes inputs while keeping the authored node graph. |
 | [Develop the surface](docs/blender-mcp/source/pages/guides/materials-and-uvs.md) | Assign PBR materials and textures, inspect UVs and bake maps. |
+| [Rig and animate](docs/blender-mcp/source/pages/guides/rigging-and-animation.md) | Build armatures or Rigify rigs, bind skins, key poses and export animated FBX or GLB. |
 | [Judge the next pass](docs/blender-mcp/source/pages/guides/previews-and-review.md) | Produce PNG previews, lit Eevee views and review sheets. |
 | [Take the work onward](docs/blender-mcp/source/pages/guides/asset-import-export.md) | Save the project or export supported GLB, FBX, OBJ, USD, STL, PLY and Alembic assets. |
 
@@ -72,7 +73,7 @@ The default workspace is `~/Documents/CaviBlender`. See [configuration](docs/ble
 
 ## Documentation and development
 
-The source setup above follows this repository. The published package installs **0.58.0**; use its [tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.58.0/docs/blender-mcp/source) for that release. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
+The source setup above follows this repository. The published package installs **0.59.0**; use its [tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.59.0/docs/blender-mcp/source) for that release. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
 
 The server publishes 20 tools over stdio. The [tool reference](docs/blender-mcp/source/pages/reference/tools.md) documents exact operations, bounds and response contracts.
 

@@ -54,7 +54,7 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | Limit | Value |
 | --- | --- |
 | Bone specifications per call | 128 |
-| Armature bones for editing and posing | 512 |
+| Armature bones for editing, posing and animated export | 512 |
 | Binding deform bones | 64 |
 | Binding meshes | 16 |
 | Binding vertices | 50,000 |
@@ -70,7 +70,7 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | Animated export meshes | 64 |
 | Animated export vertices | 100,000 |
 | Animated export triangles | 200,000 |
-| Animated export bones per armature | 128 |
+| Animated export bones per armature | 512 |
 | Animated export actions | 32 |
 | Animation QA samples | 2–32 |
 | Deformation vertex samples | 2,000,000 |
