@@ -7,6 +7,8 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+## 0.59.0 - 2026-11-18
+
 ### Added
 
 - `cavi-blender-mcp extension install` installs and enables a Blender extension that starts the bridge in your own interactive Blender, with your preferences and add-ons; `extension build` writes the archive for Install from Disk. The extension loads the installed server package, so its bridge build identity matches the server.
