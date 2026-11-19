@@ -53,8 +53,9 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 
 | Limit | Value |
 | --- | --- |
-| Armature bones | 128 |
-| Binding bones | 64 |
+| Bone specifications per call | 128 |
+| Armature bones for editing and posing | 512 |
+| Binding deform bones | 64 |
 | Binding meshes | 16 |
 | Binding vertices | 50,000 |
 | Weight repair vertices | 100,000 |

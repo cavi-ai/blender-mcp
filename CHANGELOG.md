@@ -7,9 +7,14 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- `rig_edit` `metarig` adds a Rigify `basic_human`, `human` or `basic_quadruped` metarig fitted to a `source` mesh; `generate_rig` generates a named rig from it with Blender's bundled Rigify and lists its deform bones.
+
 ### Changed
 
 - Requires MCP Core 0.1.5; Dependabot updates `uv.lock`.
+- Armatures hold up to 512 bones for editing and posing; a call still takes up to 128 bone specifications. `bind` counts deform bones toward its 64-bone limit.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
 - Argument errors use MCP Core's wording: `Not valid for action=<action>: <names>` and `<name> is required for action=<action>`.
 - The server refuses a relative `CAVI_BLENDER_WORKSPACE`; `runtime start` expands `~` in `CAVI_BLENDER_BIN` and prefers the macOS app over `PATH`.
@@ -21,6 +26,7 @@ adds its lines under Unreleased and never edits a version.
 ### Fixed
 
 - A failed texture-sidecar export removes its new `.fbm` folder through MCP Core, including one left without write permission, and names anything it cannot remove.
+- `rig_edit` `constraint` accepts a constraint without `type` as `IK`, as its schema states; the schema no longer carries a discriminator mapping to definitions it does not contain.
 - `asset_io` generate workers run through MCP Core's bounded process runner: a timeout stops the worker's whole process group, and a worker that exits is no longer held by a background child keeping its output open.
 
 ## 0.58.0 - 2026-11-18
