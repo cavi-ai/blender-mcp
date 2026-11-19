@@ -80,9 +80,11 @@ mcp = BlenderServer(
     "cavi-blender-mcp",
     package="cavi-blender-mcp",
     instructions=(
-        "Inspect the scene before editing. Saves and exports refuse existing paths. "
-        "Paths are relative to the Blender session workspace. Claim session_control ownership "
-        "before edits and pass lease_id. Never retry an uncertain mutation."
+        "Call scene_info first; if the bridge is not running, `cavi-blender-mcp runtime start` "
+        "launches Blender with it. Before edits, call session_control inspect, claim its "
+        "project_id and pass lease_id. Paths are relative to the Blender session workspace; "
+        "saves and exports refuse existing paths. Check edits with render_preview or "
+        "review_sheet. Never retry an uncertain mutation; follow next_action."
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
@@ -439,9 +441,12 @@ async def rig_edit(
     action: Annotated[Literal["create", "edit_bones", "bind", "weights", "pose", "keyframe", "clear_pose",
                     "retarget", "set_action", "rename_action", "delete_action",
                     "nla_push", "nla_edit", "nla_remove", "constraint", "remove_constraint",
-                    "assign_weights", "transfer_weights", "bake", "contact_lock"], Field(description="Action")],
-    name: Annotated[str, Field(description="Skin mesh/rig/clip; create: new")],
+                    "assign_weights", "transfer_weights", "bake", "contact_lock",
+                    "metarig", "generate_rig"], Field(description="Action")],
+    name: Annotated[str, Field(description="Skin mesh/rig/clip; create/metarig: new")],
     location: Annotated[Vector3 | None, Field(description="World position")] = None,
+    template: Annotated[Literal["basic_human", "human", "basic_quadruped"] | None,
+                        Field(description="Rigify template")] = None,
     bones: Annotated[list[BoneSpec] | None, Field(min_length=1, max_length=128, description="Bones; edit_bones: add or replace")] = None,
     names: Annotated[list[str] | None, Field(min_length=1, max_length=16, description="bind: skins; edit_bones: remove; optional for bake/contact_lock")] = None,
     max_influences: Annotated[StrictInt | None, Field(ge=1, le=32, description="Influences")] = None,
@@ -452,7 +457,7 @@ async def rig_edit(
     action_name: Annotated[str | None, Field(min_length=1, max_length=63, description="Clip")] = None,
     frame: Annotated[StrictInt | None, Field(ge=1, le=1_000_000, description="Frame")] = None,
     reset: Annotated[StrictBool | None, Field(description="Reset pose")] = None,
-    source: Annotated[str | None, Field(min_length=1, max_length=63, description="Rig/skin")] = None,
+    source: Annotated[str | None, Field(min_length=1, max_length=63, description="Rig/skin/fit mesh")] = None,
     source_action: Annotated[str | None, Field(min_length=1, max_length=63, description="Source")] = None,
     mapping: Annotated[dict[str, str] | None, Field(max_length=128, description="Bone map")] = None,
     samples: Annotated[StrictInt | None, Field(ge=2, le=256, description="Samples")] = None,
@@ -480,7 +485,7 @@ async def rig_edit(
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> RigEditResult:
     """Edit rigs, skin weights and animation clips."""
-    values = {"location": location, "bones": bones, "names": names,
+    values = {"location": location, "template": template, "bones": bones, "names": names,
               "max_influences": max_influences, "clean_threshold": clean_threshold,
               "normalize": normalize, "poses": poses, "keyframes": keyframes,
               "action_name": action_name, "frame": frame, "reset": reset,
@@ -529,6 +534,14 @@ async def rig_edit(
         operation = "create_armature"
         params = pick(action, values, ["bones"], {"location": (0, 0, 0)})
         params["bones"] = [bone.model_dump() for bone in params["bones"]]
+    elif action == "metarig":
+        operation = "add_metarig"
+        params = pick(action, values, ["template"], {"location": None, "source": None})
+        if params["location"] is not None and params["source"] is not None:
+            raise ValueError("metarig takes location or source, not both")
+    elif action == "generate_rig":
+        operation = "generate_rigify"
+        params = pick(action, values, ["new_name"])
     elif action == "edit_bones":
         operation = "edit_armature"
         params = pick(action, values, (), {"bones": [], "names": []})

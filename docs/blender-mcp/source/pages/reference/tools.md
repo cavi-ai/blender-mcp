@@ -331,12 +331,15 @@ reported joints and morph combinations visually before accepting the asset.
 
 Mutating. Actions: `create`, `edit_bones`, `bind`, `weights`, `pose`, `keyframe`,
 `clear_pose`, `retarget`, `set_action`, `rename_action`, `delete_action`,
-`nla_push`, `nla_edit`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`.
+`nla_push`, `nla_edit`, `nla_remove`, `constraint`, `remove_constraint`, `assign_weights`, `transfer_weights`, `bake`, `contact_lock`, `metarig`, `generate_rig`.
 
 | Parameter | Used by |
 | --- | --- |
-| `name` | New armature, armature or skinned mesh |
-| `location` | `create` |
+| `name` | New armature, armature or skinned mesh; `metarig`: new metarig; `generate_rig`: the metarig |
+| `location` | `create`, `metarig` |
+| `template` | `metarig`; Rigify `basic_human`, `human` or `basic_quadruped` |
+| `source` | `metarig`; optional mesh whose height and base the metarig fits, instead of `location` |
+| `new_name` | `generate_rig`; name of the generated rig |
 | `bones` | `create`; 1–128 bone specifications. `edit_bones`: bones to add or replace |
 | `names` | `bind`; 1–16 mesh names. `edit_bones`: 1–16 bones to remove |
 | `max_influences`, `clean_threshold`, `normalize` | `weights` |

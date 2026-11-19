@@ -10,17 +10,23 @@ adds its lines under Unreleased and never edits a version.
 ### Added
 
 - `cavi-blender-mcp extension install` installs and enables a Blender extension that starts the bridge in your own interactive Blender, with your preferences and add-ons; `extension build` writes the archive for Install from Disk. The extension loads the installed server package, so its bridge build identity matches the server.
+- `rig_edit` `metarig` adds a Rigify `basic_human`, `human` or `basic_quadruped` metarig fitted to a `source` mesh; `generate_rig` generates a named rig from it with Blender's bundled Rigify and lists its deform bones.
 
 ### Changed
 
 - Requires MCP Core 0.1.4; Dependabot updates `uv.lock`.
+- Armatures hold up to 512 bones for editing and posing; a call still takes up to 128 bone specifications. `bind` counts deform bones toward its 64-bone limit.
 - Failures with an unknown outcome name `scene_info` (or `session_control` for ownership) as `next_action`.
 - Argument errors use MCP Core's wording: `Not valid for action=<action>: <names>` and `<name> is required for action=<action>`.
 - The server refuses a relative `CAVI_BLENDER_WORKSPACE`; `runtime start` expands `~` in `CAVI_BLENDER_BIN` and prefers the macOS app over `PATH`.
 - The Blender bridge resolves workspace inputs and reads import and texture sources with byte-identical copies of MCP Core's `workspace` and `files` modules; a source that changes while read is refused.
+- Native checks and CI target Blender 5.3.0 and Node.js 26.
+- The server instructions name the start-up order: `scene_info`, `cavi-blender-mcp runtime start` when the bridge is not running, then `session_control` inspect and claim.
+- An offline bridge error names `cavi-blender-mcp runtime start`.
 
 ### Fixed
 
+- `rig_edit` `constraint` accepts a constraint without `type` as `IK`, as its schema states; the schema no longer carries a discriminator mapping to definitions it does not contain.
 - `asset_io` generate workers run through MCP Core's bounded process runner: a timeout stops the worker's whole process group, and a worker that exits is no longer held by a background child keeping its output open.
 
 ## 0.58.0 - 2026-11-18
@@ -91,6 +97,8 @@ adds its lines under Unreleased and never edits a version.
 - Inspect per-tile dimensions and packed file hashes, with a source-manifest fingerprint.
 - Retain mixed tile sizes, native precision and logical tile paths through material-library handoff.
 - Reuse unchanged sets and refresh changed tiles without altering other image users.
+- The server type, failure contract and schema compaction come from `cavi-mcp-core`; unknown tool names return a `TOOL_NOT_FOUND` failure.
+- TripoSG image-to-3D providers on Apple Silicon, CUDA or CPU, and through mlx-agent as `triposg-mlx`, selected with `CAVI_GENERATION_PROVIDER`.
 
 ## 0.55.0 - 2026-11-04
 
@@ -209,16 +217,6 @@ adds its lines under Unreleased and never edits a version.
 - Bake fractional frames and driven shape weights onto independent export copies.
 - Preserve subframe GLB keys and export a sampled active FBX take with import identity metadata.
 - Accept bounded FBX shape-key imports.
-
-## Unreleased
-
-### Changed
-
-- The server type, failure contract and schema compaction come from `cavi-mcp-core`; unknown tool names return a `TOOL_NOT_FOUND` failure.
-
-### Added
-
-- TripoSG image-to-3D providers on Apple Silicon, CUDA or CPU, and through mlx-agent as `triposg-mlx`, selected with `CAVI_GENERATION_PROVIDER`.
 
 ## 0.36.0 - 2026-11-03
 

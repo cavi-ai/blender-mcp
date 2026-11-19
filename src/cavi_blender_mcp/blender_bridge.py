@@ -61,6 +61,7 @@ GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", 
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "extract_faces", "mirror_mesh",
                      "array_mesh", "solidify_mesh"})
 RIG = frozenset({"create_armature", "bind_skin", "repair_weights", "edit_armature"})
+RIGIFY = frozenset({"add_metarig", "generate_rigify"})
 ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})
 OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
@@ -1389,6 +1390,10 @@ def _dispatch(operation, p):
         return HANDLERS[operation](p)
     if operation in RIG:
         from .blender_rigging import HANDLERS
+
+        return HANDLERS[operation](p)
+    if operation in RIGIFY:
+        from .blender_rigify import HANDLERS
 
         return HANDLERS[operation](p)
     if operation in COMPOSE:

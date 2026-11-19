@@ -26,6 +26,30 @@ Every call needs a `lease_id` and an OBJECT-mode session.
 | `nla_push` | Move an action into an NLA track/strip |
 | `nla_edit` | Edit one named strip's trim, timing and blend settings |
 | `nla_remove` | Remove one strip, one track, or every track |
+| `metarig` | New Rigify metarig from a `template`, fitted to a `source` mesh or placed at `location` |
+| `generate_rig` | Generate a Rigify rig named `new_name` from the `name` metarig |
+
+## Rigify rigs
+
+Rigify is Blender's bundled auto-rigging add-on. The session enables it on first
+use.
+
+1. Call `metarig` with `name`, a `template` and the character mesh as `source`.
+   `basic_human` has 29 bones and no fingers or face; `human` adds fingers and
+   face (159 bones); `basic_quadruped` has 34. With `source`, the metarig's
+   bones are scaled to the mesh's height, its feet sit at the mesh's base and it
+   is centred on the mesh; object scale stays 1. Without `source`, it is placed
+   at `location`.
+2. Move joints onto the character with `edit_bones`. The response lists every
+   metarig bone with its head and tail.
+3. Call `generate_rig` with the metarig as `name` and the rig name as
+   `new_name`. The response lists `deform_bones` (`DEF-` bones). A generated
+   `basic_human` rig has 222 bones, 35 of them deform bones. A failed generation
+   removes everything it created.
+4. `bind` the character mesh to the generated rig. Automatic weights use its
+   deform bones.
+5. Pose and key the generated controls (for example `torso` or `hand_ik.L`) with
+   `pose` and `keyframe`.
 
 ## Facial performance layers
 
@@ -73,8 +97,8 @@ Bone specifications take `name`, `head`, `tail`, `parent`, `connect`, `deform`
 and `roll_degrees`.
 
 Armatures require unique names, nonzero lengths, acyclic parents, and connected
-bones that meet their parent tail. Bone names are limited to 63 UTF-8 bytes and
-armatures to 128 bones.
+bones that meet their parent tail. Bone names are limited to 63 UTF-8 bytes. A
+call takes 1–128 bone specifications; armatures hold up to 512 bones.
 
 `edit_bones` takes full specifications: a listed bone that exists is moved,
 reparented and reflagged; a new name is added. The final hierarchy is checked
@@ -87,7 +111,7 @@ the previous bones.
 ## Binding and weights
 
 Automatic binding requires 1–16 single-user meshes without modifiers or shape
-keys, at most 50,000 vertices and 64 bones. Binding snapshots mesh data and
+keys, at most 50,000 vertices and 64 deform bones. Binding snapshots mesh data and
 restores it on failure.
 
 `weights` affects deform-bone groups only. It is bounded to 100,000 vertices,

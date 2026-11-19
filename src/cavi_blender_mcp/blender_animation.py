@@ -7,7 +7,7 @@ from mathutils import Euler
 
 from .blender_bridge import info, obj, vector
 
-MAX_BONES = 128
+MAX_BONES = 512
 MAX_POSES = 128
 MAX_FRAMES = 32
 MAX_TOTAL_POSES = 2048

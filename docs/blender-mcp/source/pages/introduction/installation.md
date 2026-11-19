@@ -3,10 +3,10 @@
 ## Requirements
 
 - macOS or Linux. Windows is not part of the tested surface.
-- Blender 5.2.3 LTS. Other releases may work, but native checks target 5.2.3.
+- Blender 5.3.0. Other releases may work, but native checks target 5.3.0.
 - Python 3.15 or newer.
 - [`uv`](https://docs.astral.sh/uv/) to install the server.
-- Node.js 22 or newer, only for MCP evaluation.
+- Node.js 26 or newer, only for MCP evaluation.
 
 ## Install the server
 
