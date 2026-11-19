@@ -68,6 +68,10 @@ Alembic writes the current frame.
 - `animations=true` applies to FBX, GLB and USD. It includes the armatures of the
   named skinned meshes and exports every linked action. GLB and USD also export
   shape-key actions. It refuses LODs, collision, instances and pair baking.
+- `deform_only=true` with `animations=true` writes only the deform bones that
+  carry the skin. GLB keeps just the deform bones; FBX and USD also keep the
+  non-deform bones above them in the hierarchy. A generated Rigify `basic_human`
+  rig exports 35 bones to GLB and 56 to FBX or USD instead of 222.
 - `textures=true` applies to FBX and USD. It copies used images into a new
   `<stem>.fbm` directory beside the export and returns a texture receipt. An
   existing sidecar directory is refused. USD writes relative texture paths. GLB

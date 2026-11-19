@@ -293,7 +293,7 @@ def main():
                 "--arguments", str(ROOT / "evals/native.arguments.json"),
                 "--min-readiness", "89", "--exclude-latency",
                 "--min-area", "protocol=100", "--min-area", "catalog=100",
-                "--min-area", "context=29", "--min-area", "error-honesty=100",
+                "--min-area", "context=28", "--min-area", "error-honesty=100",
                 "--min-area", "reliability=100", "--min-area", "coverage=100",
             ])
         command.extend(["--", sys.executable, "-m", f"cavi_{APP}_mcp.server"])

@@ -1224,6 +1224,7 @@ async def asset_io(
     collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
     animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
     baked_animation: Annotated[StrictBool | None, Field(description="export: baked animation")] = None,
+    deform_only: Annotated[StrictBool | None, Field(description="export: deform bones")] = None,
     assembly: Annotated[StrictBool | None, Field(description="export: evaluate static instances")] = None,
     animation_sample_step: Annotated[Number | None, Field(gt=0, description="export: frame interval")] = None,
     textures: Annotated[StrictBool | None, Field(description="export: write texture sidecars")] = None,
@@ -1242,7 +1243,7 @@ async def asset_io(
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
               'assembly': assembly,'uv_layer':uv_layer,'expected_sha256':expected_sha256,
-              'triangulate': triangulate}
+              'triangulate': triangulate, 'deform_only': deform_only}
     if action == 'export' and triangulate is not None and Path(path).suffix.lower() != '.fbx':
         raise ValueError('triangulate applies only to FBX exports')
     if action == 'open':
@@ -1290,13 +1291,15 @@ async def asset_io(
                                               "include_empties": False, "lods": False,
                                               "collision": False, "animations": False,
                                               "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None,'uv_layer':None,
-                                              'triangulate': False})
+                                              'triangulate': False, 'deform_only': False})
+    if not params['deform_only']:
+        params.pop('deform_only')
     if params['uv_layer'] is None:params.pop('uv_layer')
     else:
         return await run(call,'export_uv_asset',lease_id=lease_id,path=path,**params)
     if (params["lods"] or params["collision"] or params["animations"]
             or params["textures"] or params["axis"] or params["baked_animation"] or params["triangulate"] or params["animation_sample_step"] is not None
-            or path.lower().endswith((".usd", ".usda", ".usdc"))):
+            or 'deform_only' in params or path.lower().endswith((".usd", ".usda", ".usdc"))):
         return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
     for key in ("lods", "collision", "animations", "textures", "axis", "baked_animation", "animation_sample_step", "triangulate"):
         params.pop(key)

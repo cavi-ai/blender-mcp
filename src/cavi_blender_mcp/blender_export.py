@@ -78,7 +78,7 @@ def active_clip():
 
 
 def fbx(path, preset, empties=False, animations=False, textures=False, animation_step=None, baked_animation=False,
-        triangulate=False):
+        triangulate=False, deform_only=False):
     object_types = {"MESH", "EMPTY", "ARMATURE"} if animations else (
         {"MESH", "EMPTY"} if empties else {"MESH"})
     with active_clip() if baked_animation else nullcontext():
@@ -98,6 +98,7 @@ def fbx(path, preset, empties=False, animations=False, textures=False, animation
         result = bpy.ops.export_scene.fbx(
             filepath=str(path), use_selection=True, object_types=object_types,
             mesh_smooth_type="FACE", use_tspace=True, use_triangles=triangulate, add_leaf_bones=False,
+            use_armature_deform_only=deform_only,
             bake_anim=animations, bake_anim_use_all_bones=animations,
             bake_anim_use_nla_strips=False, bake_anim_use_all_actions=animations and not baked_animation,
             bake_anim_force_startend_keying=animations, use_custom_props=animations,
@@ -108,10 +109,11 @@ def fbx(path, preset, empties=False, animations=False, textures=False, animation
         return result, sampled
 
 
-def usd(path, preset, instances, animations=False):
+def usd(path, preset, instances, animations=False, deform_only=False):
     forward, up = USD_AXES[preset]
     return bpy.ops.wm.usd_export(
         filepath=str(path), selected_objects_only=True, export_animation=animations,
+        only_deform_bones=deform_only,
         export_hair=False, export_lights=False, export_cameras=False, export_materials=True,
         export_uvmaps=True, export_normals=True, use_instancing=instances,
         evaluation_mode="RENDER", export_textures_mode="KEEP",
@@ -121,7 +123,7 @@ def usd(path, preset, instances, animations=False):
 
 def write(path, objects, selection, preset, instances, empties, animations=False,
           textures=False, baked_animation=False, animation_step=None, uv_layer=None, uv_objects=None,
-          triangulate=False):
+          triangulate=False, deform_only=False):
     suffix = path.suffix.lower()
     if type(triangulate) is not bool:
         raise ValueError('triangulate must be boolean')
@@ -135,17 +137,18 @@ def write(path, objects, selection, preset, instances, empties, animations=False
 
             with instance_meshes(objects) if instances else nullcontext():
                 result, sampled = fbx(path, preset, empties, animations, textures, animation_step, baked_animation,
-                                      triangulate=triangulate)
+                                      triangulate=triangulate, deform_only=deform_only)
         elif suffix == ".glb":
             result = bpy.ops.export_scene.gltf(
                 filepath=str(path), export_format="GLB", use_selection=True,
                 export_apply=not animations, export_animations=animations,
-                export_skins=animations, export_animation_mode="ACTIONS",
+                export_skins=animations, export_def_bones=deform_only,
+                export_animation_mode="ACTIONS",
                 export_anim_single_armature=False, export_extras=animations,
                 export_force_sampling=not baked_animation,
                 export_morph=True, export_morph_animation=animations)
         else:
-            result = usd(path, preset, instances, animations)
+            result = usd(path, preset, instances, animations, deform_only)
     if "FINISHED" not in result:
         raise RuntimeError("Export did not finish")
     return {**sampled,**({'uv_maps':uv_maps} if uv_maps is not None else {})}
@@ -354,6 +357,9 @@ def export_asset(p):
     preset = preset_for(p, suffix)
     if (baked_animation or animation_step is not None) and not animations:
         raise ValueError('Animation sampling options require animations=true')
+    deform_only = flag(p, 'deform_only')
+    if deform_only and not animations:
+        raise ValueError('deform_only requires animations=true')
     if animation_step is not None:
         prop = bpy.ops.export_scene.fbx.get_rna_type().properties['bake_anim_step']
         if (suffix != '.fbx' or isinstance(animation_step, bool) or not isinstance(animation_step, (float, int))
@@ -430,7 +436,7 @@ def export_asset(p):
               prepared_images(objects, directory) if textures else nullcontext()):
             sampled = write(path, objects, selection, preset, False, empties,
                   animations=True, textures=textures, baked_animation=baked_animation, animation_step=animation_step,
-                  uv_layer=p.get('uv_layer'), triangulate=triangulate)
+                  uv_layer=p.get('uv_layer'), triangulate=triangulate, deform_only=deform_only)
             files = texture_receipt(directory) if directory else []
         return {**sampled, "path": str(path), "bytes": path.stat().st_size, "axis": preset,
                 "objects": [item.name for item in selected_objects],
