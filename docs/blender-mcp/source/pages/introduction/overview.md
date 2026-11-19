@@ -50,7 +50,7 @@ surface listing and protocol negotiation. `npm run eval:core -- --blender
 /path/to/blender` adds schema, structured output, repeated reads, contention and
 native application cases.
 
-CI runs both modes with Blender 5.2.3 LTS. Native evaluation supplies fixture
+CI runs both modes with Blender 5.3.0. Native evaluation supplies fixture
 arguments for all six read-only tools and enforces catalog, protocol, error,
 reliability and coverage checks. Catalog budgets bound discovery costs. Latency
 is excluded from readiness floors because it depends on the runner.
@@ -77,7 +77,7 @@ model; results do not establish model task quality or game integration.
   and import settings.
 - The optional image-to-3D worker produces a mesh; it does not rig, animate or
   validate game import quality.
-- Native checks target Blender 5.2.3 LTS. Behavior may differ on older releases.
+- Native checks target Blender 5.3.0. Behavior may differ on older releases.
 
 The [limits reference](../reference/limits.md) lists every input and output
 budget. The [security model](../security/model.md) describes the transport,

@@ -27,7 +27,7 @@ described in [SECURITY.md](https://github.com/cavi-ai/blender-mcp/blob/main/SECU
 
 ## Compatibility
 
-- Blender 5.2.3 LTS is the tested release.
+- Blender 5.3.0 is the tested release.
 - Python 3.15 or newer is required for the MCP server.
 - macOS and Linux are the tested platforms.
 - Unity, Unreal and Godot exports are validated for bounds and naming, not for a

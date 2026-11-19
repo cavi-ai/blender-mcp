@@ -63,7 +63,7 @@ class BridgeClient:
             fd = os.open(self.config, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         except FileNotFoundError as exc:
             raise ConnectionError(
-                "Blender bridge is not running; start Blender with the bridge"
+                "Blender bridge is not running; run `cavi-blender-mcp runtime start`"
             ) from exc
         with os.fdopen(fd) as stream:
             info = os.fstat(stream.fileno())
@@ -83,7 +83,8 @@ class BridgeClient:
         if pid is not None and not process_alive(pid):
             self.discard(info)
             raise ConnectionError(
-                "Blender bridge is not running; removed a stale connection file"
+                "Blender bridge is not running; removed a stale connection file; "
+                "run `cavi-blender-mcp runtime start`"
             ) from FileNotFoundError(str(self.config))
         return config
 
