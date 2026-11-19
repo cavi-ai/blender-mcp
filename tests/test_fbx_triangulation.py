@@ -68,6 +68,7 @@ class ExporterForwardingTests(unittest.TestCase):
             'cavi_blender_mcp.blender_bridge': SimpleNamespace(obj=lambda *a, **k: self.obj,
                 output_file=self.output, selected=lambda *a: nullcontext(), with_empties=lambda x: x),
             'cavi_blender_mcp.blender_export_uv': SimpleNamespace(promote=lambda *a: nullcontext(None)),
+            'cavi_blender_mcp.blender_rigging': SimpleNamespace(MAX_ARMATURE_BONES=512),
             'cavi_blender_mcp.export_instances': SimpleNamespace(instance_meshes=lambda *a: nullcontext())}
         self.enterContext(patch.dict(sys.modules, modules))
         source = Path(server.__file__).with_name('blender_export.py')
