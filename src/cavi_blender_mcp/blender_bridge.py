@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import importlib
 import json
 import math
 import os
@@ -47,6 +48,7 @@ from .operations import (
 )
 from .paths import destination
 from .presets import AXIS_PRESETS
+from .rig_dispatch import RIG_EDIT
 
 _server = None
 _jobs = queue.Queue(maxsize=8)
@@ -60,9 +62,6 @@ GEOMETRY = frozenset({"decimate_to", "remesh_quad", "lod_chain", "lightmap_uv", 
                       "collision", "cleanup_mesh"})
 COMPOSE = frozenset({"boolean_mesh", "join_meshes", "separate_mesh", "extract_faces", "mirror_mesh",
                      "array_mesh", "solidify_mesh"})
-RIG = frozenset({"create_armature", "bind_skin", "repair_weights", "edit_armature"})
-RIGIFY = frozenset({"add_metarig", "generate_rigify"})
-ANIMATION = frozenset({"pose_rig", "keyframe_rig", "clear_pose"})
 OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", "snap_to_grid", "rename_object",
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
                      "move_to_collection", "object_keyframe", "set_visibility"})
@@ -1292,18 +1291,13 @@ def _dispatch(operation, p):
         from .blender_rig import inspect
 
         return {**inspect(p, obj), "project_id": project_identity()}
-    if operation in {'add_constraint', 'remove_constraint', 'assign_weights'}:
-        from .blender_rig_controls import HANDLERS
-
-        return HANDLERS[operation](p)
-    if operation == 'transfer_skin_weights':
-        from .blender_skin_transfer import transfer
-
-        return transfer(p)
-    if operation == 'bake_rig':
-        from .blender_rig_bake import bake
-
-        return bake(p)
+    if operation in RIG_EDIT:
+        module_name, attribute = RIG_EDIT[operation]
+        module = importlib.import_module(f'.{module_name}', __package__)
+        target = getattr(module, attribute)
+        if attribute == 'HANDLERS':
+            return target[operation](p)
+        return target(p)
     if operation == "export_instances":
         operation, p = "export_mesh", {**p, "preserve_instances": True}
     if operation == 'inspect_udim_coverage':
@@ -1345,11 +1339,6 @@ def _dispatch(operation, p):
         from .blender_shape_keys import HANDLERS
 
         return HANDLERS[operation](p)
-    if operation in {"set_action", "rename_action", "delete_action", "nla_push", "nla_edit",
-                     "nla_remove"}:
-        from .blender_nla import HANDLERS
-
-        return HANDLERS[operation](p)
     if operation == 'bake_shader':
         from .blender_shader_bake import bake as bake_shader
 
@@ -1358,14 +1347,6 @@ def _dispatch(operation, p):
         from .blender_bake import bake
 
         return bake(p)
-    if operation == "retarget_rig":
-        from .blender_retarget import retarget
-
-        return retarget(p)
-    if operation == 'lock_rig_contacts':
-        from .blender_foot_locks import lock_contacts
-
-        return lock_contacts(p)
     if operation == "review_sheet":
         from .blender_review import review
 
@@ -1384,18 +1365,6 @@ def _dispatch(operation, p):
         from .blender_export import export_asset
 
         return export_asset(p)
-    if operation in ANIMATION:
-        from .blender_animation import HANDLERS
-
-        return HANDLERS[operation](p)
-    if operation in RIG:
-        from .blender_rigging import HANDLERS
-
-        return HANDLERS[operation](p)
-    if operation in RIGIFY:
-        from .blender_rigify import HANDLERS
-
-        return HANDLERS[operation](p)
     if operation in COMPOSE:
         from .blender_compose import HANDLERS
 
