@@ -126,9 +126,8 @@ def inspect(p, find_object):
         schedule, covered = bounded_samples(start, end, samples)
     else:
         schedule = validate_sample_frames(explicit, start, end)
-        reached = {int(frame) for frame in schedule if frame == int(frame)}
-        covered = set(range(start, end + 1)) <= reached
-    samples = len(schedule)
+        covered = sum(frame == int(frame) for frame in schedule) == end - start + 1
+        samples = len(schedule)
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
     from .blender_geometry import unit_scale
@@ -202,6 +201,7 @@ def inspect(p, find_object):
         scene.frame_set(prior[0], subframe=prior[1])
         bpy.context.view_layer.update()
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
+    covered = covered and complete
     return {'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,
             'complete': complete, 'passed': complete and all(report['violating_samples']==0 for report in reports),
             'frames': frames, 'requested_samples': samples, 'all_frames_tested': covered,

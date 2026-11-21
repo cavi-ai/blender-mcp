@@ -6,7 +6,7 @@ import re
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 from .blender_lookup import editable_mesh, info, number, selected
 from .naming import LOD, base_name
@@ -594,8 +594,21 @@ def box(low, high):
 def sphere(center, radius):
     bm = bmesh.new()
     try:
-        bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=max(radius, 1e-4),
-                                  matrix=Matrix.Translation(Vector(center)))
+        bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=1.)
+        bm.normal_update()
+        offsets = []
+        for face in bm.faces:
+            normal = face.normal.copy()
+            offset = normal.dot(face.verts[0].co)
+            if offset < 0:
+                offset = -offset
+            offsets.append(offset)
+        inset = min(offsets)
+        if inset <= 0:
+            raise RuntimeError("Sphere has an invalid supporting plane")
+        scale = max(radius, 1e-4) / inset * (1 + 8 * np.finfo(np.float32).eps)
+        bmesh.ops.scale(bm, vec=(scale,)*3, verts=bm.verts)
+        bmesh.ops.translate(bm, vec=Vector(center), verts=bm.verts)
         mesh = bpy.data.meshes.new("CAVI Sphere")
         bm.to_mesh(mesh)
         return mesh
@@ -631,7 +644,7 @@ def collision(p):
                 center = (low + high) / 2
                 radius = float(np.linalg.norm(points - center, axis=1).max())
                 mesh = sphere(center, radius)
-                outside = float(np.linalg.norm(points - center, axis=1).max()) > radius + 1e-6
+                outside = not covers(mesh, points)
             else:
                 mesh = hull(points, limit) if shape == "convex" else box(low, high)
                 if mesh is None or not covers(mesh, points):

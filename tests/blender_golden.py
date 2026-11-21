@@ -74,6 +74,14 @@ def assert_convex_hull(value, limit):
         bm.free()
 
 
+# The actual faceted sphere must contain oblique source corners.
+make("SM_Oblique", lambda bm: bmesh.ops.create_cube(bm, size=2))
+sphere_result = edit("collision", name="SM_Oblique", shape="sphere")
+sphere_entry = sphere_result["objects"][0]
+sphere_mesh = bpy.data.objects[sphere_entry["name"]].data
+sphere_points = np.array([vertex.co[:] for vertex in bpy.data.objects["SM_Oblique"].data.vertices])
+assert sphere_entry["contains_source"] and blender_geometry.covers(sphere_mesh, sphere_points, tolerance=0), sphere_result
+
 # Convex hulls of meshes with interior points.
 for name, build in (("SM_SubSphere", subdivided_sphere), ("SM_Rock", rock)):
     make(name, build, uv=True)

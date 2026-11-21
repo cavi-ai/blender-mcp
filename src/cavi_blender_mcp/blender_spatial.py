@@ -16,6 +16,7 @@ from .spatial_query import (
     chunks,
     coplanar_overlap,
     intersects,
+    point_triangle_distance,
     prove_distance,
     require_native,
     samples,
@@ -108,11 +109,11 @@ def overlap(subjects, context, subject_meta, context_meta, spec):
 
 def nearest(subjects, context, subject_meta, context_meta, spec):
     trees = (tree(subjects), tree(context))
-    best, witness = math.inf, None
+    best, proof_upper, witness = math.inf, math.inf, None
     below, counts, available = 0, [], []
-    for source, source_meta, target_meta, target_tree, reverse in (
-            (subjects, subject_meta, context_meta, trees[1], False),
-            (context, context_meta, subject_meta, trees[0], True)):
+    for source, target, source_meta, target_meta, target_tree, reverse in (
+            (subjects, context, subject_meta, context_meta, trees[1], False),
+            (context, subjects, context_meta, subject_meta, trees[0], True)):
         probes = samples(source, spec['samples_per_side'])
         counts.append(len(probes))
         available.append(len(source) * 4)
@@ -120,6 +121,7 @@ def nearest(subjects, context, subject_meta, context_meta, spec):
             hit, _, triangle, gap = target_tree.find_nearest(Vector(point))
             if hit is None or not math.isfinite(gap):
                 raise ValueError('Native nearest-surface query did not produce a finite witness')
+            proof_upper = min(proof_upper, point_triangle_distance(point, target[triangle]))
             below += gap < spec['min_clearance_m']
             if gap < best:
                 best = gap
@@ -127,7 +129,7 @@ def nearest(subjects, context, subject_meta, context_meta, spec):
                            'context': source_meta[index] if reverse else target_meta[triangle],
                            'subject_position_m': list(hit) if reverse else list(point),
                            'context_position_m': list(point) if reverse else list(hit)}
-    proof = prove_distance(subjects, context, best if math.isfinite(best) else 0., spec['max_pair_tests'])
+    proof = prove_distance(subjects, context, proof_upper, spec['max_pair_tests'])
     return {'method': 'bidirectional_vertex_and_triangle_centroid_samples',
             'distance_m': best, 'witness': witness, 'min_clearance_m': spec['min_clearance_m'],
             'samples_below_min_clearance': below, 'samples_per_side': counts,

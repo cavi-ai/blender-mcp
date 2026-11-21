@@ -152,6 +152,10 @@ def _dot(a, b):
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
+def _cross(a, b):
+    return (a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0])
+
+
 def _add(a, b):
     return tuple(a[i] + b[i] for i in range(3))
 
@@ -205,24 +209,43 @@ def segment_distance(p1, q1, p2, q2):
     r = _sub(p1, p2)
     a, e, f = _dot(d1, d1), _dot(d2, d2), _dot(d2, r)
     b, c = _dot(d1, d2), _dot(d1, r)
-    denom = a * e - b * b
-    s = _clamp((b * f - c * e) / denom) if denom > 1e-18 else 0.
-    if e <= 1e-18:
+    cross = _cross(d1, d2)
+    denom = _dot(cross, cross)
+    s = _clamp((b * f - c * e) / denom) if denom > 0 else 0.
+    if e == 0:
         t = 0.
-        s = _clamp(-c / a) if a > 1e-18 else 0.
+        s = _clamp(-c / a) if a > 0 else 0.
     else:
         t = (b * s + f) / e
         if t < 0:
             t = 0.
-            s = _clamp(-c / a) if a > 1e-18 else 0.
+            s = _clamp(-c / a) if a > 0 else 0.
         elif t > 1:
             t = 1.
-            s = _clamp((b - c) / a) if a > 1e-18 else 0.
+            s = _clamp((b - c) / a) if a > 0 else 0.
     return _dist(_add(p1, _scale(d1, s)), _add(p2, _scale(d2, t)))
+
+
+def _segment_intersects_triangle(p, q, triangle):
+    a, b, c = triangle
+    direction, edge1, edge2 = _sub(q, p), _sub(b, a), _sub(c, a)
+    h = _cross(direction, edge2)
+    det = _dot(edge1, h)
+    if det == 0:
+        return False
+    offset = _sub(p, a)
+    u = _dot(offset, h) / det
+    cross = _cross(offset, edge1)
+    v = _dot(direction, cross) / det
+    t = _dot(edge2, cross) / det
+    return 0 <= u <= 1 and 0 <= v and u + v <= 1 and 0 <= t <= 1
 
 
 def triangle_distance(a, b):
     """Exact distance between two triangles. Intersection and contact are zero."""
+    if any(_segment_intersects_triangle(tri[i], tri[(i + 1) % 3], other)
+           for tri, other in ((a, b), (b, a)) for i in range(3)):
+        return 0.
     best = min(point_triangle_distance(point, b) for point in a)
     best = min(best, min(point_triangle_distance(point, a) for point in b))
     for i in range(3):
@@ -279,12 +302,13 @@ def prove_distance(subjects, context, upper, budget):
     stopped = None
     while pending:
         gap, _, left, right = heappop(pending)
-        if gap >= best - 1e-12:
+        if gap >= best:
             continue
+        if work >= budget:
+            stopped = gap
+            break
+        work += 1
         if len(left) > 1 or len(right) > 1:
-            if len(pending) + 2 > budget and budget == 0:
-                stopped = gap
-                break
             if len(left) >= len(right) and len(left) > 1:
                 parts, other, left_side = _split(subjects, left), right, True
             else:
@@ -297,18 +321,11 @@ def prove_distance(subjects, context, upper, budget):
                 heappush(pending, (_gap(_group_bounds(subjects, pair[0]),
                                         _group_bounds(context, pair[1])),
                                    counter, tuple(pair[0]), tuple(pair[1])))
-            if len(pending) > max(budget, 1) * 4:
-                stopped = min(item[0] for item in pending)
-                break
             continue
-        if work >= budget:
-            stopped = gap
-            break
-        work += 1
         best = min(best, triangle_distance(subjects[left[0]], context[right[0]]))
     if stopped is None:
         return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
-    lower = min([stopped, *(item[0] for item in pending)])
+    lower = min(stopped, pending[0][0]) if pending else stopped
     return {'proven': False, 'lower_m': lower, 'upper_m': best, 'tests': work}
 
 
