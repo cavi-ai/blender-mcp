@@ -3,8 +3,8 @@ import math
 
 import bpy
 
-from .blender_bridge import _workspace, editable_mesh, info
 from .blender_errors import preflight
+from .blender_lookup import editable_mesh, info, workspace
 from .blender_mesh_regions import mesh_digest
 from .blender_mesh_seams import seam_digest
 from .mesh_regions import fingerprint, indices
@@ -68,7 +68,7 @@ def unwrap_faces(p):
         selected = set(faces)
         reserved = reservation(([before[i] for i in t.loops] for t in mesh.loop_triangles
                                 if t.polygon_index not in selected), spec)
-        output = solve(bpy.app.binary_path, _workspace, {**request, 'region': spec, 'angle': angle, 'method': method})
+        output = solve(bpy.app.binary_path, workspace(), {**request, 'region': spec, 'angle': angle, 'method': method})
         if output.get('unwrap_method') != method:
             raise ValueError('UV worker used a different projection method')
         rows = output.get('uv')

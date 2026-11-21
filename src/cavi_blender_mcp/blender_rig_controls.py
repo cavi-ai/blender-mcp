@@ -4,7 +4,7 @@ import math
 
 import bpy
 
-from .blender_bridge import info, obj, vector
+from .blender_lookup import info, obj, vector
 from .blender_rig import weights as inspect_weights
 from .blender_rigging import label
 

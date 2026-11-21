@@ -7125,6 +7125,39 @@
     ]
   },
   {
+    "id": "clearance-exact-frames-native",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": ["MorphSource"],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "sample_frames": [1, 12.5, 24]
+    },
+    "kind": "success",
+    "modes": ["native"],
+    "equals": {
+      "/frames": [1.0, 12.5, 24.0],
+      "/requested_samples": 3
+    }
+  },
+  {
+    "id": "clearance-invalid-frame-type",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": ["MorphSource"],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "sample_frames": [true]
+    },
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "validation"
+  },
+  {
     "id": "clearance-invalid-threshold",
     "tool": "inspect_skin_clearance",
     "arguments": {

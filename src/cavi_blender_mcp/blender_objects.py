@@ -6,8 +6,8 @@ import bpy
 import numpy as np
 from mathutils import Euler, Matrix, Vector
 
-from .blender_bridge import editable_mesh, info, new_name, number, obj, vector
 from .blender_errors import preflight
+from .blender_lookup import editable_mesh, info, new_name, number, obj, vector
 
 COMPONENTS = ("location", "rotation", "scale")
 ORIGINS = {"bounds_bottom_center", "bounds_center", "world_origin", "point"}

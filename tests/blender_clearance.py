@@ -67,6 +67,21 @@ def inspect(name='Outside', **options):
     return result
 result = inspect()
 assert result['complete'] and result['passed'], result
+assert result['frames'] == [1., 13., 25.] and result['requested_samples'] == 3
+result = inspect(sample_frames=[1., 12.5, 25.])
+assert result['complete'] and result['frames'] == [1., 12.5, 25.] and result['requested_samples'] == 3
+result = inspect(sample_frames=[12.5])
+assert result['complete'] and result['frames'] == [12.5] and result['requested_samples'] == 1
+result = inspect(sample_frames=[1., 12.5, 25.], max_queries=1)
+assert not result['complete'] and result['frames'] == [1.] and result['requested_samples'] == 3
+for invalid in ([], [True], [float('nan')], [0], [26], [3, 3], [4, 2], list(range(1, 34))):
+    try:
+        inspect(sample_frames=invalid)
+    except ValueError:
+        assert (scene.frame_current, scene.frame_subframe) == prior
+    else:
+        raise AssertionError(f'Accepted invalid sample_frames {invalid!r}')
+result = inspect()
 assert abs(result['garments'][0]['min_clearance_m']-.2) < 1e-6
 result = inspect('Inside')
 assert result['complete'] and not result['passed'], result

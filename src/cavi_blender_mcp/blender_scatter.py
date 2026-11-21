@@ -6,8 +6,8 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-from .blender_bridge import MAX_MODIFIERS, number, obj
 from .blender_geometry import MAX_TRIANGLES, triangle_count
+from .blender_lookup import MAX_MODIFIERS, number, obj
 
 MAX_INSTANCES = 100000
 MAX_REALIZED_TRIANGLES = 2000000

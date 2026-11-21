@@ -407,12 +407,17 @@ async def inspect_skin_clearance(
     samples: Annotated[StrictInt, Field(ge=2, le=32, description="Samples")] = 9,
     surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Samples")] = "vertices_and_centres",
     max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
+    sample_frames: Annotated[list[Number] | None, Field(min_length=1, max_length=32, description="Exact ordered frames, including subframes")] = None,
 ) -> SkinClearance:
     """Sample signed garment gaps (m); restore frame. Requires closed unambiguous bodies and complete budgets.
     Sampling cannot certify continuous collision."""
+    from .clearance_frames import validate_sample_frames
+
+    frames = None if sample_frames is None else validate_sample_frames(sample_frames, start_frame, end_frame)
     return await run(call, "inspect_skin_clearance", body=body, garments=garments,
         start_frame=start_frame, end_frame=end_frame, min_clearance_m=min_clearance_m,
-        samples=samples, surface_samples=surface_samples, max_queries=max_queries)
+        samples=samples, surface_samples=surface_samples, max_queries=max_queries,
+        **({'sample_frames': frames} if frames is not None else {}))
 
 
 @mcp.tool(annotations=READ_ONLY)

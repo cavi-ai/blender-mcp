@@ -4,8 +4,8 @@ import math
 
 import bpy
 
-from .blender_bridge import info, new_name, obj
 from .blender_geometry import MAX_TRIANGLES, triangle_count
+from .blender_lookup import info, new_name, obj
 
 REFERENCES = {'NodeSocketObject': ('objects', 'OBJECT'), 'NodeSocketCollection': ('collections', 'COLLECTION'),
               'NodeSocketMaterial': ('materials', 'MATERIAL'), 'NodeSocketImage': ('images', 'IMAGE')}
@@ -227,7 +227,7 @@ def set_inputs(params):
 
 
 def attach(params):
-    from .blender_bridge import MAX_MODIFIERS
+    from .blender_lookup import MAX_MODIFIERS
     from .blender_scatter import MAX_INSTANCES
 
     if bpy.context.mode != 'OBJECT':

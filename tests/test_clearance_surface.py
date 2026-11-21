@@ -9,6 +9,23 @@ from cavi_blender_mcp import server
 
 
 class ClearanceSurfaceTests(unittest.TestCase):
+    def test_explicit_frames_are_forwarded_and_invalid_schedules_rejected(self):
+        calls = []
+        def call(operation, params):
+            calls.append((operation, params))
+            return {'complete': True, 'passed': True}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[1, 12.5, 25]))
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[12.5]))
+            for invalid in ([], [True], [float('nan')], [float('inf')], [0], [26],
+                            [2, 2], [3, 2], list(range(1, 34)), ['2']):
+                with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                    asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                              sample_frames=invalid))
+        self.assertEqual([params['sample_frames'] for _, params in calls], [[1., 12.5, 25.], [12.5]])
+
     def test_clearance_is_read_only_and_keeps_explicit_metre_threshold(self):
         calls = []
         def call(operation, params):

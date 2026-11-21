@@ -9,8 +9,8 @@ import bpy
 import numpy as np
 from cavi_mcp_core import workspace as core_workspace
 
-from .blender_bridge import obj, output_file, selected, with_empties
 from .blender_export_uv import promote
+from .blender_lookup import obj, output_file, selected, with_empties
 from .blender_rigging import MAX_ARMATURE_BONES
 from .export_route import refuse_triangulate
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base

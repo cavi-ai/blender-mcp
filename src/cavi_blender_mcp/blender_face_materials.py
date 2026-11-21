@@ -1,8 +1,8 @@
 """Bind an existing finish to source polygons without rebuilding mesh data."""
 import bpy
 
-from .blender_bridge import editable_mesh, info
 from .blender_errors import preflight
+from .blender_lookup import editable_mesh, info
 from .blender_material_bindings import capture, restore
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import fingerprint, indices

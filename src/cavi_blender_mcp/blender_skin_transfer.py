@@ -7,8 +7,8 @@ import numpy as np
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-from .blender_bridge import info, new_name, obj
 from .blender_errors import preflight
+from .blender_lookup import info, new_name, obj
 from .blender_rig import weights
 from .blender_rigging import MAX_ASSIGNMENTS, label
 from .skin_projection import barycentric_factors
