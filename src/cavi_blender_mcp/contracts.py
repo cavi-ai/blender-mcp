@@ -220,6 +220,7 @@ class SkinClearance(Result):
     complete: bool
     passed: bool
     frames: list[Number]
+    all_frames_tested: bool = False
 
 
 class RigMotionComparison(Result):
@@ -231,6 +232,7 @@ class RigMotionComparison(Result):
     tolerance_m: Number
     frames: list[Number]
     meshes: list[Record]
+    all_frames_tested: bool = False
 
 
 class RigInspection(Result):

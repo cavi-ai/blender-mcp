@@ -51,6 +51,13 @@ class VertexSymmetryTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 self.plan([(-1,0,0),(1,0,0)],[0],[0,0,.1],**options)
 
+    def test_shear_uses_world_distance_to_the_symmetry_plane(self):
+        # |x| is 0.0006. Column length is 1, so the old metric is outside half of 0.001.
+        # The sheared plane distance is 0.0006/sqrt(2), inside that half.
+        with self.assertRaisesRegex(ValueError, 'tangential'):
+            self.plan([(0.0006, 0, 0)], [0], [.1, 0, 0],
+                      linear=((1, 1, 0), (0, 1, 0), (0, 0, 1)), tolerance_m=.001)
+
     def test_center_only_normal_motion_rejects_and_other_axes_reflect(self):
         with self.assertRaises(ValueError):
             self.plan([(0,0,0)],[0],[.1,0,0])

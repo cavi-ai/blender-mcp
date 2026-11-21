@@ -61,10 +61,13 @@ tolerance, and reports how many unique pairs it adds. It only examines overlappi
 triangle bounds within the same pair-work budget. World coordinates outside finite
 float32 range are rejected before native vector/BVH conversion.
 `nearest` samples vertices and triangle centres in both directions and reports the
-closest sampled witness. Its distance is an
-upper bound on the continuous surface minimum. Neither zero intersection pairs nor
-positive sampled gaps prove solid containment, physics clearance or absence of all
-contacts. The report returns no all-clear verdict.
+closest sampled witness in `distance_m`. That value is an upper bound on the
+continuous surface minimum. The same call runs a bounded triangle-distance search.
+When `continuous_minimum_proven` is true, `distance_lower_bound_m` is that minimum.
+When the pair budget runs out, the lower bound is unfinished and the report still
+lists `continuous_surface_minimum` under `not_checked`. Neither zero intersection
+pairs nor a positive sample gap proves solid containment, physics clearance or
+absence of all contacts. The report returns no all-clear verdict.
 
 The fixed query budgets are 100,000 combined triangles, 500,000 combined vertices,
 256 samples per side, 1,000,000 pair-work units and 32 intersection examples.
@@ -92,8 +95,10 @@ Optional `checks` add:
   `collision_prefixes`
 - `topology`: non-manifold and boundary edges, loose vertices, zero-area faces
   and n-gons
-- `lightmap`: presence and rasterized `overlap_ratio` of `lightmap_uv` at
-  `lightmap_resolution`
+- `lightmap`: presence of `lightmap_uv` at `lightmap_resolution`. `overlap_ratio`
+  is a cell-center raster. `exact_overlap_pairs` is the analytic count when
+  `overlap_proven` is true; a raster ratio of zero is not an overlap clearance
+  unless that flag is true
 - `transforms`: applied scale and rotation, delta transforms
 - `origin`: position relative to local bounds
 - `materials`: PBR map bindings, expected color spaces, packed image data,

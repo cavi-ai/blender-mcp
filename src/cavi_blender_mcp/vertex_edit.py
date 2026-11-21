@@ -86,6 +86,28 @@ def displaced(rows, offsets):
     return result
 
 
+def _plane_scale(linear, dimension, unit_m):
+    """Metres per local unit of distance to the axis plane.
+
+    ``||M e||`` equals that scale only when the axis is orthogonal to the other
+    two. Shear uses ``unit * |det| / ||cofactor row||``, the inverse-transpose length.
+    """
+    a, b, c = linear
+    det = a[0]*(b[1]*c[2]-b[2]*c[1])-a[1]*(b[0]*c[2]-b[2]*c[0])+a[2]*(b[0]*c[1]-b[1]*c[0])
+    cofactor = (
+        (b[1]*c[2]-b[2]*c[1], a[2]*c[1]-a[1]*c[2], a[1]*b[2]-a[2]*b[1]),
+        (b[2]*c[0]-b[0]*c[2], a[0]*c[2]-a[2]*c[0], a[2]*b[0]-a[0]*b[2]),
+        (b[0]*c[1]-b[1]*c[0], a[1]*c[0]-a[0]*c[1], a[0]*b[1]-a[1]*b[0]),
+    )
+    length = math.hypot(*cofactor[dimension])
+    if not math.isfinite(det) or det == 0 or not 0 < length < math.inf:
+        raise ValueError('Symmetry requires a nonsingular world transform')
+    scale = unit_m * abs(det) / length
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError('Symmetry plane distance must be finite')
+    return scale
+
+
 def symmetric_offsets(vertices, edges, seeds, offset, axis, tolerance_m, *, radius=None,
                       linear=((1,0,0),(0,1,0),(0,0,1)),unit_m=1.,max_affected=20000):
     """Reflect one hemisphere's displacement; retain the source's positional asymmetry."""
@@ -107,7 +129,7 @@ def symmetric_offsets(vertices, edges, seeds, offset, axis, tolerance_m, *, radi
     if not math.isfinite(determinant) or determinant == 0:
         raise ValueError('Symmetry requires a nonsingular world transform')
     dimension = 'XYZ'.index(axis)
-    axis_m = math.hypot(*(row[dimension]*unit_m for row in linear))
+    plane_scale = _plane_scale(linear, dimension, unit_m)
 
     def physical(point):
         result = tuple(sum(row[i]*point[i] for i in range(3))*unit_m for row in linear)
@@ -118,7 +140,7 @@ def symmetric_offsets(vertices, edges, seeds, offset, axis, tolerance_m, *, radi
     def mirrored(point):
         return tuple(-v if i == dimension else v for i,v in enumerate(point))
 
-    center = [abs(p[dimension])*axis_m <= tolerance_m/2 for p in vertices]
+    center = [abs(p[dimension])*plane_scale <= tolerance_m/2 for p in vertices]
     sides = {1 if vertices[i][dimension] > 0 else -1 for i in seeds if not center[i]}
     if len(sides) > 1:
         raise ValueError('Select symmetry seeds on one side of the local origin plane')
@@ -163,8 +185,19 @@ def symmetric_offsets(vertices, edges, seeds, offset, axis, tolerance_m, *, radi
     offsets,weights,pairs = {},{},[]
     max_error = 0.
     for index,weight in influence:
-        partner = counterpart(index)
-        if counterpart(partner) != index or center[index] != (partner == index):
+        # Shear can leave the local-axis mirror outside the Euclidean tolerance while the
+        # vertex is still on the world plane. That vertex is its own partner. A center
+        # vertex that does find a different vertex stays a failed match.
+        partner, matched = index, False
+        if not center[index]:
+            partner, matched = counterpart(index), True
+        else:
+            try:
+                partner, matched = counterpart(index), True
+            except ValueError as exc:
+                if not str(exc).startswith('Missing symmetry counterpart'):
+                    raise
+        if matched and (counterpart(partner) != index or center[index] != (partner == index)):
             raise ValueError('Symmetry counterparts must be reciprocal and unambiguous')
         vector = tuple(0. if center[index] and i == dimension else v*weight for i,v in enumerate(offset))
         offsets[index],weights[index] = vector,weight

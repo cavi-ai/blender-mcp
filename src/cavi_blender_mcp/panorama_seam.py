@@ -1,4 +1,4 @@
-"""Make a 2:1 panorama wrap horizontally: fade its last band into its first, then restore the original size."""
+"""Make a 2:1 panorama wrap horizontally without resampling its longitude."""
 
 import sys
 
@@ -6,19 +6,22 @@ from PIL import Image
 
 
 def wrap(source, band):
-    """The panorama without its last ``band`` columns, whose pixels fade into the first ``band`` instead, so the
-    right edge continues into the left; resized back to the source size."""
+    """Crossfade the last ``band`` columns into the first column and keep the source size.
+
+    Column ``width - 1`` matches column 0. Columns before the band are unchanged, so
+    horizontal pixels still span 360 degrees evenly.
+    """
     image = source.convert("RGB")
     width, height = image.size
     if not 0 < band < width // 2:
         raise ValueError("The seam band must be narrower than half the panorama")
-    mask = Image.new("L", (band, 1))
-    mask.putdata([round((index + 0.5) / band * 255) for index in range(band)])
-    left = image.crop((0, 0, band, height))
     right = image.crop((width - band, 0, width, height))
-    wrapped = image.crop((0, 0, width - band, height))
-    wrapped.paste(Image.composite(left, right, mask.resize((band, height), Image.NEAREST)), (0, 0))
-    return wrapped.resize((width, height), Image.LANCZOS)
+    edge = image.crop((0, 0, 1, height)).resize((band, height), Image.NEAREST)
+    mask = Image.new("L", (band, 1))
+    mask.putdata([round((index + 1) / band * 255) for index in range(band)])
+    blended = Image.composite(edge, right, mask.resize((band, height), Image.NEAREST))
+    image.paste(blended, (width - band, 0))
+    return image
 
 
 if __name__ == "__main__":

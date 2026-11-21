@@ -6,10 +6,18 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from cavi_blender_mcp import server
+from cavi_blender_mcp.blender_frame_map import bounded_samples
 from cavi_blender_mcp.rig_models import ClipTiming, ContactWindow, MotionSkinPair
 
 
 class ClipTimingTests(unittest.TestCase):
+    def test_sample_count_covers_every_integer_frame_only_when_it_fits(self):
+        frames, covered = bounded_samples(5, 21, 32)
+        self.assertEqual(frames, list(range(5, 22)))
+        self.assertTrue(covered)
+        frames, covered = bounded_samples(1, 25, 3)
+        self.assertEqual(frames, [1, 13, 25])
+        self.assertFalse(covered)
     def test_timing_and_affine_sampling_reach_the_bridge(self):
         calls = []
 

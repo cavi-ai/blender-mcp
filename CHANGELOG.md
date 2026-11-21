@@ -7,6 +7,18 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Fixed
+
+- Convex collision over the vertex limit uses the containing box instead of a hull of a vertex subset.
+- Lightmap and mesh-quality overlap report an analytic pair count. A cell-center ratio of zero is an overlap clearance only when `overlap_proven` is true.
+- Spatial clearance reports an exact triangle distance when the search finishes, and leaves the minimum unproven when the pair budget runs out.
+- Motion, garment, and contact checks set `all_frames_tested` and evaluate every integer frame when the sample count can hold the range.
+- World-space retarget rejects a pose the target hierarchy does not round-trip within 0.0001.
+- Foot lock measures the declared contact windows and removes the copy when a window misses its tolerance.
+- Panorama wrap keeps the source width so longitude is not stretched.
+- Symmetry classifies the center plane by world distance under shear.
+- Terrain value noise keeps each seed's amplitude. Heightmap borders use a full reflected filter window.
+
 ## 0.59.0 - 2026-11-19
 
 ### Added

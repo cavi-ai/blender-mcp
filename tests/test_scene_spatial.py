@@ -108,6 +108,51 @@ class SceneSpatialTests(unittest.TestCase):
             list(helpers.chunk_pairs(a, b, 24))
         self.assertEqual(len(list(helpers.chunk_pairs(a, b, 25))), 1)
 
+    def test_exact_distance_finds_an_edge_gap_tighter_than_vertices_or_centroids(self):
+        helpers = self.helpers()
+        # Closest points are edge midpoints. Vertices and centroids are farther.
+        left = [((0., 1., 0.), (0., -1., 0.), (-1., 0., 0.))]
+        right = [((0.1, 0., 1.), (0.1, 0., -1.), (1., 0., 0.))]
+        proof = helpers.prove_distance(left, right, upper=2., budget=8)
+        self.assertTrue(proof['proven'])
+        self.assertAlmostEqual(proof['lower_m'], 0.1, places=9)
+        self.assertAlmostEqual(proof['upper_m'], 0.1, places=9)
+        samples = [point for _, point in helpers.samples(left, 4)]
+        sampled = min(helpers.point_triangle_distance(point, right[0]) for point in samples)
+        self.assertGreater(sampled, proof['lower_m'] + 0.05)
+
+    def test_piercing_triangles_have_zero_distance_in_both_orders(self):
+        helpers = self.helpers()
+        a = ((0, 0, 0), (3, 0, 0), (0, 3, 0))
+        b = ((.75, .75, -1), (.75, .75, 1), (.75, 1.25, 1))
+        for left, right in ((a, b), (b, a)):
+            self.assertEqual(helpers.triangle_distance(left, right), 0)
+            self.assertEqual(helpers.prove_distance([left], [right], .75, 1)['upper_m'], 0)
+
+    def test_short_skew_segments_keep_interior_closest_points(self):
+        helpers = self.helpers()
+        gap = helpers.segment_distance((-1e-6, 0, 0), (1e-6, 0, 0),
+                                       (0, -1e-6, 1e-7), (0, 1e-6, 1e-7))
+        self.assertAlmostEqual(gap, 1e-7, places=15)
+
+    def test_spatial_module_changes_bridge_fingerprint(self):
+        from pathlib import Path
+
+        from cavi_blender_mcp.bridge_contract import expected_bridge
+        before, read = expected_bridge(), Path.read_bytes
+        def changed(path):
+            return read(path) + (b'\n' if path.name == 'spatial_query.py' else b'')
+        with patch.object(Path, 'read_bytes', changed):
+            self.assertNotEqual(before['build'], expected_bridge()['build'])
+
+    def test_an_exhausted_distance_budget_does_not_claim_the_minimum(self):
+        helpers = self.helpers()
+        left = [((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))]
+        right = [((0.2, 0.2, 0.), (1.2, 0.2, 0.), (0.2, 1.2, 0.))]
+        proof = helpers.prove_distance(left, right, upper=1., budget=0)
+        self.assertFalse(proof['proven'])
+        self.assertLess(proof['lower_m'], proof['upper_m'])
+
     def test_samples_are_bounded_and_include_surface_interiors(self):
         helpers = self.helpers()
         triangles = [((0., 0., 0.), (3., 0., 0.), (0., 3., 0.))]

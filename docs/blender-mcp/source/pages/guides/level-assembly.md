@@ -14,11 +14,14 @@ requires a `lease_id`.
 ## Terrain
 
 `terrain` builds a regular grid with one UV layer and smooth shading. Without
-`image`, deterministic value noise drives the height. With `image`, luminance
+`image`, deterministic value noise drives the height. The noise stays in its
+weighted 0–1 range and is not stretched so that every seed fills `height`.
+`minimum` and `maximum` are the actual elevations. With `image`, luminance
 from a workspace PNG or JPEG heightmap drives it; black is 0 and white is
-`height`. Image input overrides noise parameters.
+`height`. Image input overrides noise parameters. The heightmap prefilter uses
+a full reflected window, including the border.
 
-`size` is the X and Y extent in metres, `height` is the elevation range and
+`size` is the X and Y extent in metres, `height` scales elevation and
 `resolution` is the number of vertices per side. The terrain is centered on its
 origin and placed at `location`.
 

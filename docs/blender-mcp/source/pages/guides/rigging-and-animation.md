@@ -204,7 +204,9 @@ source bone maps to one target bone, target bones are used at most once, and
 every named bone must exist.
 
 By default every whole source frame is keyed, up to 1,000 frames. `samples`
-selects 2–256 evenly spaced frames instead. Armatures are limited to 512 bones,
+selects 2–256 evenly spaced frames instead. The transfer checks that each keyed
+pose matrix round-trips within 0.0001 and fails instead of keeping a pose the
+target hierarchy cannot represent. Armatures are limited to 512 bones,
 mappings to 128 pairs and the result to 100,000 keyframes. The result reports
 mapped and unmapped bones.
 
@@ -468,10 +470,14 @@ start-foot world rotation during the hold. IK stretching is disabled. This is a
 planar stance correction, not stance inference, terrain fitting, pelvis solving
 or an automatic guarantee of reachability.
 
-The receipt identifies the new rig, skins, controls, constraints and blend ranges.
-Setup failures remove generated copies and controls; errors after editing begins
-remain uncertain at the transport boundary. Save the editable working source and
-inspect the returned rig with the same contact windows and deformation checks.
+The receipt identifies the new rig, skins, controls, constraints and blend ranges,
+and `contact_validation` is the contact measurement for the declared windows.
+A window that misses its drift or height tolerance removes the generated copy.
+When `samples` can hold every integer frame in the window, those frames are the
+measurement and `all_frames_tested` is true. Otherwise the measurement is the
+evenly spaced subset. Setup failures remove generated copies and controls; errors
+after editing begins remain uncertain at the transport boundary. Save the editable
+working source and inspect deformation on the returned rig.
 Unreachable anchors or unsuitable poles must fail review rather than relax the
 contact tolerance. Bake that corrected rig again for constraint-free exports, then
 perform the existing sampled skin and FBX/GLB comparisons. Inspect transitions,

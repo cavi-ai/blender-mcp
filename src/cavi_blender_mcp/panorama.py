@@ -13,7 +13,7 @@ from .paths import destination
 PREFIX = "CAVI_IMAGE_MLX"
 SUFFIXES = ("PYTHON", "AGENT", "MODEL")
 WIDTH, HEIGHT = 2048, 1024
-# Columns faded across the wrap seam, then restored by resizing.
+# Columns crossfaded at the wrap so longitude stays one pixel per column.
 BAND = 128
 STEPS = {"default": 30, "fast": 12}
 TIMEOUT = 1800

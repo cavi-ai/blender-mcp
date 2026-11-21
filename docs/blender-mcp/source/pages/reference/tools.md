@@ -9,8 +9,10 @@ against one named context mesh without editing the scene. The object form
 meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects),
 `min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
 identities, bounded triangle intersection pairs and bidirectional sampled nearest
-surface gaps with fixed safety budgets. Bounds are broadphase only; sampled distances are not
-continuous clearance or solid-containment proofs. See [placement and surface
+surface gaps with fixed safety budgets. Bounds are broadphase only. `distance_m` is the
+closest sample. A finished search sets `continuous_minimum_proven` and
+`distance_lower_bound_m` to the exact triangle distance; an exhausted search leaves the
+minimum unproven. Neither result is a solid-containment proof. See [placement and surface
 clearance](../guides/scene-inspection.md#placement-and-surface-clearance) for limits
 and an example. This mode excludes other `scene_info` arguments.
 
@@ -311,9 +313,13 @@ reconstruction, normals, foot contact and Unity import need separate review.
 Read-only. Samples evaluated garment vertices and, by default, triangle centres
 against closed body components. Supply `body`, 1–8 distinct `garments`, increasing
 `start_frame`/`end_frame`, and an explicit `min_clearance_m`. `samples` is 2–32.
+When that count can hold every integer frame, those frames are tested and
+`all_frames_tested` is true. Otherwise the frames stay evenly spaced and
+`all_frames_tested` is false.
 Alternatively, `sample_frames` supplies 1–32 finite, strictly increasing integer
 or fractional frames within that interval. When supplied, this list overrides
-the evenly spaced `samples` schedule, and `requested_samples` is its length.
+the `samples` schedule, and `requested_samples` is its length. `all_frames_tested`
+is true when that list includes every integer frame in the interval.
 Split a longer check across explicit lists to preserve the same source geometry
 and exact fractional times. `frames` records the frames reached, including when
 a query budget stops the call before the requested schedule is complete.

@@ -5,7 +5,7 @@ import math
 import bpy
 from mathutils import Vector
 
-from .blender_frame_map import mapped_frames
+from .blender_frame_map import bounded_samples, mapped_frames
 
 
 def contact_frames(rig, action, window, frame_offset=0, frame_scale=1):
@@ -27,7 +27,8 @@ def contact_frames(rig, action, window, frame_offset=0, frame_scale=1):
             isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x)
             for x in [*point, *numbers]) or min(numbers[:2]) < 0):
         raise ValueError('Contact points and budgets must be finite, with nonnegative tolerances')
-    return mapped_frames([start+(end-start)*i/(count-1) for i in range(count)], frame_scale, frame_offset)
+    source_frames, _covered = bounded_samples(start, end, count)
+    return mapped_frames(source_frames, frame_scale, frame_offset)
 
 
 def report(rig, action, windows, reference=None, frame_offset=0, frame_scale=1):
@@ -39,6 +40,7 @@ def report(rig, action, windows, reference=None, frame_offset=0, frame_scale=1):
     result = []
     for window in windows:
         frames = contact_frames(rig, action, window, frame_offset, frame_scale)
+        _source, covered = bounded_samples(window['start_frame'], window['end_frame'], window.get('samples', 9))
         point = Vector(window['point'])
         conversion = None
         basis_error = 0.0
@@ -87,6 +89,7 @@ def report(rig, action, windows, reference=None, frame_offset=0, frame_scale=1):
             'worst_drift_frame': frames[drift.index(maximum_drift)],
             'worst_height_frame': frames[height.index(maximum_height)],
             'passed': maximum_drift <= window['max_drift_m'] and maximum_height <= window['max_height_error_m'] and basis_error <= 1e-5,
+            'all_frames_tested': covered,
             'scope': 'sampled_bone_marker_world_z_ground'}
         if reference is not None:
             measured.update(contact_reference={'armature': reference[0].name, 'action': reference[1].name},

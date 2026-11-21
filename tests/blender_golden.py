@@ -74,6 +74,14 @@ def assert_convex_hull(value, limit):
         bm.free()
 
 
+# The actual faceted sphere must contain oblique source corners.
+make("SM_Oblique", lambda bm: bmesh.ops.create_cube(bm, size=2))
+sphere_result = edit("collision", name="SM_Oblique", shape="sphere")
+sphere_entry = sphere_result["objects"][0]
+sphere_mesh = bpy.data.objects[sphere_entry["name"]].data
+sphere_points = np.array([vertex.co[:] for vertex in bpy.data.objects["SM_Oblique"].data.vertices])
+assert sphere_entry["contains_source"] and blender_geometry.covers(sphere_mesh, sphere_points, tolerance=0), sphere_result
+
 # Convex hulls of meshes with interior points.
 for name, build in (("SM_SubSphere", subdivided_sphere), ("SM_Rock", rock)):
     make(name, build, uv=True)
@@ -82,8 +90,15 @@ for name, extra in (("SM_SubSphere", {}), ("SM_Rock", {"target_triangles": 300})
         edit("decimate_to", name=name, **extra)
     hulls = edit("collision", name=name, shape="convex", max_hull_vertices=24)
     entry = hulls["objects"][0]
-    assert hulls["count"] == 1 and not entry["box_fallback"], hulls
-    assert_convex_hull(bpy.data.objects[entry["name"]], 24)
+    assert hulls["count"] == 1 and entry["contains_source"], hulls
+    shape = bpy.data.objects[entry["name"]]
+    source_co = np.empty(len(bpy.data.objects[name].data.vertices) * 3, np.float64)
+    bpy.data.objects[name].data.vertices.foreach_get("co", source_co)
+    assert blender_geometry.covers(shape.data, source_co.reshape(-1, 3)), entry
+    if not entry["box_fallback"]:
+        assert_convex_hull(shape, 24)
+    else:
+        assert len(shape.data.vertices) <= 24
     results[f"hull_{name}"] = entry["vertices"]
 
 

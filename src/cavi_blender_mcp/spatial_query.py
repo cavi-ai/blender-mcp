@@ -1,5 +1,6 @@
 """Bounded spatial-query validation and sampling, without a native dependency."""
 import math
+from heapq import heappop, heappush
 
 DEFAULTS = {'proposed_world_delta': None, 'min_clearance_m': 0., 'samples_per_side': 256,
             'max_triangles': 100000, 'max_pair_tests': 1000000, 'max_results': 32}
@@ -141,6 +142,191 @@ def chunk_pairs(subjects, context, budget):
                 raise ValueError('Spatial pair budget exceeded; select a smaller context')
             if overlap:
                 yield a, b
+
+
+def _sub(a, b):
+    return tuple(a[i] - b[i] for i in range(3))
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _cross(a, b):
+    return (a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0])
+
+
+def _add(a, b):
+    return tuple(a[i] + b[i] for i in range(3))
+
+
+def _scale(a, factor):
+    return tuple(v * factor for v in a)
+
+
+def _dist(a, b):
+    return math.dist(a, b)
+
+
+def _clamp(value):
+    return 0. if value < 0 else 1. if value > 1 else value
+
+
+def point_triangle_distance(point, triangle):
+    """Distance from a point to a triangle, including its boundary."""
+    a, b, c = triangle
+    ab, ac, ap = _sub(b, a), _sub(c, a), _sub(point, a)
+    d1, d2 = _dot(ab, ap), _dot(ac, ap)
+    if d1 <= 0 and d2 <= 0:
+        return _dist(point, a)
+    bp = _sub(point, b)
+    d3, d4 = _dot(ab, bp), _dot(ac, bp)
+    if d3 >= 0 and d4 <= d3:
+        return _dist(point, b)
+    vc = d1 * d4 - d3 * d2
+    if vc <= 0 and d1 >= 0 and d3 <= 0:
+        return _dist(point, _add(a, _scale(ab, d1 / (d1 - d3))))
+    cp = _sub(point, c)
+    d5, d6 = _dot(ab, cp), _dot(ac, cp)
+    if d6 >= 0 and d5 <= d6:
+        return _dist(point, c)
+    vb = d5 * d2 - d1 * d6
+    if vb <= 0 and d2 >= 0 and d6 <= 0:
+        return _dist(point, _add(a, _scale(ac, d2 / (d2 - d6))))
+    va = d3 * d6 - d5 * d4
+    if va <= 0 and d4 - d3 >= 0 and d5 - d6 >= 0:
+        return _dist(point, _add(b, _scale(_sub(c, b), (d4 - d3) / ((d4 - d3) + (d5 - d6)))))
+    denom = va + vb + vc
+    if denom == 0:
+        return min(_dist(point, a), _dist(point, b), _dist(point, c))
+    closest = _add(a, _add(_scale(ab, vb / denom), _scale(ac, vc / denom)))
+    return _dist(point, closest)
+
+
+def segment_distance(p1, q1, p2, q2):
+    """Distance between two segments."""
+    d1, d2 = _sub(q1, p1), _sub(q2, p2)
+    r = _sub(p1, p2)
+    a, e, f = _dot(d1, d1), _dot(d2, d2), _dot(d2, r)
+    b, c = _dot(d1, d2), _dot(d1, r)
+    cross = _cross(d1, d2)
+    denom = _dot(cross, cross)
+    s = _clamp((b * f - c * e) / denom) if denom > 0 else 0.
+    if e == 0:
+        t = 0.
+        s = _clamp(-c / a) if a > 0 else 0.
+    else:
+        t = (b * s + f) / e
+        if t < 0:
+            t = 0.
+            s = _clamp(-c / a) if a > 0 else 0.
+        elif t > 1:
+            t = 1.
+            s = _clamp((b - c) / a) if a > 0 else 0.
+    return _dist(_add(p1, _scale(d1, s)), _add(p2, _scale(d2, t)))
+
+
+def _segment_intersects_triangle(p, q, triangle):
+    a, b, c = triangle
+    direction, edge1, edge2 = _sub(q, p), _sub(b, a), _sub(c, a)
+    h = _cross(direction, edge2)
+    det = _dot(edge1, h)
+    if det == 0:
+        return False
+    offset = _sub(p, a)
+    u = _dot(offset, h) / det
+    cross = _cross(offset, edge1)
+    v = _dot(direction, cross) / det
+    t = _dot(edge2, cross) / det
+    return 0 <= u <= 1 and 0 <= v and u + v <= 1 and 0 <= t <= 1
+
+
+def triangle_distance(a, b):
+    """Exact distance between two triangles. Intersection and contact are zero."""
+    if any(_segment_intersects_triangle(tri[i], tri[(i + 1) % 3], other)
+           for tri, other in ((a, b), (b, a)) for i in range(3)):
+        return 0.
+    best = min(point_triangle_distance(point, b) for point in a)
+    best = min(best, min(point_triangle_distance(point, a) for point in b))
+    for i in range(3):
+        for j in range(3):
+            best = min(best, segment_distance(a[i], a[(i + 1) % 3], b[j], b[(j + 1) % 3]))
+    return best
+
+
+def _group_bounds(triangles, indices):
+    return bounds([point for index in indices for point in triangles[index]])
+
+
+def _gap(a, b):
+    total = 0.
+    for i in range(3):
+        if a[1][i] < b[0][i]:
+            delta = b[0][i] - a[1][i]
+        elif b[1][i] < a[0][i]:
+            delta = a[0][i] - b[1][i]
+        else:
+            delta = 0.
+        total += delta * delta
+    return math.sqrt(total)
+
+
+def _split(triangles, indices):
+    box = _group_bounds(triangles, indices)
+    axis = max(range(3), key=lambda i: box[1][i] - box[0][i])
+    ordered = sorted(indices, key=lambda i: sum(point[axis] for point in triangles[i]))
+    middle = max(1, len(ordered) // 2)
+    return ordered[:middle], ordered[middle:]
+
+
+def prove_distance(subjects, context, upper, budget):
+    """Branch-and-bound triangle distance.
+
+    ``upper`` is a known distance, such as a sample. A finished search reports
+    the exact minimum. An exhausted budget reports a lower bound that must not
+    be treated as the minimum.
+    """
+    if type(budget) is not int or budget < 0:
+        raise ValueError('Distance proof budget must be a nonnegative integer')
+    if not subjects or not context:
+        raise ValueError('Distance proof requires both surfaces')
+    if not math.isfinite(upper) or upper < 0:
+        raise ValueError('Distance upper bound must be finite and nonnegative')
+    best = float(upper)
+    work = 0
+    counter = 0
+    pending = []
+    heappush(pending, (_gap(_group_bounds(subjects, range(len(subjects))),
+                            _group_bounds(context, range(len(context)))),
+                       counter, tuple(range(len(subjects))), tuple(range(len(context)))))
+    stopped = None
+    while pending:
+        gap, _, left, right = heappop(pending)
+        if gap >= best:
+            continue
+        if work >= budget:
+            stopped = gap
+            break
+        work += 1
+        if len(left) > 1 or len(right) > 1:
+            if len(left) >= len(right) and len(left) > 1:
+                parts, other, left_side = _split(subjects, left), right, True
+            else:
+                parts, other, left_side = _split(context, right), left, False
+            for part in parts:
+                if not part:
+                    continue
+                pair = (part, other) if left_side else (other, part)
+                counter += 1
+                heappush(pending, (_gap(_group_bounds(subjects, pair[0]),
+                                        _group_bounds(context, pair[1])),
+                                   counter, tuple(pair[0]), tuple(pair[1])))
+            continue
+        best = min(best, triangle_distance(subjects[left[0]], context[right[0]]))
+    if stopped is None:
+        return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
+    lower = min(stopped, pending[0][0]) if pending else stopped
+    return {'proven': False, 'lower_m': lower, 'upper_m': best, 'tests': work}
 
 
 def samples(triangles, maximum):

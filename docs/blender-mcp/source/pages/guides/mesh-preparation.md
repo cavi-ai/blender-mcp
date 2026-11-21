@@ -24,7 +24,7 @@ on the same object without applying transforms or changing scene references.
 | `lightmap_uv` | Create or repack a lightmap UV layer and report overlap |
 | `texel_density` | Scale a UV layer to a target pixels-per-metre |
 | `uv_transform` | Move, scale or rotate explicit source-face UV loops on an existing layer |
-| `collision` | Create `UCX_`, `UBX_` or `USP_` collision objects per loose part |
+| `collision` | Create `UCX_`, `UBX_` or `USP_` collision objects per loose part. A convex hull past the vertex limit becomes the containing box |
 | `cleanup` | Merge, delete loose geometry, delete connected fragments under 0.5% of the surface area, recalculate normals, triangulate, clear custom normals |
 | `boolean` | Union, difference or intersect against one operand |
 | `join` | Consume sources into the target with transform, UV, group and slot remapping |
@@ -408,8 +408,10 @@ fractional margins can be infeasible on surfaces with many islands; the tool doe
 not reduce them automatically. Use `inspect_uv_layout` to check overlaps and the
 required pixel gutters after a successful unwrap.
 `decimate_to` dissolves faces collapsed onto coincident vertices. `lightmap_uv` creates
-`UVMap_Lightmap` when missing, keeps the render-active layer and rasterizes the
-overlap ratio. `texel_density` scales the layer around its UV bounds center;
+`UVMap_Lightmap` when missing and keeps the render-active layer. It reports the
+cell-center `overlap_ratio` and, when the triangle count finishes an analytic scan,
+`exact_overlap_pairs`. A zero raster ratio with `overlap_proven` false is not a
+clearance. `texel_density` scales the layer around its UV bounds center;
 `pack=true` rearranges islands without rescaling. Its `texture_resolution` takes
 one size or `[width, height]`; density is the geometric mean of both axes.
 

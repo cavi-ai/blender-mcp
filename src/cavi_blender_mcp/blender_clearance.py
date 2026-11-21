@@ -8,8 +8,10 @@ import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
+from .blender_frame_map import bounded_samples
 from .blender_mesh_sample import snapshot
 from .blender_motion_compare import set_frame
+from .clearance_frames import validate_sample_frames
 
 DIRECTIONS = [Vector(value).normalized() for value in
               ((1, .371, .529), (-.277, 1, .413), (.193, -.317, 1))]
@@ -119,12 +121,13 @@ def inspect(p, find_object):
             or type(maximum) is not int or not 1 <= maximum <= 1000000
             or mode not in ('vertices', 'vertices_and_centres')):
         raise ValueError('Invalid clearance frames, threshold or query budget')
-    from .clearance_frames import validate_sample_frames
-
     explicit = p.get('sample_frames')
-    schedule = (np.linspace(start, end, samples).tolist() if explicit is None
-                else validate_sample_frames(explicit, start, end))
-    samples = len(schedule)
+    if explicit is None:
+        schedule, covered = bounded_samples(start, end, samples)
+    else:
+        schedule = validate_sample_frames(explicit, start, end)
+        covered = sum(frame == int(frame) for frame in schedule) == end - start + 1
+        samples = len(schedule)
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
     from .blender_geometry import unit_scale
@@ -198,11 +201,14 @@ def inspect(p, find_object):
         scene.frame_set(prior[0], subframe=prior[1])
         bpy.context.view_layer.update()
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
+    covered = covered and complete
     return {'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,
             'complete': complete, 'passed': complete and all(report['violating_samples']==0 for report in reports),
-            'frames': frames, 'requested_samples': samples, 'surface_samples': mode,
+            'frames': frames, 'requested_samples': samples, 'all_frames_tested': covered,
+            'surface_samples': mode,
             'minimum_required_m': threshold, 'numerical_resolution_m': precision,
             'body_topology': topology, 'issues': issues, 'queries': budget.used,
             'query_budget': maximum, 'scene_unit_meters': meters,
-            'not_checked': ['unsampled times and surface locations', 'continuous triangle collision',
+            'not_checked': [*(() if covered else ('unsampled times',)), 'unsampled surface locations',
+                            'continuous triangle collision',
                             'body self-intersections', 'cloth simulation', 'Unity import']}

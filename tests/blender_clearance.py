@@ -74,6 +74,12 @@ result = inspect(sample_frames=[12.5])
 assert result['complete'] and result['frames'] == [12.5] and result['requested_samples'] == 1
 result = inspect(sample_frames=[1., 12.5, 25.], max_queries=1)
 assert not result['complete'] and result['frames'] == [1.] and result['requested_samples'] == 3
+result = inspect(end_frame=3, sample_frames=[1, 2, 3], max_queries=1)
+assert not result['complete'] and not result['all_frames_tested'], result
+result = inspect(end_frame=3, sample_frames=[1, 2, 3])
+assert result['complete'] and result['all_frames_tested'], result
+result = inspect(end_frame=3, samples=9)
+assert result['requested_samples'] == 9, result
 for invalid in ([], [True], [float('nan')], [0], [26], [3, 3], [4, 2], list(range(1, 34))):
     try:
         inspect(sample_frames=invalid)
