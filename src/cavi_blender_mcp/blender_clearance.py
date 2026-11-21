@@ -115,12 +115,15 @@ def inspect(p, find_object):
     start, end, threshold = p['start_frame'], p['end_frame'], p['min_clearance_m']
     samples, maximum = p.get('samples', 9), p.get('max_queries', 1000000)
     mode = p.get('surface_samples', 'vertices_and_centres')
+    region_attribute = p.get('region_attribute')
     if (type(start) is not int or type(end) is not int or not 1 <= start < end <= 1000000
             or type(samples) is not int or not 2 <= samples <= 32
             or isinstance(threshold, bool) or not math.isfinite(threshold) or threshold < 0
             or type(maximum) is not int or not 1 <= maximum <= 1000000
             or mode not in ('vertices', 'vertices_and_centres')):
         raise ValueError('Invalid clearance frames, threshold or query budget')
+    if region_attribute is not None and (type(region_attribute) is not str or not 1 <= len(region_attribute) <= 63):
+        raise ValueError('region_attribute must be a name of 1..63 characters')
     explicit = p.get('sample_frames')
     if explicit is None:
         schedule, covered = bounded_samples(start, end, samples)
@@ -136,6 +139,8 @@ def inspect(p, find_object):
     reports = [{'name': name, 'min_clearance_m': None, 'worst_frame': None,
                 'inside_samples': 0, 'violating_samples': 0, 'ambiguous_samples': 0,
                 'samples_checked': 0, 'worst_probe': None, 'violation_examples': []} for name in names]
+    region_reports = [{} for _ in names]
+    seen_regions = [set() for _ in names]
     frames, topology, issues, work = [], [], [], 0
     budget, precision = Budget(maximum), 0.
     try:
@@ -158,8 +163,16 @@ def inspect(p, find_object):
                 break
             tree = BVHTree.FromPolygons(body_vectors, faces.tolist(), all_triangles=True)
             precision = max(precision, EPSILON*scale*meters)
-            for value, report in zip(garments, reports, strict=True):
-                positions, triangles = snapshot(value, depsgraph, triangles=mode=='vertices_and_centres')
+            for value, report, buckets, seen in zip(garments, reports, region_reports, seen_regions, strict=True):
+                if region_attribute is None:
+                    positions, triangles = snapshot(value, depsgraph, triangles=mode=='vertices_and_centres')
+                    regions = None
+                else:
+                    positions, triangles, regions = snapshot(value, depsgraph,
+                        triangles=mode=='vertices_and_centres', region_attribute=region_attribute)
+                    seen.update(regions)
+                    if len(seen) > 64:
+                        raise ValueError(f'Garment {value.name!r} exceeds 64 distinct region buckets')
                 vertex_count = len(positions)
                 if mode == 'vertices_and_centres' and len(triangles):
                     positions = np.vstack((positions, positions[triangles].mean(axis=1)))
@@ -181,14 +194,31 @@ def inspect(p, find_object):
                                 break
                             uncertain = uncertain or state is None
                     report['samples_checked'] += 1
+                    bucket = None
+                    if regions is not None:
+                        ids = regions[index]
+                        bucket = buckets.get(ids)
+                        if bucket is None:
+                            bucket = {'region_ids': list(ids), 'samples_checked': 0,
+                                'inside_samples': 0, 'violating_samples': 0, 'ambiguous_samples': 0,
+                                'min_clearance_m': None, 'worst_frame': None, 'worst_probe': None}
+                            buckets[ids] = bucket
+                        bucket['samples_checked'] += 1
                     if uncertain:
                         report['ambiguous_samples'] += 1
+                        if bucket is not None:
+                            bucket['ambiguous_samples'] += 1
                         continue
                     gap = distance*scale*meters*(-1 if inside else 1)
                     report['inside_samples'] += int(inside)
                     report['violating_samples'] += int(gap < threshold)
                     probe = {'kind': 'vertex' if index < vertex_count else 'triangle_centre',
                              'index': index if index < vertex_count else index-vertex_count}
+                    if bucket is not None:
+                        bucket['inside_samples'] += int(inside)
+                        bucket['violating_samples'] += int(gap < threshold)
+                        if bucket['min_clearance_m'] is None or gap < bucket['min_clearance_m']:
+                            bucket['min_clearance_m'], bucket['worst_frame'], bucket['worst_probe'] = gap, frame, probe
                     if gap < threshold and len(report['violation_examples']) < 16:
                         report['violation_examples'].append({'frame': frame, **probe, 'clearance_m': gap})
                     if report['min_clearance_m'] is None or gap < report['min_clearance_m']:
@@ -200,6 +230,9 @@ def inspect(p, find_object):
     finally:
         scene.frame_set(prior[0], subframe=prior[1])
         bpy.context.view_layer.update()
+    if region_attribute is not None:
+        for report, buckets in zip(reports, region_reports, strict=True):
+            report['regions'] = [buckets[key] for key in sorted(buckets)]
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
     covered = covered and complete
     return {'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,

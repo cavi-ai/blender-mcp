@@ -7143,6 +7143,21 @@
     }
   },
   {
+    "id": "clearance-invalid-region-name",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": ["MorphSource"],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "region_attribute": ""
+    },
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "validation"
+  },
+  {
     "id": "clearance-invalid-frame-type",
     "tool": "inspect_skin_clearance",
     "arguments": {
