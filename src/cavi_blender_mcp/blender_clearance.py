@@ -11,6 +11,7 @@ from mathutils.bvhtree import BVHTree
 from .blender_frame_map import bounded_samples
 from .blender_mesh_sample import snapshot
 from .blender_motion_compare import set_frame
+from .clearance_frames import validate_sample_frames
 
 DIRECTIONS = [Vector(value).normalized() for value in
               ((1, .371, .529), (-.277, 1, .413), (.193, -.317, 1))]
@@ -120,6 +121,14 @@ def inspect(p, find_object):
             or type(maximum) is not int or not 1 <= maximum <= 1000000
             or mode not in ('vertices', 'vertices_and_centres')):
         raise ValueError('Invalid clearance frames, threshold or query budget')
+    explicit = p.get('sample_frames')
+    if explicit is None:
+        schedule, covered = bounded_samples(start, end, samples)
+    else:
+        schedule = validate_sample_frames(explicit, start, end)
+        reached = {int(frame) for frame in schedule if frame == int(frame)}
+        covered = set(range(start, end + 1)) <= reached
+    samples = len(schedule)
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
     from .blender_geometry import unit_scale
@@ -131,8 +140,7 @@ def inspect(p, find_object):
     frames, topology, issues, work = [], [], [], 0
     budget, precision = Budget(maximum), 0.
     try:
-        frames_to_test, covered = bounded_samples(start, end, samples)
-        for frame in frames_to_test:
+        for frame in schedule:
             set_frame(frame)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             body_points, faces = snapshot(body, depsgraph, triangles=True)

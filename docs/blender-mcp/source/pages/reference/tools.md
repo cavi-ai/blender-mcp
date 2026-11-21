@@ -313,6 +313,16 @@ reconstruction, normals, foot contact and Unity import need separate review.
 Read-only. Samples evaluated garment vertices and, by default, triangle centres
 against closed body components. Supply `body`, 1–8 distinct `garments`, increasing
 `start_frame`/`end_frame`, and an explicit `min_clearance_m`. `samples` is 2–32.
+When that count can hold every integer frame, those frames are tested and
+`all_frames_tested` is true. Otherwise the frames stay evenly spaced and
+`all_frames_tested` is false.
+Alternatively, `sample_frames` supplies 1–32 finite, strictly increasing integer
+or fractional frames within that interval. When supplied, this list overrides
+the `samples` schedule, and `requested_samples` is its length. `all_frames_tested`
+is true when that list includes every integer frame in the interval.
+Split a longer check across explicit lists to preserve the same source geometry
+and exact fractional times. `frames` records the frames reached, including when
+a query budget stops the call before the requested schedule is complete.
 `surface_samples: vertices` omits face-centre probes. `max_queries` bounds nearest,
 component and ray queries (default/maximum 1,000,000); surface samples are capped
 at four million. The call restores frame and subframe.
