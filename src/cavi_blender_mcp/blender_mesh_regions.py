@@ -9,9 +9,9 @@ import bmesh
 import bpy
 from mathutils import Vector
 
-from .blender_bridge import info, obj
 from .blender_errors import preflight
 from .blender_geometry import MAX_TRIANGLES, source, swap
+from .blender_lookup import info, obj
 from .mesh_regions import selection
 
 

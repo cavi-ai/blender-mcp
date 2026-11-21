@@ -9,8 +9,8 @@ import bpy
 import numpy as np
 from mathutils import Euler, Vector
 
-from .blender_bridge import RENDERLESS, number, obj, output_file
 from .blender_geometry import triangle_count, unit_scale
+from .blender_lookup import RENDERLESS, number, obj, output_file
 
 VIEWS = {"front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0),
          "top": (0, 0, 1), "persp": (1.5, -2, 1.4)}
