@@ -339,6 +339,16 @@ probe indices, body topology and numerical resolution. Multiple closed body
 components are treated as a union. Ray parity does not depend on face winding.
 Coordinates are normalized around the body before native BVH queries.
 
+Optionally set `region_attribute` to the name of an evaluated FACE-domain INT
+attribute present on every garment. Each garment then reports `regions` with
+disjoint `region_ids` buckets and their probe counts, signed minimum, worst frame,
+and original probe index. Triangle centres use their polygon's ID; a vertex uses
+the sorted unique IDs of its incident polygons, and a loose vertex uses an empty
+list. Shared vertices occur in one combined bucket. At most 64 distinct buckets
+per garment across the call, 64 incident IDs per vertex, and 600,000 polygon
+corners per evaluated garment are supported. When a
+budget stops the call, region counts cover the probes actually classified.
+
 `complete` and `passed` must both be true. Open or degenerate bodies, exhausted
 budgets and ambiguous ray/contact classifications cannot pass. A closed skinned
 reference cage can be used when the visible body has intentional openings.

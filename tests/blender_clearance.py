@@ -40,6 +40,13 @@ mesh = bpy.data.meshes.new('Cross')
 mesh.from_pydata([(-3, -2, 0), (3, -2, 0), (0, 3, 0)], [], [(0, 1, 2)])
 cross = bpy.data.objects.new('Cross', mesh)
 scene.collection.objects.link(cross)
+role_mesh = bpy.data.meshes.new('RoleGarment')
+role_mesh.from_pydata([(1.1, -.5, -.5), (1.2, .5, -.5), (1.2, .5, .5),
+                       (1.2, -.5, .5), (2, 0, 0)], [], [(0, 1, 2), (0, 2, 3)])
+role_attr = role_mesh.attributes.new('garment_role', 'INT', 'FACE')
+role_attr.data[0].value, role_attr.data[1].value = 0, 1
+role_garment = bpy.data.objects.new('RoleGarment', role_mesh)
+scene.collection.objects.link(role_garment)
 opened = cube('OpenBody', 1)
 bm = bmesh.new()
 bm.from_mesh(opened.data)
@@ -67,6 +74,46 @@ def inspect(name='Outside', **options):
     return result
 result = inspect()
 assert result['complete'] and result['passed'], result
+baseline = inspect('RoleGarment')
+regional = inspect('RoleGarment', region_attribute='garment_role')
+garment = regional['garments'][0]
+buckets = garment.pop('regions')
+assert regional == baseline, (regional, baseline)
+assert {tuple(bucket['region_ids']) for bucket in buckets} == {(), (0,), (1,), (0, 1)}, buckets
+assert sum(bucket['samples_checked'] for bucket in buckets) == garment['samples_checked'] == 21
+for key in ('inside_samples', 'violating_samples', 'ambiguous_samples'):
+    assert sum(bucket[key] for bucket in buckets) == garment[key], buckets
+assert any(bucket['min_clearance_m'] == garment['min_clearance_m']
+           and bucket['worst_probe'] == garment['worst_probe']
+           and bucket['worst_frame'] == garment['worst_frame'] for bucket in buckets)
+partial = inspect('RoleGarment', region_attribute='garment_role', max_queries=10)
+partial_garment = partial['garments'][0]
+assert not partial['complete'], partial
+for key in ('samples_checked', 'inside_samples', 'violating_samples', 'ambiguous_samples'):
+    assert sum(bucket[key] for bucket in partial_garment['regions']) == partial_garment[key], partial
+for name, domain, datatype in [('wrong_domain', 'POINT', 'INT'), ('wrong_type', 'FACE', 'FLOAT')]:
+    role_mesh.attributes.new(name, datatype, domain)
+for name in ('absent', 'wrong_domain', 'wrong_type', '', 'x'*64):
+    try:
+        inspect('RoleGarment', region_attribute=name)
+    except ValueError:
+        assert (scene.frame_current, scene.frame_subframe) == prior
+    else:
+        raise AssertionError(f'Accepted invalid region_attribute {name!r}')
+many_mesh = bpy.data.meshes.new('ManyRegions')
+many_mesh.from_pydata([(2, i*.01, z) for i in range(65) for z in (0, .001, .002)], [],
+                      [(3*i, 3*i+1, 3*i+2) for i in range(65)])
+many_attr = many_mesh.attributes.new('garment_role', 'INT', 'FACE')
+for index, entry in enumerate(many_attr.data):
+    entry.value = index
+many = bpy.data.objects.new('ManyRegions', many_mesh)
+scene.collection.objects.link(many)
+try:
+    inspect('ManyRegions', region_attribute='garment_role')
+except ValueError as error:
+    assert '64 distinct' in str(error) and (scene.frame_current, scene.frame_subframe) == prior
+else:
+    raise AssertionError('Accepted more than 64 region buckets')
 assert result['frames'] == [1., 13., 25.] and result['requested_samples'] == 3
 result = inspect(sample_frames=[1., 12.5, 25.])
 assert result['complete'] and result['frames'] == [1., 12.5, 25.] and result['requested_samples'] == 3
