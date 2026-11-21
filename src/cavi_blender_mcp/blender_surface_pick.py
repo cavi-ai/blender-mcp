@@ -10,6 +10,7 @@ from mathutils.bvhtree import BVHTree
 from .blender_errors import preflight
 from .blender_mesh_regions import mesh_digest, page_source
 from .blender_uv_charts import uv_digest
+from .scene_mode import require_scene_mode
 from .skin_projection import barycentric_factors
 from .surface_ray import local_ray
 
@@ -130,6 +131,7 @@ def inspect(p):
                 report['material']=material_binding(value,report['material_index'])
                 if layer is not None:
                     report['uv']['position']=uv_position(layer,report)
+            require_scene_mode(result)
             return result
     finally:
         if evaluated is not None:

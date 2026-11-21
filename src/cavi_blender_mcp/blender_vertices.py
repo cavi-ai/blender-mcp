@@ -5,16 +5,19 @@ from .blender_errors import preflight
 from .blender_lookup import editable_mesh, info
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import selection
+from .scene_mode import require_scene_mode
 from .vertex_edit import displaced, geodesic_weights, radius_m, symmetric_offsets, translated
 
 
 def inspect(p):
     value, limit, offset = page_source(p)
     mesh = value.data
-    return {'name': value.name, 'type': 'MESH', 'mesh': mesh.name, 'scope': 'source_mesh_vertices',
+    result = {'name': value.name, 'type': 'MESH', 'mesh': mesh.name, 'scope': 'source_mesh_vertices',
         'mesh_sha256': mesh_digest(mesh), 'total': len(mesh.vertices), 'offset': offset, 'limit': limit,
         'vertices': [{'index': v.index, 'position_local': list(v.co), 'normal_local': list(v.normal),
                       'selected': v.select} for v in mesh.vertices[offset:offset+limit]]}
+    require_scene_mode(result)
+    return result
 
 
 def move(p):
