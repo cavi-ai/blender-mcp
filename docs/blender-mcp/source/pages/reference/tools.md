@@ -144,20 +144,22 @@ workspace and are hashed without conversion. See [native libraries](../guides/na
 
 ## geometry_nodes
 
-`inspect` is lease-free. `set_inputs`, `bake_copy` and `add` require a lease.
+`inspect` is lease-free. `set_inputs`, `bake_copy`, `add`, `create`, `add_node` and `link` require a lease.
 
 | Parameter | Used by |
 | --- | --- |
 | `name` | Existing procedural object; a mesh for `add` |
-| `modifier` | Optional exact modifier for `inspect`, required for `set_inputs`; new modifier name for `add` |
+| `modifier` | Optional for `inspect` and `create`; required for `set_inputs`, `add_node` and `link`; new name for `add` |
 | `node_group` | `add`; existing Geometry Nodes group with a Geometry output |
 | `inputs` | Socket identifier to typed value; omitted values are preserved |
 | `attributes` | Socket identifier to attribute name; null disables attribute mode |
-| `new_name` | `bake_copy`; independent static mesh of the evaluated stack at the current frame |
+| `new_name` | `bake_copy` output; `create` group name; `add_node` node name |
+| `node_type` | `add_node`; a node type that polls on this Geometry Nodes tree |
+| `from_node`, `from_socket`, `to_node`, `to_socket` | `link` |
 
 Read socket identifiers, types, ranges, values and field modes before edits.
-Datablock values use `{name, id_type}` or null. Source node groups remain shared
-and unchanged; values belong to the named object's modifier. The full batch is
+Datablock values use `{name, id_type}` or null. `set_inputs` leaves the source
+node group unchanged; values belong to the named object's modifier. The full batch is
 validated before assignment; a native setter or value mismatch restores prior
 values. Inputs driven by animation still follow that animation when time changes.
 
@@ -165,6 +167,11 @@ values. Inputs driven by animation still follow that animation when time changes
 `modifier` or the group name. The modifier is removed again when the evaluated
 mesh exceeds 500,000 triangles or 100,000 instances. The result is the `inspect`
 report for the new modifier.
+
+`create` makes a Geometry Nodes group with Geometry input and output sockets linked,
+then attaches it. The group is limited to 64 nodes and 128 links. `add_node` adds
+one polled node under a new name. `link` connects two existing sockets. These
+actions edit that object's group; they do not rewire a shared instance definition.
 
 `bake_copy` preserves evaluated mesh layers, material slots and world transform.
 It reports fractional frame time, triangle counts and triangle usage per material
@@ -431,7 +438,14 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
 `add_socket`, `duplicate`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
 `shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`,
-`visibility`.
+`visibility`, `rigid_body`, `particles`, `hair`, `volume_to_mesh`.
+
+`rigid_body` sets ACTIVE or PASSIVE, mass, and a BOX, SPHERE or CONVEX_HULL shape. A bake requires the scene and its background scenes and collection instances to have no other point caches.
+`frames` from 1 to 50 bakes the scene point cache and reports the world location
+at the last frame; 0 stores the body and does not bake. `particles` adds an
+emitter of 1–256 particles from faces. `hair` parents 1–32 curves of 2–8 points
+to the mesh. `volume_to_mesh` puts a Volume to Mesh modifier on `name` from a
+volume `source`, at 8–125 voxels per axis.
 
 `visibility` sets `hide_viewport` (object flag and view-layer eye) and/or `hide_render`.
 
@@ -445,7 +459,11 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
 `lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
 `join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `set_seams`, `mirror`,
-`array`, `solidify`, `uv_transform`.
+`array`, `solidify`, `uv_transform`, `sculpt_stroke`.
+
+`sculpt_stroke` sends 3–32 positions through the Draw brush in a 3D view.
+Strength is `amount` in (0, 1]. Background mode refuses before the brush runs.
+A stroke that leaves the mesh unchanged fails.
 
 `array` requires a three-component translation `offset`. `solidify` accepts a
 scalar `offset` from -1 to 1 (default -1) to position the shell through its thickness.
@@ -604,7 +622,9 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 Actions: `import`, `export`, `save`, `generate`. Import, export and save require
 a lease. GLB import accepts an optional `expected_sha256` and rejects a source
 whose bytes differ from that hash before editing the scene. Import and static
-export also cover OBJ, STL, PLY and Alembic. Export supports animated
+export also cover OBJ, STL, PLY, Alembic and OpenVDB. A `.vdb` import creates one
+volume object from a workspace file of at most 32 MiB and refuses any other
+bytes or a file with no grids. Export supports animated
 FBX, GLB and USD output and FBX and USD
 texture sidecars with `textures=true`. With `animations=true`, `deform_only=true`
 writes deform bones only (FBX and USD keep their non-deform ancestors).
@@ -669,7 +689,7 @@ authorizes an automatic mutation retry. Unexpected defects remain opaque.
 ## scene_edit
 
 Authors persistent scene definitions under an edit lease. Supply exactly the
-model matching `action`: `camera`, `light`, `world` or `render`.
+model matching `action`: `camera`, `light`, `world`, `render` or `compositor`.
 
 - `camera`: named camera, location/target, perspective or orthographic projection,
   focal length, sensor width, clip range, lens shift, depth of field, focus distance
@@ -679,6 +699,10 @@ model matching `action`: `camera`, `light`, `world` or `render`.
 - `world`: new managed color/HDRI node graph, strength and rotation. Workspace EXR,
   HDR, PNG, TIFF or JPEG inputs are hashed and packed into the editable project.
   Subsequent calls update that managed graph; an unrelated authored graph is preserved.
+- `compositor`: `add_node` adds a polled compositor node, creating the scene
+  compositor group when needed. `link` connects named sockets. The graph is
+  limited to 64 nodes and 128 links. This uses Blender 5.3
+  `scene.compositing_node_group`.
 - `render`: renders the actual scene through the exact named camera, using Cycles
   or Eevee. The definition includes independent width/height, sample count, film
   transparency, color management, precision, thread count and pixel budget. Settings

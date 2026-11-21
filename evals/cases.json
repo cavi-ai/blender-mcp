@@ -1,4 +1,11 @@
 [
+  {"id":"geometry-create-needs-name","tool":"geometry_nodes","arguments":{"action":"create","name":"Board"},"kind":"invalid","modes":["protocol","native"],"error":"new_name is required for action"},
+  {"id":"geometry-create-rejects-inputs","tool":"geometry_nodes","arguments":{"action":"create","name":"Board","new_name":"Warp","inputs":{"A":1}},"kind":"invalid","modes":["protocol","native"],"error":"Not valid for action=create"},
+  {"id":"geometry-link-needs-sockets","tool":"geometry_nodes","arguments":{"action":"link","name":"Board","modifier":"Warp"},"kind":"invalid","modes":["protocol","native"],"error":"from_node is required for action"},
+  {"id":"sculpt-strength-bound","tool":"mesh_edit","arguments":{"action":"sculpt_stroke","name":"Board","amount":2,"vertices":[[0,0,1],[0,0,1],[0,0,1]]},"kind":"invalid","modes":["protocol","native"],"error":"Sculpt strength"},
+  {"id":"rigid-body-needs-shape","tool":"object_edit","arguments":{"action":"rigid_body","name":"Board"},"kind":"invalid","modes":["protocol","native"],"error":"collision_shape is required for action"},
+  {"id":"hair-needs-curves","tool":"object_edit","arguments":{"action":"hair","name":"Board","new_name":"BoardHair"},"kind":"invalid","modes":["protocol","native"],"error":"curves is required for action"},
+  {"id":"compositor-link-needs-sockets","tool":"scene_edit","arguments":{"action":"compositor","compositor":{"step":"link","from_node":"Blur"}},"kind":"invalid","modes":["protocol","native"],"error":"link needs from_node"},
   {"id":"node-controls-missing-node","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node_settings":{"normalize":true}},"kind":"invalid","modes":["protocol","native"],"error":"node is required for action"},
   {"id":"node-controls-missing-settings","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise"},"kind":"invalid","modes":["protocol","native"],"error":"node_settings is required for action"},
   {"id":"node-controls-empty","tool":"assign_material","arguments":{"action":"set_node","material_name":"Glaze","node":"Noise","node_settings":{}},"kind":"invalid","modes":["protocol","native"],"error":"requires nonempty node_settings"},

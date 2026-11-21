@@ -1,8 +1,9 @@
 # Reuse a procedural asset
 
 Start with an artist-authored Geometry Nodes asset in an owned Blender source.
-Inspect the scene and claim its edit lease. `geometry_nodes` edits the exposed
-interface; node topology and shared group defaults stay authored inputs.
+Inspect the scene and claim its edit lease. `inspect` and `set_inputs` edit the
+exposed interface of an existing group. `create`, `add_node` and `link` build a
+new Geometry Nodes group on a mesh, capped at 64 nodes and 128 links.
 
 1. `geometry_nodes` `inspect` with the object `name`. Choose the exact modifier
    and socket identifiers from the response. Display names can repeat; an

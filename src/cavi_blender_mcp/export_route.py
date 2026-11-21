@@ -52,7 +52,7 @@ def route_asset(action, path, values, *, lease_id, pick):
         operation = {'.fbx': 'import_fbx', '.obj': 'import_obj',
                      '.usd': 'import_usd', '.usda': 'import_usd',
                      '.usdc': 'import_usd', '.stl': 'import_stl', '.ply': 'import_ply',
-                     '.abc': 'import_abc'}.get(suffix, 'import_mesh')
+                     '.abc': 'import_abc', '.vdb': 'import_vdb'}.get(suffix, 'import_mesh')
         if values['expected_sha256'] is not None and suffix != '.glb':
             raise ValueError('expected_sha256 applies only to GLB imports')
         params = pick(action, values, ['name'], {'expected_sha256': None})

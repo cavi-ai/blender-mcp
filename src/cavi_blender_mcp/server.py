@@ -66,6 +66,7 @@ from .runtime import workspace_root
 from .scene_models import (
     CameraRay,
     CameraSpec,
+    CompositorSpec,
     LightSpec,
     PreviewSettings,
     RenderSpec,
@@ -624,18 +625,20 @@ async def rig_edit(
 
 @mcp.tool(annotations=MUTATING)
 async def scene_edit(
-    action: Annotated[Literal['camera', 'light', 'world', 'render'], Field(description="Action")],
+    action: Annotated[Literal['camera', 'light', 'world', 'render', 'compositor'], Field(description="Action")],
     camera: Annotated[CameraSpec | None, Field(description='camera: create/update named camera')] = None,
     light: Annotated[LightSpec | None, Field(description='light: create/update named light')] = None,
     world: Annotated[WorldSpec | None, Field(description='world: color/HDRI; updates require managed graphs')] = None,
     render: Annotated[RenderSpec | None, Field(description='render: persistent; PNG/TIFF default 16-bit, EXR 16/32; enabled Cycles GPU')] = None,
+    compositor: Annotated[CompositorSpec | None, Field(description='compositor: add or link a node')] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> SceneEditResult:
-    """Author cameras/lights/managed worlds; render named cameras."""
-    definitions = {'camera': camera, 'light': light, 'world': world, 'render': render}
+    """Author cameras, lights, worlds, compositor nodes; render named cameras."""
+    definitions = {'camera': camera, 'light': light, 'world': world, 'render': render,
+                   'compositor': compositor}
     params = pick(action, definitions, [action])
-    return await run(call, 'scene_authoring', lease_id=lease_id, action=action,
-                     definition=params[action].model_dump())
+    definition = params[action].model_dump(exclude_none=True) if action == 'compositor' else params[action].model_dump()
+    return await run(call, 'scene_authoring', lease_id=lease_id, action=action, definition=definition)
 
 
 @mcp.tool(annotations=ADDITIVE)
@@ -701,11 +704,12 @@ async def object_edit(
     action: Annotated[Literal["create_primitive", "create_mesh", "transform", "set_color", "shade",
                     "apply_transforms", "set_origin", "snap_to_grid", "rename", "add_socket",
                     "duplicate", "delete", "make_unique", "make_single_user", "parent", "unparent", "move_to_collection", "shape_key_add",
-                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe", "visibility"], Field(description="Action")],
+                    "shape_key_value", "shape_key_keyframe", "shape_key_remove", "keyframe", "visibility",
+                    "rigid_body", "particles", "hair", "volume_to_mesh"], Field(description="Action")],
     name: Annotated[str, Field(description="Object; unique for create_*")],
     kind: Annotated[Literal["cube", "sphere", "cylinder", "cone", "plane", "torus", "icosphere", "grid",
                             "bezier_curve", "text"] | None, Field(description="create_primitive needs kind")] = None,
-    body: Annotated[str | None, Field(min_length=1, max_length=1024, description="create_primitive text: string")] = None,
+    body: Annotated[str | None, Field(min_length=1, max_length=1024, description="text string; rigid_body ACTIVE or PASSIVE")] = None,
     location: Annotated[Vector3 | None, Field(description="Position: world; add_socket: local")] = None,
     rotation_degrees: Annotated[Vector3 | None, Field(description="XYZ Euler angles")] = None,
     scale: Annotated[Vector3 | None, Field(description="Nonzero; negative mirrors")] = None,
@@ -723,7 +727,7 @@ async def object_edit(
     origin: Annotated[Literal["bounds_bottom_center", "bounds_center", "world_origin", "point"] | None, Field(description="set_origin: default bounds_bottom_center; point needs location")] = None,
     grid: Annotated[Number | None, Field(ge=0.001, le=100, description="snap_to_grid needs spacing (scene units)")] = None,
     new_name: Annotated[str | None, Field(min_length=1, max_length=63, description="shape_key_*: key; parent: parent; move_to_collection: collection; else output name")] = None,
-    count: Annotated[StrictInt | None, Field(ge=1, le=256, description="duplicate: copies; default 1")] = None,
+    count: Annotated[StrictInt | None, Field(ge=1, le=256, description="duplicate copies; particles 1-256")] = None,
     offset: Annotated[Vector3 | None, Field(description="Copy translation; duplicate default [0,0,0]")] = None,
     linked: Annotated[StrictBool | None, Field(description="duplicate: linked; default false")] = None,
     create: Annotated[StrictBool | None, Field(description="move_to_collection: create missing; default true")] = None,
@@ -736,6 +740,13 @@ async def object_edit(
     recursive: Annotated[StrictBool | None, Field(description='delete: descendants')] = None,
     hide_viewport: Annotated[StrictBool | None, Field(description='visibility: viewport')] = None,
     hide_render: Annotated[StrictBool | None, Field(description='visibility: render')] = None,
+    collision_shape: Annotated[Literal["BOX", "SPHERE", "CONVEX_HULL"] | None, Field(description="rigid_body shape")] = None,
+    mass: Annotated[Number | None, Field(ge=0.001, le=1000, description="rigid_body mass; default 1")] = None,
+    frames: Annotated[StrictInt | None, Field(ge=0, le=50, description="rigid_body bake frames; 0 skips")] = None,
+    seed: Annotated[StrictInt | None, Field(ge=0, le=1000000, description="particles seed; default 0")] = None,
+    curves: Annotated[list[Annotated[list[Vector3], Field(min_length=2, max_length=8)]] | None,
+                      Field(min_length=1, max_length=32, description="hair curves of XYZ points")] = None,
+    resolution: Annotated[StrictInt | None, Field(ge=8, le=125, description="volume_to_mesh voxel amount")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ObjectEditResult:
     """Create, transform or delete objects and branch data."""
@@ -746,7 +757,14 @@ async def object_edit(
               "offset": offset, "linked": linked, "create": create, "value": value,
               "keyframes": keyframes, "action_name": action_name, "source": source,
               "offsets": offsets, "recursive": recursive, "hide_viewport": hide_viewport,
-              "hide_render": hide_render, "body": body}
+              "hide_render": hide_render, "body": body, "collision_shape": collision_shape,
+              "mass": mass, "frames": frames, "seed": seed, "curves": curves,
+              "resolution": resolution}
+
+    def strands():
+        params = pick(action, values, ["new_name", "curves"])
+        params["curves"] = [[list(point) for point in strand] for strand in params["curves"]]
+        return params
 
     def visible():
         params = pick(action, values, (), {"hide_viewport": None, "hide_render": None})
@@ -797,6 +815,12 @@ async def object_edit(
             "keyframes": frames(TransformKeyframe, "location/rotation_degrees/scale"),
         }),
         "visibility": ("set_visibility", visible),
+        "rigid_body": ("rigid_body", lambda: pick(action, values, ["collision_shape"], {
+            "body": "ACTIVE", "mass": 1, "frames": 0})),
+        "particles": ("particle_system", lambda: pick(action, values, ["count"], {
+            "seed": 0, "new_name": "Particles"})),
+        "hair": ("hair_curves", lambda: strands()),
+        "volume_to_mesh": ("volume_to_mesh", lambda: pick(action, values, ["source", "resolution"])),
     }[action]
     return await run(call, operation, lease_id=lease_id, name=name, **params())
 
@@ -805,14 +829,14 @@ async def object_edit(
 async def mesh_edit(
     action: Annotated[Literal["modifier", "modifier_update", "modifier_remove", "unwrap", "decimate_to", "remesh_quad", "lod_chain",
                     "lightmap_uv", "texel_density", "collision", "cleanup", "boolean",
-                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "assign_faces", "mirror", "array", "solidify", "uv_transform"], Field(description="Action")],
+                    "join", "separate", "extract_faces", "extrude_faces", "unwrap_faces", "set_seams", "move_vertices", "assign_faces", "mirror", "array", "solidify", "uv_transform", "sculpt_stroke"], Field(description="Action")],
     name: Annotated[ObjectName, Field(description="Mesh")],
     kind: Annotated[Literal["bevel", "decimate", "subdivision", "voxel_remesh", "weld", "displace", "shrinkwrap",
                             "weighted_normal", "data_transfer"] | None, Field(description="Modifier")] = None,
     amount: Annotated[Number | None, Field(
         description="Bevel width (0,100], decimate (0,1], subdivision 1-3, voxel [0.005,1], weld distance (0,1], "
         "displace strength, shrinkwrap offset, weighted_normal weight 1-100, data_transfer mix (0,1]; "
-        "move_vertices radius (m).")] = None,
+        "move_vertices radius (m); sculpt strength (0,1].")] = None,
     apply: Annotated[StrictBool | None, Field(description="Bake; no modifiers allowed")] = None,
     angle_limit_degrees: Annotated[Number | None, Field(ge=1, le=89, description="Unwrap split angle")] = None,
     island_margin: Annotated[Number | None, Field(ge=0, le=0.5, description="Unwrap margin")] = None,
@@ -866,6 +890,7 @@ async def mesh_edit(
     material_name: Annotated[str | None, Field(min_length=1, max_length=63, description='assign_faces: existing finish')] = None,
     modifier_name: Annotated[RigName | None, Field(description='Existing modifier')] = None,
     modifier_settings: Annotated[dict[str,JsonValue] | None, Field(description='Native modifier controls')] = None,
+    vertices: Annotated[list[Vector3] | None, Field(min_length=3, max_length=32, description="sculpt_stroke positions")] = None,
 ) -> MeshEditResult:
     """Edit a leased mesh, its UVs or derived geometry."""
     values = {"kind": kind, "amount": amount, "apply": apply,
@@ -886,7 +911,8 @@ async def mesh_edit(
               'edge_indices': edge_indices, 'seam': seam, 'unwrap_method': unwrap_method,
               'vertex_indices': vertex_indices, 'symmetry_tolerance_m': symmetry_tolerance_m,
               'material_name': material_name, 'expected_uv_sha256': expected_uv_sha256,
-              'modifier_name':modifier_name,'modifier_settings':modifier_settings}
+              'modifier_name':modifier_name,'modifier_settings':modifier_settings,
+              'vertices': vertices}
     if action in ('modifier_update','modifier_remove'):
         params=pick(action,values,['modifier_name'],
                     {'amount':None,'modifier_settings':None} if action=='modifier_update' else {})
@@ -1020,6 +1046,12 @@ async def mesh_edit(
     elif action == "collision":
         operation = action
         params = pick(action, values, (), {"shape": "convex", "max_hull_vertices": 32})
+    elif action == "sculpt_stroke":
+        operation = "sculpt_stroke"
+        params = pick(action, values, ["vertices", "amount"])
+        params["vertices"] = [list(point) for point in params["vertices"]]
+        if not 0 < params["amount"] <= 1:
+            raise ValueError("Sculpt strength must be in (0, 1]")
     else:
         operation = "cleanup_mesh"
         params = pick(action, values, (), {
@@ -1300,7 +1332,7 @@ async def asset_library(
 
 @mcp.tool(annotations=MUTATING)
 async def geometry_nodes(
-    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy', 'add'], Field(description="Action")],
+    action: Annotated[Literal['inspect', 'set_inputs', 'bake_copy', 'add', 'create', 'add_node', 'link'], Field(description="Action")],
     name: Annotated[str, Field(description="Mesh")],
     modifier: Annotated[str | None, Field(description="Geometry Nodes modifier; add: new name")] = None,
     node_group: Annotated[str | None, Field(min_length=1, max_length=63, description="add: existing Geometry Nodes group")] = None,
@@ -1308,14 +1340,30 @@ async def geometry_nodes(
     attributes: Annotated[dict[str, str | None] | None, Field(description="set_inputs: ID/attribute map; null disables")] = None,
     new_name: Annotated[str | None, Field(description="bake_copy needs output name")] = None,
     instance: Annotated[str | None, Field(description='Containing instance; edits share its definition')] = None,
+    node_type: Annotated[str | None, Field(min_length=1, max_length=63, description="add_node: native node type")] = None,
+    from_node: Annotated[str | None, Field(min_length=1, max_length=63, description="link: source node")] = None,
+    from_socket: Annotated[str | None, Field(min_length=1, max_length=63, description="link: source socket")] = None,
+    to_node: Annotated[str | None, Field(min_length=1, max_length=63, description="link: destination node")] = None,
+    to_socket: Annotated[str | None, Field(min_length=1, max_length=63, description="link: destination socket")] = None,
     lease_id: Annotated[LeaseId, Field(description="Lease")] = None,
 ) -> ProceduralAssetResult:
-    """Inspect/edit procedural inputs, attach node groups or snapshot meshes; members via scene_info(definition=true)."""
+    """Inspect, edit, attach or build Geometry Nodes; snapshot meshes. Instances via scene_info(definition=true)."""
     values = {'modifier': modifier, 'inputs': inputs, 'attributes': attributes, 'new_name': new_name,
-              'instance': instance, 'node_group': node_group}
+              'instance': instance, 'node_group': node_group, 'node_type': node_type,
+              'from_node': from_node, 'from_socket': from_socket, 'to_node': to_node,
+              'to_socket': to_socket}
     if action == 'add':
         params = pick(action, values, ['node_group'], {'modifier': None})
         return await run(call, 'attach_geometry_nodes', name=name, lease_id=lease_id, **params)
+    if action == 'create':
+        params = pick(action, values, ['new_name'], {'modifier': None})
+        return await run(call, 'create_geometry_group', name=name, lease_id=lease_id, **params)
+    if action == 'add_node':
+        params = pick(action, values, ['modifier', 'new_name', 'node_type'])
+        return await run(call, 'add_geometry_node', name=name, lease_id=lease_id, **params)
+    if action == 'link':
+        params = pick(action, values, ['modifier', 'from_node', 'from_socket', 'to_node', 'to_socket'])
+        return await run(call, 'link_geometry_node', name=name, lease_id=lease_id, **params)
     if action == 'inspect':
         params = pick(action, values, (), {'modifier': None, 'instance': None})
         scoped = params.pop('instance')

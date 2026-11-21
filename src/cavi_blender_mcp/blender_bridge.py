@@ -1102,6 +1102,16 @@ def _dispatch(operation, p):
     if operation in {"import_stl", "import_ply", "import_abc"}:
         return {"import_stl": import_stl, "import_ply": import_ply,
                 "import_abc": import_abc}[operation](p["path"], p["name"])
+    if operation == "import_vdb":
+        from .blender_domains import import_vdb
+
+        return import_vdb(p["path"], p["name"], _workspace)
+    if operation in {"create_geometry_group", "add_geometry_node", "link_geometry_node",
+                     "sculpt_stroke", "rigid_body", "particle_system", "hair_curves",
+                     "volume_to_mesh"}:
+        from .blender_domains import HANDLERS
+
+        return HANDLERS[operation](p)
     if operation in {"shape_key_add", "shape_key_value", "shape_key_remove",
                      "shape_key_keyframe"}:
         from .blender_shape_keys import HANDLERS

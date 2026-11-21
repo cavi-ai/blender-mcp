@@ -15,7 +15,7 @@ need a `lease_id`. Generation does not.
 ```
 
 The suffix selects the importer: `.glb`, `.fbx`, `.obj`, `.usd`, `.usda`,
-`.usdc`, `.stl`, `.ply` or `.abc`.
+`.usdc`, `.stl`, `.ply`, `.abc` or `.vdb`.
 
 Imports:
 
@@ -35,6 +35,7 @@ Imports:
 | STL | ASCII or binary triangles, Z up | Empty files, more than 500,000 triangles |
 | PLY | ASCII or binary meshes with vertex colors, Z up | Point clouds, more than 500,000 vertices or faces |
 | Alembic | Ogawa meshes at the current frame; cache readers are removed | HDF5 archives, curves, cameras, lights |
+| OpenVDB | One volume object from a workspace `.vdb` of at most 32 MiB | Any other bytes, files with no grids |
 
 Textures must be packed or resolve inside the workspace, depending on the
 format. Source files are capped at 64 MiB.
