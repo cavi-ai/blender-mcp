@@ -345,6 +345,13 @@ probe indices, body topology and numerical resolution. Multiple closed body
 components are treated as a union. Ray parity does not depend on face winding.
 Coordinates are normalized around the body before native BVH queries.
 
+Set `include_worst_support` to include the nearest evaluated body triangle index
+and the garment and body witness points at each signed worst probe, including
+regional worst probes. Triangle indices use the evaluated body tessellation at `worst_frame`. Both
+points use world scene coordinates. Multiply their distance by `scene_unit_meters`
+to compare it with the magnitude of the signed gap. The witness is
+null when no signed probe was classified.
+
 Optionally set `region_attribute` to the name of an evaluated FACE-domain INT
 attribute present on every garment. Each garment then reports `regions` with
 disjoint `region_ids` buckets and their probe counts, signed minimum, worst frame,

@@ -113,6 +113,24 @@ for key in ('inside_samples', 'violating_samples', 'ambiguous_samples'):
 assert any(bucket['min_clearance_m'] == garment['min_clearance_m']
            and bucket['worst_probe'] == garment['worst_probe']
            and bucket['worst_frame'] == garment['worst_frame'] for bucket in buckets)
+witnessed = inspect('RoleGarment', region_attribute='garment_role', include_worst_support=True)
+rows = witnessed['garments'][0]
+for row in (rows, *rows['regions']):
+    support = row['worst_support']
+    if row['min_clearance_m'] is not None:
+        assert isinstance(support['body_triangle_index'], int) and 0 <= support['body_triangle_index'] < 12
+        from mathutils import Vector
+        distance = (Vector(support['garment_point_world']) - Vector(support['body_point_world'])).length
+        assert abs(distance - abs(row['min_clearance_m'])) < 1e-5, row
+    else:
+        assert support is None
+without = inspect('RoleGarment', region_attribute='garment_role')
+rows.pop('worst_support')
+for row in rows['regions']:
+    row.pop('worst_support')
+assert witnessed == without
+empty = inspect('RoleGarment', region_attribute='garment_role', include_worst_support=True, max_queries=1)
+assert empty['garments'][0]['worst_support'] is None
 partial = inspect('RoleGarment', region_attribute='garment_role', max_queries=10)
 partial_garment = partial['garments'][0]
 assert not partial['complete'], partial

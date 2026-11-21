@@ -129,6 +129,9 @@ def inspect(p, find_object):
     samples, maximum = p.get('samples', 9), p.get('max_queries', 1000000)
     mode = p.get('surface_samples', 'vertices_and_centres')
     region_attribute = p.get('region_attribute')
+    include_worst_support = p.get('include_worst_support', False)
+    if type(include_worst_support) is not bool:
+        raise ValueError('include_worst_support must be boolean')
     if (type(start) is not int or type(end) is not int or not 1 <= start < end <= 1000000
             or type(samples) is not int or not 2 <= samples <= 32
             or isinstance(threshold, bool) or not math.isfinite(threshold) or threshold < 0
@@ -157,6 +160,9 @@ def inspect(p, find_object):
     reports = [{'name': name, 'min_clearance_m': None, 'worst_frame': None,
                 'inside_samples': 0, 'violating_samples': 0, 'ambiguous_samples': 0,
                 'samples_checked': 0, 'worst_probe': None, 'violation_examples': []} for name in names]
+    if include_worst_support:
+        for report in reports:
+            report['worst_support'] = None
     region_reports = [{} for _ in names]
     seen_regions = [set() for _ in names]
     frames, topology, issues, work = [], [], [], 0
@@ -203,7 +209,7 @@ def inspect(p, find_object):
                     raise QueryBudgetReached
                 for index, point in enumerate(vectors((positions-origin)/scale)):
                     budget.use()
-                    _, _, _, distance = tree.find_nearest(point)
+                    nearest, _, face_index, distance = tree.find_nearest(point)
                     if distance is None or not math.isfinite(distance):
                         raise ValueError('No finite body surface distance')
                     inside, uncertain = False, distance <= EPSILON
@@ -223,6 +229,8 @@ def inspect(p, find_object):
                             bucket = {'region_ids': list(ids), 'samples_checked': 0,
                                 'inside_samples': 0, 'violating_samples': 0, 'ambiguous_samples': 0,
                                 'min_clearance_m': None, 'worst_frame': None, 'worst_probe': None}
+                            if include_worst_support:
+                                bucket['worst_support'] = None
                             buckets[ids] = bucket
                         bucket['samples_checked'] += 1
                     if uncertain:
@@ -235,16 +243,31 @@ def inspect(p, find_object):
                     report['violating_samples'] += int(gap < threshold)
                     probe = {'kind': 'vertex' if index < vertex_count else 'triangle_centre',
                              'index': index if index < vertex_count else index-vertex_count}
+                    garment_worst = report['min_clearance_m'] is None or gap < report['min_clearance_m']
+                    region_worst = bucket is not None and (
+                        bucket['min_clearance_m'] is None or gap < bucket['min_clearance_m'])
+                    witness = None
+                    if include_worst_support and (garment_worst or region_worst):
+                        if (nearest is None or type(face_index) is not int or not 0 <= face_index < len(faces)
+                                or not all(math.isfinite(v) for v in nearest)):
+                            raise ValueError('Invalid nearest body triangle hit')
+                        witness = {'body_triangle_index': face_index,
+                                   'garment_point_world': positions[index].tolist(),
+                                   'body_point_world': (np.asarray(nearest)*scale+origin).tolist()}
                     if bucket is not None:
                         bucket['inside_samples'] += int(inside)
                         bucket['violating_samples'] += int(gap < threshold)
-                        if bucket['min_clearance_m'] is None or gap < bucket['min_clearance_m']:
+                        if region_worst:
                             bucket['min_clearance_m'], bucket['worst_frame'], bucket['worst_probe'] = gap, frame, probe
+                            if include_worst_support:
+                                bucket['worst_support'] = witness
                     if gap < threshold and len(report['violation_examples']) < 16:
                         report['violation_examples'].append({'frame': frame, **probe, 'clearance_m': gap})
-                    if report['min_clearance_m'] is None or gap < report['min_clearance_m']:
+                    if garment_worst:
                         report['min_clearance_m'], report['worst_frame'] = gap, frame
                         report['worst_probe'] = probe
+                        if include_worst_support:
+                            report['worst_support'] = witness
     except QueryBudgetReached:
         if not issues:
             issues.append('query_budget_exhausted')

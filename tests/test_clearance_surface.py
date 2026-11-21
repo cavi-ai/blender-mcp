@@ -72,6 +72,25 @@ class ClearanceSurfaceTests(unittest.TestCase):
             asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
                                                       sample_frames=[12.5], rest_armature='Rig'))
 
+    def test_witness_opt_in_and_stale_bridge(self):
+        from mcp.server.mcpserver.exceptions import UnexpectedToolError
+
+        calls = []
+        def call(operation, params):
+            calls.append(params)
+            return {'garments': [{'worst_support': None, 'regions': [{'worst_support': None}]}]}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002))
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                        region_attribute='role', include_worst_support=True))
+        self.assertNotIn('include_worst_support', calls[0])
+        self.assertIs(calls[1]['include_worst_support'], True)
+        for result in ({'garments': [{}]}, {'garments': [{'worst_support': None, 'regions': [{}]}]}):
+            with (patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=lambda *_, value=result: value)),
+                  self.assertRaises(UnexpectedToolError)):
+                asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                            region_attribute='role', include_worst_support=True))
+
     def test_clearance_is_read_only_and_keeps_explicit_metre_threshold(self):
         calls = []
         def call(operation, params):
