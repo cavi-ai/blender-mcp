@@ -86,6 +86,11 @@ for key in ('inside_samples', 'violating_samples', 'ambiguous_samples'):
 assert any(bucket['min_clearance_m'] == garment['min_clearance_m']
            and bucket['worst_probe'] == garment['worst_probe']
            and bucket['worst_frame'] == garment['worst_frame'] for bucket in buckets)
+partial = inspect('RoleGarment', region_attribute='garment_role', max_queries=10)
+partial_garment = partial['garments'][0]
+assert not partial['complete'], partial
+for key in ('samples_checked', 'inside_samples', 'violating_samples', 'ambiguous_samples'):
+    assert sum(bucket[key] for bucket in partial_garment['regions']) == partial_garment[key], partial
 for name, domain, datatype in [('wrong_domain', 'POINT', 'INT'), ('wrong_type', 'FACE', 'FLOAT')]:
     role_mesh.attributes.new(name, datatype, domain)
 for name in ('absent', 'wrong_domain', 'wrong_type', '', 'x'*64):

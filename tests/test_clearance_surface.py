@@ -13,7 +13,7 @@ class ClearanceSurfaceTests(unittest.TestCase):
         calls = []
         def call(operation, params):
             calls.append((operation, params))
-            return {'complete': True, 'passed': True}
+            return {'complete': True, 'passed': True, 'garments': [{'regions': []}]}
         with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
             asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002))
             asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
@@ -23,6 +23,17 @@ class ClearanceSurfaceTests(unittest.TestCase):
         tool = next(tool for tool in asyncio.run(server.mcp.list_tools())
                     if tool.name == 'inspect_skin_clearance')
         self.assertIn('region_attribute', tool.input_schema['properties'])
+
+    def test_regional_request_rejects_older_bridge_responses(self):
+        from mcp.server.mcpserver.exceptions import UnexpectedToolError
+
+        for response in ({'garments': [{}]}, {'garments': []}, {'garments': [{'regions': None}]}):
+            client = SimpleNamespace(call=lambda *_, result=response: result)
+            with (self.subTest(response=response),
+                  patch.object(server, 'BridgeClient', return_value=client),
+                  self.assertRaisesRegex(UnexpectedToolError, 'refresh the Blender bridge')):
+                asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                          region_attribute='garment_role'))
 
     def test_explicit_frames_are_forwarded_and_invalid_schedules_rejected(self):
         calls = []
