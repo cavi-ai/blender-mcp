@@ -119,6 +119,12 @@ def inspect(p, find_object):
             or type(maximum) is not int or not 1 <= maximum <= 1000000
             or mode not in ('vertices', 'vertices_and_centres')):
         raise ValueError('Invalid clearance frames, threshold or query budget')
+    from .clearance_frames import validate_sample_frames
+
+    explicit = p.get('sample_frames')
+    schedule = (np.linspace(start, end, samples).tolist() if explicit is None
+                else validate_sample_frames(explicit, start, end))
+    samples = len(schedule)
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
     from .blender_geometry import unit_scale
@@ -130,7 +136,7 @@ def inspect(p, find_object):
     frames, topology, issues, work = [], [], [], 0
     budget, precision = Budget(maximum), 0.
     try:
-        for frame in np.linspace(start, end, samples).tolist():
+        for frame in schedule:
             set_frame(frame)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             body_points, faces = snapshot(body, depsgraph, triangles=True)
