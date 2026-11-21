@@ -8,6 +8,7 @@ from .blender_mesh_regions import mesh_digest
 from .blender_scene_geometry import candidates
 from .blender_surface_pick import DEFORMERS, cast, material_binding, topology, uv_position
 from .blender_uv_charts import uv_digest
+from .scene_mode import require_scene_mode
 from .surface_ray import bounds_intersect
 
 
@@ -66,4 +67,5 @@ def inspect(p):
             view_layer=bpy.context.view_layer.name,intersection_precision='native_float32_bvh',
             geometry_considered={'vertices':vertices,'triangles':triangles},
             not_checked=['shader_opacity','non_mesh_geometry','render_only_visibility','render_modifier_differences'])
+        require_scene_mode(result)
         return result
