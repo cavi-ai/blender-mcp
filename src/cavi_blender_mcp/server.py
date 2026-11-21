@@ -45,6 +45,7 @@ from .contracts import (
     SkinClearance,
     UVLayout,
 )
+from .export_route import route_asset
 from .generation import generate
 from .operations import SERVER_LEASE_FREE
 from .panorama import panorama
@@ -1249,68 +1250,14 @@ async def asset_io(
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
               'assembly': assembly,'uv_layer':uv_layer,'expected_sha256':expected_sha256,
               'triangulate': triangulate, 'deform_only': deform_only}
-    if action == 'export' and triangulate is not None and Path(path).suffix.lower() != '.fbx':
-        raise ValueError('triangulate applies only to FBX exports')
-    if action == 'open':
-        params = pick(action, values, (), {'expected_sha256': None})
-        return await run(call, 'open_project', lease_id=lease_id, path=path, **params)
-    if action == 'export' and assembly is True:
-        values.pop('assembly')
-        params = pick(action, values, ['names'], {'axis': None, 'textures': False,'uv_layer':None,
-                                                'triangulate': False})
-        if params['uv_layer'] is None:params.pop('uv_layer')
-        if not params['triangulate']:params.pop('triangulate')
-        return await run(call, 'export_uv_assembly' if uv_layer is not None else 'export_assembly', path=path, lease_id=lease_id, **params)
-    if action == 'export' and assembly is False:
-        values.pop('assembly')
-    if action == "generate" and prompt is not None:
-        params = pick(action, values, ["prompt"], {"quality": None})
+    routed = route_asset(action, path, values, lease_id=lease_id, pick=pick)
+    if routed.kind == 'panorama':
         workspace = workspace_root()
-        return await run(panorama, workspace, params["prompt"], path, params["quality"])
-    if action == "generate":
-        params = pick(action, values, ["image"], {"resolution": None, "quality": None, "views": None,
-                                                  "guide": None})
+        return await run(panorama, workspace, *routed.args)
+    if routed.kind == 'generate':
         workspace = workspace_root()
-        return await run(generate, workspace, params["image"], path, params["resolution"], params["quality"],
-                         params["views"], params["guide"])
-    if action == "import":
-        suffix = Path(path).suffix.lower()
-        operation = {".fbx": "import_fbx", ".obj": "import_obj",
-                     ".usd": "import_usd", ".usda": "import_usd",
-                     ".usdc": "import_usd", ".stl": "import_stl", ".ply": "import_ply",
-                     ".abc": "import_abc"}.get(suffix, "import_mesh")
-        if expected_sha256 is not None and suffix != ".glb":
-            raise ValueError("expected_sha256 applies only to GLB imports")
-        params = pick(action, values, ["name"], {"expected_sha256": None})
-        if params["expected_sha256"] is None:
-            params.pop("expected_sha256")
-        return await run(call, operation, lease_id=lease_id, path=path, **params)
-    if action == "save":
-        pick(action, values)
-        return await run(call, "save_project", lease_id=lease_id, path=path)
-    if bake_pair is not None:
-        params = pick(action, values, ["bake_pair"], {"axis": None})
-        params["bake_pair"] = bake_pair.model_dump()
-        return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    params = pick(action, values, ["names"], {"preserve_instances": False,
-                                              "include_empties": False, "lods": False,
-                                              "collision": False, "animations": False,
-                                              "textures": False, "axis": None, "baked_animation": False, "animation_sample_step": None,'uv_layer':None,
-                                              'triangulate': False, 'deform_only': False})
-    if not params['deform_only']:
-        params.pop('deform_only')
-    if params['uv_layer'] is None:params.pop('uv_layer')
-    else:
-        return await run(call,'export_uv_asset',lease_id=lease_id,path=path,**params)
-    if (params["lods"] or params["collision"] or params["animations"]
-            or params["textures"] or params["axis"] or params["baked_animation"] or params["triangulate"] or params["animation_sample_step"] is not None
-            or 'deform_only' in params or path.lower().endswith((".usd", ".usda", ".usdc"))):
-        return await run(call, "export_asset", lease_id=lease_id, path=path, **params)
-    for key in ("lods", "collision", "animations", "textures", "axis", "baked_animation", "animation_sample_step", "triangulate"):
-        params.pop(key)
-    # A distinct bridge operation makes older bridges fail before writing a file.
-    operation = "export_instances" if params["preserve_instances"] else "export_mesh"
-    return await run(call, operation, lease_id=lease_id, path=path, **params)
+        return await run(generate, workspace, *routed.args)
+    return await run(call, routed.operation, **routed.params)
 
 
 @mcp.tool(annotations=ADDITIVE)
