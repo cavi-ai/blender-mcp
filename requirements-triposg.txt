@@ -29,7 +29,7 @@ regex==2026.11.9
 requests==2.34.2
 safetensors==0.8.0
 scikit-image==0.26.0
-scipy==1.17.1
+scipy==1.18.1
 setuptools==84.2.1
 sympy==1.14.0
 tifffile==2026.11.12
