@@ -29,6 +29,46 @@ MAX_TOTAL_MORPH_TARGETS = 256
 TARGET_ATTRIBUTES = {"POSITION", "NORMAL", "TANGENT"}
 
 
+def _over_budget(count, limit, message):
+    if count > limit:
+        raise RuntimeError(message)
+
+
+def check_imported_armatures(count):
+    _over_budget(count, MAX_SKINS, "Imported armatures exceed the import budget")
+
+
+def check_imported_bones(total, per_armature):
+    message = "Imported bones exceed the import budget"
+    _over_budget(total, MAX_TOTAL_JOINTS, message)
+    for count in per_armature:
+        _over_budget(count, MAX_JOINTS, message)
+
+
+def check_imported_vertex_groups(count):
+    _over_budget(count, MAX_JOINTS, "Imported skins exceed the vertex-group budget")
+
+
+def check_imported_skinned_meshes(count):
+    _over_budget(count, MAX_SKINNED_MESHES, "Imported skinned meshes exceed the import budget")
+
+
+def check_imported_actions(count):
+    _over_budget(count, MAX_ANIMATIONS, "Imported actions exceed the import budget")
+
+
+def check_imported_shape_keys(count):
+    _over_budget(count, MAX_MORPH_TARGETS, "Imported shape keys exceed the import budget")
+
+
+def check_imported_morph_targets(total):
+    _over_budget(total, MAX_TOTAL_MORPH_TARGETS, "Imported morph targets exceed the import budget")
+
+
+def check_imported_shape_key_actions(count):
+    _over_budget(count, MAX_ANIMATIONS, "Imported shape-key actions exceed the import budget")
+
+
 def verify_expected_sha256(expected, actual):
     if expected is not None:
         if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):

@@ -28,6 +28,14 @@ from .importing import (
     MAX_BYTES,
     MAX_FBX_BYTES,
     MAX_GEOMETRY,
+    check_imported_actions,
+    check_imported_armatures,
+    check_imported_bones,
+    check_imported_morph_targets,
+    check_imported_shape_key_actions,
+    check_imported_shape_keys,
+    check_imported_skinned_meshes,
+    check_imported_vertex_groups,
     inspect_abc,
     inspect_fbx,
     inspect_glb,
@@ -261,13 +269,11 @@ def validate_imported(objects, previous, animations_allowed=True, shape_keys_all
     if set(bpy.data.scenes) != previous["scenes"]:
         raise RuntimeError("Import unexpectedly changed the scene set")
     armatures = [item for item in objects if item.type == "ARMATURE"]
-    if len(armatures) > 16:
-        raise RuntimeError("Imported armatures exceed the import budget")
+    check_imported_armatures(len(armatures))
     bones = sum(len(item.data.bones) for item in armatures)
     if any(not item.data.bones for item in armatures):
         raise RuntimeError("Imported armatures need at least one bone")
-    if bones > 1024 or any(len(item.data.bones) > 512 for item in armatures):
-        raise RuntimeError("Imported bones exceed the import budget")
+    check_imported_bones(bones, [len(item.data.bones) for item in armatures])
     meshes = [item for item in objects if item.type == "MESH"]
     if not shape_keys_allowed and any(item.data.shape_keys is not None for item in meshes):
         raise RuntimeError("Shape keys need a separate import workflow")
@@ -279,11 +285,11 @@ def validate_imported(objects, previous, animations_allowed=True, shape_keys_all
             continue
         if len(modifiers) != 1 or modifiers[0].object not in armatures:
             raise RuntimeError("Imported skins need one armature modifier on an imported rig")
-        if not item.vertex_groups or len(item.vertex_groups) > 512:
+        if not item.vertex_groups:
             raise RuntimeError("Imported skins exceed the vertex-group budget")
+        check_imported_vertex_groups(len(item.vertex_groups))
         skinned.append(item)
-    if len(skinned) > 64:
-        raise RuntimeError("Imported skinned meshes exceed the import budget")
+    check_imported_skinned_meshes(len(skinned))
     vertices = sum(len(item.data.vertices) for item in meshes)
     triangles = sum(len(poly.vertices) - 2 for item in meshes for poly in item.data.polygons)
     if (len(objects) > 1000 or not 0 < vertices <= MAX_GEOMETRY
@@ -296,8 +302,7 @@ def validate_imported(objects, previous, animations_allowed=True, shape_keys_all
     actions = sorted(set(bpy.data.actions) - previous["actions"], key=lambda item: item.name)
     if not animations_allowed and actions:
         raise RuntimeError("Animation clips need the animated import workflow")
-    if len(actions) > 32:
-        raise RuntimeError("Imported actions exceed the import budget")
+    check_imported_actions(len(actions))
     for action in actions:
         start, end = action.frame_range
         if not math.isfinite(start) or not math.isfinite(end) or end < start:
@@ -403,15 +408,13 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
                 count = len(blocks) - 1
                 if count <= 0:
                     continue
-                if count > 64:
-                    raise RuntimeError("Imported shape keys exceed the import budget")
+                check_imported_shape_keys(count)
                 names = [block.name for block in blocks[1:]]
                 if len(set(names)) != len(names) or any(
                         len(block.encode()) > 63 for block in names):
                     raise RuntimeError("Imported shape keys have invalid names")
                 morph_targets += count
-                if morph_targets > 256:
-                    raise RuntimeError("Imported morph targets exceed the import budget")
+                check_imported_morph_targets(morph_targets)
                 shape_key_meshes.append({"name": item.name, "shape_keys": count,
                                          "names": names})
             result["shape_key_meshes"] = shape_key_meshes
@@ -438,8 +441,7 @@ def _import_asset(loader, inspector, path, name, suffix, maximum, *,
                         "name": action.name, "mesh": item.name, "binding": binding,
                         "frame_range": list(action.frame_range),
                         "slot": slot.identifier if slot else None})
-                    if len(shape_key_animations) > 32:
-                        raise RuntimeError("Imported shape-key actions exceed the import budget")
+                    check_imported_shape_key_actions(len(shape_key_animations))
             result["shape_key_animations"] = shape_key_animations
         return result
     except Exception:
