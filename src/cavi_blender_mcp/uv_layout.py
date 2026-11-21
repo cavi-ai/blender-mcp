@@ -5,12 +5,38 @@ from heapq import heappop, heappush
 
 import numpy as np
 
+from .uvmath import overlap as raster_overlap
+
 MAX_TRIANGLES = 20000
 MAX_COMPARISONS = 1000000
 COMPARISONS_PER_TRIANGLE = MAX_COMPARISONS // MAX_TRIANGLES
 AREA_EPSILON = 1e-8  # Pixel squared, also the degenerate-area threshold.
 DISTANCE_EPSILON = 1e-6  # Pixels; only used for the requested padding comparison.
 EXAMPLES = 32
+
+
+def measured_overlap(triangles, resolution):
+    """Raster ratio plus an analytic pair count when the scan finishes.
+
+    A cell-center raster can miss a sliver. ``overlap_ratio`` stays above zero
+    when the finished analytic scan finds any positive-area pair. An unfinished
+    or oversized scan sets ``overlap_proven`` false.
+    """
+    if type(resolution) is not int or not 1 <= resolution <= 4096:
+        raise ValueError('Raster resolution must be an integer from 1 to 4096')
+    raster = raster_overlap(triangles, resolution)
+    tri = np.asarray(triangles, dtype=np.float64)
+    if tri.ndim != 3 or tri.shape[1:] != (3, 2) or not 1 <= len(tri) <= MAX_TRIANGLES:
+        return {**raster, 'exact_overlap_pairs': None, 'overlap_proven': False}
+    report = analyze(tri, np.arange(len(tri) * 3, dtype=np.int64).reshape(len(tri), 3),
+                     (resolution, resolution), 0)
+    proven = bool(report['complete'])
+    pairs = report['overlap']['triangle_pairs'] if proven else None
+    result = {**raster, 'exact_overlap_pairs': pairs, 'overlap_proven': proven}
+    if proven and pairs and result['overlap_ratio'] == 0:
+        area = report['overlap']['pairwise_area_pixels2'] / (resolution * resolution)
+        result['overlap_ratio'] = min(1., max(float(area), 1e-12))
+    return result
 
 
 def validate_packed(triangles, margin):

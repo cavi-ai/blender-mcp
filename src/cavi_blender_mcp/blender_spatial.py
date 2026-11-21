@@ -16,6 +16,7 @@ from .spatial_query import (
     chunks,
     coplanar_overlap,
     intersects,
+    prove_distance,
     require_native,
     samples,
     transformed,
@@ -126,11 +127,13 @@ def nearest(subjects, context, subject_meta, context_meta, spec):
                            'context': source_meta[index] if reverse else target_meta[triangle],
                            'subject_position_m': list(hit) if reverse else list(point),
                            'context_position_m': list(point) if reverse else list(hit)}
+    proof = prove_distance(subjects, context, best if math.isfinite(best) else 0., spec['max_pair_tests'])
     return {'method': 'bidirectional_vertex_and_triangle_centroid_samples',
             'distance_m': best, 'witness': witness, 'min_clearance_m': spec['min_clearance_m'],
             'samples_below_min_clearance': below, 'samples_per_side': counts,
             'available_samples_per_side': available, 'all_sample_points_tested': counts == available,
-            'continuous_minimum_proven': False}
+            'distance_lower_bound_m': proof['lower_m'], 'distance_upper_bound_m': proof['upper_m'],
+            'continuous_minimum_proven': proof['proven']}
 
 
 def inspect(params):
@@ -163,6 +166,8 @@ def inspect(params):
                     'sha256': digest({key: [(p['object'], p['surface_sha256']) for p in rows]
                                       for key, rows in parts.items()}),
                     'triangles': spec['max_triangles'] - remaining}
+        gaps = nearest(geometry['subjects'], geometry['context'],
+                       metadata['subjects'], metadata['context'], spec)
         report = {**parts, 'geometry_identity': identity,
                   'query_sha256': digest({'geometry': identity, 'query': spec}),
                   'frame': bpy.context.scene.frame_current,
@@ -172,9 +177,10 @@ def inspect(params):
                   'bounds_m': boxes, 'bounds_overlap': intersects(boxes['subjects'], boxes['context']),
                   'intersections': overlap(geometry['subjects'], geometry['context'],
                                            metadata['subjects'], metadata['context'], spec),
-                  'nearest': nearest(geometry['subjects'], geometry['context'],
-                                     metadata['subjects'], metadata['context'], spec),
-                  'not_checked': ['solid_containment', 'continuous_surface_minimum',
+                  'nearest': gaps,
+                  'not_checked': ['solid_containment',
+                                  *([] if gaps['continuous_minimum_proven']
+                                    else ['continuous_surface_minimum']),
                                   'render_only_modifier_differences', 'non_mesh_geometry',
                                   'shader_opacity', 'physics_collision_shapes']}
         return {'scope': 'scene_spatial_inspection', 'spatial': report}

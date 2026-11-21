@@ -3,7 +3,14 @@ import unittest
 
 import numpy as np
 
-from cavi_blender_mcp.uv_layout import _candidate_pairs, analyze, overlapping, validate_packed
+from cavi_blender_mcp.uv_layout import (
+    _candidate_pairs,
+    analyze,
+    measured_overlap,
+    overlapping,
+    validate_packed,
+)
+from cavi_blender_mcp.uvmath import overlap as raster_overlap
 
 QUAD = [[(.1, .1), (.4, .1), (.4, .4)], [(.1, .1), (.4, .4), (.1, .4)]]
 IDS = [[0, 1, 2], [0, 2, 3]]
@@ -14,6 +21,14 @@ def check(triangles=QUAD, vertices=IDS, resolution=(100, 100), padding=2, budget
 
 
 class UVLayoutTests(unittest.TestCase):
+    def test_a_sliver_missed_by_cell_centers_is_still_an_overlap(self):
+        sliver = [[(0.24, 0.24), (0.26, 0.24), (0.24, 0.26)],
+                  [(0.25, 0.245), (0.27, 0.26), (0.245, 0.27)]]
+        self.assertEqual(raster_overlap(sliver, 8)['overlap_ratio'], 0)
+        measured = measured_overlap(sliver, 8)
+        self.assertTrue(measured['overlap_proven'])
+        self.assertGreater(measured['exact_overlap_pairs'], 0)
+        self.assertGreater(measured['overlap_ratio'], 0)
     def test_packed_uvs_reject_collapsed_nonfinite_and_outside_results(self):
         validate_packed(QUAD, .1)
         for triangles in ([[[.2, .2]] * 3],

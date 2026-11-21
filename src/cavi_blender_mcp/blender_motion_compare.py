@@ -6,7 +6,7 @@ import bpy
 import numpy as np
 from mathutils.kdtree import KDTree
 
-from .blender_frame_map import mapped_frames
+from .blender_frame_map import bounded_samples, mapped_frames
 
 
 def set_frame(frame):
@@ -72,7 +72,7 @@ def compare(p, find_object):
     if not source_bones or not candidate_bones or max(len(source_bones), len(candidate_bones)) > 512:
         raise ValueError('Comparison requires 1..512 bones per rig')
     shared = sorted(source_bones & candidate_bones)
-    frames = np.linspace(start, end, samples).tolist()
+    frames, covered = bounded_samples(start, end, samples)
     scale = p.get('candidate_frame_scale', 1)
     candidate_frames = mapped_frames(frames, scale, offset)
     scene = bpy.context.scene
@@ -145,5 +145,7 @@ def compare(p, find_object):
             'frames': frames, 'candidate_frame_offset': offset, 'space': space, 'vertex_match': matching,
             'max_error_m': maximum, 'tolerance_m': tolerance, 'passed': not missing and not extra and maximum <= tolerance,
             'bone_head_error_m': bone_error, 'missing_bones': missing, 'extra_bones': extra,
-            'meshes': reports, 'scene_unit_meters': meters,
-            'not_checked': ['unsampled times', 'bone roll and tail reconstruction', 'normal/tangent deformation', 'foot contact', 'Unity import']}
+            'meshes': reports, 'scene_unit_meters': meters, 'all_frames_tested': covered,
+            'not_checked': [*(() if covered else ('unsampled times',)),
+                            'bone roll and tail reconstruction', 'normal/tangent deformation',
+                            'foot contact', 'Unity import']}

@@ -11,6 +11,7 @@ from mathutils.bvhtree import BVHTree
 
 from .blender_bridge import new_name, number, obj, vector
 from .blender_geometry import MAX_TRIANGLES, triangle_count
+from .terrain_field import noise, prefilter, sample
 from .textures import read_image
 
 MAX_TERRAIN_RESOLUTION = 501
@@ -29,59 +30,6 @@ def integer(value, low, high, label):
     if type(value) is not int or not low <= value <= high:
         raise ValueError(f"{label} must be an integer from {low} to {high}")
     return value
-
-
-def smoothstep(value):
-    return value * value * (3 - 2 * value)
-
-
-def sample(grid, resolution, ease=smoothstep):
-    height, width = grid.shape
-    x = np.linspace(0, width - 1, resolution)
-    y = np.linspace(0, height - 1, resolution)
-    x0 = np.floor(x).astype(np.int64)
-    y0 = np.floor(y).astype(np.int64)
-    x1 = np.minimum(x0 + 1, width - 1)
-    y1 = np.minimum(y0 + 1, height - 1)
-    tx = ease(x - x0)
-    ty = ease(y - y0)
-    top = grid[np.ix_(y0, x0)] * (1 - tx) + grid[np.ix_(y0, x1)] * tx
-    bottom = grid[np.ix_(y1, x0)] * (1 - tx) + grid[np.ix_(y1, x1)] * tx
-    return top * (1 - ty)[:, None] + bottom * ty[:, None]
-
-
-def prefilter(grid, resolution):
-    # Average across one output spacing so detail finer than the terrain grid cannot alias.
-    # Windows are truncated at the image border rather than padded.
-    for axis in (0, 1):
-        count, half = grid.shape[axis], (grid.shape[axis] - 1) // (resolution - 1) // 2
-        if half > 0:
-            total = np.insert(np.cumsum(grid, axis=axis, dtype=np.float64), 0, 0, axis=axis)
-            index = np.arange(count)
-            low, high = np.maximum(index - half, 0), np.minimum(index + half + 1, count)
-            shape = [1, 1]
-            shape[axis] = count
-            grid = ((np.take(total, high, axis=axis) - np.take(total, low, axis=axis))
-                    / (high - low).reshape(shape))
-    return grid
-
-
-def noise(resolution, seed, octaves, frequency):
-    rng = np.random.default_rng(seed)
-    total = np.zeros((resolution, resolution), np.float64)
-    amplitude, weight = 1.0, 0.0
-    for octave in range(octaves):
-        # A lattice finer than the output grid only adds memory, not detail.
-        cells = min(max(2, round(frequency * 2 ** octave)), max(2, resolution - 1))
-        lattice = rng.random((cells + 1, cells + 1))
-        total += amplitude * sample(lattice, resolution)
-        weight += amplitude
-        amplitude *= 0.5
-    total /= weight
-    low, high = float(total.min()), float(total.max())
-    if high - low < 1e-9:
-        return np.zeros_like(total)
-    return (total - low) / (high - low)
 
 
 def height_image(workspace, name, resolution):

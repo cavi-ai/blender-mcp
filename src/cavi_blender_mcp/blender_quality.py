@@ -8,6 +8,7 @@ import numpy as np
 
 from .mapping import measure_triangle, summarize
 from .naming import lint, rules
+from .uv_layout import measured_overlap
 
 MAX_TRIANGLES = 100000
 MAX_VERTICES = 100000
@@ -191,8 +192,6 @@ def material_report(value):
 
 
 def run_checks(value, layer_name, requested, naming, lightmap_resolution):
-    from .uvmath import overlap
-
     mesh = value.data
     report = {}
     if "naming" in requested:
@@ -214,7 +213,7 @@ def run_checks(value, layer_name, requested, naming, lightmap_resolution):
             uv = np.empty(len(mesh.loops) * 2, np.float64)
             layer.data.foreach_get("uv", uv)
             triangles = uv.reshape(-1, 2)[loops].reshape(-1, 3, 2)
-            entry.update(overlap(triangles, lightmap_resolution))
+            entry.update(measured_overlap(triangles, lightmap_resolution))
             entry["outside_unit_square"] = bool(len(uv) and (uv.min() < -1e-6
                                                              or uv.max() > 1 + 1e-6))
         report["lightmap"] = entry

@@ -52,7 +52,8 @@ try:
         "seed": 3, "octaves": 3, "frequency": 3, "lease_id": lease})
     assert terrain["triangles"] == 128 and terrain["vertices"] == 81, terrain
     assert terrain["source"] == "noise"
-    assert terrain["minimum"] == 0 and terrain["maximum"] == 4, terrain
+    assert 0 <= terrain["minimum"] < terrain["maximum"] <= 4, terrain
+    assert not (terrain["minimum"] == 0 and terrain["maximum"] == 4), terrain
     mesh = bpy.data.objects["LevelTerrain"].data
     assert len(mesh.uv_layers) == 1
     assert all(polygon.use_smooth for polygon in mesh.polygons)

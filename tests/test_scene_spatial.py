@@ -108,6 +108,27 @@ class SceneSpatialTests(unittest.TestCase):
             list(helpers.chunk_pairs(a, b, 24))
         self.assertEqual(len(list(helpers.chunk_pairs(a, b, 25))), 1)
 
+    def test_exact_distance_finds_an_edge_gap_tighter_than_vertices_or_centroids(self):
+        helpers = self.helpers()
+        # Closest points are edge midpoints. Vertices and centroids are farther.
+        left = [((0., 1., 0.), (0., -1., 0.), (-1., 0., 0.))]
+        right = [((0.1, 0., 1.), (0.1, 0., -1.), (1., 0., 0.))]
+        proof = helpers.prove_distance(left, right, upper=2., budget=8)
+        self.assertTrue(proof['proven'])
+        self.assertAlmostEqual(proof['lower_m'], 0.1, places=9)
+        self.assertAlmostEqual(proof['upper_m'], 0.1, places=9)
+        samples = [point for _, point in helpers.samples(left, 4)]
+        sampled = min(helpers.point_triangle_distance(point, right[0]) for point in samples)
+        self.assertGreater(sampled, proof['lower_m'] + 0.05)
+
+    def test_an_exhausted_distance_budget_does_not_claim_the_minimum(self):
+        helpers = self.helpers()
+        left = [((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))]
+        right = [((0.2, 0.2, 0.), (1.2, 0.2, 0.), (0.2, 1.2, 0.))]
+        proof = helpers.prove_distance(left, right, upper=1., budget=0)
+        self.assertFalse(proof['proven'])
+        self.assertLess(proof['lower_m'], proof['upper_m'])
+
     def test_samples_are_bounded_and_include_surface_interiors(self):
         helpers = self.helpers()
         triangles = [((0., 0., 0.), (3., 0., 0.), (0., 3., 0.))]

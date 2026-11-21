@@ -8,6 +8,7 @@ import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
+from .blender_frame_map import bounded_samples
 from .blender_mesh_sample import snapshot
 from .blender_motion_compare import set_frame
 
@@ -130,7 +131,8 @@ def inspect(p, find_object):
     frames, topology, issues, work = [], [], [], 0
     budget, precision = Budget(maximum), 0.
     try:
-        for frame in np.linspace(start, end, samples).tolist():
+        frames_to_test, covered = bounded_samples(start, end, samples)
+        for frame in frames_to_test:
             set_frame(frame)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             body_points, faces = snapshot(body, depsgraph, triangles=True)
@@ -194,9 +196,11 @@ def inspect(p, find_object):
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
     return {'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,
             'complete': complete, 'passed': complete and all(report['violating_samples']==0 for report in reports),
-            'frames': frames, 'requested_samples': samples, 'surface_samples': mode,
+            'frames': frames, 'requested_samples': samples, 'all_frames_tested': covered,
+            'surface_samples': mode,
             'minimum_required_m': threshold, 'numerical_resolution_m': precision,
             'body_topology': topology, 'issues': issues, 'queries': budget.used,
             'query_budget': maximum, 'scene_unit_meters': meters,
-            'not_checked': ['unsampled times and surface locations', 'continuous triangle collision',
+            'not_checked': [*(() if covered else ('unsampled times',)), 'unsampled surface locations',
+                            'continuous triangle collision',
                             'body self-intersections', 'cloth simulation', 'Unity import']}

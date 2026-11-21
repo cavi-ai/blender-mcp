@@ -82,8 +82,15 @@ for name, extra in (("SM_SubSphere", {}), ("SM_Rock", {"target_triangles": 300})
         edit("decimate_to", name=name, **extra)
     hulls = edit("collision", name=name, shape="convex", max_hull_vertices=24)
     entry = hulls["objects"][0]
-    assert hulls["count"] == 1 and not entry["box_fallback"], hulls
-    assert_convex_hull(bpy.data.objects[entry["name"]], 24)
+    assert hulls["count"] == 1 and entry["contains_source"], hulls
+    shape = bpy.data.objects[entry["name"]]
+    source_co = np.empty(len(bpy.data.objects[name].data.vertices) * 3, np.float64)
+    bpy.data.objects[name].data.vertices.foreach_get("co", source_co)
+    assert blender_geometry.covers(shape.data, source_co.reshape(-1, 3)), entry
+    if not entry["box_fallback"]:
+        assert_convex_hull(shape, 24)
+    else:
+        assert len(shape.data.vertices) <= 24
     results[f"hull_{name}"] = entry["vertices"]
 
 

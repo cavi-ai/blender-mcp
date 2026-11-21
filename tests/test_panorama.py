@@ -65,6 +65,7 @@ class PanoramaTests(unittest.TestCase):
         wrapped = wrap(ramp, 32)
         self.assertEqual(wrapped.size, (512, 256))
         self.assertLess(seam(wrapped)[0], 4)
+        self.assertEqual(wrapped.getpixel((200, 20)), ramp.getpixel((200, 20)))
 
     def test_requests_outside_the_contract_publish_nothing(self):
         for prompt, path, message in (("", "sky.png", "1..1000"), ("x" * 1001, "sky.png", "1..1000"),

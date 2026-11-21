@@ -10,7 +10,7 @@ from mathutils import Matrix, Vector
 
 from .blender_bridge import editable_mesh, info, number, selected
 from .naming import LOD, base_name
-from .uvmath import density, overlap
+from .uvmath import density
 
 MAX_TRIANGLES = 500000
 MAX_UV_TRIANGLES = 200000
@@ -407,7 +407,9 @@ def unit_scale():
 
 
 def uv_overlap(mesh, layer, resolution):
-    return overlap(uv_triangles(mesh, layer), resolution)
+    from .uv_layout import measured_overlap
+
+    return measured_overlap(uv_triangles(mesh, layer), resolution)
 
 
 def edit_uvs(value, layer, steps):
@@ -534,42 +536,50 @@ def loose_parts(mesh):
     return list(groups.values())
 
 
-def farthest(points, limit):
-    chosen = [0]
-    distance = np.linalg.norm(points - points[0], axis=1)
-    while len(chosen) < limit:
-        index = int(distance.argmax())
-        if distance[index] <= 0:
-            break
-        chosen.append(index)
-        distance = np.minimum(distance, np.linalg.norm(points - points[index], axis=1))
-    return points[chosen]
+def covers(mesh, points, tolerance=1e-4):
+    """True when every point is inside or on the mesh's convex faces."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    try:
+        bm.normal_update()
+        if not bm.faces:
+            return False
+        center = np.mean([vert.co[:] for vert in bm.verts], axis=0)
+        coords = np.asarray(points, np.float64)
+        for face in bm.faces:
+            normal = np.array(face.normal[:], np.float64)
+            origin = np.array(face.verts[0].co[:], np.float64)
+            if normal @ (center - origin) > 0:
+                normal = -normal
+            if float(((coords - origin) @ normal).max()) > tolerance:
+                return False
+        return True
+    finally:
+        bm.free()
 
 
 def hull(points, limit):
-    for _ in range(2):
-        bm = bmesh.new()
-        try:
-            verts = [bm.verts.new(point) for point in points.tolist()]
-            result = bmesh.ops.convex_hull(bm, input=verts)
-            # Blender 5.2 repeats vertices across these slots.
-            extra = dict.fromkeys(
-                item for key in ("geom_interior", "geom_unused", "geom_holes")
-                for item in result[key] if isinstance(item, bmesh.types.BMVert) and item.is_valid)
-            bmesh.ops.delete(bm, geom=list(extra), context="VERTS")
-            bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
-            bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
-            if len(bm.faces) < 4 or not all(e.is_manifold for e in bm.edges):
-                return None
-            kept = np.array([v.co[:] for v in bm.verts])
-            if len(kept) <= limit:
-                mesh = bpy.data.meshes.new("CAVI Hull")
-                bm.to_mesh(mesh)
-                return mesh
-            points = farthest(kept, limit)
-        finally:
-            bm.free()
-    return None
+    """Convex hull of every point, or None when it exceeds the vertex limit.
+
+    Dropping hull vertices would leave source corners outside the shape.
+    """
+    bm = bmesh.new()
+    try:
+        verts = [bm.verts.new(point) for point in points.tolist()]
+        result = bmesh.ops.convex_hull(bm, input=verts)
+        extra = dict.fromkeys(
+            item for key in ("geom_interior", "geom_unused", "geom_holes")
+            for item in result[key] if isinstance(item, bmesh.types.BMVert) and item.is_valid)
+        bmesh.ops.delete(bm, geom=list(extra), context="VERTS")
+        bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        if len(bm.faces) < 4 or not all(e.is_manifold for e in bm.edges) or len(bm.verts) > limit:
+            return None
+        mesh = bpy.data.meshes.new("CAVI Hull")
+        bm.to_mesh(mesh)
+        return mesh
+    finally:
+        bm.free()
 
 
 def box(low, high):
@@ -618,15 +628,21 @@ def collision(p):
             points = co[part]
             low, high = points.min(axis=0), points.max(axis=0)
             fallback = False
-            if shape == "convex":
-                mesh = hull(points, limit)
-                if mesh is None:
-                    mesh, fallback = box(low, high), True
-            elif shape == "box":
-                mesh = box(low, high)
-            else:
+            if shape == "sphere":
                 center = (low + high) / 2
-                mesh = sphere(center, float(np.linalg.norm(points - center, axis=1).max()))
+                radius = float(np.linalg.norm(points - center, axis=1).max())
+                mesh = sphere(center, radius)
+                outside = float(np.linalg.norm(points - center, axis=1).max()) > radius + 1e-6
+            else:
+                mesh = hull(points, limit) if shape == "convex" else box(low, high)
+                if mesh is None or not covers(mesh, points):
+                    if mesh is not None:
+                        bpy.data.meshes.remove(mesh)
+                    mesh, fallback = box(low, high), True
+                outside = not covers(mesh, points)
+            if outside:
+                bpy.data.meshes.remove(mesh)
+                raise RuntimeError("Collision shape does not contain the source part")
             label = free_name(f"{prefix}{base}_{index:02}")
             mesh.name = label
             item = bpy.data.objects.new(label, mesh)
@@ -636,7 +652,8 @@ def collision(p):
             item.display_type = "WIRE"
             item.hide_render = True
             report.append({"name": label, "vertices": len(mesh.vertices),
-                           "faces": len(mesh.polygons), "box_fallback": fallback})
+                           "faces": len(mesh.polygons), "box_fallback": fallback,
+                           "contains_source": True})
     except Exception:
         for item in created:
             mesh = item.data

@@ -10,6 +10,7 @@ from .blender_errors import preflight
 from .blender_rig import action_context
 from .blender_rig_bake import bake
 from .blender_rig_contacts import contact_frames
+from .blender_rig_contacts import report as contact_report
 from .blender_rig_controls import armature
 from .blender_rigging import label
 
@@ -203,6 +204,13 @@ def lock_contacts(p):
                     "blend_range": [item["begin"], item["end"]],
                 }
             )
+        checked = contact_report(rig, action, [item["contact"] for item in parsed])
+        missed = [item for item in checked if not item["passed"]]
+        if missed:
+            detail = ", ".join(
+                f"{item['bone']} drift {item['max_drift_m']:.6g} m height {item['max_height_error_m']:.6g} m"
+                for item in missed)
+            raise ValueError("Foot lock missed a declared contact window: " + detail)
         scene.frame_set(frame[0], subframe=frame[1])
         bpy.context.view_layer.update()
     except Exception:
@@ -234,5 +242,5 @@ def lock_contacts(p):
         "preparation": prepared,
         "locks": receipts,
         "source_action_preserved": True,
-        "contact_validation": "required",
+        "contact_validation": checked,
     }

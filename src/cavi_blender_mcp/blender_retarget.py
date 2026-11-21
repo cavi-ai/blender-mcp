@@ -131,14 +131,22 @@ def retarget(p):
                 apply_calibrated(source.evaluated_get(bpy.context.evaluated_depsgraph_get()),
                                  target, ordered, calibration)
             else:
+                desired = {}
                 for src_bone, dst_bone in ordered:
                     target_bone = target.pose.bones[dst_bone]
                     target_bone.rotation_mode = "QUATERNION"
-                    target_bone.matrix = (target.matrix_world.inverted()
-                                          @ source.matrix_world
-                                          @ source.pose.bones[src_bone].matrix)
+                    matrix = (target.matrix_world.inverted()
+                              @ source.matrix_world
+                              @ source.pose.bones[src_bone].matrix).copy()
+                    target_bone.matrix = matrix
+                    desired[dst_bone] = matrix
                     # Children resolve against the parent's pose from this frame, not the last one.
                     bpy.context.view_layer.update()
+                bpy.context.view_layer.update()
+                for name, matrix in desired.items():
+                    actual = target.pose.bones[name].matrix
+                    if max(abs(actual[r][c] - matrix[r][c]) for r in range(4) for c in range(4)) > 1e-4:
+                        raise ValueError('Target inheritance cannot preserve transferred pose matrices')
             for src_bone, dst_bone in ordered:
                 target_bone = target.pose.bones[dst_bone]
                 rotation = target_bone.rotation_quaternion
