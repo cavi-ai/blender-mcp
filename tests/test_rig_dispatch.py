@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from cavi_blender_mcp.rig_dispatch import RIG_EDIT
+from cavi_blender_mcp.blender_rig_dispatch import RIG_EDIT
+from cavi_blender_mcp.bridge_contract import expected_bridge
 
 EXPECTED = {
     "add_constraint": ("blender_rig_controls", "HANDLERS"),
@@ -32,3 +35,13 @@ class RigDispatchTests(unittest.TestCase):
     def test_operation_set_and_targets_match_the_table(self):
         self.assertEqual(set(RIG_EDIT), set(EXPECTED))
         self.assertEqual(RIG_EDIT, EXPECTED)
+
+    def test_dispatch_table_changes_bridge_fingerprint(self):
+        before = expected_bridge()
+        read = Path.read_bytes
+
+        def changed(path):
+            return read(path) + (b"\n" if path.name == "blender_rig_dispatch.py" else b"")
+
+        with patch.object(Path, "read_bytes", changed):
+            self.assertNotEqual(before["build"], expected_bridge()["build"])

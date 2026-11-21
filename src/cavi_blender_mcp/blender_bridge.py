@@ -25,6 +25,7 @@ from .geometry import validate_mesh
 from .source_identity import LoadedSource
 
 _LOADED_BRIDGE = expected_bridge()
+from .blender_rig_dispatch import RIG_EDIT
 from .importing import (
     MAX_BYTES,
     MAX_FBX_BYTES,
@@ -48,7 +49,6 @@ from .operations import (
 )
 from .paths import destination
 from .presets import AXIS_PRESETS
-from .rig_dispatch import RIG_EDIT
 
 _server = None
 _jobs = queue.Queue(maxsize=8)
