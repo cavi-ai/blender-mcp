@@ -430,7 +430,7 @@ Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`,
 `visibility`, `rigid_body`, `particles`, `hair`, `volume_to_mesh`.
 
-`rigid_body` sets ACTIVE or PASSIVE, mass, and a BOX, SPHERE or CONVEX_HULL shape.
+`rigid_body` sets ACTIVE or PASSIVE, mass, and a BOX, SPHERE or CONVEX_HULL shape. A bake requires the scene and its background scenes and collection instances to have no other point caches.
 `frames` from 1 to 50 bakes the scene point cache and reports the world location
 at the last frame; 0 stores the body and does not bake. `particles` adds an
 emitter of 1–256 particles from faces. `hair` parents 1–32 curves of 2–8 points

@@ -117,6 +117,20 @@ def add_geometry_node(p):
     return _graph(target, tree, modifier)
 
 
+def _check_link(tree, source, dest, input_socket):
+    pending, seen = [dest], set()
+    while pending:
+        node = pending.pop()
+        if node == source:
+            raise ValueError("Node link would create a cycle")
+        if node in seen:
+            continue
+        seen.add(node)
+        pending.extend(link.to_node for link in tree.links
+                       if link.from_node == node
+                       and (input_socket.is_multi_input or link.to_socket != input_socket))
+
+
 def link_geometry_node(p):
     _object_mode()
     target, modifier, tree = _geometry(p["name"], p.get("modifier"))
@@ -131,6 +145,7 @@ def link_geometry_node(p):
         raise ValueError("Output socket is not on the source node")
     if not isinstance(input_name, str) or input_name not in dest.inputs:
         raise ValueError("Input socket is not on the destination node")
+    _check_link(tree, source, dest, dest.inputs[input_name])
     link = tree.links.new(source.outputs[output_name], dest.inputs[input_name])
     if (link is None or link.from_node != source or link.to_node != dest
             or link.from_socket.name != output_name or link.to_socket.name != input_name):
@@ -158,20 +173,30 @@ def compositor(spec):
     scene = bpy.context.scene
     tree = _tree(scene)
     if step == "add_node":
-        if tree is None:
+        created = tree is None
+        if created:
             tree = bpy.data.node_groups.new("Compositor", "CompositorNodeTree")
-            scene.compositing_node_group = tree
-        if len(tree.nodes) >= MAX_GRAPH_NODES:
-            raise ValueError("Compositor graphs are limited to 64 nodes")
-        name = _label(spec.get("node"), tree.nodes, "Node")
-        cls = _node_type(spec.get("node_type"), tree)
-        node = tree.nodes.new(cls.bl_rna.identifier)
+        node = None
         try:
+            if len(tree.nodes) >= MAX_GRAPH_NODES:
+                raise ValueError("Compositor graphs are limited to 64 nodes")
+            name = _label(spec.get("node"), tree.nodes, "Node")
+            cls = _node_type(spec.get("node_type"), tree)
+            node = tree.nodes.new(cls.bl_rna.identifier)
             node.name = name
             if node.name != name:
                 raise RuntimeError("Compositor node was not named")
+            if created:
+                scene.compositing_node_group = tree
+                if scene.compositing_node_group != tree:
+                    raise RuntimeError("Compositor tree was not attached")
         except Exception:
-            tree.nodes.remove(node)
+            if created:
+                if scene.compositing_node_group == tree:
+                    scene.compositing_node_group = None
+                bpy.data.node_groups.remove(tree)
+            elif node is not None:
+                tree.nodes.remove(node)
             raise
     elif step == "link":
         if tree is None:
@@ -187,6 +212,7 @@ def compositor(spec):
             raise ValueError("Output socket is not on the source node")
         if not isinstance(input_name, str) or input_name not in dest.inputs:
             raise ValueError("Input socket is not on the destination node")
+        _check_link(tree, source, dest, dest.inputs[input_name])
         link = tree.links.new(source.outputs[output_name], dest.inputs[input_name])
         if (link is None or link.from_node != source or link.to_node != dest
                 or link.from_socket.name != output_name or link.to_socket.name != input_name):
@@ -248,6 +274,36 @@ def sculpt_stroke(p):
     return {**info(mesh), "domain": {"kind": "sculpt", "moved_m": moved}}
 
 
+def _other_scene_caches(scene):
+    scenes, objects, pending = set(), set(), [scene]
+    while pending:
+        current = pending.pop()
+        if current in scenes:
+            continue
+        scenes.add(current)
+        objects.update(current.objects)
+        if current.background_set is not None:
+            pending.append(current.background_set)
+    pending_objects = list(objects)
+    while pending_objects:
+        value = pending_objects.pop()
+        if value.instance_collection is not None:
+            for item in value.instance_collection.all_objects:
+                if item not in objects:
+                    objects.add(item)
+                    pending_objects.append(item)
+        if value.soft_body is not None:
+            return True
+        if any(system.settings.physics_type != 'NO' for system in value.particle_systems):
+            return True
+        for modifier in value.modifiers:
+            if (modifier.type == 'CLOTH'
+                    or (modifier.type == 'FLUID' and modifier.fluid_type == 'DOMAIN')
+                    or (modifier.type == 'DYNAMIC_PAINT' and modifier.ui_type == 'CANVAS')):
+                return True
+    return False
+
+
 def rigid_body(p):
     _object_mode()
     target = obj(p["name"], mesh=True)
@@ -264,6 +320,11 @@ def rigid_body(p):
     if type(frames) is not int or not 0 <= frames <= MAX_PHYSICS_FRAMES:
         raise ValueError("Physics bake is 0 to 50 frames")
     scene = bpy.context.scene
+    if frames and _other_scene_caches(scene):
+        raise ValueError("Rigid body bake requires a scene without other point caches")
+    if (frames and scene.rigidbody_world is not None
+            and (scene.rigidbody_world.point_cache.is_baked or scene.rigidbody_world.point_cache.use_external)):
+        raise ValueError("Existing baked or external rigid body cache cannot be replaced")
     if scene.rigidbody_world is None and "FINISHED" not in bpy.ops.rigidbody.world_add():
         raise RuntimeError("Rigid body world was not created")
     with selected([target]):
@@ -277,17 +338,18 @@ def rigid_body(p):
         world = scene.rigidbody_world
         cache = world.point_cache
         previous = (scene.frame_start, scene.frame_end, cache.frame_start, cache.frame_end,
-                    scene.frame_current)
+                    scene.frame_current, scene.frame_subframe)
         try:
             scene.frame_start = cache.frame_start = 1
             scene.frame_end = cache.frame_end = frames
+            scene.frame_set(1)
             if "FINISHED" not in bpy.ops.ptcache.bake_all(bake=True):
                 raise RuntimeError("Physics bake did not finish")
             scene.frame_set(frames)
             location = [float(value) for value in target.matrix_world.translation]
         finally:
-            scene.frame_start, scene.frame_end, cache.frame_start, cache.frame_end, current = previous
-            scene.frame_set(current)
+            scene.frame_start, scene.frame_end, cache.frame_start, cache.frame_end, current, subframe = previous
+            scene.frame_set(current, subframe=subframe)
     if target.rigid_body.type != body or target.rigid_body.collision_shape != shape:
         raise RuntimeError("Rigid body settings did not apply")
     return {**info(target), "domain": {
@@ -432,15 +494,24 @@ def import_vdb(path, name, workspace):
                 raise ValueError("Volume import did not create one volume")
             volume = next(iter(created))
             volume.name = label
-            grids = list(volume.data.grids)
-            if not grids:
+            volume.data.grids.load()
+            names = [grid.name for grid in volume.data.grids]
+            if not names:
                 raise ValueError("Volume file has no grids")
+            checked_path, checked_data = workspace_bytes(workspace, path, {".vdb"}, "OpenVDB", limit=VDB_LIMIT)
+            if checked_path != file_path or checked_data != data:
+                raise ValueError("Volume source changed during import")
+            volume.data.filepath = str(file_path)
+            volume.data.grids.unload()
+            volume.data.grids.load()
+            if [grid.name for grid in volume.data.grids] != names:
+                raise ValueError("Volume source grids could not be reloaded")
         except Exception:
             _drop_created(previous, previous_volumes)
             raise
     finally:
         Path(temporary).unlink(missing_ok=True)
-    return {**info(volume), "domain": {"kind": "volume", "grids": [grid.name for grid in grids][:32]}}
+    return {**info(volume), "domain": {"kind": "volume", "grids": names[:32]}}
 
 
 HANDLERS = {

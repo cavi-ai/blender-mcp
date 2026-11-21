@@ -9,7 +9,8 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from cavi_blender_mcp import blender_bridge as bridge
 
-workspace = Path(tempfile.mkdtemp(prefix="cavi-domains-"))
+folder = tempfile.TemporaryDirectory(prefix="cavi-domains-")
+workspace = Path(folder.name)
 bridge._workspace = workspace
 state = bridge.dispatch("session_control", {"action": "inspect"})
 lease = bridge.dispatch("session_control", {
@@ -58,11 +59,33 @@ if min(shifted) < -0.01 or max(shifted) < 1.5:
     raise AssertionError(shifted)
 
 call("create_primitive", name="Drop", kind="cube", location=[0, 0, 2])
+scene = bpy.context.scene
+scene.frame_set(3, subframe=.375)
 body = call("rigid_body", name="Drop", collision_shape="BOX", body="ACTIVE", mass=1, frames=5)
 if body["domain"]["evaluated_location"][2] >= 2:
     raise AssertionError(body["domain"])
-if bpy.context.scene.frame_current != 1:
-    raise AssertionError("physics bake left the scene frame")
+if (scene.frame_current, scene.frame_subframe) != (3, .375):
+    raise AssertionError("physics bake changed the scene frame")
+prior_settings = (bpy.data.objects["Drop"].rigid_body.mass, scene.frame_current, scene.frame_subframe)
+try:
+    call("rigid_body", name="Drop", collision_shape="BOX", body="ACTIVE", mass=2, frames=5)
+except ValueError:
+    pass
+else:
+    raise AssertionError("repeated rigid cache bake was accepted")
+assert (bpy.data.objects["Drop"].rigid_body.mass, scene.frame_current, scene.frame_subframe) == prior_settings
+cloth = bpy.data.objects.new("Cloth", cube.data.copy())
+scene.collection.objects.link(cloth)
+cloth_modifier = cloth.modifiers.new("Cloth", "CLOTH")
+call("create_primitive", name="SecondDrop", kind="cube", location=[3, 0, 2])
+try:
+    call("rigid_body", name="SecondDrop", collision_shape="BOX", body="ACTIVE", frames=5)
+except ValueError as error:
+    assert "other point caches" in str(error)
+else:
+    raise AssertionError("bake with unrelated cloth cache was accepted")
+assert bpy.data.objects["SecondDrop"].rigid_body is None and not cloth_modifier.point_cache.is_baked
+bpy.data.objects.remove(cloth, do_unlink=True)
 passive = call("rigid_body", name="Cube", collision_shape="CONVEX_HULL", body="PASSIVE", frames=0)
 if passive["domain"]["collision_shape"] != "CONVEX_HULL":
     raise AssertionError(passive["domain"])
@@ -75,6 +98,17 @@ hair = call("hair_curves", name="Cube", new_name="CubeHair", curves=[
 if (hair["domain"]["curves"], hair["domain"]["points"], hair["parent"]) != (2, 5, "Cube"):
     raise AssertionError(hair)
 
+before_groups = set(bpy.data.node_groups)
+assert bpy.context.scene.compositing_node_group is None
+try:
+    call("scene_authoring", action="compositor", definition={
+        "step": "add_node", "node": "Invalid", "node_type": "NoSuchNode"})
+except ValueError:
+    pass
+else:
+    raise AssertionError("invalid compositor node was accepted")
+assert bpy.context.scene.compositing_node_group is None and set(bpy.data.node_groups) == before_groups
+
 blur = call("scene_authoring", action="compositor", definition={
     "step": "add_node", "node": "Blur", "node_type": "CompositorNodeBlur"})
 call("scene_authoring", action="compositor", definition={
@@ -82,6 +116,16 @@ call("scene_authoring", action="compositor", definition={
 linked_blur = call("scene_authoring", action="compositor", definition={
     "step": "link", "from_node": "Blur", "from_socket": "Image",
     "to_node": "Soft", "to_socket": "Image"})
+before_links = [(link.from_node.name, link.to_node.name) for link in scene.compositing_node_group.links]
+try:
+    call("scene_authoring", action="compositor", definition={
+        "step": "link", "from_node": "Soft", "from_socket": "Image",
+        "to_node": "Blur", "to_socket": "Image"})
+except ValueError as error:
+    assert "cycle" in str(error)
+else:
+    raise AssertionError("cyclic compositor link was accepted")
+assert [(link.from_node.name, link.to_node.name) for link in scene.compositing_node_group.links] == before_links
 if blur["type"] != "COMPOSITOR" or linked_blur["link_count"] < 1:
     raise AssertionError((blur, linked_blur))
 
@@ -93,6 +137,25 @@ if volume["domain"] != {"kind": "volume_to_mesh", "source": "Fog", "resolution":
     raise AssertionError(volume["domain"])
 if cube.modifiers["VolumeMesh"].object != fog or cube.modifiers["VolumeMesh"].voxel_amount != 16:
     raise AssertionError("volume modifier did not keep its source")
+
+source_data = bpy.data.volumes.new("SourceVolume")
+source = bpy.data.objects.new("SourceVolume", source_data)
+scene.collection.objects.link(source)
+modifier = source.modifiers.new("Density", "MESH_TO_VOLUME")
+modifier.object = bpy.data.objects["Drop"]
+modifier.resolution_mode = 'VOXEL_AMOUNT'
+modifier.voxel_amount = 16
+bpy.context.view_layer.update()
+vdb_path = workspace / "density.vdb"
+evaluated = source.evaluated_get(bpy.context.evaluated_depsgraph_get())
+assert evaluated.data.grids.save(str(vdb_path))
+imported = call("import_vdb", path="density.vdb", name="Density")
+volume_data = bpy.data.objects["Density"].data
+assert imported['domain']['grids'] == ['density'] and Path(volume_data.filepath).resolve() == vdb_path.resolve(), (imported, volume_data.filepath, vdb_path)
+assert not list(workspace.glob('.cavi-import-*.vdb'))
+volume_data.grids.unload()
+volume_data.grids.load()
+assert [grid.name for grid in volume_data.grids] == ['density']
 
 (workspace / "notes.vdb").write_bytes(b"not a volume")
 try:
@@ -112,3 +175,5 @@ else:
     raise AssertionError("incomplete volume bytes were imported")
 if {item.name for item in bpy.data.objects} != before:
     raise AssertionError("failed volume import left an object")
+
+folder.cleanup()
