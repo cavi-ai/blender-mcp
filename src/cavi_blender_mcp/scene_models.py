@@ -100,6 +100,30 @@ class LightSpec(Definition):
     spot_blend: Annotated[Number, Field(ge=0, le=1)] = .15
 
 
+class CompositorSpec(Definition):
+    step: Literal['add_node', 'link']
+    node: Name | None = None
+    node_type: Name | None = None
+    from_node: Name | None = None
+    from_socket: Name | None = None
+    to_node: Name | None = None
+    to_socket: Name | None = None
+
+    @model_validator(mode='after')
+    def complete(self):
+        sockets = (self.from_node, self.from_socket, self.to_node, self.to_socket)
+        if self.step == 'add_node':
+            if self.node is None or self.node_type is None:
+                raise ValueError('add_node needs node and node_type')
+            if any(value is not None for value in sockets):
+                raise ValueError('add_node does not take link sockets')
+        elif any(value is None for value in sockets):
+            raise ValueError('link needs from_node, from_socket, to_node and to_socket')
+        elif self.node is not None or self.node_type is not None:
+            raise ValueError('link does not take a node')
+        return self
+
+
 class WorldSpec(Definition):
     name: Name
     color: Vector = (.05, .05, .05)

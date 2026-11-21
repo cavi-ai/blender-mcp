@@ -150,6 +150,19 @@ Long operations: `remesh_quad`, `lod_chain` and `bake_map`.
 | Estimated instances | 100,000 |
 | Realized scatter triangles | 2,000,000 |
 
+## Graphs, simulation and volumes
+
+| Limit | Value |
+| --- | --- |
+| Geometry or compositor nodes | 64 |
+| Geometry or compositor links | 128 |
+| Particle count | 1–256 |
+| Hair curves | 1–32, with 2–8 points each |
+| Rigid-body bake | 0–50 frames |
+| Volume file | 32 MiB OpenVDB |
+| Volume to mesh | 8–125 voxels per axis, at most 2,000,000 voxels |
+| Sculpt stroke | 3–32 positions; refused in background mode and when vertices do not move |
+
 ## Local generation
 
 | Limit | Value |

@@ -28,6 +28,10 @@ Unrelated action parameters are refused before contacting Blender.
 | `shape_key_remove` | `new_name`; Basis cannot be removed |
 | `keyframe` | `action_name`, `keyframes` = 1–32 `{frame, location, rotation_degrees, scale, interpolation}` |
 | `visibility` | `hide_viewport`, `hide_render`; at least one |
+| `rigid_body` | `collision_shape` BOX, SPHERE or CONVEX_HULL; `body` ACTIVE or PASSIVE; `mass`; `frames` 0–50 |
+| `particles` | `count` 1–256; `seed`; `new_name` |
+| `hair` | `new_name`; `curves` of 1–32 strands, 2–8 points each |
+| `volume_to_mesh` | mesh `name`, volume `source`, `resolution` 8–125 |
 
 ## Transforms and origins
 

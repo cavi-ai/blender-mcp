@@ -11,6 +11,7 @@ import bpy
 from cavi_mcp_core import workspace as core_workspace
 from mathutils import Vector
 
+from .blender_domains import compositor as edit_compositor
 from .blender_images import packed_snapshot
 from .blender_lookup import info, obj, output_file, vector
 from .blender_rigging import label
@@ -318,4 +319,6 @@ def author(p, workspace):
         return world(spec, workspace)
     if action == 'render':
         return render(spec)
+    if action == 'compositor':
+        return edit_compositor(spec)
     raise ValueError('Unknown scene authoring action')

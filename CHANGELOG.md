@@ -7,6 +7,13 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- `geometry_nodes` `create`, `add_node` and `link` build a Geometry Nodes group on a mesh.
+- `scene_edit` `compositor` adds and links nodes on the scene compositor.
+- `object_edit` adds a bounded rigid-body bake, particle emitter, hair curves and volume-to-mesh resolution.
+- `asset_io` imports one workspace OpenVDB volume. `mesh_edit` `sculpt_stroke` uses the Draw brush, refuses background mode, and refuses a stroke that leaves the mesh unchanged.
+
 ### Fixed
 
 - Convex collision over the vertex limit uses the containing box instead of a hull of a vertex subset.

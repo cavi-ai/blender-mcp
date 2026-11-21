@@ -78,7 +78,9 @@ model; results do not establish model task quality or game integration.
 ## Boundaries
 
 - Blender's operators and the render engine remain the source of truth. The
-  server reports refusals instead of simulating unsupported edits.
+  server reports refusals instead of simulating unsupported edits. Sculpt is
+  refused in background mode, and a stroke that does not move vertices is refused.
+  Volume import accepts an OpenVDB file and does not invent grid data.
 - Materials, shading and UV edits refuse shared mesh data. Make the mesh
   single-user in Blender first.
 - Exported assets still need the destination game's materials, scale, collision
