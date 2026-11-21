@@ -4,7 +4,7 @@ import math
 
 import bpy
 
-from .blender_bridge import info, obj
+from .blender_lookup import info, obj
 from .blender_nla_settings import FIELDS, validate
 from .blender_rig import action_slot
 

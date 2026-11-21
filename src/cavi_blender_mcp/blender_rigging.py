@@ -5,7 +5,7 @@ import math
 import bpy
 from mathutils import Vector
 
-from .blender_bridge import info, new_name, number, obj, selected, vector
+from .blender_lookup import info, new_name, number, obj, selected, vector
 from .blender_rig import weights
 
 MAX_BONES = 128

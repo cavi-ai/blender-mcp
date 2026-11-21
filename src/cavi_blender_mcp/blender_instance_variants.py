@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 import bpy
 
 from .blender_asset_library import ids, native_append
-from .blender_bridge import info
 from .blender_collection_instances import members, root
+from .blender_lookup import info
 
 
 def make_unique(params, workspace):

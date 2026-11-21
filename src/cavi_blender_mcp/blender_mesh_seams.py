@@ -3,8 +3,8 @@ import hashlib
 
 import bpy
 
-from .blender_bridge import editable_mesh, info
 from .blender_errors import preflight
+from .blender_lookup import editable_mesh, info
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import fingerprint, indices
 

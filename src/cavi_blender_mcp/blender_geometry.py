@@ -8,7 +8,7 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
-from .blender_bridge import editable_mesh, info, number, selected
+from .blender_lookup import editable_mesh, info, number, selected
 from .naming import LOD, base_name
 from .uvmath import density, overlap
 

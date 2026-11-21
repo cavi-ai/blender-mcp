@@ -8,8 +8,8 @@ import bpy
 from mathutils import Matrix
 
 from .blender_animation import ACTION_TAG, frame_number
-from .blender_bridge import info, new_name, obj
 from .blender_errors import preflight
+from .blender_lookup import info, new_name, obj
 from .blender_rig_controls import armature
 from .blender_rigging import label
 

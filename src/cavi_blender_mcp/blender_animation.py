@@ -5,7 +5,7 @@ import math
 import bpy
 from mathutils import Euler
 
-from .blender_bridge import info, obj, vector
+from .blender_lookup import info, obj, vector
 from .blender_rigging import MAX_ARMATURE_BONES
 
 MAX_POSES = 128

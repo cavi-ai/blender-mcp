@@ -6,7 +6,7 @@ import bpy
 from mathutils import Vector
 
 from .blender_animation import ACTION_TAG
-from .blender_bridge import info, number, obj
+from .blender_lookup import info, number, obj
 
 MAX_KEYS = 64
 MAX_OFFSETS = 10000
