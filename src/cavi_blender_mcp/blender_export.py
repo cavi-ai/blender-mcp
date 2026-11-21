@@ -12,10 +12,12 @@ from cavi_mcp_core import workspace as core_workspace
 from .blender_bridge import obj, output_file, selected, with_empties
 from .blender_export_uv import promote
 from .blender_rigging import MAX_ARMATURE_BONES
+from .export_route import refuse_triangulate
 from .naming import COLLISION_PREFIXES, LOD, base_name, pair_base
 from .presets import AXIS_PRESETS, USD_AXES
 
 FORMATS = {".fbx", ".glb", ".usd", ".usda", ".usdc"}
+MESH_FORMATS = {".fbx", ".glb", ".obj", ".stl", ".ply", ".abc"}
 
 
 def lod_siblings(value):
@@ -127,8 +129,7 @@ def write(path, objects, selection, preset, instances, empties, animations=False
     suffix = path.suffix.lower()
     if type(triangulate) is not bool:
         raise ValueError('triangulate must be boolean')
-    if triangulate and suffix != '.fbx':
-        raise ValueError('triangulate applies only to FBX exports')
+    refuse_triangulate(triangulate, suffix)
     sampled = {}
     primary='st' if suffix in {'.usd','.usda','.usdc'} else None
     with promote(objects if uv_objects is None else uv_objects,uv_layer,primary) as uv_maps, selected(selection), (export_identities(selection) if animations else nullcontext()):
@@ -152,6 +153,69 @@ def write(path, objects, selection, preset, instances, empties, animations=False
     if "FINISHED" not in result:
         raise RuntimeError("Export did not finish")
     return {**sampled,**({'uv_maps':uv_maps} if uv_maps is not None else {})}
+
+
+def export_mesh(p):
+    if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
+        raise ValueError("Provide between 1 and 1000 mesh names")
+    objects = [obj(n, mesh=True) for n in p["names"]]
+    preserve = p.get("preserve_instances", False)
+    empties = p.get("include_empties", False)
+    if type(preserve) is not bool or type(empties) is not bool:
+        raise ValueError("preserve_instances and include_empties must be booleans")
+    suffix = Path(p["path"]).suffix.lower()
+    if preserve and suffix != ".fbx":
+        raise ValueError("preserve_instances applies to static FBX exports")
+    if empties and suffix in {".obj", ".stl", ".ply"}:
+        raise ValueError("include_empties applies to FBX, GLB and Alembic exports")
+    selection = with_empties(objects) if empties else list(objects)
+    library = None
+    with ExitStack() as stack:
+        path = stack.enter_context(output_file(p["path"], MESH_FORMATS))
+        if suffix == ".obj":
+            # Reserve the material library too; never clobber a neighbouring file.
+            library = stack.enter_context(output_file(str(Path(p["path"]).with_suffix(".mtl")), {".mtl"}))
+        stack.enter_context(selected(selection))
+        if suffix == ".obj":
+            result = bpy.ops.wm.obj_export(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                export_uv=True, export_normals=True, export_materials=True, path_mode="STRIP",
+                forward_axis="NEGATIVE_Z", up_axis="Y", global_scale=1.0)
+        elif suffix in {".stl", ".ply"}:
+            operator = bpy.ops.wm.stl_export if suffix == ".stl" else bpy.ops.wm.ply_export
+            result = operator(
+                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
+                ascii_format=False, forward_axis="Y", up_axis="Z", global_scale=1.0)
+        elif suffix == ".abc":
+            frame = bpy.context.scene.frame_current
+            result = bpy.ops.wm.alembic_export(
+                filepath=str(path), selected=True, start=frame, end=frame,
+                export_hair=False, export_particles=False, as_background_job=False)
+        elif suffix == ".fbx":
+            from .export_instances import instance_meshes
+
+            with instance_meshes(objects) if preserve else nullcontext():
+                result = bpy.ops.export_scene.fbx(
+                    filepath=str(path),
+                    use_selection=True,
+                    object_types={"MESH", "EMPTY"} if empties else {"MESH"},
+                    mesh_smooth_type="FACE",
+                    use_tspace=True,
+                    add_leaf_bones=False,
+                    bake_anim=False,
+                    global_scale=1,
+                    path_mode="STRIP",
+                    **AXIS_PRESETS["unity"],
+                )
+        else:
+            result = bpy.ops.export_scene.gltf(
+                filepath=str(path), export_format="GLB", use_selection=True,
+                export_apply=True, export_morph=True, export_morph_animation=False)
+        if "FINISHED" not in result:
+            raise RuntimeError("Mesh export did not finish")
+    return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
+            "preserve_instances": preserve, "include_empties": empties,
+            **({"material_library": str(library)} if library else {})}
 
 
 def flag(p, key):
@@ -352,8 +416,7 @@ def export_asset(p):
     if suffix not in FORMATS:
         raise ValueError(f"Expected extension in {sorted(FORMATS)}")
     triangulate = flag(p, 'triangulate')
-    if triangulate and suffix != '.fbx':
-        raise ValueError('triangulate applies only to FBX exports')
+    refuse_triangulate(triangulate, suffix)
     preset = preset_for(p, suffix)
     if (baked_animation or animation_step is not None) and not animations:
         raise ValueError('Animation sampling options require animations=true')

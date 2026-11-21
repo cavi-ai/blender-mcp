@@ -10,7 +10,7 @@ import secrets
 import tempfile
 import threading
 import time
-from contextlib import ExitStack, contextmanager, nullcontext
+from contextlib import contextmanager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -46,7 +46,6 @@ from .operations import (
     SOURCE_PRESERVING,
 )
 from .paths import destination
-from .presets import AXIS_PRESETS
 
 _server = None
 _jobs = queue.Queue(maxsize=8)
@@ -67,7 +66,6 @@ OBJECTS = frozenset({"make_mesh_single_user", "apply_transforms", "set_origin", 
                      "add_socket", "duplicate_object", "parent_object", "unparent_object",
                      "move_to_collection", "object_keyframe", "set_visibility"})
 MAX_MODIFIERS = 16
-MESH_FORMATS = {".fbx", ".glb", ".obj", ".stl", ".ply", ".abc"}
 MAX_EVALUATED_FACES = 500000
 COLOR_TAG = "cavi_color_owner"
 RENDERLESS = frozenset({"CAMERA", "LIGHT", "LIGHT_PROBE", "LIGHTPROBE", "SPEAKER"})
@@ -1062,69 +1060,6 @@ def with_empties(objects):
     return selection
 
 
-def export_mesh(p):
-    if not isinstance(p["names"], list) or not p["names"] or len(p["names"]) > 1000:
-        raise ValueError("Provide between 1 and 1000 mesh names")
-    objects = [obj(n, mesh=True) for n in p["names"]]
-    preserve = p.get("preserve_instances", False)
-    empties = p.get("include_empties", False)
-    if type(preserve) is not bool or type(empties) is not bool:
-        raise ValueError("preserve_instances and include_empties must be booleans")
-    suffix = Path(p["path"]).suffix.lower()
-    if preserve and suffix != ".fbx":
-        raise ValueError("preserve_instances applies to static FBX exports")
-    if empties and suffix in {".obj", ".stl", ".ply"}:
-        raise ValueError("include_empties applies to FBX, GLB and Alembic exports")
-    selection = with_empties(objects) if empties else list(objects)
-    library = None
-    with ExitStack() as stack:
-        path = stack.enter_context(output_file(p["path"], MESH_FORMATS))
-        if suffix == ".obj":
-            # Reserve the material library too; never clobber a neighbouring file.
-            library = stack.enter_context(output_file(str(Path(p["path"]).with_suffix(".mtl")), {".mtl"}))
-        stack.enter_context(selected(selection))
-        if suffix == ".obj":
-            result = bpy.ops.wm.obj_export(
-                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
-                export_uv=True, export_normals=True, export_materials=True, path_mode="STRIP",
-                forward_axis="NEGATIVE_Z", up_axis="Y", global_scale=1.0)
-        elif suffix in {".stl", ".ply"}:
-            operator = bpy.ops.wm.stl_export if suffix == ".stl" else bpy.ops.wm.ply_export
-            result = operator(
-                filepath=str(path), export_selected_objects=True, apply_modifiers=True,
-                ascii_format=False, forward_axis="Y", up_axis="Z", global_scale=1.0)
-        elif suffix == ".abc":
-            frame = bpy.context.scene.frame_current
-            result = bpy.ops.wm.alembic_export(
-                filepath=str(path), selected=True, start=frame, end=frame,
-                export_hair=False, export_particles=False, as_background_job=False)
-        elif suffix == ".fbx":
-            from .export_instances import instance_meshes
-
-            with instance_meshes(objects) if preserve else nullcontext():
-                result = bpy.ops.export_scene.fbx(
-                    filepath=str(path),
-                    use_selection=True,
-                    object_types={"MESH", "EMPTY"} if empties else {"MESH"},
-                    mesh_smooth_type="FACE",
-                    use_tspace=True,
-                    add_leaf_bones=False,
-                    bake_anim=False,
-                    global_scale=1,
-                    path_mode="STRIP",
-                    **AXIS_PRESETS["unity"],
-                )
-        else:
-            result = bpy.ops.export_scene.gltf(
-                filepath=str(path), export_format="GLB", use_selection=True,
-                export_apply=True, export_morph=True, export_morph_animation=False)
-        if "FINISHED" not in result:
-            raise RuntimeError("Mesh export did not finish")
-    return {"path": str(path), "objects": p["names"], "bytes": path.stat().st_size,
-            "preserve_instances": preserve, "include_empties": empties,
-            **({"material_library": str(library)} if library else {})}
-
-
 def save_project(p):
     previous = bpy.context.preferences.filepaths.save_version
     try:
@@ -1416,6 +1351,11 @@ def _dispatch(operation, p):
         return edit({**p,'action':'remove' if operation=='remove_modifier' else 'update'},obj,info)
     if operation == "object_info":
         return info(obj(p["name"]),modifier_schema=True)
+    if operation == "export_mesh":
+        # Lazy: blender_export imports blender_bridge while this module is loading.
+        from .blender_export import export_mesh
+
+        return export_mesh(p)
     handlers = {
         "scene_info": scene_info,
         "create_mesh": create_mesh,
@@ -1425,7 +1365,6 @@ def _dispatch(operation, p):
         "add_modifier": add_modifier,
         "shade_mesh": shade,
         "unwrap_mesh": unwrap,
-        "export_mesh": export_mesh,
         "save_project": save_project,
         "render_preview": preview,
     }
