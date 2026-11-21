@@ -65,7 +65,7 @@ class ExporterForwardingTests(unittest.TestCase):
             polygons=[SimpleNamespace(vertices=[0, 1, 2, 3, 4])]),
             modifiers=[SimpleNamespace(type='ARMATURE')])
         modules = {'bpy': self.bpy, 'numpy': numpy,
-            'cavi_blender_mcp.blender_bridge': SimpleNamespace(obj=lambda *a, **k: self.obj,
+            'cavi_blender_mcp.blender_lookup': SimpleNamespace(obj=lambda *a, **k: self.obj,
                 output_file=self.output, selected=lambda *a: nullcontext(), with_empties=lambda x: x),
             'cavi_blender_mcp.blender_export_uv': SimpleNamespace(promote=lambda *a: nullcontext(None)),
             'cavi_blender_mcp.blender_rigging': SimpleNamespace(MAX_ARMATURE_BONES=512),

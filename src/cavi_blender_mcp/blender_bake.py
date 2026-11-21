@@ -5,7 +5,7 @@ from pathlib import Path
 
 import bpy
 
-from .blender_bridge import number, obj, output_file
+from .blender_lookup import number, obj, output_file
 
 MAX_LOW_TRIANGLES = 200000
 MAX_HIGH_TRIANGLES = 1000000

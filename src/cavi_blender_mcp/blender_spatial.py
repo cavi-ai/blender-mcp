@@ -5,8 +5,8 @@ import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-from .blender_bridge import obj
 from .blender_errors import preflight
+from .blender_lookup import obj
 from .blender_scene_geometry import digest
 from .spatial_query import (
     COPLANAR_NORMAL_TOLERANCE,

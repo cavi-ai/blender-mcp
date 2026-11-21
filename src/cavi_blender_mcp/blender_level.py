@@ -9,8 +9,8 @@ import numpy as np
 from mathutils import Euler, Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-from .blender_bridge import new_name, number, obj, vector
 from .blender_geometry import MAX_TRIANGLES, triangle_count
+from .blender_lookup import new_name, number, obj, vector
 from .terrain_field import noise, prefilter, sample
 from .textures import read_image
 

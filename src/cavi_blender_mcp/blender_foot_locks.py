@@ -5,8 +5,8 @@ import math
 import bpy
 from mathutils import Vector
 
-from .blender_bridge import info, new_name, vector
 from .blender_errors import preflight
+from .blender_lookup import info, new_name, vector
 from .blender_rig import action_context
 from .blender_rig_bake import bake
 from .blender_rig_contacts import contact_frames

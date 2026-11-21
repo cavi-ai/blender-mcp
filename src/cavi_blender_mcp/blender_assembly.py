@@ -5,9 +5,9 @@ from contextlib import contextmanager, nullcontext
 import bpy
 from mathutils import Matrix
 
-from .blender_bridge import obj, output_file
 from .blender_export import prepared_images, preset_for, sidecars, texture_receipt, write
 from .blender_geometry import triangle_count
+from .blender_lookup import obj, output_file
 
 
 @contextmanager

@@ -1,8 +1,8 @@
 """Inspect and translate source vertices while retaining all shape-key offsets."""
 import bpy
 
-from .blender_bridge import editable_mesh, info
 from .blender_errors import preflight
+from .blender_lookup import editable_mesh, info
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import selection
 from .vertex_edit import displaced, geodesic_weights, radius_m, symmetric_offsets, translated

@@ -8,8 +8,9 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
-from .blender_bridge import editable_mesh, info, number, selected
+from .blender_lookup import editable_mesh, info, number, selected
 from .naming import LOD, base_name
+from .uv_layout import measured_overlap
 from .uvmath import density
 
 MAX_TRIANGLES = 500000
@@ -407,8 +408,6 @@ def unit_scale():
 
 
 def uv_overlap(mesh, layer, resolution):
-    from .uv_layout import measured_overlap
-
     return measured_overlap(uv_triangles(mesh, layer), resolution)
 
 

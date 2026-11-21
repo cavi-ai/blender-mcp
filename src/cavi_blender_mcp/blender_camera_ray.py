@@ -5,7 +5,7 @@ import json
 import bpy
 import numpy as np
 
-from .blender_bridge import obj
+from .blender_lookup import obj
 from .surface_ray import pixel_ray
 
 

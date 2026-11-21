@@ -5,8 +5,8 @@ import math
 import bpy
 
 from .blender_animation import ACTION_TAG, previous_action, restore, restore_action, snapshot
-from .blender_bridge import info, obj
 from .blender_errors import preflight
+from .blender_lookup import info, obj
 from .blender_retarget_profile import apply as apply_calibrated
 from .blender_retarget_profile import prepare as prepare_calibration
 from .blender_rig import action_slot, sample_frames

@@ -7,8 +7,8 @@ import numpy as np
 
 from .blender_asset_library import digest
 from .blender_bake import MAX_LOW_TRIANGLES, bake_layer, restore, state, triangles, write_png
-from .blender_bridge import obj, output_file
 from .blender_errors import preflight
+from .blender_lookup import obj, output_file
 from .blender_material_bindings import capture
 from .blender_material_bindings import restore as restore_bindings
 from .blender_material_variants import clone_graph, dispose_graph

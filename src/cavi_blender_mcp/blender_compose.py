@@ -6,8 +6,8 @@ import bmesh
 import bpy
 from mathutils import Matrix
 
-from .blender_bridge import info, new_name, number, selected, vector
 from .blender_geometry import MAX_TRIANGLES, bake, free_name, loose_parts, source, triangle_count
+from .blender_lookup import info, new_name, number, selected, vector
 
 MAX_JOIN_OBJECTS = 64
 MAX_PARTS = 64
