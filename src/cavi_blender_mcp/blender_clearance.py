@@ -104,6 +104,19 @@ def inside_component(point, component, budget):
     return parities[0] if len(set(parities)) == 1 else None
 
 
+def rest_rig(name, body, garments):
+    rig = bpy.data.objects.get(name)
+    if rig is None or rig.type != 'ARMATURE':
+        raise ValueError('rest_armature must name an armature')
+    if sum(obj.type == 'ARMATURE' and obj.data == rig.data for obj in bpy.data.objects) != 1:
+        raise ValueError('rest_armature data must not be shared by multiple armatures')
+    for obj in (body, *garments):
+        if not any(mod.type == 'ARMATURE' and mod.object == rig and mod.show_viewport
+                   for mod in obj.modifiers):
+            raise ValueError(f'{obj.name!r} must have an active modifier for rest_armature')
+    return rig
+
+
 def inspect(p, find_object):
     if bpy.context.mode != 'OBJECT':
         raise ValueError('Inspect clearance in Object Mode')
@@ -131,8 +144,13 @@ def inspect(p, find_object):
         schedule = validate_sample_frames(explicit, start, end)
         covered = sum(frame == int(frame) for frame in schedule) == end - start + 1
         samples = len(schedule)
+    rest_name = p.get("rest_armature")
+    if rest_name is not None and (not isinstance(rest_name, str) or not rest_name or explicit is None or len(schedule) != 1):
+        raise ValueError("rest_armature requires exactly one explicit sample frame")
+    rig = rest_rig(rest_name, body, garments) if rest_name is not None else None
     scene = bpy.context.scene
     prior = scene.frame_current, scene.frame_subframe
+    prior_pose = rig.data.pose_position if rig is not None else None
     from .blender_geometry import unit_scale
 
     meters = unit_scale()
@@ -146,6 +164,9 @@ def inspect(p, find_object):
     try:
         for frame in schedule:
             set_frame(frame)
+            if rig is not None:
+                rig.data.pose_position = "REST"
+                bpy.context.view_layer.update()
             depsgraph = bpy.context.evaluated_depsgraph_get()
             body_points, faces = snapshot(body, depsgraph, triangles=True)
             work += len(body_points)
@@ -228,6 +249,8 @@ def inspect(p, find_object):
         if not issues:
             issues.append('query_budget_exhausted')
     finally:
+        if rig is not None:
+            rig.data.pose_position = prior_pose
         scene.frame_set(prior[0], subframe=prior[1])
         bpy.context.view_layer.update()
     if region_attribute is not None:
@@ -235,7 +258,8 @@ def inspect(p, find_object):
             report['regions'] = [buckets[key] for key in sorted(buckets)]
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
     covered = covered and complete
-    return {'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,
+    return {**({'rest_armature': rest_name} if rest_name is not None else {}),
+            'scope': 'sampled_garment_clearance', 'body': body.name, 'garments': reports,
             'complete': complete, 'passed': complete and all(report['violating_samples']==0 for report in reports),
             'frames': frames, 'requested_samples': samples, 'all_frames_tested': covered,
             'surface_samples': mode,
