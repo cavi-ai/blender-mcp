@@ -17,6 +17,7 @@ from pydantic import (
     JsonValue,
     StrictBool,
     StrictInt,
+    StrictStr,
     WithJsonSchema,
     model_validator,
 )
@@ -408,6 +409,7 @@ async def inspect_skin_clearance(
     surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Samples")] = "vertices_and_centres",
     max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
     sample_frames: Annotated[list[Number] | None, Field(min_length=1, max_length=32, description="Exact ordered frames, including subframes")] = None,
+    region_attribute: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Evaluated FACE INT garment attribute")] = None,
 ) -> SkinClearance:
     """Sample signed garment gaps (m); restore frame. Requires closed unambiguous bodies and complete budgets.
     Sampling cannot certify continuous collision."""
@@ -417,7 +419,8 @@ async def inspect_skin_clearance(
     return await run(call, "inspect_skin_clearance", body=body, garments=garments,
         start_frame=start_frame, end_frame=end_frame, min_clearance_m=min_clearance_m,
         samples=samples, surface_samples=surface_samples, max_queries=max_queries,
-        **({'sample_frames': frames} if frames is not None else {}))
+        **({'sample_frames': frames} if frames is not None else {}),
+        **({'region_attribute': region_attribute} if region_attribute is not None else {}))
 
 
 @mcp.tool(annotations=READ_ONLY)

@@ -9,6 +9,21 @@ from cavi_blender_mcp import server
 
 
 class ClearanceSurfaceTests(unittest.TestCase):
+    def test_region_attribute_is_opt_in_and_forwarded(self):
+        calls = []
+        def call(operation, params):
+            calls.append((operation, params))
+            return {'complete': True, 'passed': True}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002))
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      region_attribute='garment_role'))
+        self.assertNotIn('region_attribute', calls[0][1])
+        self.assertEqual(calls[1][1]['region_attribute'], 'garment_role')
+        tool = next(tool for tool in asyncio.run(server.mcp.list_tools())
+                    if tool.name == 'inspect_skin_clearance')
+        self.assertIn('region_attribute', tool.input_schema['properties'])
+
     def test_explicit_frames_are_forwarded_and_invalid_schedules_rejected(self):
         calls = []
         def call(operation, params):
