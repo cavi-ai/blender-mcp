@@ -52,6 +52,26 @@ class ClearanceSurfaceTests(unittest.TestCase):
                                                               sample_frames=invalid))
         self.assertEqual([params['sample_frames'] for _, params in calls], [[1., 12.5, 25.], [12.5]])
 
+    def test_rest_option_requires_one_frame_and_echo(self):
+        from mcp.server.mcpserver.exceptions import UnexpectedToolError
+
+        calls = []
+        def call(operation, params):
+            calls.append(params)
+            return {'rest_armature': 'Rig'}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            for frames in (None, [1, 2]):
+                with self.assertRaises(ValueError):
+                    asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                              sample_frames=frames, rest_armature='Rig'))
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[12.5], rest_armature='Rig'))
+        self.assertEqual(calls[0]['rest_armature'], 'Rig')
+        with (patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=lambda *_: {})),
+              self.assertRaises(UnexpectedToolError)):
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[12.5], rest_armature='Rig'))
+
     def test_clearance_is_read_only_and_keeps_explicit_metre_threshold(self):
         calls = []
         def call(operation, params):

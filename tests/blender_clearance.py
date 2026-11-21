@@ -72,6 +72,33 @@ def inspect(name='Outside', **options):
     result = bridge.dispatch('inspect_skin_clearance', params)
     assert (scene.frame_current, scene.frame_subframe) == prior
     return result
+rig_data = bpy.data.armatures.new('RestRigData')
+rig = bpy.data.objects.new('RestRig', rig_data)
+scene.collection.objects.link(rig)
+for obj in (body, role_garment):
+    mod = obj.modifiers.new('Rig', 'ARMATURE')
+    mod.object = rig
+rig_data.pose_position = 'POSE'
+rest = inspect('RoleGarment', rest_armature='RestRig', sample_frames=[12.5])
+assert rest['rest_armature'] == 'RestRig' and rig_data.pose_position == 'POSE'
+rest_budget = inspect('RoleGarment', rest_armature='RestRig', sample_frames=[12.5], max_queries=1)
+assert not rest_budget['complete'] and rig_data.pose_position == 'POSE'
+for options in ({'sample_frames': [1, 2]}, {'sample_frames': [12.5], 'region_attribute': 'missing'}):
+    try:
+        inspect('RoleGarment', rest_armature='RestRig', **options)
+    except ValueError:
+        assert rig_data.pose_position == 'POSE' and (scene.frame_current, scene.frame_subframe) == prior
+    else:
+        raise AssertionError('Invalid rest clearance accepted')
+shared = bpy.data.objects.new('SharedRestRig', rig_data)
+scene.collection.objects.link(shared)
+try:
+    inspect('RoleGarment', rest_armature='RestRig', sample_frames=[12.5])
+except ValueError:
+    assert rig_data.pose_position == 'POSE'
+else:
+    raise AssertionError('Shared armature data accepted')
+bpy.data.objects.remove(shared, do_unlink=True)
 result = inspect()
 assert result['complete'] and result['passed'], result
 baseline = inspect('RoleGarment')

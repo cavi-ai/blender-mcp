@@ -330,6 +330,12 @@ is true when that list includes every integer frame in the interval.
 Split a longer check across explicit lists to preserve the same source geometry
 and exact fractional times. `frames` records the frames reached, including when
 a query budget stops the call before the requested schedule is complete.
+Set `rest_armature` to a named armature with its own data and supply one explicit
+`sample_frames` entry. The body and garments use active Armature modifiers for the
+named rig. The tool samples its rest pose at that scene frame, restores the
+original pose setting, and echoes `rest_armature`. Other scene animation remains
+evaluated at that frame.
+
 `surface_samples: vertices` omits face-centre probes. `max_queries` bounds nearest,
 component and ray queries (default/maximum 1,000,000); surface samples are capped
 at four million. The call restores frame and subframe.
