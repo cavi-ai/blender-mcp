@@ -412,6 +412,7 @@ async def inspect_skin_clearance(
     sample_frames: Annotated[list[Number] | None, Field(min_length=1, max_length=32, description="Exact ordered frames, including subframes")] = None,
     region_attribute: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Evaluated FACE INT garment attribute")] = None,
     rest_armature: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Armature to evaluate in rest pose")] = None,
+    include_worst_support: Annotated[StrictBool, Field(description="Include closest body witnesses")] = False,
 ) -> SkinClearance:
     """Sample signed garment gaps (m); restore frame. Requires closed unambiguous bodies and complete budgets.
     Sampling cannot certify continuous collision."""
@@ -425,7 +426,8 @@ async def inspect_skin_clearance(
         samples=samples, surface_samples=surface_samples, max_queries=max_queries,
         **({'sample_frames': frames} if frames is not None else {}),
         **({'region_attribute': region_attribute} if region_attribute is not None else {}),
-        **({'rest_armature': rest_armature} if rest_armature is not None else {}))
+        **({'rest_armature': rest_armature} if rest_armature is not None else {}),
+        **({'include_worst_support': True} if include_worst_support else {}))
     if rest_armature is not None and (not isinstance(result, dict) or result.get("rest_armature") != rest_armature):
         raise UnexpectedToolError("Rest clearance results are unavailable; refresh the Blender bridge")
     if region_attribute is not None:
@@ -434,6 +436,14 @@ async def inspect_skin_clearance(
                 or any(not isinstance(row, dict) or not isinstance(row.get('regions'), list)
                        for row in rows)):
             raise UnexpectedToolError('Regional clearance results are unavailable; refresh the Blender bridge')
+    if include_worst_support:
+        rows = result.get('garments') if isinstance(result, dict) else None
+        if (not isinstance(rows, list) or len(rows) != len(garments)
+                or any(not isinstance(row, dict) or 'worst_support' not in row
+                       or (region_attribute is not None and any(
+                           not isinstance(region, dict) or 'worst_support' not in region
+                           for region in row['regions'])) for row in rows)):
+            raise UnexpectedToolError('Support witnesses are unavailable; refresh the Blender bridge')
     return result
 
 

@@ -7236,6 +7236,21 @@
     "error": "validation"
   },
   {
+    "id": "clearance-invalid-support-flag",
+    "tool": "inspect_skin_clearance",
+    "arguments": {
+      "body": "EvalSkin",
+      "garments": ["MorphSource"],
+      "start_frame": 1,
+      "end_frame": 24,
+      "min_clearance_m": 0.001,
+      "include_worst_support": "yes"
+    },
+    "kind": "invalid",
+    "modes": ["protocol", "native"],
+    "error": "validation"
+  },
+  {
     "id": "clearance-invalid-budget",
     "tool": "inspect_skin_clearance",
     "arguments": {
