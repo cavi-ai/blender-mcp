@@ -7,10 +7,12 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+## 0.60.0 - 2026-11-21
+
 ### Added
 
 - Garment clearance supports exact fractional sample frames, rest-pose checks, region summaries, closest body witnesses and bounded connected violation patches.
-
+- Proportional vertex edits can restrict falloff to selected faces and keep region boundary vertices fixed.
 - `geometry_nodes` `create`, `add_node` and `link` build a Geometry Nodes group on a mesh.
 - `scene_edit` `compositor` adds and links nodes on the scene compositor.
 - `object_edit` adds a bounded rigid-body bake, particle emitter, hair curves and volume-to-mesh resolution.
@@ -22,7 +24,6 @@ adds its lines under Unreleased and never edits a version.
 - Garment clearance marks hidden or uncertain union boundaries ambiguous rather than reporting an internal surface as the boundary.
 - Spatial distance handles thin triangles, reuses search bounds and does not claim a positive minimum when contact is detected.
 - UV overlap keeps the raster ratio separate from analytic pairwise area, which may count stacked regions more than once.
-
 - Convex collision over the vertex limit uses the containing box instead of a hull of a vertex subset.
 - Lightmap and mesh-quality overlap report an analytic pair count. A zero cell-center ratio alone does not prove overlap clearance.
 - Spatial clearance reports an exact triangle distance when the search finishes, and leaves the minimum unproven when the pair budget runs out.
