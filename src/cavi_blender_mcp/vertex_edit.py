@@ -59,6 +59,25 @@ def geodesic_weights(vertices, edges, seeds, radius, *, linear=((1,0,0),(0,1,0),
     return sorted(result)
 
 
+def bounded_face_graph(faces, selected_faces, vertex_count):
+    """Return selected-face edges and pinned boundary/shared vertices."""
+    indices(selected_faces, len(faces), 'face_indices')
+    chosen = set(selected_faces)
+    counts, region, other = {}, set(), set()
+    for index, face in enumerate(faces):
+        if index not in chosen:
+            other.update(face)
+            continue
+        region.update(face)
+        for a, b in zip(face, (*face[1:], face[0]), strict=True):
+            edge = tuple(sorted((a, b)))
+            counts[edge] = counts.get(edge, 0) + 1
+    pinned = (region & other) | {v for edge, count in counts.items() if count == 1 for v in edge}
+    if any(type(i) is not int or not 0 <= i < vertex_count for i in region):
+        raise ValueError('Face region contains invalid vertices')
+    return sorted(counts), sorted(pinned), region
+
+
 def translated(rows, offset, weights=None):
     weights = [1.]*len(rows) if weights is None else weights
     if (len(weights) != len(rows)

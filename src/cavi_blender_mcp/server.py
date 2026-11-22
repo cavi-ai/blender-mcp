@@ -947,8 +947,15 @@ async def mesh_edit(
         from .mesh_regions import selection
         from .vertex_edit import radius_m
 
-        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None,'amount': None,
+        params = pick(action, values, ['vertex_indices','offset'], {'expected_mesh_sha256': None,'amount': None,'face_indices': None,
             'symmetry_axis':None,'symmetry_tolerance_m':None})
+        if params['face_indices'] is not None:
+            from .mesh_regions import indices
+            indices(params['face_indices'])
+            if amount is None or symmetry_axis is not None or symmetry_tolerance_m is not None or expected_mesh_sha256 is None:
+                raise ValueError('Face-bounded proportional edits require amount and mesh fingerprint, without symmetry')
+        else:
+            params.pop('face_indices')
         if (symmetry_axis is None) != (symmetry_tolerance_m is None):
             raise ValueError('move_vertices symmetry requires both axis and tolerance in metres')
         for field in ('symmetry_axis','symmetry_tolerance_m'):
