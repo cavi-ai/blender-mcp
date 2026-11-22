@@ -11,7 +11,7 @@
 ## Install the server
 
 ```bash
-uv tool install cavi-blender-mcp==0.59.0
+uv tool install cavi-blender-mcp==0.60.0
 ```
 
 This installs the `cavi-blender-mcp` entry point on your `PATH`.
@@ -112,7 +112,7 @@ cavi-blender-mcp runtime status
 
 Use Python 3.15 or newer for the current development checkout. For the published
 package's source and documentation, use the
-[v0.59.0 tag](https://github.com/cavi-ai/blender-mcp/tree/v0.59.0).
+[v0.60.0 tag](https://github.com/cavi-ai/blender-mcp/tree/v0.60.0).
 
 ```bash
 git clone https://github.com/cavi-ai/blender-mcp.git

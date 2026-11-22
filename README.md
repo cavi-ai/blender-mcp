@@ -47,7 +47,7 @@ Register the source environment's absolute `.venv/bin/cavi-blender-mcp` path as 
 
 New sessions use factory settings without changing your usual preferences. An existing connected session may be reused; startup will not replace a different connected project. To work in your own Blender instead, run `cavi-blender-mcp extension install` with Blender closed; see [Use your own Blender](docs/blender-mcp/source/pages/introduction/installation.md#use-your-own-blender). See [project startup](docs/blender-mcp/source/pages/guides/runtime-and-headless.md) and [installation](docs/blender-mcp/source/pages/introduction/installation.md) for options.
 
-For the published release, install `cavi-blender-mcp==0.59.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.59.0/docs/blender-mcp/source) for its supported features.
+For the published release, install `cavi-blender-mcp==0.60.0` with `uv tool install`; use the [release documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.60.0/docs/blender-mcp/source) for its supported features.
 
 ## Keep developing the asset
 
@@ -73,7 +73,7 @@ The default workspace is `~/Documents/CaviBlender`. See [configuration](docs/ble
 
 ## Documentation and development
 
-The source setup above follows this repository. The published package installs **0.59.0**; use its [tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.59.0/docs/blender-mcp/source) for that release. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
+The source setup above follows this repository. The published package installs **0.60.0**; use its [tagged documentation](https://github.com/cavi-ai/blender-mcp/tree/v0.60.0/docs/blender-mcp/source) for that release. Check the version shown on the [documentation website](https://cavi-ai.xyz/docs/blender-mcp/) when following a guide there.
 
 The server publishes 20 tools over stdio. The [tool reference](docs/blender-mcp/source/pages/reference/tools.md) documents exact operations, bounds and response contracts.
 
