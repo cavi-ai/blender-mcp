@@ -349,6 +349,14 @@ probe indices, body topology and numerical resolution. Multiple closed body
 components are treated as a union. Ray parity does not depend on face winding.
 Coordinates are normalized around the body before native BVH queries.
 
+Set `include_violation_patches` with one explicit `sample_frames` entry to group
+classified violating garment vertices along evaluated tessellation edges. Region
+buckets remain separate when `region_attribute` is supplied. Each garment reports
+coverage and up to 32 worst-first components, with up to eight deepest vertex seeds
+per component. Ambiguous and triangle-centre probes remain in the ordinary results
+and are excluded from these vertex patches. `vertex_scan_complete` indicates whether
+all garment vertices were processed before a budget stop.
+
 Set `include_worst_support` to include the nearest evaluated body triangle index
 and the garment and body witness points at each signed worst probe, including
 regional worst probes. Triangle indices use the evaluated body tessellation at `worst_frame`. Both

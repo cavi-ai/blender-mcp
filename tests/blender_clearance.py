@@ -181,6 +181,18 @@ for invalid in ([], [True], [float('nan')], [0], [26], [3, 3], [4, 2], list(rang
         raise AssertionError(f'Accepted invalid sample_frames {invalid!r}')
 result = inspect()
 assert abs(result['garments'][0]['min_clearance_m']-.2) < 1e-6
+inside_role = inside.data.attributes.new('inside_role', 'INT', 'FACE')
+for item in inside_role.data:
+    item.value = 11
+plain = inspect('Inside', sample_frames=[12.5], region_attribute='inside_role')
+patched = inspect('Inside', sample_frames=[12.5], region_attribute='inside_role', include_violation_patches=True)
+patches = patched['garments'][0].pop('violation_patches')
+assert patched == plain and patches['vertex_scan_complete']
+assert patches['violating_vertices'] == 8 and patches['total_patches'] == 1
+assert patches['patches'][0]['region_ids'] == [11] and patches['patches'][0]['vertex_count'] == 8
+partial_patch = inspect('Inside', sample_frames=[12.5], region_attribute='inside_role',
+                        include_violation_patches=True, max_queries=1)
+assert not partial_patch['garments'][0]['violation_patches']['vertex_scan_complete']
 result = inspect('Inside')
 assert result['complete'] and not result['passed'], result
 assert result['garments'][0]['inside_samples'] > 0

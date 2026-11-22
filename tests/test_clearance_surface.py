@@ -91,6 +91,26 @@ class ClearanceSurfaceTests(unittest.TestCase):
                 asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
                             region_attribute='role', include_worst_support=True))
 
+    def test_violation_patches_require_single_frame_and_bridge_support(self):
+        from mcp.server.mcpserver.exceptions import UnexpectedToolError
+
+        calls = []
+        def call(operation, params):
+            calls.append(params)
+            return {'garments': [{'violation_patches': {}}]}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
+            for frames in (None, [1, 2]):
+                with self.assertRaises(ValueError):
+                    asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                              sample_frames=frames, include_violation_patches=True))
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[12.5], include_violation_patches=True))
+        self.assertIs(calls[0]['include_violation_patches'], True)
+        with (patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=lambda *_: {'garments': [{}]})),
+              self.assertRaises(UnexpectedToolError)):
+            asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                                      sample_frames=[12.5], include_violation_patches=True))
+
     def test_clearance_is_read_only_and_keeps_explicit_metre_threshold(self):
         calls = []
         def call(operation, params):

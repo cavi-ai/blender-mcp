@@ -129,6 +129,9 @@ def inspect(p, find_object):
     samples, maximum = p.get('samples', 9), p.get('max_queries', 1000000)
     mode = p.get('surface_samples', 'vertices_and_centres')
     region_attribute = p.get('region_attribute')
+    include_patches = p.get('include_violation_patches', False)
+    if type(include_patches) is not bool:
+        raise ValueError('include_violation_patches must be boolean')
     include_worst_support = p.get('include_worst_support', False)
     if type(include_worst_support) is not bool:
         raise ValueError('include_worst_support must be boolean')
@@ -147,6 +150,8 @@ def inspect(p, find_object):
         schedule = validate_sample_frames(explicit, start, end)
         covered = sum(frame == int(frame) for frame in schedule) == end - start + 1
         samples = len(schedule)
+    if include_patches and (explicit is None or len(schedule) != 1):
+        raise ValueError("include_violation_patches requires exactly one explicit sample frame")
     rest_name = p.get("rest_armature")
     if rest_name is not None and (not isinstance(rest_name, str) or not rest_name or explicit is None or len(schedule) != 1):
         raise ValueError("rest_armature requires exactly one explicit sample frame")
@@ -164,6 +169,7 @@ def inspect(p, find_object):
         for report in reports:
             report['worst_support'] = None
     region_reports = [{} for _ in names]
+    patch_state = [{'vertices': {}, 'triangles': (), 'evaluated': None, 'processed': 0} for _ in names]
     seen_regions = [set() for _ in names]
     frames, topology, issues, work = [], [], [], 0
     budget, precision = Budget(maximum), 0.
@@ -190,17 +196,19 @@ def inspect(p, find_object):
                 break
             tree = BVHTree.FromPolygons(body_vectors, faces.tolist(), all_triangles=True)
             precision = max(precision, EPSILON*scale*meters)
-            for value, report, buckets, seen in zip(garments, reports, region_reports, seen_regions, strict=True):
+            for value, report, buckets, seen, patches in zip(garments, reports, region_reports, seen_regions, patch_state, strict=True):
                 if region_attribute is None:
-                    positions, triangles = snapshot(value, depsgraph, triangles=mode=='vertices_and_centres')
+                    positions, triangles = snapshot(value, depsgraph, triangles=mode=='vertices_and_centres' or include_patches)
                     regions = None
                 else:
                     positions, triangles, regions = snapshot(value, depsgraph,
-                        triangles=mode=='vertices_and_centres', region_attribute=region_attribute)
-                    seen.update(regions)
+                        triangles=mode=='vertices_and_centres' or include_patches, region_attribute=region_attribute)
+                    seen.update(regions if mode == 'vertices_and_centres' else regions[:len(positions)])
                     if len(seen) > 64:
                         raise ValueError(f'Garment {value.name!r} exceeds 64 distinct region buckets')
                 vertex_count = len(positions)
+                if include_patches:
+                    patches['triangles'], patches['evaluated'] = triangles, vertex_count
                 if mode == 'vertices_and_centres' and len(triangles):
                     positions = np.vstack((positions, positions[triangles].mean(axis=1)))
                 work += len(positions)
@@ -221,6 +229,8 @@ def inspect(p, find_object):
                                 break
                             uncertain = uncertain or state is None
                     report['samples_checked'] += 1
+                    if include_patches and index < vertex_count:
+                        patches['processed'] += 1
                     bucket = None
                     if regions is not None:
                         ids = regions[index]
@@ -239,6 +249,8 @@ def inspect(p, find_object):
                             bucket['ambiguous_samples'] += 1
                         continue
                     gap = distance*scale*meters*(-1 if inside else 1)
+                    if include_patches and index < vertex_count and gap < threshold:
+                        patches['vertices'][index] = (gap, regions[index] if regions is not None else ())
                     report['inside_samples'] += int(inside)
                     report['violating_samples'] += int(gap < threshold)
                     probe = {'kind': 'vertex' if index < vertex_count else 'triangle_centre',
@@ -279,6 +291,11 @@ def inspect(p, find_object):
     if region_attribute is not None:
         for report, buckets in zip(reports, region_reports, strict=True):
             report['regions'] = [buckets[key] for key in sorted(buckets)]
+    if include_patches:
+        from .blender_clearance_patches import summarize
+        for report, patches in zip(reports, patch_state, strict=True):
+            report['violation_patches'] = summarize(patches['vertices'], patches['triangles'],
+                patches['evaluated'], patches['processed'])
     complete = not issues and all(report['ambiguous_samples']==0 for report in reports)
     covered = covered and complete
     return {**({'rest_armature': rest_name} if rest_name is not None else {}),
