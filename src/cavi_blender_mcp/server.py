@@ -443,6 +443,7 @@ async def inspect_skin_clearance(
         rows = result.get('garments') if isinstance(result, dict) else None
         if (not isinstance(rows, list) or len(rows) != len(garments)
                 or any(not isinstance(row, dict) or 'worst_support' not in row
+                       or ('ambiguity_examples' in row and not isinstance(row['ambiguity_examples'], list))
                        or (region_attribute is not None and any(
                            not isinstance(region, dict) or 'worst_support' not in region
                            for region in row['regions'])) for row in rows)):

@@ -80,7 +80,7 @@ def components(points, faces):
     return result, status, face_owners
 
 
-def inside_component(point, component, budget):
+def inside_component(point, component, budget, reasons=None):
     budget.use()
     tree, lower, upper = component
     if np.any(np.asarray(point) < lower-EPSILON) or np.any(np.asarray(point) > upper+EPSILON):
@@ -96,16 +96,24 @@ def inside_component(point, component, budget):
                 break
             if face not in seen:
                 if distance <= EPSILON/4:
+                    if reasons is not None:
+                        reasons.add('ray_hit_too_close')
                     return None
                 seen.add(face)
                 hits += 1
             advanced = hit + direction*(2*EPSILON)
             progress = (advanced-origin).dot(direction)
             if not math.isfinite(progress) or progress <= 0:
+                if reasons is not None:
+                    reasons.add('ray_no_progress')
                 return None
             origin = advanced
         parities.append(hits % 2 == 1)
-    return parities[0] if len(set(parities)) == 1 else None
+    if len(set(parities)) == 1:
+        return parities[0]
+    if reasons is not None:
+        reasons.add('ray_parity_disagreement')
+    return None
 
 
 def rest_rig(name, body, garments):
@@ -119,6 +127,15 @@ def rest_rig(name, body, garments):
                    for mod in obj.modifiers):
             raise ValueError(f'{obj.name!r} must have an active modifier for rest_armature')
     return rig
+
+
+def support_witness(nearest, face_index, faces, position, origin, scale):
+    if (nearest is None or type(face_index) is not int or not 0 <= face_index < len(faces)
+            or not all(math.isfinite(value) for value in nearest)):
+        raise ValueError('Invalid nearest body triangle hit')
+    return {'body_triangle_index': face_index,
+            'garment_point_world': position.tolist(),
+            'body_point_world': (np.asarray(nearest)*scale+origin).tolist()}
 
 
 def inspect(p, find_object):
@@ -172,6 +189,7 @@ def inspect(p, find_object):
     if include_worst_support:
         for report in reports:
             report['worst_support'] = None
+            report['ambiguity_examples'] = []
     region_reports = [{} for _ in names]
     patch_state = [{'vertices': {}, 'triangles': (), 'evaluated': None, 'processed': 0} for _ in names]
     seen_regions = [set() for _ in names]
@@ -225,9 +243,12 @@ def inspect(p, find_object):
                     if distance is None or not math.isfinite(distance):
                         raise ValueError('No finite body surface distance')
                     inside, uncertain = False, distance <= EPSILON
+                    reasons = set() if include_worst_support and len(report['ambiguity_examples']) < 16 else None
+                    if uncertain and reasons is not None:
+                        reasons.add('near_surface')
                     if not uncertain:
                         for part in parts:
-                            state = inside_component(point, part, budget)
+                            state = inside_component(point, part, budget, reasons)
                             if state is True:
                                 inside, uncertain = True, False
                                 break
@@ -269,6 +290,15 @@ def inspect(p, find_object):
                         report['ambiguous_samples'] += 1
                         if bucket is not None:
                             bucket['ambiguous_samples'] += 1
+                        if reasons is not None:
+                            example = {'frame': frame,
+                                'kind': 'vertex' if index < vertex_count else 'triangle_centre',
+                                'index': index if index < vertex_count else index-vertex_count,
+                                'unsigned_distance_m': distance*scale*meters, 'causes': sorted(reasons),
+                                **support_witness(nearest, face_index, faces, positions[index], origin, scale)}
+                            if regions is not None:
+                                example['region_ids'] = list(regions[index])
+                            report['ambiguity_examples'].append(example)
                         continue
                     gap = distance*scale*meters*(-1 if inside else 1)
                     if include_patches and index < vertex_count and gap < threshold:
@@ -282,12 +312,7 @@ def inspect(p, find_object):
                         bucket['min_clearance_m'] is None or gap < bucket['min_clearance_m'])
                     witness = None
                     if include_worst_support and (garment_worst or region_worst):
-                        if (nearest is None or type(face_index) is not int or not 0 <= face_index < len(faces)
-                                or not all(math.isfinite(v) for v in nearest)):
-                            raise ValueError('Invalid nearest body triangle hit')
-                        witness = {'body_triangle_index': face_index,
-                                   'garment_point_world': positions[index].tolist(),
-                                   'body_point_world': (np.asarray(nearest)*scale+origin).tolist()}
+                        witness = support_witness(nearest, face_index, faces, positions[index], origin, scale)
                     if bucket is not None:
                         bucket['inside_samples'] += int(inside)
                         bucket['violating_samples'] += int(gap < threshold)

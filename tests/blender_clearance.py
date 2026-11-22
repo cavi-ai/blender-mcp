@@ -143,11 +143,27 @@ for row in (rows, *rows['regions']):
         assert support is None
 without = inspect('RoleGarment', region_attribute='garment_role')
 rows.pop('worst_support')
+assert rows.pop('ambiguity_examples') == []
 for row in rows['regions']:
     row.pop('worst_support')
 assert witnessed == without
 empty = inspect('RoleGarment', region_attribute='garment_role', include_worst_support=True, max_queries=1)
 assert empty['garments'][0]['worst_support'] is None
+touch = cube('Touch', 1)
+touch_role = touch.data.attributes.new('touch_role', 'INT', 'FACE')
+for item in touch_role.data:
+    item.value = 11
+touch_plain = inspect('Touch', sample_frames=[12.5], region_attribute='touch_role')
+touch_extra = inspect('Touch', sample_frames=[12.5], region_attribute='touch_role', include_worst_support=True)
+touch_row = touch_extra['garments'][0]
+examples = touch_row.pop('ambiguity_examples')
+touch_row.pop('worst_support')
+for row in touch_row['regions']:
+    row.pop('worst_support')
+assert touch_extra == touch_plain and touch_row['ambiguous_samples'] > 16
+assert len(examples) == 16 and all(example['causes'] == ['near_surface'] for example in examples)
+assert all(example['region_ids'] == [11] and example['unsigned_distance_m'] >= 0 for example in examples)
+assert all('clearance_m' not in example for example in examples)
 partial = inspect('RoleGarment', region_attribute='garment_role', max_queries=10)
 partial_garment = partial['garments'][0]
 assert not partial['complete'], partial
