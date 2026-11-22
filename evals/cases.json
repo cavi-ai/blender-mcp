@@ -2864,7 +2864,9 @@
     ],
     "equals": {
       "/uv_layer": "UVMap_Lightmap",
-      "/overlap_ratio": 0.0
+      "/overlap_ratio": 0.0,
+      "/exact_overlap_pairs": 0,
+      "/pairwise_overlap_area_uv2": 0.0
     }
   },
   {

@@ -28,7 +28,8 @@ class UVLayoutTests(unittest.TestCase):
         measured = measured_overlap(sliver, 8)
         self.assertTrue(measured['overlap_proven'])
         self.assertGreater(measured['exact_overlap_pairs'], 0)
-        self.assertGreater(measured['overlap_ratio'], 0)
+        self.assertEqual(measured['overlap_ratio'], 0)
+        self.assertGreater(measured['pairwise_overlap_area_uv2'], 0)
     def test_packed_uvs_reject_collapsed_nonfinite_and_outside_results(self):
         validate_packed(QUAD, .1)
         for triangles in ([[[.2, .2]] * 3],

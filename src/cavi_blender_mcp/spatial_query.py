@@ -173,34 +173,25 @@ def _clamp(value):
 
 
 def point_triangle_distance(point, triangle):
-    """Distance from a point to a triangle, including its boundary."""
+    """Distance to a triangle using a plane projection and edge tests."""
     a, b, c = triangle
-    ab, ac, ap = _sub(b, a), _sub(c, a), _sub(point, a)
-    d1, d2 = _dot(ab, ap), _dot(ac, ap)
-    if d1 <= 0 and d2 <= 0:
-        return _dist(point, a)
-    bp = _sub(point, b)
-    d3, d4 = _dot(ab, bp), _dot(ac, bp)
-    if d3 >= 0 and d4 <= d3:
-        return _dist(point, b)
-    vc = d1 * d4 - d3 * d2
-    if vc <= 0 and d1 >= 0 and d3 <= 0:
-        return _dist(point, _add(a, _scale(ab, d1 / (d1 - d3))))
-    cp = _sub(point, c)
-    d5, d6 = _dot(ab, cp), _dot(ac, cp)
-    if d6 >= 0 and d5 <= d6:
-        return _dist(point, c)
-    vb = d5 * d2 - d1 * d6
-    if vb <= 0 and d2 >= 0 and d6 <= 0:
-        return _dist(point, _add(a, _scale(ac, d2 / (d2 - d6))))
-    va = d3 * d6 - d5 * d4
-    if va <= 0 and d4 - d3 >= 0 and d5 - d6 >= 0:
-        return _dist(point, _add(b, _scale(_sub(c, b), (d4 - d3) / ((d4 - d3) + (d5 - d6)))))
-    denom = va + vb + vc
-    if denom == 0:
-        return min(_dist(point, a), _dist(point, b), _dist(point, c))
-    closest = _add(a, _add(_scale(ab, vb / denom), _scale(ac, vc / denom)))
-    return _dist(point, closest)
+    normal = _cross(_sub(b, a), _sub(c, a))
+    length = math.hypot(*normal)
+    if length:
+        normal = _scale(normal, 1 / length)
+        height = _dot(_sub(point, a), normal)
+        projected = _sub(point, _scale(normal, height))
+        if all(_dot(_cross(_sub(triangle[(i + 1) % 3], triangle[i]),
+                           _sub(projected, triangle[i])), normal) >= 0 for i in range(3)):
+            return abs(height)
+    distances = []
+    for i in range(3):
+        start, end = triangle[i], triangle[(i + 1) % 3]
+        edge = _sub(end, start)
+        size = _dot(edge, edge)
+        t = _clamp(_dot(_sub(point, start), edge) / size) if size else 0.
+        distances.append(_dist(point, _add(start, _scale(edge, t))))
+    return min(distances)
 
 
 def segment_distance(p1, q1, p2, q2):
@@ -211,7 +202,7 @@ def segment_distance(p1, q1, p2, q2):
     b, c = _dot(d1, d2), _dot(d1, r)
     cross = _cross(d1, d2)
     denom = _dot(cross, cross)
-    s = _clamp((b * f - c * e) / denom) if denom > 0 else 0.
+    s = _clamp(_dot(_cross(d2, r), cross) / denom) if denom > 0 else 0.
     if e == 0:
         t = 0.
         s = _clamp(-c / a) if a > 0 else 0.
@@ -271,14 +262,6 @@ def _gap(a, b):
     return math.sqrt(total)
 
 
-def _split(triangles, indices):
-    box = _group_bounds(triangles, indices)
-    axis = max(range(3), key=lambda i: box[1][i] - box[0][i])
-    ordered = sorted(indices, key=lambda i: sum(point[axis] for point in triangles[i]))
-    middle = max(1, len(ordered) // 2)
-    return ordered[:middle], ordered[middle:]
-
-
 def prove_distance(subjects, context, upper, budget):
     """Branch-and-bound triangle distance.
 
@@ -292,37 +275,42 @@ def prove_distance(subjects, context, upper, budget):
         raise ValueError('Distance proof requires both surfaces')
     if not math.isfinite(upper) or upper < 0:
         raise ValueError('Distance upper bound must be finite and nonnegative')
-    best = float(upper)
-    work = 0
-    counter = 0
-    pending = []
-    heappush(pending, (_gap(_group_bounds(subjects, range(len(subjects))),
-                            _group_bounds(context, range(len(context)))),
-                       counter, tuple(range(len(subjects))), tuple(range(len(context)))))
+    class Node:
+        def __init__(self, triangles, indices):
+            self.triangles = triangles
+            self.indices = tuple(indices)
+            self.box = _group_bounds(triangles, self.indices)
+            self.children = None
+
+        def split(self):
+            if self.children is None:
+                axis = max(range(3), key=lambda i: self.box[1][i] - self.box[0][i])
+                ordered = sorted(self.indices, key=lambda i: sum(p[axis] for p in self.triangles[i]))
+                middle = len(ordered) // 2
+                self.children = (Node(self.triangles, ordered[:middle]),
+                                 Node(self.triangles, ordered[middle:]))
+            return self.children
+
+    best, work, counter = float(upper), 0, 0
+    left, right = Node(subjects, range(len(subjects))), Node(context, range(len(context)))
+    pending = [(_gap(left.box, right.box), len(left.indices) * len(right.indices), counter, left, right)]
     stopped = None
     while pending:
-        gap, _, left, right = heappop(pending)
+        gap, _, _, left, right = heappop(pending)
         if gap >= best:
             continue
         if work >= budget:
             stopped = gap
             break
         work += 1
-        if len(left) > 1 or len(right) > 1:
-            if len(left) >= len(right) and len(left) > 1:
-                parts, other, left_side = _split(subjects, left), right, True
-            else:
-                parts, other, left_side = _split(context, right), left, False
-            for part in parts:
-                if not part:
-                    continue
-                pair = (part, other) if left_side else (other, part)
+        if len(left.indices) > 1 or len(right.indices) > 1:
+            split_left = len(left.indices) >= len(right.indices) and len(left.indices) > 1
+            for child in (left if split_left else right).split():
+                l, r = (child, right) if split_left else (left, child)
                 counter += 1
-                heappush(pending, (_gap(_group_bounds(subjects, pair[0]),
-                                        _group_bounds(context, pair[1])),
-                                   counter, tuple(pair[0]), tuple(pair[1])))
+                heappush(pending, (_gap(l.box, r.box), len(l.indices) * len(r.indices), counter, l, r))
             continue
-        best = min(best, triangle_distance(subjects[left[0]], context[right[0]]))
+        best = min(best, triangle_distance(subjects[left.indices[0]], context[right.indices[0]]))
     if stopped is None:
         return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
     lower = min(stopped, pending[0][0]) if pending else stopped

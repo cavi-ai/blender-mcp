@@ -131,11 +131,50 @@ def _check_link(tree, source, dest, input_socket):
                        and (input_socket.is_multi_input or link.to_socket != input_socket))
 
 
+def _link(tree, source, target):
+    if any(not socket.enabled or socket.is_unavailable or socket.bl_idname == 'NodeSocketVirtual'
+           for socket in (source, target)):
+        raise ValueError("Sockets must be enabled and available")
+    if (source.type == 'GEOMETRY') != (target.type == 'GEOMETRY'):
+        raise ValueError("Geometry sockets require geometry connections")
+    if any(link.from_socket == source and link.to_socket == target and link.is_valid for link in target.links):
+        return
+    _check_link(tree, source.node, target.node, target)
+    replaced = [] if target.is_multi_input else list(target.links)
+    if len(tree.links) - len(replaced) >= MAX_GRAPH_LINKS:
+        raise ValueError("Node graphs are limited to 128 links")
+    if source.link_limit and sum(link not in replaced for link in source.links) + 1 > source.link_limit:
+        raise ValueError("Output connection limit would be exceeded")
+    if target.is_multi_input and target.link_limit and len(target.links) + 1 > target.link_limit:
+        raise ValueError("Input connection limit would be exceeded")
+    prior = [(link, link.is_muted, link.is_valid) for link in tree.links if link not in replaced]
+    old = [(link.from_socket, link.to_socket, link.is_muted, link.is_valid) for link in replaced]
+    link = None
+    try:
+        for item in replaced:
+            tree.links.remove(item)
+        link = tree.links.new(source, target, verify_limits=False, handle_dynamic_sockets=False)
+        tree.update_tag()
+        bpy.context.view_layer.update()
+        current = set(tree.links)
+        if (link is None or not link.is_valid or link.from_socket != source or link.to_socket != target
+                or any(item not in current or item.is_muted != muted or item.is_valid != valid
+                       for item, muted, valid in prior)):
+            raise ValueError("Native node connection is invalid")
+    except Exception:
+        if link is not None and link in tree.links[:]:
+            tree.links.remove(link)
+        for old_source, old_target, muted, valid in old:
+            restored = tree.links.new(old_source, old_target, verify_limits=False, handle_dynamic_sockets=False)
+            restored.is_muted, restored.is_valid = muted, valid
+        tree.update_tag()
+        bpy.context.view_layer.update()
+        raise
+
+
 def link_geometry_node(p):
     _object_mode()
     target, modifier, tree = _geometry(p["name"], p.get("modifier"))
-    if len(tree.links) >= MAX_GRAPH_LINKS:
-        raise ValueError("Geometry node graphs are limited to 128 links")
     source = tree.nodes.get(p.get("from_node"))
     dest = tree.nodes.get(p.get("to_node"))
     if source is None or dest is None:
@@ -145,11 +184,7 @@ def link_geometry_node(p):
         raise ValueError("Output socket is not on the source node")
     if not isinstance(input_name, str) or input_name not in dest.inputs:
         raise ValueError("Input socket is not on the destination node")
-    _check_link(tree, source, dest, dest.inputs[input_name])
-    link = tree.links.new(source.outputs[output_name], dest.inputs[input_name])
-    if (link is None or link.from_node != source or link.to_node != dest
-            or link.from_socket.name != output_name or link.to_socket.name != input_name):
-        raise RuntimeError("Geometry sockets were not linked")
+    _link(tree, source.outputs[output_name], dest.inputs[input_name])
     return _graph(target, tree, modifier)
 
 
@@ -201,8 +236,6 @@ def compositor(spec):
     elif step == "link":
         if tree is None:
             raise ValueError("Scene has no compositor node tree")
-        if len(tree.links) >= MAX_GRAPH_LINKS:
-            raise ValueError("Compositor graphs are limited to 128 links")
         source = tree.nodes.get(spec.get("from_node"))
         dest = tree.nodes.get(spec.get("to_node"))
         if source is None or dest is None:
@@ -212,11 +245,7 @@ def compositor(spec):
             raise ValueError("Output socket is not on the source node")
         if not isinstance(input_name, str) or input_name not in dest.inputs:
             raise ValueError("Input socket is not on the destination node")
-        _check_link(tree, source, dest, dest.inputs[input_name])
-        link = tree.links.new(source.outputs[output_name], dest.inputs[input_name])
-        if (link is None or link.from_node != source or link.to_node != dest
-                or link.from_socket.name != output_name or link.to_socket.name != input_name):
-            raise RuntimeError("Compositor sockets were not linked")
+        _link(tree, source.outputs[output_name], dest.inputs[input_name])
     else:
         raise ValueError("Compositor step must be add_node or link")
     return _compositor_result(tree)

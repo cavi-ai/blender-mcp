@@ -45,6 +45,10 @@ async def exercise(root, env, parameters=None):
         crossing = await spatial(context=('Crossing',))
         assert crossing['intersections']['triangle_pairs'] > 0, crossing
         assert crossing['intersections']['examples'][0]['subject']['object'] == 'Shelter', crossing
+        thin = await spatial(subjects=('ThinOuter',), context=('ThinInner',))
+        assert thin['intersections']['triangle_pairs'] > 0, thin
+        assert not (thin['nearest']['continuous_minimum_proven']
+                    and thin['nearest']['distance_lower_bound_m'] > 0), thin
         sparse = await spatial(context=('SparseTown',))
         assert sparse['bounds_overlap'], sparse
         assert sparse['intersections']['triangle_pairs'] == 0, sparse

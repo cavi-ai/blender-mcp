@@ -97,7 +97,8 @@ Optional `checks` add:
   and n-gons
 - `lightmap`: presence of `lightmap_uv` at `lightmap_resolution`. `overlap_ratio`
   is a cell-center raster. `exact_overlap_pairs` is the analytic count when
-  `overlap_proven` is true; a raster ratio of zero is not an overlap clearance
+  `overlap_proven` is true. `pairwise_overlap_area_uv2` sums analytic pair areas,
+  can count stacked regions more than once, and is null when unfinished; a raster ratio of zero is not an overlap clearance
   unless that flag is true
 - `transforms`: applied scale and rotation, delta transforms
 - `origin`: position relative to local bounds

@@ -52,7 +52,7 @@ def components(points, faces):
               'nonmanifold_edges': sum(len(owners)>2 for owners in edges.values()),
               'degenerate_triangles': degenerate, 'components': 0}
     if not len(faces) or any(status[key] for key in status):
-        return [], status
+        return [], status, []
     def find(index):
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -62,9 +62,13 @@ def components(points, faces):
         parents[find(owners[1])] = find(owners[0])
     groups = defaultdict(list)
     for index, triangle in enumerate(faces):
-        groups[find(index)].append(tuple(int(v) for v in triangle))
+        groups[find(index)].append((index, tuple(int(v) for v in triangle)))
     result = []
-    for triangles in groups.values():
+    face_owners = [None] * len(faces)
+    for entries in groups.values():
+        for face_index, _ in entries:
+            face_owners[face_index] = len(result)
+        triangles = [triangle for _, triangle in entries]
         indices = sorted({vertex for triangle in triangles for vertex in triangle})
         mapping = {vertex: index for index, vertex in enumerate(indices)}
         coordinates = [points[index] for index in indices]
@@ -73,7 +77,7 @@ def components(points, faces):
             [tuple(mapping[index] for index in triangle) for triangle in triangles], all_triangles=True)
         result.append((tree, array.min(axis=0), array.max(axis=0)))
     status['components'] = len(result)
-    return result, status
+    return result, status, face_owners
 
 
 def inside_component(point, component, budget):
@@ -188,7 +192,7 @@ def inspect(p, find_object):
                 issues.append('body_has_zero_or_invalid_extent')
                 break
             body_vectors = vectors((body_points-origin)/scale)
-            parts, status = components(body_vectors, faces)
+            parts, status, face_owners = components(body_vectors, faces)
             topology.append({'frame': frame, **status})
             frames.append(frame)
             if not parts:
@@ -228,6 +232,24 @@ def inspect(p, find_object):
                                 inside, uncertain = True, False
                                 break
                             uncertain = uncertain or state is None
+                    if inside and len(parts) > 1:
+                        if nearest is None or type(face_index) is not int or not 0 <= face_index < len(face_owners):
+                            raise ValueError('Invalid nearest body triangle hit')
+                        nearest_array = np.asarray(nearest)
+                        for part_index, part in enumerate(parts):
+                            if part_index == face_owners[face_index]:
+                                continue
+                            budget.use()
+                            _, lower, upper = part
+                            if np.any(nearest_array < lower-EPSILON) or np.any(nearest_array > upper+EPSILON):
+                                continue
+                            budget.use()
+                            _, _, _, proximity = part[0].find_nearest(nearest)
+                            if proximity is None or proximity <= EPSILON or inside_component(nearest, part, budget) is not False:
+                                uncertain = True
+                                if 'union_boundary_unresolved' not in issues:
+                                    issues.append('union_boundary_unresolved')
+                                break
                     report['samples_checked'] += 1
                     if include_patches and index < vertex_count:
                         patches['processed'] += 1

@@ -410,7 +410,9 @@ required pixel gutters after a successful unwrap.
 `decimate_to` dissolves faces collapsed onto coincident vertices. `lightmap_uv` creates
 `UVMap_Lightmap` when missing and keeps the render-active layer. It reports the
 cell-center `overlap_ratio` and, when the triangle count finishes an analytic scan,
-`exact_overlap_pairs`. A zero raster ratio with `overlap_proven` false is not a
+`exact_overlap_pairs` and `pairwise_overlap_area_uv2`. The analytic area sums pairwise
+intersections and can count stacked regions more than once; it is null when the scan
+does not finish. A zero raster ratio with `overlap_proven` false is not a
 clearance. `texel_density` scales the layer around its UV bounds center;
 `pack=true` rearranges islands without rescaling. Its `texture_resolution` takes
 one size or `[width, height]`; density is the geometric mean of both axes.
