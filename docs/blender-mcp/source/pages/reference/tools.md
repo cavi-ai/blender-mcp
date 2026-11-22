@@ -86,6 +86,10 @@ With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
 `mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
 Its optional `amount` enables physical proportional falloff along connected source
 edges; `vertex_edit.falloff` records the metric and sampled weights.
+For a bounded proportional edit, supply `face_indices`, `amount`, and the current
+`expected_mesh_sha256`. Choose seed vertices in the selected region’s interior.
+The falloff follows selected face edges and holds shared and open-edge boundary
+vertices fixed. Use this option for a single-sided edit.
 Optional `symmetry_axis` plus `symmetry_tolerance_m` reflect displacements to
 unique reciprocal source counterparts; `vertex_edit.symmetry` reports pairing.
 Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;

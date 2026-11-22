@@ -6,7 +6,14 @@ from .blender_lookup import editable_mesh, info
 from .blender_mesh_regions import mesh_digest, page_source
 from .mesh_regions import selection
 from .scene_mode import require_scene_mode
-from .vertex_edit import displaced, geodesic_weights, radius_m, symmetric_offsets, translated
+from .vertex_edit import (
+    bounded_face_graph,
+    displaced,
+    geodesic_weights,
+    radius_m,
+    symmetric_offsets,
+    translated,
+)
 
 
 def inspect(p):
@@ -29,6 +36,10 @@ def move(p):
         if keys is not None and (not keys.is_editable or keys.users > 1):
             raise ValueError('Vertex editing requires independent editable shape-key data')
         radius = radius_m(p['amount']) if p.get('amount') is not None else None
+        region_faces = p.get('face_indices')
+        if region_faces is not None and (radius is None or p.get('expected_mesh_sha256') is None
+                or p.get('symmetry_axis') is not None or p.get('symmetry_tolerance_m') is not None):
+            raise ValueError('Face-bounded proportional edits require amount and mesh fingerprint, without symmetry')
         symmetric = p.get('symmetry_axis') is not None
         if symmetric != (p.get('symmetry_tolerance_m') is not None):
             raise ValueError('Symmetric vertex editing requires both axis and tolerance in metres')
@@ -46,18 +57,34 @@ def move(p):
             seeds = selected
             positions = [tuple(v.co) for v in mesh.vertices]
             edges = (tuple(e.vertices) for e in mesh.edges)
+            pinned = []
+            boundary_edges = None
+            if region_faces is not None:
+                boundary_edges, pinned, region = bounded_face_graph(
+                    [tuple(face.vertices) for face in mesh.polygons], region_faces, len(mesh.vertices))
+                pinned_set = set(pinned)
+                if any(seed not in region or seed in pinned_set for seed in seeds):
+                    raise ValueError('Proportional seeds must lie inside the unpinned face region')
+                edges = [edge for edge in boundary_edges if not pinned_set.intersection(edge)]
             if symmetric:
                 vectors,symmetry,influence = symmetric_offsets(positions,edges,seeds,offset,
                     p['symmetry_axis'],p['symmetry_tolerance_m'],radius=radius,linear=linear,unit_m=unit)
                 affected = list(influence.items())
             else:
                 affected = geodesic_weights(positions,edges,seeds,radius,linear=linear,unit_m=unit)
+                if region_faces is not None and pinned:
+                    boundary = dict(geodesic_weights(positions,boundary_edges,pinned,radius,linear=linear,unit_m=unit))
+                    capped = [(i, min(weight, 1-boundary.get(i, 0.))) for i,weight in affected]
+                    affected = [(i, weight) for i,weight in capped if weight > 0.]
             selected,weights = [i for i,_ in affected],[w for _,w in affected]
             if radius is not None:
                 falloff = {'mode':'source_edge_geodesic_smoothstep','radius_m':radius,
                     'seed_indices':seeds,'scene_unit_meters':unit,'world_linear':linear,
                     'weight_samples':[{'index':i,'weight':w} for i,w in affected[:64]],
                     'weights_truncated':len(affected) > 64}
+            if region_faces is not None:
+                falloff.update(face_count=len(region_faces), pinned_boundary_vertices=len(pinned),
+                               boundary_policy='fixed_shared_and_open_edges')
             if symmetry is not None:
                 symmetry.update(scene_unit_meters=unit,world_linear=linear)
         blocks = list(keys.key_blocks) if keys else []
