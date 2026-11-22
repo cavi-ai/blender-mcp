@@ -6,6 +6,7 @@ from pathlib import Path
 
 import bmesh
 import bpy
+from mathutils import Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from cavi_blender_mcp import blender_bridge as bridge
@@ -62,6 +63,22 @@ faces += [tuple(index+8 for index in face.vertices) for face in second.data.poly
 second.data = bpy.data.meshes.new('Union')
 second.data.from_pydata(coords, [], faces)
 second.location = (0, 0, 0)
+def combined_body(name, offset, inner_scale):
+    value = cube(name, 1)
+    vertices = [tuple(v.co) for v in body.data.vertices]
+    vertices += [tuple(v.co * inner_scale + Vector(offset)) for v in body.data.vertices]
+    polygons = [tuple(face.vertices) for face in body.data.polygons]
+    polygons += [tuple(index + 8 for index in face.vertices) for face in body.data.polygons]
+    value.data = bpy.data.meshes.new(name + 'Mesh')
+    value.data.from_pydata(vertices, [], polygons)
+    return value
+
+nested = combined_body('NestedBody', (0, 0, 0), .5)
+disjoint = combined_body('DisjointBody', (4, 0, 0), .5)
+probe_mesh = bpy.data.meshes.new('ProbeMesh')
+probe_mesh.from_pydata([(.51, 0, 0)], [], [])
+probe = bpy.data.objects.new('Probe', probe_mesh)
+scene.collection.objects.link(probe)
 scene.frame_set(7, subframe=.375)
 bpy.context.view_layer.update()
 prior = scene.frame_current, scene.frame_subframe
@@ -208,8 +225,14 @@ result = inspect('Cross')
 assert result['complete'] and not result['passed'], result
 assert result['garments'][0]['worst_probe']['kind'] == 'triangle_centre'
 result = inspect('Inside', body='UnionBody')
-assert result['complete'] and not result['passed'], result
+assert not result['complete'] and not result['passed'] and 'union_boundary_unresolved' in result['issues'], result
 assert result['body_topology'][0]['components'] == 2
+result = inspect('Probe', body='NestedBody', surface_samples='vertices', sample_frames=[1], include_worst_support=True)
+assert not result['complete'] and 'union_boundary_unresolved' in result['issues'], result
+assert result['garments'][0]['ambiguous_samples'] == 1
+assert result['garments'][0]['worst_support'] is None and result['garments'][0]['min_clearance_m'] is None
+result = inspect('Probe', body='DisjointBody', surface_samples='vertices', sample_frames=[1], include_worst_support=True)
+assert result['complete'] and result['garments'][0]['min_clearance_m'] < 0, result
 result = inspect(body='OpenBody')
 assert not result['complete'] and not result['passed']
 assert result['body_topology'][0]['boundary_edges'] > 0

@@ -145,6 +145,24 @@ class SceneSpatialTests(unittest.TestCase):
         with patch.object(Path, 'read_bytes', changed):
             self.assertNotEqual(before['build'], expected_bridge()['build'])
 
+    def test_skinny_triangle_projection_and_separation(self):
+        h = self.helpers()
+        outer = ((0, 0, 0), (1, 0, 0), (1, 1e-8, 0))
+        inner = ((.6, 1e-9, 0), (.8, 2e-9, 0), (.8, 4e-9, 0))
+        self.assertEqual(h.triangle_distance(outer, inner), 0)
+        shifted = tuple((x, y, z + .01) for x, y, z in inner)
+        self.assertAlmostEqual(h.triangle_distance(outer, shifted), .01)
+
+    def test_distance_proof_reuses_group_bounds(self):
+        h = self.helpers()
+        a = ((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))
+        b = ((.1, .1, 0.), (.9, .1, 0.), (.1, .9, 0.))
+        with patch.object(h, '_group_bounds', wraps=h._group_bounds) as bound:
+            proof = h.prove_distance([a] * 128, [b] * 128, 1., 64)
+        self.assertTrue(proof['proven'])
+        self.assertEqual(proof['upper_m'], 0.)
+        self.assertLessEqual(bound.call_count, 32)
+
     def test_an_exhausted_distance_budget_does_not_claim_the_minimum(self):
         helpers = self.helpers()
         left = [((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))]

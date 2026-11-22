@@ -45,6 +45,16 @@ if bpy.context.mode != "OBJECT":
 created = call("create_geometry_group", name="Cube", new_name="Warp")
 if created["domain"]["nodes"] != ["Group Input", "Group Output"] or min(heights("Cube")) >= 0:
     raise AssertionError(created)
+call("add_geometry_node", name="Cube", modifier="Warp", new_name="Position",
+     node_type="GeometryNodeInputPosition")
+try:
+    call("link_geometry_node", name="Cube", modifier="Warp", from_node="Position",
+         from_socket="Position", to_node="Group Output", to_socket="Geometry")
+except ValueError:
+    pass
+else:
+    raise AssertionError("invalid geometry socket link was accepted")
+assert len(bpy.data.node_groups["Warp"].links) == 1 and min(heights("Cube")) < 0
 call("add_geometry_node", name="Cube", modifier="Warp", new_name="Offset",
      node_type="GeometryNodeSetPosition")
 call("link_geometry_node", name="Cube", modifier="Warp", from_node="Group Input",
@@ -53,6 +63,10 @@ linked = call("link_geometry_node", name="Cube", modifier="Warp", from_node="Off
               from_socket="Geometry", to_node="Group Output", to_socket="Geometry")
 if "Offset" not in linked["domain"]["nodes"] or linked["domain"]["links"] < 2:
     raise AssertionError(linked)
+before_count = len(bpy.data.node_groups["Warp"].links)
+call("link_geometry_node", name="Cube", modifier="Warp", from_node="Offset",
+     from_socket="Geometry", to_node="Group Output", to_socket="Geometry")
+assert len(bpy.data.node_groups["Warp"].links) == before_count
 bpy.data.node_groups["Warp"].nodes["Offset"].inputs["Offset"].default_value = (0, 0, 1)
 shifted = heights("Cube")
 if min(shifted) < -0.01 or max(shifted) < 1.5:

@@ -168,8 +168,13 @@ def inspect(params):
                     'sha256': digest({key: [(p['object'], p['surface_sha256']) for p in rows]
                                       for key, rows in parts.items()}),
                     'triangles': spec['max_triangles'] - remaining}
+        intersections = overlap(geometry['subjects'], geometry['context'],
+                                metadata['subjects'], metadata['context'], spec)
         gaps = nearest(geometry['subjects'], geometry['context'],
                        metadata['subjects'], metadata['context'], spec)
+        if intersections['triangle_pairs'] and gaps['distance_lower_bound_m'] > 0:
+            gaps['distance_lower_bound_m'] = 0.
+            gaps['continuous_minimum_proven'] = False
         report = {**parts, 'geometry_identity': identity,
                   'query_sha256': digest({'geometry': identity, 'query': spec}),
                   'frame': bpy.context.scene.frame_current,
@@ -177,8 +182,7 @@ def inspect(params):
                   'view_layer': bpy.context.view_layer.name,
                   'proposed_world_delta': spec['proposed_world_delta'],
                   'bounds_m': boxes, 'bounds_overlap': intersects(boxes['subjects'], boxes['context']),
-                  'intersections': overlap(geometry['subjects'], geometry['context'],
-                                           metadata['subjects'], metadata['context'], spec),
+                  'intersections': intersections,
                   'nearest': gaps,
                   'not_checked': ['solid_containment',
                                   *([] if gaps['continuous_minimum_proven']

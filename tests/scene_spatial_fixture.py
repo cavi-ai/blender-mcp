@@ -54,6 +54,9 @@ def audit(*_):
             for o in bpy.data.objects}}))
 
 
+mesh('ThinOuter', [(0, 0, 0), (1, 0, 0), (1, 1e-8, 0)], [(0, 1, 2)])
+mesh('ThinInner', [(.6, 1e-9, 0), (.8, 2e-9, 0), (.8, 4e-9, 0)], [(0, 1, 2)])
+
 bpy.context.view_layer.update()
 bpy.app.handlers.save_post.append(audit)
 bpy.ops.wm.save_as_mainfile(filepath=str(root/'initial.blend'), check_existing=False)

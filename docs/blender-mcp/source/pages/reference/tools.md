@@ -342,7 +342,10 @@ evaluated at that frame.
 
 `surface_samples: vertices` omits face-centre probes. `max_queries` bounds nearest,
 component and ray queries (default/maximum 1,000,000); surface samples are capped
-at four million. The call restores frame and subframe.
+at four million. The call restores frame and subframe. For overlapping or nested
+body components, a nearest surface hidden inside another component is excluded;
+when an exposed union boundary cannot be established, the sample is ambiguous and
+`union_boundary_unresolved` is reported. No replacement distance is inferred.
 
 Reports signed gaps in metres, inside/violating/ambiguous counts, worst frames and
 probe indices, body topology and numerical resolution. Multiple closed body
