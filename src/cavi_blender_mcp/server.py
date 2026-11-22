@@ -405,18 +405,17 @@ async def inspect_skin_clearance(
     garments: Annotated[list[ObjectName], Field(min_length=1, max_length=8, description="Distinct garments")],
     start_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="First")],
     end_frame: Annotated[StrictInt, Field(ge=1, le=1000000, description="Last")],
-    min_clearance_m: Annotated[Number, Field(ge=0, description="Minimum signed gap (m)")],
-    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Samples")] = 9,
-    surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Samples")] = "vertices_and_centres",
-    max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Query cap")] = 1000000,
-    sample_frames: Annotated[list[Number] | None, Field(min_length=1, max_length=32, description="Exact ordered frames, including subframes")] = None,
-    region_attribute: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Evaluated FACE INT garment attribute")] = None,
-    rest_armature: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Armature to evaluate in rest pose")] = None,
-    include_worst_support: Annotated[StrictBool, Field(description="Include closest body witnesses")] = False,
-    include_violation_patches: Annotated[StrictBool, Field(description="Group violating garment vertices")] = False,
+    min_clearance_m: Annotated[Number, Field(ge=0, description="Signed gap (m)")],
+    samples: Annotated[StrictInt, Field(ge=2, le=32, description="Count")] = 9,
+    surface_samples: Annotated[Literal["vertices", "vertices_and_centres"], Field(description="Sites")] = "vertices_and_centres",
+    max_queries: Annotated[StrictInt, Field(ge=1, le=1000000, description="Budget")] = 1000000,
+    sample_frames: Annotated[list[Number] | None, Field(min_length=1, max_length=32, description="Ordered exact frames or subframes")] = None,
+    region_attribute: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="FACE INT region attribute")] = None,
+    rest_armature: Annotated[StrictStr | None, Field(min_length=1, max_length=63, description="Rest-pose armature")] = None,
+    include_worst_support: Annotated[StrictBool, Field(description="Body witnesses")] = False,
+    include_violation_patches: Annotated[StrictBool, Field(description="Group vertex violations")] = False,
 ) -> SkinClearance:
-    """Sample signed garment gaps (m); restore frame. Requires closed unambiguous bodies and complete budgets.
-    Sampling cannot certify continuous collision."""
+    """Sample signed garment gaps (m). Restore time. Discrete probes only."""
     from .clearance_frames import validate_sample_frames
 
     frames = None if sample_frames is None else validate_sample_frames(sample_frames, start_frame, end_frame)
