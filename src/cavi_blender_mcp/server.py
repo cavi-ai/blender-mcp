@@ -1297,7 +1297,7 @@ async def asset_io(
     preserve_instances: Annotated[StrictBool | None, Field(description="export: keep supported instancing")] = None,
     include_empties: Annotated[StrictBool | None, Field(description="export: empties")] = None,
     image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
-    prompt: Annotated[str | None, Field(max_length=1000, description="generate: panorama text")] = None,
+    prompt: Annotated[str | None, Field(max_length=1000, description="generate: panorama text; path .png or .exr")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
     quality: Annotated[Literal["fast", "default", "high"] | None, Field(description='generate: MLX tier')] = None,
     views: Annotated[list[str] | None, Field(max_length=5, description="generate: TRELLIS.2 more views")] = None,

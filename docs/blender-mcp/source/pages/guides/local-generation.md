@@ -212,24 +212,30 @@ retopology, UV work, rigging and game import validation.
 ## Generate a world panorama
 
 `asset_io` `action="generate"` with `prompt` instead of `image` writes a new
-2048×1024 PNG to `path` from the local image model in `CAVI_IMAGE_MLX_MODEL`.
+2048×1024 PNG or EXR to `path` from the local image model in `CAVI_IMAGE_MLX_MODEL`.
 The prompt is sent with "seamless 360 degree equirectangular panorama, level
 horizon" appended, at seed 42 and 30 steps (`quality="fast"`: 12). The last
 128 columns are faded into the first and the image is resized back to 2:1, so
-its right edge continues into its left. The PNG is low dynamic range.
+its right edge continues into its left. A `.png` path keeps the 8-bit image,
+which is low dynamic range.
+
+A `.exr` path writes uncompressed half-float RGB in scene-linear Rec. 709. Each
+8-bit value is decoded from sRGB, then expanded with an inverse Reinhard curve
+that maps 8-bit white to 16, so bright sky and sun light the scene above 1.0
+while dark and middle values stay close to their decoded sRGB values.
 
 ```json
-{"action": "generate", "path": "worlds/meadow.png", "prompt": "a sunny meadow with distant mountains"}
+{"action": "generate", "path": "worlds/meadow.exr", "prompt": "a sunny meadow with distant mountains"}
 ```
 
 Light the scene with it through `scene_edit`:
 
 ```json
-{"action": "world", "world": {"name": "Meadow", "hdri": "worlds/meadow.png", "strength": 1}, "lease_id": "<lease_id>"}
+{"action": "world", "world": {"name": "Meadow", "hdri": "worlds/meadow.exr", "strength": 1}, "lease_id": "<lease_id>"}
 ```
 
 The result reports `steps`, `quality`, `seam_band`, `seconds` and
-`prompt_sha256`.
+`prompt_sha256`; an EXR result adds `white`.
 
 ## Related
 

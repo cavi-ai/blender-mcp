@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import os
+import struct
 import sys
 import tempfile
 import unittest
@@ -24,6 +25,37 @@ def seam(image):
     across = sum(abs(pixels[width - 1, y] - pixels[0, y]) for y in range(height)) / height
     inside = sum(abs(pixels[1, y] - pixels[0, y]) for y in range(height)) / height
     return across, inside
+
+
+def read_exr(path):
+    """Header attributes and an (R, G, B) reader for an uncompressed scanline EXR of half channels."""
+    data = path.read_bytes()
+    position, attributes = 8, {}
+    while data[position]:
+        name, kind = data[position:].split(b"\0", 2)[:2]
+        position += len(name) + len(kind) + 2
+        size = struct.unpack_from("<i", data, position)[0]
+        attributes[name] = (kind, data[position + 4:position + 4 + size])
+        position += 4 + size
+    _, _, right, bottom = struct.unpack("<4i", attributes[b"dataWindow"][1])
+    width = right + 1
+    offsets = struct.unpack_from(f"<{bottom + 1}Q", data, position + 1)
+
+    def pixel(x, y):
+        block = offsets[y]
+        assert struct.unpack_from("<2i", data, block) == (y, 6 * width)
+        blue, green, red = (struct.unpack_from("<e", data, block + 8 + 2 * (plane * width + x))[0]
+                            for plane in range(3))
+        return red, green, blue
+
+    return data[:8], attributes, pixel
+
+
+def scene_linear(code):
+    """The documented EXR value of an 8-bit sRGB code: sRGB decoding, then inverse Reinhard to white 16."""
+    encoded = code / 255
+    decoded = encoded / 12.92 if encoded <= 0.04045 else ((encoded + 0.055) / 1.055) ** 2.4
+    return decoded / (1 - decoded * 15 / 16)
 
 
 class PanoramaTests(unittest.TestCase):
@@ -56,6 +88,30 @@ class PanoramaTests(unittest.TestCase):
         self.assertLess(inside, 3)
         self.assertEqual(report["prompt_sha256"], hashlib.sha256(b"a sunny meadow").hexdigest())
         self.assertEqual((report["seconds"], report["seam_band"]), (12.5, 128))
+        self.assertFalse(list(self.work.glob(".cavi-panorama-*")))
+
+    def test_an_exr_path_publishes_scene_linear_half_floats_above_display_white(self):
+        self.assertNotIn("white", self.generate(path="sky.png"))
+        report = self.generate(path="sky.exr")
+        self.assertEqual((report["white"], report["width"], report["height"]), (16, 2048, 1024))
+        magic, attributes, pixel = read_exr(self.work / "sky.exr")
+        self.assertEqual(magic, b"\x76\x2f\x31\x01\x02\0\0\0")
+        self.assertEqual(attributes[b"compression"], (b"compression", b"\0"))
+        channels = attributes[b"channels"][1]
+        for index, name in enumerate(b"BGR"):
+            self.assertEqual(channels[18 * index], name)
+            self.assertEqual(struct.unpack_from("<i", channels, 18 * index + 2)[0], 1)
+        with Image.open(self.work / "sky.png") as published:
+            codes = published.convert("RGB")
+        brightest = (0, 0)
+        for x in range(0, 2048, 89):
+            for y in (0, 511, 1023):
+                for value, code in zip(pixel(x, y), codes.getpixel((x, y)), strict=True):
+                    self.assertAlmostEqual(value, scene_linear(code), delta=scene_linear(code) / 500)
+                brightest = max(brightest, (pixel(x, y)[0], codes.getpixel((x, y))[0]))
+        self.assertGreater(brightest[0], 4)
+        self.assertGreater(brightest[1], 230)
+        self.assertLess(abs(pixel(2047, 300)[0] - pixel(0, 300)[0]), 0.05)
         self.assertFalse(list(self.work.glob(".cavi-panorama-*")))
 
     def test_a_ramp_jumps_at_its_seam_until_it_is_wrapped(self):
