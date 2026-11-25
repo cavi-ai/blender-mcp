@@ -65,7 +65,7 @@ class CatalogTests(unittest.TestCase):
         encoded = lambda value: len(json.dumps(short_references(value), separators=(',', ':')))
         self.assertLessEqual(encoded(shared_constraints(source)), encoded(source))
 
-    def test_short_references_drop_alias_definitions_and_defaults_equal_to_const(self):
+    def test_short_references_drop_alias_definitions_and_preserve_defaults(self):
         from cavi_blender_mcp.catalog import short_references
 
         name = {'type': 'string', 'minLength': 1, 'maxLength': 63}
@@ -83,7 +83,7 @@ class CatalogTests(unittest.TestCase):
         shared = '#/$defs/' + next(iter(compact['$defs']))
         self.assertEqual(compact['properties']['bone'], {'$ref': shared, 'description': 'Bone'})
         self.assertEqual(compact['properties']['target']['anyOf'][0], {'$ref': shared})
-        self.assertEqual(compact['properties']['kind'], {'const': 'IK'})
+        self.assertEqual(compact['properties']['kind'], {'const': 'IK', 'default': 'IK'})
         self.assertEqual(compact['properties']['flag'], {'const': True, 'default': 1})
         for value in ({}, {'bone': 'a'}, {'bone': ''}, {'bone': 'a' * 64}, {'bone': 'a', 'target': None},
                       {'bone': 'a', 'target': 'a' * 64}, {'bone': 'a', 'kind': 'IK'},

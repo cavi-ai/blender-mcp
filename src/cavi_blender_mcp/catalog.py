@@ -71,8 +71,7 @@ def shared_constraints(schema):
 def short_references(schema):
     """Rename only unscoped local definitions; literal JSON data stays untouched.
 
-    Definitions that only point to another definition are bypassed, and a default
-    equal to its const is dropped because the const already fixes the value.
+    Definitions that only point to another definition are bypassed.
     """
     if not isinstance(schema, dict) or not schema.get('$defs') or preserve_structure(schema):
         return schema
@@ -116,16 +115,12 @@ def short_references(schema):
             node['$ref'] = references[reference]
         return node
 
-    def encoded(value):
-        return json.dumps(value, sort_keys=True, separators=(',', ':'))
-
     result = map_schema(schema, rewrite)
     result['$defs'] = {names[name]: value for name, value in result['$defs'].items() if name in names}
     if not result['$defs']:
         result.pop('$defs')
     return map_schema(result,lambda node:{key:value for key,value in node.items()
-        if not (key == 'additionalProperties' and value == {})
-        and not (key == 'default' and 'const' in node and encoded(value) == encoded(node['const']))})
+        if not (key == 'additionalProperties' and value == {})})
 
 
 class BlenderServer(CoreServer):
