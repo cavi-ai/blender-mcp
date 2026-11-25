@@ -11,6 +11,7 @@ from mathutils import Euler, Vector
 
 from .blender_geometry import triangle_count, unit_scale
 from .blender_lookup import RENDERLESS, number, obj, output_file
+from .framing import effective_fov, fit_sphere
 
 VIEWS = {"front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0),
          "top": (0, 0, 1), "persp": (1.5, -2, 1.4)}
@@ -159,13 +160,16 @@ def place_camera(camera, view, center, radius):
     data = camera.data
     if view == "persp":
         data.type = "PERSP"
-        distance = max(radius * 3.5, 2)
+        render = bpy.context.scene.render
+        fov = effective_fov(data.lens, data.sensor_width, data.sensor_height, data.sensor_fit,
+                            render.resolution_x, render.resolution_y)
+        distance, data.clip_start, data.clip_end = fit_sphere(radius, *fov)
     else:
         data.type = "ORTHO"
         data.ortho_scale = radius * 2.2
         distance = radius * 3 + 1
-    data.clip_start = max(1e-4, min(0.1, (distance - radius) * 0.5))
-    data.clip_end = distance + radius * 2
+        data.clip_start = max(1e-4, min(0.1, (distance - radius) * 0.5))
+        data.clip_end = distance + radius * 2
     direction = Vector(VIEWS[view]).normalized()
     camera.location = center + direction * distance
     if view == "top":
