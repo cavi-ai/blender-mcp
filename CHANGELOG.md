@@ -9,6 +9,7 @@ adds its lines under Unreleased and never edits a version.
 
 ### Added
 
+- `inspect_mesh_quality` `topology` reports inconsistent winding edges, coincident vertex pairs, sliver triangles and self-intersecting face pairs with up to 32 examples each, and marks budget-limited searches incomplete.
 - `inspect_skin_clearance` with `include_worst_support` reports up to 16 `ambiguity_examples` per garment, with the probe, nearest body triangle and causes of each unresolved classification.
 
 ### Changed
