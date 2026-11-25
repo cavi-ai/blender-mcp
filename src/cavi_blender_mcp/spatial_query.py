@@ -1,4 +1,4 @@
-"""Bounded spatial-query validation and sampling, without a native dependency."""
+"""Bounded spatial-query validation and sampling; numpy loads only for batched distances."""
 import math
 from heapq import heappop, heappush
 
@@ -8,6 +8,8 @@ IDENTITY = ((1., 0., 0., 0.), (0., 1., 0., 0.), (0., 0., 1., 0.), (0., 0., 0., 1
 FLOAT32_MAX = 3.4028234663852886e38
 COPLANAR_TOLERANCE_M = 1e-6
 COPLANAR_NORMAL_TOLERANCE = 1e-6
+PROOF_LEAF_TRIANGLES = 16
+PROOF_BATCH_PAIRS = 256
 
 
 def finite(value):
@@ -245,6 +247,142 @@ def triangle_distance(a, b):
     return best
 
 
+# Batched float64 twins of the scalar functions above. Each repeats the scalar operation
+# order and branches; only the final Euclidean norms may differ by a few ulp.
+def _numpy():
+    import numpy
+
+    return numpy
+
+
+_NEXT = [1, 2, 0]
+
+
+def _vdot(a, b):
+    return a[..., 0] * b[..., 0] + a[..., 1] * b[..., 1] + a[..., 2] * b[..., 2]
+
+
+def _vcross(np, a, b):
+    return np.stack((a[..., 1]*b[..., 2] - a[..., 2]*b[..., 1],
+                     a[..., 2]*b[..., 0] - a[..., 0]*b[..., 2],
+                     a[..., 0]*b[..., 1] - a[..., 1]*b[..., 0]), axis=-1)
+
+
+def _vclamp(np, value):
+    return np.where(value < 0, 0., np.where(value > 1, 1., value))
+
+
+def _vdist(np, a, b):
+    delta = a - b
+    return np.hypot(np.hypot(delta[..., 0], delta[..., 1]), delta[..., 2])
+
+
+def _unit_normals(np, triangles):
+    """Unit normals scaled by ``1 / math.hypot`` as point_triangle_distance does."""
+    cross = _vcross(np, triangles[..., 1, :] - triangles[..., 0, :],
+                    triangles[..., 2, :] - triangles[..., 0, :])
+    flat = cross.reshape(-1, 3).T.tolist()
+    length = np.array(list(map(math.hypot, *flat)), dtype=np.float64).reshape(cross.shape[:-1])
+    valid = length != 0
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        scale = np.where(valid, 1 / np.where(valid, length, 1.), 0.)
+        return cross * scale[..., None], valid
+
+
+def _point_triangle(np, points, triangles, normals, valid):
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        height = _vdot(points - triangles[..., 0, :], normals)
+        projected = points - normals * height[..., None]
+        inside, best = valid, None
+        for i in range(3):
+            start, end = triangles[..., i, :], triangles[..., _NEXT[i], :]
+            inside = inside & (_vdot(_vcross(np, end - start, projected - start), normals) >= 0)
+            edge = end - start
+            size = _vdot(edge, edge)
+            t = np.where(size != 0, _vclamp(np, _vdot(points - start, edge) / size), 0.)
+            gap = _vdist(np, points, start + edge * t[..., None])
+            best = gap if best is None else np.minimum(best, gap)
+        return np.where(inside, np.abs(height), best)
+
+
+def _segment_distances(np, p1, q1, p2, q2):
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        d1, d2 = q1 - p1, q2 - p2
+        r = p1 - p2
+        a, e, f = _vdot(d1, d1), _vdot(d2, d2), _vdot(d2, r)
+        b, c = _vdot(d1, d2), _vdot(d1, r)
+        cross = _vcross(np, d1, d2)
+        denom = _vdot(cross, cross)
+        s = np.where(denom > 0, _vclamp(np, _vdot(_vcross(np, d2, r), cross) / denom), 0.)
+        low_s = np.where(a > 0, _vclamp(np, -c / a), 0.)
+        high_s = np.where(a > 0, _vclamp(np, (b - c) / a), 0.)
+        t = (b * s + f) / e
+        low = (e == 0) | (t < 0)
+        high = (e != 0) & (t > 1)
+        s = np.where(low, low_s, np.where(high, high_s, s))
+        t = np.where(low, 0., np.where(high, 1., t))
+        return _vdist(np, p1 + d1 * s[..., None], p2 + d2 * t[..., None])
+
+
+def _segment_hits(np, p, q, triangles):
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        a = triangles[..., 0, :]
+        direction, edge1, edge2 = q - p, triangles[..., 1, :] - a, triangles[..., 2, :] - a
+        h = _vcross(np, direction, edge2)
+        det = _vdot(edge1, h)
+        offset = p - a
+        u = _vdot(offset, h) / det
+        cross = _vcross(np, offset, edge1)
+        v = _vdot(direction, cross) / det
+        t = _vdot(edge2, cross) / det
+        return ((det != 0) & (0 <= u) & (u <= 1) & (0 <= v) & (u + v <= 1)
+                & (0 <= t) & (t <= 1))
+
+
+def _triangle_pairs(np, a, b, normals_a, valid_a, normals_b, valid_b):
+    starts = np.stack((a, b), axis=1)
+    ends = starts[:, :, _NEXT]
+    others = np.stack((b, a), axis=1)[:, :, None]
+    hits = _segment_hits(np, starts, ends, others).any(axis=(1, 2))
+    normals = np.stack((normals_b, normals_a), axis=1)[:, :, None]
+    valid = np.stack((valid_b, valid_a), axis=1)[:, :, None]
+    points = _point_triangle(np, starts, others, normals, valid).reshape(len(a), 6)
+    segments = _segment_distances(np, a[:, :, None], a[:, _NEXT, None],
+                                  b[:, None, :], b[:, None, _NEXT]).reshape(len(a), 9)
+    return np.where(hits, 0., np.minimum(points.min(axis=1, initial=math.inf),
+                                         segments.min(axis=1, initial=math.inf)))
+
+
+def _triangle_array(np, values):
+    array = np.asarray(values, dtype=np.float64)
+    if array.size == 0:
+        array = array.reshape(0, 3, 3)
+    if array.ndim != 3 or array.shape[1:] != (3, 3):
+        raise ValueError('Batched distances require (n, 3, 3) triangle arrays')
+    return array
+
+
+def point_triangle_distances(points, triangles):
+    """``point_triangle_distance`` over matching (n, 3) points and (n, 3, 3) triangles."""
+    np = _numpy()
+    triangles = _triangle_array(np, triangles)
+    points = np.asarray(points, dtype=np.float64)
+    if points.size == 0:
+        points = points.reshape(0, 3)
+    if points.shape != (len(triangles), 3):
+        raise ValueError('Batched distances require one (x, y, z) point per triangle')
+    return _point_triangle(np, points, triangles, *_unit_normals(np, triangles))
+
+
+def triangle_distances(a, b):
+    """``triangle_distance`` over matching (n, 3, 3) triangle arrays."""
+    np = _numpy()
+    a, b = _triangle_array(np, a), _triangle_array(np, b)
+    if a.shape != b.shape:
+        raise ValueError('Batched distances require the same number of triangles per side')
+    return _triangle_pairs(np, a, b, *_unit_normals(np, a), *_unit_normals(np, b))
+
+
 def _group_bounds(triangles, indices):
     return bounds([point for index in indices for point in triangles[index]])
 
@@ -262,12 +400,79 @@ def _gap(a, b):
     return math.sqrt(total)
 
 
+def _box_gaps(np, low_a, high_a, low_b, high_b):
+    """Batched ``_gap`` with the same per-axis branches and summation order."""
+    total = 0.
+    for i in range(3):
+        delta = np.where(high_a[..., i] < low_b[..., i], low_b[..., i] - high_a[..., i],
+                         np.where(high_b[..., i] < low_a[..., i], low_a[..., i] - high_b[..., i],
+                                  0.))
+        total = total + delta * delta
+    return np.sqrt(total)
+
+
+class _Surface:
+    def __init__(self, np, triangles):
+        self.np = np
+        self.vertices = _triangle_array(np, triangles)
+        self.lows, self.highs = self.vertices.min(axis=1), self.vertices.max(axis=1)
+        self.keys = self.vertices[:, 0] + self.vertices[:, 1] + self.vertices[:, 2]
+        self.normals, self.valid = _unit_normals(np, self.vertices)
+
+
+class _Node:
+    __slots__ = ('box', 'children', 'high', 'indices', 'low', 'surface')
+
+    def __init__(self, surface, indices):
+        self.surface, self.indices = surface, indices
+        self.low = surface.lows[indices].min(axis=0)
+        self.high = surface.highs[indices].max(axis=0)
+        self.box = [self.low.tolist(), self.high.tolist()]
+        self.children = None
+
+    def split(self):
+        if self.children is None:
+            axis = max(range(3), key=lambda i: self.box[1][i] - self.box[0][i])
+            keys = self.surface.keys[self.indices, axis]
+            ordered = self.indices[self.surface.np.argsort(keys, kind='stable')]
+            middle = len(ordered) // 2
+            self.children = (_Node(self.surface, ordered[:middle]),
+                             _Node(self.surface, ordered[middle:]))
+        return self.children
+
+
+def _leaf_work(left, right):
+    """Most budget units one leaf pair can spend in ``_near_pairs``."""
+    k, m = len(left.indices), len(right.indices)
+    return k * m if k == 1 or m == 1 else k + m + k * m
+
+
+def _near_pairs(np, left, right, best):
+    """Triangle pairs whose boxes are closer than ``best``, and the budget units spent."""
+    a, b = left.surface, right.surface
+    rows, cols = left.indices, right.indices
+    work = 0
+    if len(rows) > 1 and len(cols) > 1:
+        work = len(rows) + len(cols)
+        rows = rows[_box_gaps(np, a.lows[rows], a.highs[rows], right.low, right.high) < best]
+        cols = cols[_box_gaps(np, left.low, left.high, b.lows[cols], b.highs[cols]) < best]
+    near = _box_gaps(np, a.lows[rows][:, None], a.highs[rows][:, None],
+                     b.lows[cols][None], b.highs[cols][None]) < best
+    i, j = np.nonzero(near)
+    return rows[i], cols[j], work + len(i)
+
+
 def prove_distance(subjects, context, upper, budget):
     """Branch-and-bound triangle distance.
 
     ``upper`` is a known distance, such as a sample. A finished search reports
     the exact minimum. An exhausted budget reports a lower bound that must not
     be treated as the minimum.
+
+    Budget units: one per node-pair split and one per exact triangle-pair distance.
+    A leaf pair of at most ``PROOF_LEAF_TRIANGLES`` triangles a side, both sides
+    with two or more, also costs one per triangle box tested against the other
+    leaf's box. ``tests`` reports the units spent and never exceeds ``budget``.
     """
     if type(budget) is not int or budget < 0:
         raise ValueError('Distance proof budget must be a nonnegative integer')
@@ -275,24 +480,24 @@ def prove_distance(subjects, context, upper, budget):
         raise ValueError('Distance proof requires both surfaces')
     if not math.isfinite(upper) or upper < 0:
         raise ValueError('Distance upper bound must be finite and nonnegative')
-    class Node:
-        def __init__(self, triangles, indices):
-            self.triangles = triangles
-            self.indices = tuple(indices)
-            self.box = _group_bounds(triangles, self.indices)
-            self.children = None
-
-        def split(self):
-            if self.children is None:
-                axis = max(range(3), key=lambda i: self.box[1][i] - self.box[0][i])
-                ordered = sorted(self.indices, key=lambda i: sum(p[axis] for p in self.triangles[i]))
-                middle = len(ordered) // 2
-                self.children = (Node(self.triangles, ordered[:middle]),
-                                 Node(self.triangles, ordered[middle:]))
-            return self.children
-
+    np = _numpy()
+    a, b = _Surface(np, subjects), _Surface(np, context)
     best, work, counter = float(upper), 0, 0
-    left, right = Node(subjects, range(len(subjects))), Node(context, range(len(context)))
+    queued, queued_pairs = [], 0
+
+    def flush(best):
+        nonlocal queued_pairs
+        i = np.concatenate([rows for rows, _ in queued])
+        j = np.concatenate([cols for _, cols in queued])
+        queued.clear()
+        queued_pairs = 0
+        if not len(i):
+            return best
+        distances = _triangle_pairs(np, a.vertices[i], b.vertices[j], a.normals[i], a.valid[i],
+                                    b.normals[j], b.valid[j])
+        return min(best, float(np.fmin.reduce(distances)))
+
+    left, right = _Node(a, np.arange(len(a.vertices))), _Node(b, np.arange(len(b.vertices)))
     pending = [(_gap(left.box, right.box), len(left.indices) * len(right.indices), counter, left, right)]
     stopped = None
     while pending:
@@ -300,17 +505,30 @@ def prove_distance(subjects, context, upper, budget):
         if gap >= best:
             continue
         if work >= budget:
+            if queued:
+                best = flush(best)
+                if gap >= best:
+                    continue
             stopped = gap
             break
-        work += 1
-        if len(left.indices) > 1 or len(right.indices) > 1:
-            split_left = len(left.indices) >= len(right.indices) and len(left.indices) > 1
-            for child in (left if split_left else right).split():
-                l, r = (child, right) if split_left else (left, child)
-                counter += 1
-                heappush(pending, (_gap(l.box, r.box), len(l.indices) * len(r.indices), counter, l, r))
+        leaf = max(len(left.indices), len(right.indices)) <= PROOF_LEAF_TRIANGLES
+        if leaf and _leaf_work(left, right) <= budget - work:
+            rows, cols, spent = _near_pairs(np, left, right, best)
+            work += spent
+            if len(rows):
+                queued.append((rows, cols))
+                queued_pairs += len(rows)
+            if queued_pairs >= PROOF_BATCH_PAIRS:
+                best = flush(best)
             continue
-        best = min(best, triangle_distance(subjects[left.indices[0]], context[right.indices[0]]))
+        work += 1
+        split_left = len(left.indices) >= len(right.indices) and len(left.indices) > 1
+        for child in (left if split_left else right).split():
+            l, r = (child, right) if split_left else (left, child)
+            counter += 1
+            heappush(pending, (_gap(l.box, r.box), len(l.indices) * len(r.indices), counter, l, r))
+    if queued:
+        best = flush(best)
     if stopped is None:
         return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
     lower = min(stopped, pending[0][0]) if pending else stopped

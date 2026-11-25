@@ -16,7 +16,7 @@ from .spatial_query import (
     chunks,
     coplanar_overlap,
     intersects,
-    point_triangle_distance,
+    point_triangle_distances,
     prove_distance,
     require_native,
     samples,
@@ -109,8 +109,8 @@ def overlap(subjects, context, subject_meta, context_meta, spec):
 
 def nearest(subjects, context, subject_meta, context_meta, spec):
     trees = (tree(subjects), tree(context))
-    best, proof_upper, witness = math.inf, math.inf, None
-    below, counts, available = 0, [], []
+    best, witness = math.inf, None
+    below, counts, available, probe_points, probe_triangles = 0, [], [], [], []
     for source, target, source_meta, target_meta, target_tree, reverse in (
             (subjects, context, subject_meta, context_meta, trees[1], False),
             (context, subjects, context_meta, subject_meta, trees[0], True)):
@@ -121,7 +121,8 @@ def nearest(subjects, context, subject_meta, context_meta, spec):
             hit, _, triangle, gap = target_tree.find_nearest(Vector(point))
             if hit is None or not math.isfinite(gap):
                 raise ValueError('Native nearest-surface query did not produce a finite witness')
-            proof_upper = min(proof_upper, point_triangle_distance(point, target[triangle]))
+            probe_points.append(point)
+            probe_triangles.append(target[triangle])
             below += gap < spec['min_clearance_m']
             if gap < best:
                 best = gap
@@ -129,6 +130,7 @@ def nearest(subjects, context, subject_meta, context_meta, spec):
                            'context': source_meta[index] if reverse else target_meta[triangle],
                            'subject_position_m': list(hit) if reverse else list(point),
                            'context_position_m': list(point) if reverse else list(hit)}
+    proof_upper = float(point_triangle_distances(probe_points, probe_triangles).min())
     proof = prove_distance(subjects, context, proof_upper, spec['max_pair_tests'])
     return {'method': 'bidirectional_vertex_and_triangle_centroid_samples',
             'distance_m': best, 'witness': witness, 'min_clearance_m': spec['min_clearance_m'],
