@@ -120,7 +120,7 @@ def short_references(schema):
     if not result['$defs']:
         result.pop('$defs')
     return map_schema(result,lambda node:{key:value for key,value in node.items()
-                                          if key!='additionalProperties' or value!={}})
+        if not (key == 'additionalProperties' and value == {})})
 
 
 class BlenderServer(CoreServer):
