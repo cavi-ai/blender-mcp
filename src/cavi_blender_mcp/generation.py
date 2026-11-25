@@ -10,7 +10,7 @@ from pathlib import Path
 from cavi_mcp_core import proc
 from cavi_mcp_core import workspace as core_workspace
 
-from .importing import MAX_BYTES, MAX_GEOMETRY
+from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .paths import destination
 
 MLX_MAX_FACES = 500000
@@ -52,8 +52,8 @@ PROVIDERS = {
         },
         "vertex_colors": True,
         "guides": True,
-        # Atlas export duplicates each triangle corner; also bound the embedded GLB.
-        "fast_max_faces": min(180_000, MAX_GEOMETRY // 3),
+        # Atlas export duplicates each triangle corner.
+        "atlas_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
 QUALITIES = ("fast", "default", "high")
@@ -110,7 +110,9 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         extra += ["--bbox", *(str(size) for size in bbox)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
-    max_faces = settings.get("fast_max_faces", MLX_MAX_FACES) if quality == "fast" else MLX_MAX_FACES
+    max_faces = MLX_MAX_FACES
+    if quality in ("fast", "high"):
+        max_faces = settings.get("atlas_max_faces", MLX_MAX_FACES)
     command = [
         configured["PYTHON"],
         configured["AGENT"],
@@ -266,6 +268,11 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
             raise RuntimeError("Reconstruction did not produce a GLB")
         if size > MAX_BYTES:
             raise RuntimeError(f"Reconstruction GLB is {size} bytes; maximum is {MAX_BYTES} bytes")
+        if quality == "high":
+            try:
+                inspect_glb(temporary, generated.name)
+            except ValueError as exc:
+                raise RuntimeError(f"Reconstruction GLB cannot be imported: {exc}") from exc
         # Publish without replacing an existing destination, even if another writer won the race.
         os.link(generated, target)
     return {**report, "path": str(target), "bytes": target.stat().st_size}

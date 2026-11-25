@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+from test_importing import write_glb
+
 PNG_SIGNATURE = bytes([0x89]) + b"PNG\r\n" + bytes([0x1A]) + b"\n"
 
 parser = argparse.ArgumentParser()
@@ -29,6 +31,7 @@ parser.add_argument("--timeout", type=int, required=True)
 parser.add_argument("--json", action="store_true", required=True)
 arguments = parser.parse_args()
 mode = os.environ["FAKE_AGENT_MODE"]
+quality = os.environ.get("FAKE_AGENT_QUALITY", "default")
 # TripoSG takes fixed steps and an RGB frame; TRELLIS.2 keeps its own steps and needs alpha.
 trellis = os.environ.get("FAKE_AGENT_MODEL") == "trellis2"
 # Sampler steps, grid resolution and denoiser cache each quality tier must send.
@@ -39,7 +42,7 @@ TIERS = {
     (True, "fast"): (6, 512, "off"),
     (True, "high"): (None, 1024, "off"),
 }
-tier = TIERS[trellis, os.environ.get("FAKE_AGENT_QUALITY", "default")]
+tier = TIERS[trellis, quality]
 record = Path(os.environ["FAKE_AGENT_RECORD"])
 out = Path(arguments.out)
 
@@ -72,7 +75,7 @@ valid = (
     and out.parent.is_dir()
     and (arguments.steps, arguments.resolution, arguments.denoiser_cache) == tier
     and arguments.seed == 42
-    and arguments.max_faces == (166666 if trellis and os.environ.get("FAKE_AGENT_QUALITY") == "fast" else 500000)
+    and (quality == "high" or arguments.max_faces == (166666 if trellis and quality == "fast" else 500000))
     and 1 <= arguments.timeout <= 600
 )
 if not valid:
@@ -93,9 +96,28 @@ if mode == "garbage":
 if mode == "error":
     out.write_bytes(b"partial-glb")
     reply("error", code=os.environ["FAKE_AGENT_CODE"], exit_code=2)
+faces = arguments.max_faces - 10
 glb = b"glTF" + struct.pack("<II", 2, 28) + bytes(16)
 if mode != "missing":
-    out.write_bytes(b"" if mode == "empty" else glb)
+    if mode == "empty":
+        out.write_bytes(b"")
+    elif quality == "high":
+        # An expanded mesh stores three positions per face, just like atlas export.
+        faces = arguments.max_faces
+        exported_faces = 166_667 if mode == "over_budget_glb" else faces
+        binary = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0) * exported_faces
+        document = {
+            "asset": {"version": "2.0"},
+            "buffers": [{"byteLength": len(binary)}],
+            "bufferViews": [{"buffer": 0, "byteLength": len(binary)}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3 * exported_faces,
+                           "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}], "scene": 0,
+        }
+        write_glb(out, document, binary)
+    else:
+        out.write_bytes(glb)
     if mode == "oversized_file":
         with out.open("r+b") as stream:
             stream.truncate(64 * 1024 * 1024 + 1)
@@ -109,7 +131,7 @@ data = {
     "seed": 42,
     "resolution": 512,
     "vertices": 249896,
-    "faces": (arguments.max_faces + 1 if mode == "oversized" else arguments.max_faces - 10),
+    "faces": arguments.max_faces + 1 if mode == "oversized" else faces,
     "queries": [16777216, 12473832],
     "stage_seconds": {"load": 0.864, "sampling": 61.804, "decode_refine": 33.015},
     "peak_memory_gb": 10.301,

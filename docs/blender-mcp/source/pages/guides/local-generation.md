@@ -148,7 +148,9 @@ cache, and `trellis2-mlx` runs 6 steps at resolution 512 with at most 166,666
 faces. `quality="default"`
 is the setting described above. The other providers refuse `fast`.
 `quality="high"` runs `trellis2-mlx` at resolution 1024 with the checkpoint's
-own sampler steps and at most 500,000 faces; the other providers refuse it.
+own sampler steps and at most 166,666 faces. Textured output can store three
+positions per face, so the server checks the generated GLB against Blender's
+import limits before publishing it. The other providers refuse `high`.
 
 | Provider | `default` | `fast` |
 | --- | --- | --- |

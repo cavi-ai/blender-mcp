@@ -16,6 +16,7 @@ from PIL import Image
 
 from cavi_blender_mcp import generation, neural_worker, server
 from cavi_blender_mcp.generation import generate
+from cavi_blender_mcp.importing import inspect_glb
 
 FAKE_AGENT = Path(__file__).with_name("fake_mlx_agent.py")
 
@@ -462,10 +463,15 @@ class Trellis2MlxTests(TripoSGMlxTests):
         self.assert_nothing_published()
 
     def test_high_quality(self):
-        # The fake agent accepts only resolution 1024, the checkpoint's own steps and 500,000 faces.
         result = self.generate(quality="high", FAKE_AGENT_QUALITY="high")
-        self.assertEqual((result["quality"], result["faces"]), ("high", 499990))
-        self.assertTrue((self.work / "mesh.glb").is_file())
+        self.assertEqual((result["quality"], result["faces"]), ("high", 166_666))
+        imported = inspect_glb(self.work, "mesh.glb")
+        self.assertEqual((imported["vertices"], imported["triangles"]), (499_998, 166_666))
+
+    def test_high_quality_refuses_a_glb_over_the_import_budget(self):
+        with self.assertRaisesRegex(RuntimeError, "GLB cannot be imported.*geometry exceeds the import budget"):
+            self.generate("over_budget_glb", quality="high", FAKE_AGENT_QUALITY="high")
+        self.assert_nothing_published()
 
     def test_the_tool_schema_offers_the_high_tier(self):
         settings = {**self.settings("ok", FAKE_AGENT_QUALITY="high"), "CAVI_BLENDER_WORKSPACE": str(self.work)}

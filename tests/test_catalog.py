@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 from pydantic import BaseModel, WithJsonSchema
 
 from cavi_blender_mcp.catalog import BlenderServer, omit_null_defaults
+from cavi_blender_mcp.server import mcp
 
 
 class CatalogTests(unittest.TestCase):
@@ -65,7 +66,7 @@ class CatalogTests(unittest.TestCase):
         encoded = lambda value: len(json.dumps(short_references(value), separators=(',', ':')))
         self.assertLessEqual(encoded(shared_constraints(source)), encoded(source))
 
-    def test_short_references_drop_alias_definitions_and_defaults_equal_to_const(self):
+    def test_short_references_drop_alias_definitions_and_keep_const_defaults(self):
         from cavi_blender_mcp.catalog import short_references
 
         name = {'type': 'string', 'minLength': 1, 'maxLength': 63}
@@ -83,7 +84,7 @@ class CatalogTests(unittest.TestCase):
         shared = '#/$defs/' + next(iter(compact['$defs']))
         self.assertEqual(compact['properties']['bone'], {'$ref': shared, 'description': 'Bone'})
         self.assertEqual(compact['properties']['target']['anyOf'][0], {'$ref': shared})
-        self.assertEqual(compact['properties']['kind'], {'const': 'IK'})
+        self.assertEqual(compact['properties']['kind'], {'const': 'IK', 'default': 'IK'})
         self.assertEqual(compact['properties']['flag'], {'const': True, 'default': 1})
         for value in ({}, {'bone': 'a'}, {'bone': ''}, {'bone': 'a' * 64}, {'bone': 'a', 'target': None},
                       {'bone': 'a', 'target': 'a' * 64}, {'bone': 'a', 'kind': 'IK'},
@@ -93,6 +94,17 @@ class CatalogTests(unittest.TestCase):
         cycle = {'$defs': {'A': {'$ref': '#/$defs/B'}, 'B': {'$ref': '#/$defs/A'}},
                  'properties': {'x': {'$ref': '#/$defs/A'}}}
         self.assertEqual(len(short_references(cycle)['$defs']), 2)
+
+    def test_rig_edit_discovery_advertises_optional_constraint_type_defaults(self):
+        schema = next(tool.input_schema for tool in asyncio.run(mcp.list_tools()) if tool.name == 'rig_edit')
+        variants = schema['properties']['constraint']['anyOf']
+        defaults = {}
+        for variant in variants:
+            if 'properties' in variant:
+                field = variant['properties']['type']
+                self.assertNotIn('type', variant.get('required', []))
+                defaults[field['const']] = field.get('default')
+        self.assertEqual(defaults, {'IK': 'IK', 'LIMIT_ROTATION': 'LIMIT_ROTATION'})
 
     def test_shared_constraints_reuse_an_existing_definition_container_when_profitable(self):
         from cavi_blender_mcp.catalog import shared_constraints, short_references
