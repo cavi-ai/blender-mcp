@@ -86,8 +86,10 @@ mcp = BlenderServer(
         "Call scene_info first; if the bridge is not running, `cavi-blender-mcp runtime start` "
         "launches Blender with it. Before edits, call session_control inspect, claim its "
         "project_id and pass lease_id. Paths are relative to the Blender session workspace; "
-        "saves and exports refuse existing paths. Check edits with render_preview or "
-        "review_sheet. Never retry an uncertain mutation; follow next_action."
+        "saves and exports refuse existing paths. Fields ending in _m are metres; other "
+        "lengths are scene units. Inspect, edit, then check with render_preview or "
+        "review_sheet; pass expected_mesh_sha256 / expected_uv_sha256 from the inspect "
+        "when editing geometry or UVs. Never retry an uncertain mutation; follow next_action."
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
@@ -332,7 +334,7 @@ async def inspect_mesh_quality(
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
                               Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Pixels")] = (1024, 1024),
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
-    checks: Annotated[list[Check] | None, Field(max_length=6, description="Empty: all checks")] = None,
+    checks: Annotated[list[Check] | None, Field(max_length=6, description="Omitted or empty: none run")] = None,
     naming: Annotated[NamingRules | None, Field(description="Rules")] = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63, description="Lightmap UVs")] = "UVMap_Lightmap",
     lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096, description="Lightmap pixels")] = 64,

@@ -3,127 +3,10 @@
 The server publishes 20 tools. Every mutation requires a `lease_id` unless the
 tool is listed as lease-free.
 
-`scene_info(spatial=["Subject", "Context"])` evaluates one named subject mesh
-against one named context mesh without editing the scene. The object form
-`{"subjects": [...], "context": [...]}` takes up to 32 subjects and 128 context
-meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects),
-`min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
-identities, bounded triangle intersection pairs and bidirectional sampled nearest
-surface gaps with fixed safety budgets. Bounds are broadphase only. `distance_m` is the
-closest sample. A finished search sets `continuous_minimum_proven` and
-`distance_lower_bound_m` to the exact triangle distance; an exhausted search leaves the
-minimum unproven. Neither result is a solid-containment proof. See [placement and surface
-clearance](../guides/scene-inspection.md#placement-and-surface-clearance) for limits
-and an example. This mode excludes other `scene_info` arguments.
-
-`scene_info(name=...)` reports ordered modifier names, native types, viewport/render
-visibility, exposed settings and `control_schema` with their native types, hard
-ranges, enum identifiers and read-only state. Scene-wide pages omit this detailed
-schema. `mesh_edit(action="modifier_update",
-name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
-in place: bevel width, collapse-decimation ratio, subdivision viewport/render
-levels, voxel size, weld distance, displace strength, shrinkwrap offset, weighted
-normal weight or data transfer mix. Other controls and stack order are retained. Percentage
-bevels and other remesh/decimation modes require their own native controls and are
-rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
-size 0.005–1, matching modifier creation.
-
-Alternatively, pass `modifier_settings` as an explicit property map, omitting
-`amount`. It supports exposed bevel finish controls, decimation modes, independent
-subdivision levels, remesh controls and viewport/render visibility. For example,
-`{"segments": 8, "profile": 0.7, "show_render": true}` tunes a bevel.
-Use the inspected native types and hard ranges; integers, booleans and enum
-identifiers are distinct. Unknown, read-only, nonfinite or out-of-range values
-reject the complete map before assignment. No values are silently clamped.
-Native subdivision ranges apply to this form, subject to the geometry budget;
-the shorthand's fixed level range does not apply. Angle properties use radians.
-
-Updates check a conservative 500,000-triangle bound across bevel, decimate,
-subdivision, armature, weld, displace, shrinkwrap, weighted normal and data
-transfer stacks before evaluating changed geometry. Unknown
-topology-changing modifiers cannot establish that bound. Remesh updates require
-a standalone modifier on a shape-key-free working mesh and at most two million
-bounding voxel or octree cells. Visibility-only disabling does not enlarge a
-stack and can bypass its growth estimate. A rejected update leaves the stack intact.
-
-`mesh_edit(action="modifier_remove", name=..., modifier_name=..., lease_id=...)`
-removes exactly the named modifier, including types outside scalar editing.
-Both actions operate on the object's stack and retain its base mesh, UVs,
-shape keys and vertex weights. Objects sharing that mesh keep their own stacks.
-Neither action applies a modifier or edits the base geometry.
-Animated or driven controls require animation editing instead of a static update.
-Removal rejects modifier animation and driver references to the modifier; unrelated
-object animation remains supported.
-
-`scene_info(name=..., region={"seed": 0, "stop_at": ["seam", "material"]})`
-pages a connected source-face selection without changing native selection.
-An optional `angle_limit_degrees` stops at sharper source-normal transitions.
-`stop_at=["uv"]` requires an explicit `uv_layer` and follows matching source-edge
-corner UVs, including unmarked splits. It returns `uv.layer` and `uv.sha256`;
-the selection identity also binds those coordinates and pin flags. UV, seam,
-material and angle boundaries can be combined. Non-manifold edges always stop.
-
-`mesh_edit(action="assign_faces", name=..., material_name=..., face_indices=[...])`
-binds existing finishes to source polygons. It reuses the first matching slot or
-appends one, retaining other slots and all UV, skin and shape-key data.
-
-`object_edit(action="delete", name=..., lease_id=...)` removes a named object.
-`recursive=true` includes parented descendants. Complete dependency checks precede
-removal; shared data is preserved and the receipt lists exactly which objects were deleted.
-
-`scene_info` with `faces=true` pages source polygon indices and local geometry.
-With `surface_ray`, it intersects a named mesh from an explicit world ray and
-metre range, returning a source face, triangle indices and optional corner UVs.
-`evaluated=true` checks current deform-only geometry against source topology.
-Hits and misses are explicit; the query does not test other objects' occlusion.
-`surface_ray` also accepts a named camera, top-left pixel index and image size.
-Named renders return image/projection hashes for rejecting a changed camera view.
-Omit `name` with an evaluated camera query to discover the nearest scene mesh or
-instance, its material binding and the availability of editable source indices.
-Named renders also provide a geometry identity; camera queries can require its
-`expected_geometry_sha256` to reject changed evaluated meshes, placements, UVs or bindings.
-With `vertices=true`, it pages source vertex coordinates; `move_vertices` in
-`mesh_edit` translates declared `vertex_indices` while retaining morph offsets.
-Its optional `amount` enables physical proportional falloff along connected source
-edges; `vertex_edit.falloff` records the metric and sampled weights.
-For a bounded proportional edit, supply `face_indices`, `amount`, and the current
-`expected_mesh_sha256`. Choose seed vertices in the selected region’s interior.
-The falloff follows selected face edges and holds shared and open-edge boundary
-vertices fixed. Use this option for a single-sided edit.
-Optional `symmetry_axis` plus `symmetry_tolerance_m` reflect displacements to
-unique reciprocal source counterparts; `vertex_edit.symmetry` reports pairing.
-Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;
-match mesh and UV hashes across pages before collecting a whole-chart selection.
-With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.
-`mesh_edit` with `extrude_faces` extrudes a declared region using `face_indices`
-and a local `offset`; optional `expected_mesh_sha256` guards against stale
-geometry. See [face-region modeling](../guides/mesh-preparation.md#inspect-and-extrude-a-face-region).
-
-`render_preview` and `review_sheet` return a PNG image block plus structured
-`path` and `mime_type` (`image/png`) fields. The receipt identifies the file written
-in the session workspace; image blocks remain available to visual clients.
-
 Lease-free tools: `scene_info`, `inspect_mesh_quality`, `inspect_uv_layout`, `inspect_rig`,
 `render_preview`, `review_sheet` and `session_control`. `asset_io` generation
 also runs without a lease, but import, export, save and open do not.
-`assign_material` `inspect` is lease-free; shader edits require ownership. Inspect
-native shader inputs/outputs and shared owners before tuning defaults through nested
-`group_path` nodes. `set_image` replaces an image binding with a packed native
-workspace snapshot and explicit color/alpha interpretation. Optional `image.tiles`
-declares an exact UDIM set for an `<UDIM>` filename pattern. See [authored shader controls](../guides/materials-and-uvs.md#tune-an-authored-shader-graph).
-
-For a nested kit definition, `scene_info(name=..., definition=true)` pages through
-its source objects. `geometry_nodes` inspect/set_inputs accepts `instance` to
-resolve an internal member through that scene instance. Edits affect the shared
-definition; the ordinary scene-object route remains unchanged.
-
-`object_edit` `make_unique` takes a scene collection instance's `name`, a unique
-collection `new_name` and lease. It branches the current editable definition and
-retargets that placement, returning actual source/copy ID mappings.
-
-`assign_material` accepts `instance` for internal mesh targets and `link_mode`
-(DATA/OBJECT) for slot binding. Object overrides retain shared geometry; omitted
-modes on updates preserve existing links. Definition pages report `material_slots`.
+`assign_material` `inspect` is lease-free; shader edits require ownership.
 
 ## asset_library
 
@@ -167,6 +50,10 @@ node group unchanged; values belong to the named object's modifier. The full bat
 validated before assignment; a native setter or value mismatch restores prior
 values. Inputs driven by animation still follow that animation when time changes.
 
+`inspect` and `set_inputs` accept `instance` to resolve an internal member
+through a scene instance (see `scene_info` `definition`). Edits affect the shared
+definition; the ordinary scene-object route remains unchanged.
+
 `add` attaches an existing node group as a new Geometry Nodes modifier, named
 `modifier` or the group name. The modifier is removed again when the evaluated
 mesh exceeds 500,000 triangles or 100,000 instances. The result is the `inspect`
@@ -206,6 +93,67 @@ is replaced externally. Compare it with the declared production source and requi
 | `limit` | 1–1000, default 200 |
 | `offset` | Nonnegative page offset |
 
+### Spatial proofs
+
+`scene_info(spatial=["Subject", "Context"])` evaluates one named subject mesh
+against one named context mesh without editing the scene. The object form
+`{"subjects": [...], "context": [...]}` takes up to 32 subjects and 128 context
+meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects),
+`min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
+identities, bounded triangle intersection pairs and bidirectional sampled nearest
+surface gaps with fixed safety budgets. Bounds are broadphase only. `distance_m` is the
+closest sample. A finished search sets `continuous_minimum_proven` and
+`distance_lower_bound_m` to the exact triangle distance; an exhausted search leaves the
+minimum unproven. Neither result is a solid-containment proof. See [placement and surface
+clearance](../guides/scene-inspection.md#placement-and-surface-clearance) for limits
+and an example. This mode excludes other `scene_info` arguments.
+
+`max_pair_tests` bounds the distance proof in work units: one per node-pair split,
+one per exact triangle-pair distance, and one per triangle box test inside a leaf
+pair when both leaves hold two or more triangles. `tests` reports the units spent
+and never exceeds the budget. Batched evaluation does not change results.
+
+### Modifier controls
+
+`scene_info(name=...)` reports ordered modifier names, native types, viewport/render
+visibility, exposed settings and `control_schema` with their native types, hard
+ranges, enum identifiers and read-only state. Scene-wide pages omit this detailed
+schema. Edit modifiers with `mesh_edit` `modifier_update`.
+
+### Face regions
+
+`scene_info(name=..., region={"seed": 0, "stop_at": ["seam", "material"]})`
+pages a connected source-face selection without changing native selection.
+An optional `angle_limit_degrees` stops at sharper source-normal transitions.
+`stop_at=["uv"]` requires an explicit `uv_layer` and follows matching source-edge
+corner UVs, including unmarked splits. It returns `uv.layer` and `uv.sha256`;
+the selection identity also binds those coordinates and pin flags. UV, seam,
+material and angle boundaries can be combined. Non-manifold edges always stop.
+
+### Faces, vertices and edges
+
+`scene_info` with `faces=true` pages source polygon indices and local geometry.
+With `surface_ray`, it intersects a named mesh from an explicit world ray and
+metre range, returning a source face, triangle indices and optional corner UVs.
+`evaluated=true` checks current deform-only geometry against source topology.
+Hits and misses are explicit; the query does not test other objects' occlusion.
+`surface_ray` also accepts a named camera, top-left pixel index and image size.
+Named renders return image/projection hashes for rejecting a changed camera view.
+Omit `name` with an evaluated camera query to discover the nearest scene mesh or
+instance, its material binding and the availability of editable source indices.
+Named renders also provide a geometry identity; camera queries can require its
+`expected_geometry_sha256` to reject changed evaluated meshes, placements, UVs or bindings.
+With `vertices=true`, it pages source vertex coordinates; `mesh_edit` `move_vertices`
+translates declared vertices.
+Add `uv_layer` for source chart membership, bounds, pin counts and UV identity;
+match mesh and UV hashes across pages before collecting a whole-chart selection.
+With `edges=true`, it reports source edge endpoints, adjacent faces and seam flags.
+
+### Instance definitions
+
+For a nested kit definition, `scene_info(name=..., definition=true)` pages through
+its source objects. Definition pages report `material_slots`.
+
 ## inspect_mesh_quality
 
 Read-only. Measures exact static mesh names.
@@ -215,12 +163,29 @@ Read-only. Measures exact static mesh names.
 | `names` | 1–32 unique mesh names |
 | `texture_resolution` | Two integers 1–4096, default `[1024, 1024]` |
 | `uv_layer` | Optional render-active override |
-| `checks` | Any of `naming`, `topology`, `lightmap`, `transforms`, `origin`, `materials` |
+| `checks` | Any of `naming`, `topology`, `lightmap`, `transforms`, `origin`, `materials`; an omitted or empty list runs no checks |
 | `naming` | `mesh_prefix`, `lod_suffix`, `collision_prefixes` |
 | `lightmap_uv` | UV layer name, default `UVMap_Lightmap` |
 | `lightmap_resolution` | 16–4096, default 64 |
 
 Refuses modifiers, shape keys and rigs.
+
+The `topology` check reports `non_manifold_edges`, `boundary_edges`, `loose_vertices`,
+`zero_area_faces` and `ngons`, plus these defect fields. Distances and angles use
+metres after object rotation, scale and scene unit scale.
+
+| Field | Meaning |
+| --- | --- |
+| `inconsistent_winding_edges`, `inconsistent_winding_edge_examples` | Edges shared by exactly two faces that traverse the edge in the same direction; edge indices |
+| `coincident_vertex_pairs`, `coincident_vertex_pair_examples` | Vertex pairs within `coincident_distance_m`; `[vertex, vertex]` |
+| `coincident_distance_m` | Coincidence distance, 1e-4 m |
+| `sliver_triangles`, `sliver_triangle_examples` | Triangles of non-zero-area faces whose smallest angle is below `sliver_angle_degrees`; `[triangle, face]` |
+| `sliver_angle_degrees` | Sliver threshold, 1.0 |
+| `self_intersecting_face_pairs`, `self_intersecting_face_pair_examples` | Face pairs whose triangles cross; `[face, face]` |
+
+Each examples list holds at most 32 entries in ascending order; counts cover all
+findings. Face pairs that share a vertex, coplanar overlaps and edge contacts are
+not counted as self-intersections, and `not_checked` lists them when `topology` runs.
 
 ## inspect_uv_layout
 
@@ -248,7 +213,8 @@ coverage. UV readiness applies only to the selected faces. The `dirty` field rep
 whether the current Blender file has unsaved changes.
 
 Triangle intersections use polygon clipping, including subpixel overlaps;
-shared edges have zero overlap area. `overlap.pairwise_area_pixels2` sums areas
+shared edges have zero overlap area. A zero-area clip triangle has zero
+intersection area. `overlap.pairwise_area_pixels2` sums areas
 across pairs, so triple overlaps are counted repeatedly. It is not atlas occupancy.
 Charts connect across shared source edges with exactly matching loop UVs.
 Disconnected but touching charts have zero clearance. Padding uses pixel-space
@@ -340,7 +306,8 @@ named rig. The tool samples its rest pose at that scene frame, restores the
 original pose setting, and echoes `rest_armature`. Other scene animation remains
 evaluated at that frame.
 
-`surface_samples: vertices` omits face-centre probes. `max_queries` bounds nearest,
+`surface_samples` is `vertices_and_centres` (default) or `vertices`; `vertices` omits
+face-centre probes. `max_queries` bounds nearest,
 component and ray queries (default/maximum 1,000,000); surface samples are capped
 at four million. The call restores frame and subframe. For overlapping or nested
 body components, a nearest surface hidden inside another component is excluded;
@@ -419,6 +386,10 @@ Mutating. Actions: `create`, `edit_bones`, `bind`, `weights`, `pose`, `keyframe`
 | `max_influences` | `transfer_weights`; strongest influences retained and normalized, default 4 |
 | `start_frame`, `end_frame`, `frame_step` | `bake`; positive fractional steps supported, at most 4096 samples |
 | `new_name`, `action_name`, `names` | `bake`; independent rig/action and optional skinned copies |
+| `skinning_mode` | `bake`; `preserve` or `linear` |
+| `constraint` | `constraint`; `type` `IK` or `LIMIT_ROTATION`; `owner_space` `WORLD`, `POSE`, `LOCAL` (default) or `LOCAL_WITH_PARENT` |
+| `strip_settings.blend_type` | `REPLACE`, `COMBINE`, `ADD`, `SUBTRACT` or `MULTIPLY` |
+| `strip_settings.extrapolation` | `NOTHING`, `HOLD` or `HOLD_FORWARD` |
 
 [Guide](../guides/rigging-and-animation.md)
 
@@ -437,6 +408,11 @@ Lease-free. Returns a PNG MCP image.
 | `orthographic` | Boolean |
 
 Eevee requires material colors and at most 1024 pixels.
+
+The result carries a PNG image block plus structured `path` and `mime_type`
+(`image/png`) fields. The receipt identifies the file written in the session
+workspace; image blocks remain available to visual clients. A perspective camera is
+placed from its effective field of view to fit the bounding sphere with a 10% margin.
 
 ## session_control
 
@@ -464,11 +440,28 @@ It takes only `name` and `lease_id`; `mesh_copy` reports whether a copy was need
 
 Mutating. Actions: `create_primitive`, `create_mesh`, `transform`, `set_color`,
 `shade`, `apply_transforms`, `set_origin`, `snap_to_grid`, `rename`,
-`add_socket`, `duplicate`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
+`add_socket`, `duplicate`, `delete`, `make_unique`, `make_single_user`, `parent`, `unparent`, `move_to_collection`,
 `shape_key_add`, `shape_key_value`, `shape_key_keyframe`, `shape_key_remove`, `keyframe`,
 `visibility`, `rigid_body`, `particles`, `hair`, `volume_to_mesh`.
 
-`rigid_body` sets ACTIVE or PASSIVE, mass, and a BOX, SPHERE or CONVEX_HULL shape. A bake requires the scene and its background scenes and collection instances to have no other point caches.
+`create_primitive` takes a `kind`: `cube`, `sphere`, `cylinder`, `cone`, `plane`,
+`torus`, `icosphere`, `grid`, `bezier_curve` or `text`. `text` uses `body` for the string.
+
+`apply_transforms` takes `components` from `location`, `rotation` and `scale`;
+the default is `rotation` and `scale`. `set_origin` takes `origin`:
+`bounds_bottom_center` (default), `bounds_center`, `world_origin` or `point`, which
+needs `location`.
+
+`delete` removes a named object. `recursive=true` includes parented descendants.
+Complete dependency checks precede removal; shared data is preserved and the
+receipt lists exactly which objects were deleted.
+
+`make_unique` takes a scene collection instance's `name`, a unique
+collection `new_name` and lease. It branches the current editable definition and
+retargets that placement, returning actual source/copy ID mappings.
+
+`rigid_body` sets `ACTIVE` or `PASSIVE` through `body`, mass, and a `BOX`, `SPHERE` or
+`CONVEX_HULL` `collision_shape`. A bake requires the scene and its background scenes and collection instances to have no other point caches.
 `frames` from 1 to 50 bakes the scene point cache and reports the world location
 at the last frame; 0 stores the body and does not bake. `particles` adds an
 emitter of 1–256 particles from faces. `hair` parents 1–32 curves of 2–8 points
@@ -478,16 +471,87 @@ volume `source`, at 8–125 voxels per axis.
 `visibility` sets `hide_viewport` (object flag and view-layer eye) and/or `hide_render`.
 
 `keyframe` keys `location`, `rotation_degrees` and `scale` of any object into a new
-`action_name` clip, 1–32 frames, with per-key `interpolation`.
+`action_name` clip, 1–32 frames, with per-key `interpolation`: `BEZIER` (default),
+`LINEAR` or `CONSTANT`.
 
 [Guide](../guides/object-editing.md)
 
 ## mesh_edit
 
-Mutating. Actions: `modifier`, `unwrap`, `decimate_to`, `remesh_quad`,
-`lod_chain`, `lightmap_uv`, `texel_density`, `collision`, `cleanup`, `boolean`,
-`join`, `separate`, `extract_faces`, `extrude_faces`, `unwrap_faces`, `set_seams`, `mirror`,
+Mutating. Actions: `modifier`, `modifier_update`, `modifier_remove`, `unwrap`,
+`decimate_to`, `remesh_quad`, `lod_chain`, `lightmap_uv`, `texel_density`, `collision`,
+`cleanup`, `boolean`, `join`, `separate`, `extract_faces`, `extrude_faces`,
+`unwrap_faces`, `set_seams`, `move_vertices`, `assign_faces`, `mirror`,
 `array`, `solidify`, `uv_transform`, `sculpt_stroke`.
+
+### Modifiers
+
+`modifier` creates a modifier of the given `kind`: `bevel`, `decimate`, `subdivision`,
+`voxel_remesh`, `weld`, `displace`, `shrinkwrap`, `weighted_normal` or `data_transfer`.
+`shrinkwrap` and `data_transfer` take their source mesh in `operand`.
+
+`mesh_edit(action="modifier_update",
+name=..., modifier_name=..., amount=..., lease_id=...)` updates an existing modifier
+in place: bevel width, collapse-decimation ratio, subdivision viewport/render
+levels, voxel size, weld distance, displace strength, shrinkwrap offset, weighted
+normal weight or data transfer mix. Other controls and stack order are retained. Percentage
+bevels and other remesh/decimation modes require their own native controls and are
+rejected by this scalar shorthand. Its subdivision levels remain 1–3 and voxel
+size 0.005–1, matching modifier creation.
+
+Alternatively, pass `modifier_settings` as an explicit property map, omitting
+`amount`. It supports exposed bevel finish controls, decimation modes, independent
+subdivision levels, remesh controls and viewport/render visibility. For example,
+`{"segments": 8, "profile": 0.7, "show_render": true}` tunes a bevel.
+Use the inspected native types and hard ranges; integers, booleans and enum
+identifiers are distinct. Unknown, read-only, nonfinite or out-of-range values
+reject the complete map before assignment. No values are silently clamped.
+Native subdivision ranges apply to this form, subject to the geometry budget;
+the shorthand's fixed level range does not apply. Angle properties use radians.
+
+Updates check a conservative 500,000-triangle bound across bevel, decimate,
+subdivision, armature, weld, displace, shrinkwrap, weighted normal and data
+transfer stacks before evaluating changed geometry. Unknown
+topology-changing modifiers cannot establish that bound. Remesh updates require
+a standalone modifier on a shape-key-free working mesh and at most two million
+bounding voxel or octree cells. Visibility-only disabling does not enlarge a
+stack and can bypass its growth estimate. A rejected update leaves the stack intact.
+
+`mesh_edit(action="modifier_remove", name=..., modifier_name=..., lease_id=...)`
+removes exactly the named modifier, including types outside scalar editing.
+Both actions operate on the object's stack and retain its base mesh, UVs,
+shape keys and vertex weights. Objects sharing that mesh keep their own stacks.
+Neither action applies a modifier or edits the base geometry.
+Animated or driven controls require animation editing instead of a static update.
+Removal rejects modifier animation and driver references to the modifier; unrelated
+object animation remains supported.
+
+### Geometry and topology
+
+`assign_faces` (`mesh_edit(action="assign_faces", name=..., material_name=..., face_indices=[...])`)
+binds existing finishes to source polygons. It reuses the first matching slot or
+appends one, retaining other slots and all UV, skin and shape-key data.
+
+`move_vertices` translates declared `vertex_indices` while retaining morph offsets.
+Its optional `amount` enables physical proportional falloff along connected source
+edges; `vertex_edit.falloff` records the metric and sampled weights.
+For a bounded proportional edit, supply `face_indices`, `amount`, and the current
+`expected_mesh_sha256`. Choose seed vertices in the selected region’s interior.
+The falloff follows selected face edges and holds shared and open-edge boundary
+vertices fixed. Use this option for a single-sided edit.
+Optional `symmetry_axis` plus `symmetry_tolerance_m` reflect displacements to
+unique reciprocal source counterparts; `vertex_edit.symmetry` reports pairing.
+
+`extrude_faces` extrudes a declared region using `face_indices`
+and a local `offset`; optional `expected_mesh_sha256` guards against stale
+geometry. See [face-region modeling](../guides/mesh-preparation.md#inspect-and-extrude-a-face-region).
+
+`boolean` takes an `operand`, an `operation` of `union`, `difference` or `intersect`,
+and a `solver` of `exact` or `fast`. `collision` takes a `shape` of `convex`, `box`
+or `sphere`. `separate` takes `by`: `loose_parts` or `materials`. `decimate_to` and
+`lod_chain` accept `preserve` `seams`; `remesh_quad` accepts `preserve` `sharp` and
+`boundary`. `cleanup` runs ordered `steps` from `merge`, `delete_loose`,
+`delete_fragments`, `recalc_normals`, `triangulate` and `clear_custom_normals`.
 
 `sculpt_stroke` sends 3–32 positions through the Draw brush in a 3D view.
 Strength is `amount` in (0, 1]. Background mode refuses before the brush runs.
@@ -500,6 +564,8 @@ scalar `offset` from -1 to 1 (default -1) to position the shell through its thic
 It copies those source polygons to an independent unrigged surface, retaining
 the world transform, materials, UVs and native mesh data without changing the
 original. Modifiers, shape keys and rigged sources are refused.
+
+### UVs
 
 `uv_transform` takes a `uv_transform` object with required source `faces` and
 optional `offset`, `scale`, `rotation_degrees`, `pivot`. `uv_layer` selects an
@@ -536,6 +602,19 @@ It updates only selected seam flags, preserving UVs and other mesh data.
 
 ## assign_material
 
+Actions: `assign`, `inspect`, `set_inputs`, `set_image`, `make_unique`, `connect`,
+`disconnect`, `node_types`, `create_node`, `set_ramp`, `set_node`. `inspect` is
+lease-free; shader edits require ownership. Inspect native shader inputs/outputs
+and shared owners before tuning defaults through nested `group_path` nodes.
+`set_image` replaces an image binding with a packed native workspace snapshot and
+explicit color/alpha interpretation: `alpha_mode` is `STRAIGHT` (default), `PREMUL`,
+`CHANNEL_PACKED` or `NONE`. Optional `image.tiles` declares an exact UDIM set for an
+`<UDIM>` filename pattern. See [authored shader controls](../guides/materials-and-uvs.md#tune-an-authored-shader-graph).
+
+`assign` accepts `instance` for internal mesh targets and `link_mode`
+(`DATA`/`OBJECT`) for slot binding. Object overrides retain shared geometry; omitted
+modes on updates preserve existing links. Definition pages report `material_slots`.
+
 `node_types` pages native node types available in the material's `group_path`.
 Pass `node_type` to inspect its `control_schema` without creating nodes.
 `create_node` requires a unique `node` name and an exact discovered `node_type`.
@@ -558,7 +637,7 @@ before creation. Read `created_node.resources.node_tree` and the node's actual
 definition is shared. Failed creation removes the node and releases its group user.
 
 To create a new definition, pass a `node_tree` object with a unique `name` and
-optional `interface` list. Each socket declares `name`, `in_out` (INPUT/OUTPUT),
+optional `interface` list. Each socket declares `name`, `in_out` (`INPUT`/`OUTPUT`),
 and native `socket_type`, with optional `description`, `default_value`,
 `min_value` and `max_value`. Blender validates the declared socket and its values;
 failed construction removes the new definition and instance. Defaults retain
@@ -609,7 +688,7 @@ flags; link discovery includes validity and mute state.
 
 `make_unique` copies the selected slots' authored material and nested node groups
 to a new `material_name`. It takes `names`, `slot` (default 0) and `link_mode`
-(default OBJECT). Image, action and scene references remain shared. Results include
+(default `OBJECT`). Image, action and scene references remain shared. Results include
 `material_copy` and actual `bindings`.
 
 Mutating. Binds a PBR material to exact mesh slots.
@@ -623,7 +702,7 @@ Mutating. Binds a PBR material to exact mesh slots.
 | `roughness_texture`, `roughness` | Non-Color map; 0–1 |
 | `metallic_texture`, `metallic` | Non-Color map; 0–1 |
 | `emission_texture`, `emission_strength` | sRGB map; strength 0–1000 |
-| `alpha_texture`, `alpha_mode` | Non-Color map; opaque, clip or blend |
+| `alpha_texture`, `alpha_mode` | Non-Color map; `opaque`, `clip` or `blend` |
 | `occlusion_texture` | Non-Color map; red channel is ambient occlusion |
 | `orm_texture` | Non-Color map; occlusion, roughness, metallic in R, G, B |
 | `height_texture`, `height_scale` | Non-Color map; range 0–10 m, default 0.1 |
@@ -636,9 +715,11 @@ Mutating. Binds a PBR material to exact mesh slots.
 ## bake
 
 Mutating. Bakes geometry maps or high-poly vertex colors into a new PNG or an
-explicit numeric/color/vector shader socket into PNG/EXR. `vertex_color` and
+explicit numeric/color/vector shader socket into PNG/EXR. `map` is `normal`, `ao`,
+`curvature`, `lightmap`, `vertex_color`, `vertex_orm` or `shader`; `normal_space` is
+`tangent` or `object`. `vertex_color` and
 `vertex_orm` (glTF `COLOR_1` occlusion, roughness, metallic) need `high`. `source` selects the material, nested group path,
-node, socket identifier, INPUT/OUTPUT direction and data/color role. PNG defaults
+node, socket identifier, `INPUT`/`OUTPUT` direction and `data`/`color` role. PNG defaults
 to 16-bit; shader EXR to 32-bit. Shader bakes preserve the actor and shader UVs
 while rasterizing the chosen 0..1 atlas. Signed/HDR channels require EXR.
 Returns precision, color space, file hash and channel metadata. Requires an updated bridge.
@@ -647,14 +728,15 @@ Returns precision, color space, file hash and channel metadata. Requires an upda
 
 ## asset_io
 
-Actions: `import`, `export`, `save`, `generate`. Import, export and save require
+Actions: `import`, `export`, `save`, `generate`, `open`. Import, export, save and open require
 a lease. GLB import accepts an optional `expected_sha256` and rejects a source
 whose bytes differ from that hash before editing the scene. Import and static
 export also cover OBJ, STL, PLY, Alembic and OpenVDB. A `.vdb` import creates one
 volume object from a workspace file of at most 32 MiB and refuses any other
 bytes or a file with no grids. Export supports animated
 FBX, GLB and USD output and FBX and USD
-texture sidecars with `textures=true`. With `animations=true`, `deform_only=true`
+texture sidecars with `textures=true`. Export `axis` is `unity` (default), `unreal`
+or `godot`. With `animations=true`, `deform_only=true`
 writes deform bones only (FBX and USD keep their non-deform ancestors).
 `triangulate=true` triangulates temporary FBX exporter meshes; it defaults to
 false and is unavailable for other formats or bake pairs.
@@ -674,6 +756,20 @@ wrapping 2048×1024 panorama PNG for `scene_edit` `world.hdri`.
 ## review_sheet
 
 Lease-free. Returns one PNG contact sheet.
+
+| Parameter | Values |
+| --- | --- |
+| `path` | New workspace `.png` |
+| `names` | Optional 1–1000 objects |
+| `views` | 1–6 of `front`, `back`, `left`, `right`, `top`, `persp` |
+| `mode` | `shaded` (default), `wireframe`, `uv_checker`, `texel_heatmap`, `matcap` |
+| `resolution` | Sheet width 256–2048, default 1024 |
+| `target_px_per_m` | `texel_heatmap`; default 512 |
+| `texture_resolution`, `uv_layer` | Pixels or `[width, height]`; UV map |
+
+The result carries a PNG image block plus structured `path` and `mime_type`
+(`image/png`) fields. The `persp` view is placed from the camera's effective field of
+view to fit the bounding sphere with a 10% margin; orthographic views are unchanged.
 
 [Guide](../guides/previews-and-review.md)
 
@@ -719,11 +815,12 @@ authorizes an automatic mutation retry. Unexpected defects remain opaque.
 Authors persistent scene definitions under an edit lease. Supply exactly the
 model matching `action`: `camera`, `light`, `world`, `render` or `compositor`.
 
-- `camera`: named camera, location/target, perspective or orthographic projection,
+- `camera`: named camera, location/target, `perspective` or `orthographic` projection,
   focal length, sensor width, clip range, lens shift, depth of field, focus distance
   and f-stop. Existing camera names update in place; shared camera data is copied.
-- `light`: named area, point, sun or spot light, location/target, energy, RGB color,
-  area shape/size, radius, sun angle or spot cone/blend. Existing lights update in place.
+- `light`: named `AREA`, `POINT`, `SUN` or `SPOT` light, location/target, energy, RGB color,
+  area shape (`SQUARE`, `RECTANGLE`, `DISK` or `ELLIPSE`)/size, radius, sun angle or
+  spot cone/blend. Existing lights update in place.
 - `world`: new managed color/HDRI node graph, strength and rotation. Workspace EXR,
   HDR, PNG, TIFF or JPEG inputs are hashed and packed into the editable project.
   Subsequent calls update that managed graph; an unrelated authored graph is preserved.
@@ -731,10 +828,11 @@ model matching `action`: `camera`, `light`, `world`, `render` or `compositor`.
   compositor group when needed. `link` connects named sockets. The graph is
   limited to 64 nodes and 128 links. This uses Blender 5.3
   `scene.compositing_node_group`.
-- `render`: renders the actual scene through the exact named camera, using Cycles
-  or Eevee. The definition includes independent width/height, sample count, film
+- `render`: renders the actual scene through the exact named camera, using `cycles`
+  or `eevee`. The definition includes independent width/height, sample count, film
   transparency, color management, precision, thread count and pixel budget. Settings
   persist with the project. `scene_info(name=...)` reads camera/light definitions.
+  `file_format` is `png` (default), `exr` or `tiff`.
 
 Production PNG/TIFF default to 16-bit; EXR supports half or full float through
 `bit_depth="16"` or `"32"`. Explicit 8-bit PNG/TIFF remain available. Output paths
@@ -751,7 +849,7 @@ sequences need `cycles_time_limit` above 0 and at most 600 seconds across all
 frames. The result lists each frame's path, bytes and SHA-256; `path` is the
 first frame and `bytes` the total.
 
-Cycles defaults to CPU. `device="GPU"` uses the app's configured enabled Cycles
+Cycles defaults to `CPU`. `device="GPU"` uses the app's configured enabled Cycles
 devices and refuses an unavailable GPU instead of silently falling back. Eevee uses
 its native GPU renderer. Existing `render_preview` remains a separate temporary
 preview operation with its original budgets.

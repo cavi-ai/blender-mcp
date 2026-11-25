@@ -19,6 +19,10 @@ image.
 | `orthographic` | Use an orthographic camera |
 | `settings` | Optional temporary display controls and PNG precision |
 
+A perspective camera is placed from its effective field of view (sensor fit and
+render aspect) so the bounding sphere of the previewed meshes fits the frame with a
+10% margin, so small assets fill the frame. Orthographic framing is unchanged.
+
 Workbench checks shape. Eevee checks materials under temporary studio lighting
 at up to 1024 pixels and requires material colors.
 
@@ -44,7 +48,9 @@ preview settings apply only while the image is rendered.
 `review_sheet` renders up to six views into one contact sheet exactly
 `resolution` pixels wide.
 
-Views: `front`, `back`, `left`, `right`, `top` and `persp`.
+Views: `front`, `back`, `left`, `right`, `top` and `persp`. The `persp` view
+uses the same field-of-view fit as `render_preview` with a 10% margin around the
+bounding sphere; orthographic views are unchanged.
 
 Modes:
 

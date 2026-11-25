@@ -209,5 +209,36 @@ class DocumentationTests(unittest.TestCase):
                 )
 
 
+def schema_strings(node, found):
+    if isinstance(node, dict):
+        for key in ("enum", "const"):
+            value = node.get(key)
+            for item in value if isinstance(value, list) else [value]:
+                if isinstance(item, str):
+                    found.add(item)
+        for value in node.values():
+            schema_strings(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            schema_strings(value, found)
+
+
+class ToolReferenceTests(unittest.TestCase):
+    def test_reference_names_every_schema_enum_value(self):
+        found = set()
+        for tool in asyncio.run(server.mcp.list_tools()):
+            schema_strings(tool.input_schema, found)
+        # Numeric strings are sample counts and axis letters are single-character tokens.
+        found = {v for v in found if not v.isdigit() and v not in {"X", "Y", "Z"}}
+        reference = (PAGES / "reference" / "tools.md").read_text()
+        spans = "\n".join(re.findall(r"`([^`\n]+)`", reference))
+        missing = [
+            v for v in found
+            if not re.search(rf"(?<![\w-]){re.escape(v)}(?![\w-])", spans)
+        ]
+        self.maxDiff = None
+        self.assertEqual(sorted(missing), [])
+
+
 if __name__ == "__main__":
     unittest.main()
