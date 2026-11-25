@@ -24,6 +24,7 @@ parser.add_argument("--max-faces", type=int, required=True)
 parser.add_argument("--denoiser-cache", choices=("off", "adaptive"), default="off")
 parser.add_argument("--view", action="append", default=[])
 parser.add_argument("--guide")
+parser.add_argument("--bbox", type=float, nargs=3)
 parser.add_argument("--timeout", type=int, required=True)
 parser.add_argument("--json", action="store_true", required=True)
 arguments = parser.parse_args()
@@ -64,6 +65,7 @@ valid = (
     and all(trellis and framed(view) for view in arguments.view)
     and (arguments.guide is None or (trellis and Path(arguments.guide).suffix == ".glb"
                                      and Path(arguments.guide).is_file()))
+    and (arguments.bbox is None or (trellis and arguments.guide is None))
     and out.suffix == ".glb"
     and not out.exists()
     and out.parent.is_dir()
@@ -118,5 +120,6 @@ data = {
 if trellis and mode != "unflagged":
     data["vertex_colors"] = mode != "uncolored"
 if trellis:
-    data.update(views=1 + len(arguments.view), guided=arguments.guide is not None)
+    data.update(views=1 + len(arguments.view), guided=arguments.guide is not None,
+                bbox=None if mode == "unboxed" else arguments.bbox)
 reply("ok", data)

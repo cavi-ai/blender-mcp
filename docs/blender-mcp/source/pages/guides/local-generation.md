@@ -163,6 +163,11 @@ the generated mesh is written in the guide's own position and size. Other
 providers refuse both. The result adds `views`, `guided`, `view_sha256` and,
 with a guide, `guide_sha256`.
 
+`trellis2-mlx` also takes `bbox`, the X, Y and Z sizes with Z up. The sampled
+coarse shape is fitted to those proportions and the mesh bounds to those sizes,
+centered on the origin. Sides may differ by at most 16 times, and `bbox` cannot
+be combined with `guide`. The result adds `bbox`.
+
 To texture an existing mesh, export it with `asset_io` `action="export"` as a
 GLB, generate with that file as `guide`, import the result and run `bake` with
 `map="vertex_color"` (and `map="vertex_orm"` when the model writes `COLOR_1`)

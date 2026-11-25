@@ -43,10 +43,10 @@ def route_asset(action, path, values, *, lease_id, pick):
         return AssetRoute('panorama', 'panorama', {}, (params['prompt'], path, params['quality']))
     if action == 'generate':
         params = pick(action, values, ['image'], {'resolution': None, 'quality': None, 'views': None,
-                                                  'guide': None})
+                                                  'guide': None, 'bbox': None})
         return AssetRoute('generate', 'generate', {}, (
             params['image'], path, params['resolution'], params['quality'], params['views'],
-            params['guide']))
+            params['guide'], params['bbox']))
     if action == 'import':
         suffix = Path(path).suffix.lower()
         operation = {'.fbx': 'import_fbx', '.obj': 'import_obj',

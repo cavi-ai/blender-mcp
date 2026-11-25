@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- `asset_io` `action="generate"` takes a TRELLIS.2 `bbox` that fits the generated shape and bounds to X, Y and Z sizes.
+
 ### Changed
 
 - The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.

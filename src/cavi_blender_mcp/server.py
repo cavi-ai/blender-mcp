@@ -1302,6 +1302,7 @@ async def asset_io(
     quality: Annotated[Literal["fast", "default"] | None, Field(description='generate: MLX speed tier')] = None,
     views: Annotated[list[str] | None, Field(max_length=5, description="generate: TRELLIS.2 more views")] = None,
     guide: Annotated[str | None, Field(description="generate: TRELLIS.2 shape GLB")] = None,
+    bbox: Annotated[Vector3 | None, Field(description="generate: TRELLIS.2 XYZ size")] = None,
     lods: Annotated[StrictBool | None, Field(description="export: generated LODs")] = None,
     collision: Annotated[StrictBool | None, Field(description="export: collision proxies")] = None,
     animations: Annotated[StrictBool | None, Field(description="export: animation")] = None,
@@ -1320,7 +1321,7 @@ async def asset_io(
     """Import/export/save/open. Open needs clean source, no file UI/scripts. Only generate is lease-free."""
     values = {"name": name, "names": names, "preserve_instances": preserve_instances,
               "include_empties": include_empties, "image": image, "prompt": prompt, "resolution": resolution,
-              "quality": quality, "views": views, "guide": guide,
+              "quality": quality, "views": views, "guide": guide, "bbox": bbox,
               "lods": lods, "collision": collision, "animations": animations,
               "textures": textures, "bake_pair": bake_pair, "axis": axis,
               "baked_animation": baked_animation, "animation_sample_step": animation_sample_step,
