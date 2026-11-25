@@ -7,6 +7,14 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Changed
+
+- The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.
+
+### Fixed
+
+- The `inspect_mesh_quality` `checks` description states that an omitted or empty list runs no checks.
+
 ## 0.60.0 - 2026-11-21
 
 ### Added

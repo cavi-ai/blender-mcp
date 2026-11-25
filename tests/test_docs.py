@@ -209,5 +209,40 @@ class DocumentationTests(unittest.TestCase):
                 )
 
 
+def schema_strings(node, found):
+    if isinstance(node, dict):
+        for key in ("enum", "const"):
+            value = node.get(key)
+            for item in value if isinstance(value, list) else [value]:
+                if isinstance(item, str):
+                    found.add(item)
+        for value in node.values():
+            schema_strings(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            schema_strings(value, found)
+
+
+class ToolReferenceTests(unittest.TestCase):
+    def test_reference_names_every_schema_enum_value(self):
+        reference = (PAGES / "reference" / "tools.md").read_text()
+        sections = dict(re.findall(
+            r"^## ([a-z_]+)\n(.*?)(?=^## |\Z)", reference, re.MULTILINE | re.DOTALL
+        ))
+        missing = {}
+        for tool in asyncio.run(server.mcp.list_tools()):
+            values = set()
+            schema_strings(tool.input_schema, values)
+            spans = "\n".join(re.findall(r"`([^`\n]+)`", sections.get(tool.name, "")))
+            undocumented = [
+                value for value in sorted(values)
+                if not re.search(rf"(?<![\w-]){re.escape(value)}(?![\w-])", spans)
+            ]
+            if undocumented:
+                missing[tool.name] = undocumented
+        self.maxDiff = None
+        self.assertEqual(missing, {})
+
+
 if __name__ == "__main__":
     unittest.main()
