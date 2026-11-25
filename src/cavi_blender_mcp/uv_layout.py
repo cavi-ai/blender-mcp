@@ -67,7 +67,10 @@ def _area(poly):
 def triangle_intersection_area(a, b):
     """Sutherland-Hodgman clipping of two triangles, independent of winding."""
     poly = list(a)
-    sign = 1 if _cross(b[1] - b[0], b[2] - b[0]) > 0 else -1
+    orientation = _cross(b[1] - b[0], b[2] - b[0])
+    if orientation == 0:
+        return 0.  # A zero-area clip triangle has no interior to intersect.
+    sign = 1 if orientation > 0 else -1
     for i in range(3):
         if not poly:
             break

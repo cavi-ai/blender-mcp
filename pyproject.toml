@@ -38,7 +38,7 @@ Changelog = "https://github.com/cavi-ai/blender-mcp/blob/main/CHANGELOG.md"
 cavi-blender-mcp = "cavi_blender_mcp.server:main"
 
 [dependency-groups]
-dev = ["numpy>=2,<3", "pillow>=13,<14", "ruff>=0.14,<1"]
+dev = ["numpy>=2,<3", "pillow>=13,<14", "ruff>=0.14,<1", "scipy>=1.18,<2"]
 
 # The version comes from the git tag: vX.Y.Z builds X.Y.Z, later commits X.Y.(Z+1).devN+g<sha>.
 [tool.hatch.version]
