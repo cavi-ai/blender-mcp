@@ -9,15 +9,20 @@ adds its lines under Unreleased and never edits a version.
 
 ### Added
 
+- `inspect_mesh_quality` `topology` reports inconsistent winding edges, coincident vertex pairs, sliver triangles and self-intersecting face pairs with up to 32 examples each, and marks budget-limited searches incomplete.
+- `inspect_skin_clearance` with `include_worst_support` reports up to 16 `ambiguity_examples` per garment, with the probe, nearest body triangle and causes of each unresolved classification.
 - `asset_io` `action="generate"` takes a TRELLIS.2 `bbox` that fits the generated shape and bounds to X, Y and Z sizes.
 
 ### Changed
 
 - The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.
+- `scene_info` spatial distance proofs compute triangle distances in numpy batches.
 
 ### Fixed
 
 - The `inspect_mesh_quality` `checks` description states that an omitted or empty list runs no checks.
+- Perspective previews in `render_preview` and `review_sheet` frame the bounding sphere from the camera's effective field of view, so small assets fill the frame.
+- Zero-area clip triangles report zero UV intersection area.
 
 ## 0.60.0 - 2026-11-21
 

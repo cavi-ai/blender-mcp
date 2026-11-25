@@ -2,23 +2,61 @@
 
 import json
 import math
+from itertools import combinations_with_replacement
 
 import bpy
 import numpy as np
 
+from .blender_spatial import tree as triangle_tree
 from .mapping import measure_triangle, summarize
+from .mesh_topology import report as topology_defects
 from .naming import lint, rules
+from .spatial_query import chunks, intersects
 from .uv_layout import measured_overlap
 
 MAX_TRIANGLES = 100000
 MAX_VERTICES = 100000
+MAX_SELF_INTERSECTION_PAIR_TESTS = 64_000_000
+MAX_SELF_INTERSECTION_CANDIDATES = 1_000_000
 CHECKS = {"naming", "topology", "lightmap", "transforms", "origin", "materials"}
 MATERIAL_INPUTS = {"Base Color": "sRGB", "Emission Color": "sRGB", "Normal": "Non-Color",
                    "Roughness": "Non-Color", "Metallic": "Non-Color", "Alpha": "Non-Color"}
 CONFIG_TAG = "cavi_material_config"
 
 
-def topology(mesh):
+def _self_overlap_candidates(corners):
+    """Collect triangle indices from bounded native queries, or None on budget exhaustion."""
+    if len(corners) < 2:
+        return []
+    source = corners.tolist()
+    pairs = []
+    work = count = 0
+    # Leaves contain at most 128 triangles, so a single overlap call cannot allocate
+    # more than 128 squared pairs. Charge the potential work even if it returns no pairs.
+    for left, right in combinations_with_replacement(chunks(source), 2):
+        if not intersects(left["bounds"], right["bounds"]):
+            continue
+        work += len(left["indices"]) * len(right["indices"])
+        if work > MAX_SELF_INTERSECTION_PAIR_TESTS:
+            return None
+        for leaf in (left, right):
+            if "tree" not in leaf:
+                leaf["tree"] = triangle_tree([source[i] for i in leaf["indices"]])
+        overlap = np.asarray(left["tree"].overlap(right["tree"]), np.int64).reshape(-1, 2)
+        if left is right:
+            distinct = overlap[overlap[:, 0] != overlap[:, 1]]
+            overlap = np.unique(np.sort(distinct, axis=1), axis=0)
+        count += len(overlap)
+        if count > MAX_SELF_INTERSECTION_CANDIDATES:
+            return None
+        if len(overlap):
+            pairs.append(np.stack([np.asarray(left["indices"])[overlap[:, 0]],
+                                   np.asarray(right["indices"])[overlap[:, 1]]], axis=1))
+    return np.concatenate(pairs) if pairs else []
+
+
+def topology(value, unit_scale):
+    mesh = value.data
     edge_faces = np.zeros(len(mesh.edges), np.int64)
     loop_edges = np.empty(len(mesh.loops), np.int64)
     mesh.loops.foreach_get("edge_index", loop_edges)
@@ -31,11 +69,28 @@ def topology(mesh):
     mesh.polygons.foreach_get("loop_total", totals)
     areas = np.empty(len(mesh.polygons), np.float64)
     mesh.polygons.foreach_get("area", areas)
+    zero_area = areas <= 1e-12
+    # Distances and angles use metres after object rotation/scale; translation changes neither.
+    coordinates = np.empty(len(mesh.vertices) * 3, np.float64)
+    mesh.vertices.foreach_get("co", coordinates)
+    linear = np.array(value.matrix_world.to_3x3(), np.float64)
+    points = coordinates.reshape(-1, 3) @ linear.T * unit_scale
+    loop_vertices = np.empty(len(mesh.loops), np.int64)
+    mesh.loops.foreach_get("vertex_index", loop_vertices)
+    starts = np.empty(len(mesh.polygons), np.int64)
+    mesh.polygons.foreach_get("loop_start", starts)
+    triangles = np.empty(len(mesh.loop_triangles) * 3, np.int64)
+    mesh.loop_triangles.foreach_get("vertices", triangles)
+    triangle_faces = np.empty(len(mesh.loop_triangles), np.int64)
+    mesh.loop_triangles.foreach_get("polygon_index", triangle_faces)
+    candidates = _self_overlap_candidates(points[triangles.reshape(-1, 3)])
     return {"non_manifold_edges": int(((edge_faces == 0) | (edge_faces > 2)).sum()),
             "boundary_edges": int((edge_faces == 1).sum()),
             "loose_vertices": int((~used).sum()),
-            "zero_area_faces": int((areas <= 1e-12).sum()),
-            "ngons": int((totals > 4).sum())}
+            "zero_area_faces": int(zero_area.sum()),
+            "ngons": int((totals > 4).sum()),
+            **topology_defects(points, loop_vertices, loop_edges, starts, totals, len(mesh.edges),
+                               triangles, triangle_faces, zero_area, candidates)}
 
 
 def transforms(value):
@@ -191,7 +246,7 @@ def material_report(value):
     return slots
 
 
-def run_checks(value, layer_name, requested, naming, lightmap_resolution):
+def run_checks(value, layer_name, requested, naming, lightmap_resolution, unit_scale):
     mesh = value.data
     report = {}
     if "naming" in requested:
@@ -203,7 +258,7 @@ def run_checks(value, layer_name, requested, naming, lightmap_resolution):
             result["issues"].append("collision_without_mesh")
         report["naming"] = result
     if "topology" in requested:
-        report["topology"] = topology(mesh)
+        report["topology"] = topology(value, unit_scale)
     if "lightmap" in requested:
         layer = mesh.uv_layers.get(layer_name)
         entry = {"uv_layer": layer_name, "present": layer is not None}
@@ -347,7 +402,8 @@ def inspect(params, find_object):
                 "mapping": summarize(samples),
                 "surfaces": bound_surfaces,
                 **({"checks": run_checks(value, lightmap_layer, selected_checks, naming,
-                                         lightmap_resolution)} if selected_checks else {}),
+                                         lightmap_resolution, unit_scale)}
+                   if selected_checks else {}),
             }
         )
     return {
@@ -364,5 +420,7 @@ def inspect(params, find_object):
         "unique_materials": len(materials),
         "images": list(images.values()),
         "not_checked": ["UV overlaps" if "lightmap" not in selected_checks else "texture UV overlaps",
-                        "seam continuity", "shader appearance"],
+                        "seam continuity", "shader appearance",
+                        *(["coplanar face overlaps", "crossings between faces sharing a vertex"]
+                          if "topology" in selected_checks else [])],
     }
