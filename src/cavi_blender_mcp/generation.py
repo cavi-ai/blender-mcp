@@ -58,6 +58,11 @@ PROVIDERS = {
 QUALITIES = ("fast", "default")
 IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_VIEWS = 5
+# mlx-agent keeps the smallest bbox side at least two voxels of TRELLIS.2's 32³ sparse structure.
+MAX_BOX_RATIO = 16
+# The provider writes bbox endpoints at ±half the side length as float32 GLB positions.
+MIN_BOX_SIZE = 2.0 ** -148
+MAX_BOX_SIZE = float.fromhex("0x1.fffffep+128")
 
 
 def envelope_error(result):
@@ -87,7 +92,8 @@ def run(command, env, timeout, deadline, describe=None):
     return result
 
 
-def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality, views=(), guide=None):
+def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality, views=(), guide=None,
+             bbox=None):
     """Frame the images for the model, then run the mlx-agent mesh command."""
     framed = generated.with_name("framed.png")
     frame = Path(__file__).with_name(settings["frame"])
@@ -99,6 +105,8 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         extra += ["--view", str(framed_view)]
     if guide is not None:
         extra += ["--guide", str(guide)]
+    if bbox is not None:
+        extra += ["--bbox", *(str(size) for size in bbox)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
     max_faces = settings.get("fast_max_faces", MLX_MAX_FACES) if quality == "fast" else MLX_MAX_FACES
@@ -152,6 +160,10 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
                 raise ValueError("views")
             if guide is not None:
                 report["guide_sha256"] = hashlib.sha256(guide.read_bytes()).hexdigest()
+        if bbox is not None:
+            report["bbox"] = data["bbox"]
+            if report["bbox"] != bbox:
+                raise ValueError("bbox")
     except (ValueError, KeyError, TypeError) as exc:
         raise RuntimeError("mlx-agent returned no usable mesh result") from exc
     if type(report["faces"]) is not int or not 0 < report["faces"] <= max_faces:
@@ -170,7 +182,7 @@ def inside(workspace, relative, suffixes, limit, message):
     return resolved
 
 
-def generate(workspace, image, path, resolution=None, quality=None, views=None, guide=None):
+def generate(workspace, image, path, resolution=None, quality=None, views=None, guide=None, bbox=None):
     provider = os.environ.get("CAVI_GENERATION_PROVIDER", "triposr")
     if provider not in PROVIDERS:
         raise ValueError(
@@ -186,8 +198,17 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
     source = inside(workspace, image, IMAGES, 16 * 1024 * 1024,
                     "Input image must be a workspace PNG, JPEG or WebP image of at most 16 MiB")
     views = list(views or ())
-    if (views or guide is not None) and not settings.get("guides"):
-        raise ValueError("Views and guides apply only to the trellis2-mlx provider")
+    if (views or guide is not None or bbox is not None) and not settings.get("guides"):
+        raise ValueError("Views, guides and bbox apply only to the trellis2-mlx provider")
+    if bbox is not None:
+        if (guide is not None or not isinstance(bbox, (list, tuple)) or len(bbox) != 3
+                or any(type(size) not in (int, float) or not MIN_BOX_SIZE <= size <= MAX_BOX_SIZE for size in bbox)
+                or max(bbox) > MAX_BOX_RATIO * min(bbox)):
+            raise ValueError(
+                f"bbox takes three sizes with half-widths in the positive float32 range, "
+                f"at most {MAX_BOX_RATIO} times apart, and no guide"
+            )
+        bbox = [float(size) for size in bbox]
     if len(views) > MAX_VIEWS:
         raise ValueError(f"Provide at most {MAX_VIEWS} views")
     views = [inside(workspace, view, IMAGES, 16 * 1024 * 1024,
@@ -225,7 +246,7 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
         generated = Path(temporary) / "mesh.glb"
         if "frame" in settings:
             report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality,
-                              views, guide)
+                              views, guide, bbox)
         else:
             command = [
                 configured["PYTHON"],

@@ -11,6 +11,7 @@ adds its lines under Unreleased and never edits a version.
 
 - `inspect_mesh_quality` `topology` reports inconsistent winding edges, coincident vertex pairs, sliver triangles and self-intersecting face pairs with up to 32 examples each, and marks budget-limited searches incomplete.
 - `inspect_skin_clearance` with `include_worst_support` reports up to 16 `ambiguity_examples` per garment, with the probe, nearest body triangle and causes of each unresolved classification.
+- `asset_io` `action="generate"` takes a TRELLIS.2 `bbox` that fits the generated shape and bounds to X, Y and Z sizes.
 
 ### Changed
 

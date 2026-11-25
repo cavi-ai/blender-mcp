@@ -32,7 +32,8 @@ class GenerationTests(unittest.TestCase):
             ):
                 result = asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png"))
             self.assertEqual(result, report)
-            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None, None, None, None)
+            native.assert_called_once_with(workspace.resolve(), "input.png", "mesh.glb", None, None, None, None,
+                                           None)
 
     def test_server_generation_defaults_to_runtime_workspace_without_a_bridge(self):
         with (
@@ -42,7 +43,7 @@ class GenerationTests(unittest.TestCase):
         ):
             asyncio.run(server.asset_io("generate", "mesh.glb", image="input.png", resolution=96))
         native.assert_called_once_with((Path.home() / "Documents/CaviBlender").resolve(),
-                                       "input.png", "mesh.glb", 96, None, None, None)
+                                       "input.png", "mesh.glb", 96, None, None, None, None)
 
     def configured(self, work):
         return patch.dict(
@@ -412,7 +413,7 @@ class TripoSGMlxTests(unittest.TestCase):
         if generation.PROVIDERS[self.provider].get("guides"):
             self.skipTest("this provider accepts views and guides")
         (self.work / "guide.glb").write_bytes(b"glTF")
-        for options in ({"views": ["input.png"]}, {"guide": "guide.glb"}):
+        for options in ({"views": ["input.png"]}, {"guide": "guide.glb"}, {"bbox": (1, 1, 1)}):
             with (
                 self.subTest(options=options),
                 patch.dict(os.environ, self.settings("ok")),
@@ -485,6 +486,37 @@ class Trellis2MlxTests(TripoSGMlxTests):
         self.assertEqual(report["view_sha256"], [hashlib.sha256((self.work / "side.png").read_bytes()).hexdigest()])
         self.assertEqual(report["guide_sha256"], hashlib.sha256(b"glTF guide").hexdigest())
         self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def boxed(self, mode="ok", **options):
+        with patch.dict(os.environ, self.settings(mode)):
+            return generate(self.work, "input.png", "mesh.glb", **options)
+
+    def test_a_bbox_reaches_the_agent_and_is_reported(self):
+        self.assertEqual(self.boxed(bbox=(0.6, 0.6, 1.2))["bbox"], [0.6, 0.6, 1.2])
+        self.assertTrue((self.work / "mesh.glb").is_file())
+        (self.work / "mesh.glb").unlink()
+        with self.assertRaisesRegex(RuntimeError, "no usable mesh result"):
+            self.boxed("unboxed", bbox=(0.6, 0.6, 1.2))
+        self.assert_nothing_published()
+
+    def test_a_bbox_outside_the_contract_is_refused_before_the_agent(self):
+        (self.work / "guide.glb").write_bytes(b"glTF guide")
+        for options in ({"bbox": (1, 1)}, {"bbox": (1, 0, 1)}, {"bbox": (1, 1, 17)}, {"bbox": (True, 1, 1)},
+                        {"bbox": (1, float("nan"), 1)}, {"bbox": (1, 1, 1), "guide": "guide.glb"}):
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, "bbox takes"):
+                self.boxed(**options)
+            self.assert_nothing_published()
+        self.assertFalse((self.record / "image.png").exists())
+
+    def test_a_bbox_outside_the_glb_position_range_is_refused_before_the_agent(self):
+        with patch.dict(os.environ, self.settings("ok")):
+            for size in (1e-50, 1e40):
+                path = f"mesh-{size}.glb"
+                with self.subTest(size=size):
+                    with self.assertRaisesRegex(ValueError, "bbox.*float32"):
+                        generate(self.work, "input.png", path, bbox=(size, size, size))
+                    self.assertFalse((self.work / path).exists())
+                    self.assertFalse((self.record / "image.png").exists())
 
     def test_views_and_guides_outside_the_contract_are_refused_before_the_agent(self):
         for options, message in (
