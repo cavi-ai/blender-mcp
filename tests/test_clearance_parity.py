@@ -73,6 +73,20 @@ class ClearanceParityTests(unittest.TestCase):
             with self.subTest(hits=hits):
                 self.assertIsNone(self.classify(TraceTree([hits, [], []]))[0])
 
+    def test_reason_sink_preserves_results_and_query_counts(self):
+        cases = [([[(9, self.kernel.EPSILON/8)], [], []], 'ray_hit_too_close'),
+                 ([[(9, .1)], [], []], 'ray_parity_disagreement')]
+        for rays, expected in cases:
+            reasons, budget = set(), self.kernel.Budget(100)
+            tree = TraceTree(rays)
+            point = self.kernel.DIRECTIONS[0].copy() * 0
+            result = self.kernel.inside_component(point, (tree, np.full(3, -1.), np.ones(3)), budget, reasons)
+            plain, plain_budget = self.classify(TraceTree(rays))
+            self.assertIsNone(result)
+            self.assertIs(result, plain)
+            self.assertEqual(budget.used, plain_budget.used)
+            self.assertEqual(reasons, {expected})
+
     def test_repeated_facet_exhaustion_keeps_the_query_limit(self):
         class EndlessTree:
             calls = 0
@@ -99,5 +113,9 @@ class ClearanceParityTests(unittest.TestCase):
                 return self.hit, None, 9, .01 if self.calls == 1 else 0.
 
         tree = StalledTree()
-        self.assertIsNone(self.classify(tree)[0])
+        reasons = set()
+        budget = self.kernel.Budget(100)
+        point = self.kernel.DIRECTIONS[0].copy() * 0
+        self.assertIsNone(self.kernel.inside_component(point, (tree, np.full(3, -1.), np.ones(3)), budget, reasons))
+        self.assertEqual(reasons, {'ray_no_progress'})
         self.assertEqual(tree.calls, 2)

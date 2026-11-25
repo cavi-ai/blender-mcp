@@ -314,6 +314,12 @@ regional worst probes. Triangle indices use the evaluated body tessellation at `
 points use world scene coordinates. Multiply their distance by `scene_unit_meters`
 to compare it with the magnitude of the signed gap. The witness is
 null when no signed probe was classified.
+The same option adds up to 16 `ambiguity_examples` per garment, with probe
+identity, unsigned distance in metres, nearest body triangle and world points,
+and the causes of ambiguity. An unresolved union boundary is reported in the
+example as `union_boundary_unresolved`. Region IDs are included when requested.
+Ambiguous probes have no signed gap. An older bridge may omit
+`ambiguity_examples`; refresh it to obtain these details.
 
 Optionally set `region_attribute` to the name of an evaluated FACE-domain INT
 attribute present on every garment. Each garment then reports `regions` with
