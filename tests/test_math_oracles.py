@@ -1,6 +1,7 @@
 """Pure math modules checked against independent scipy and numpy oracles."""
 import math
 import unittest
+from fractions import Fraction
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -673,22 +674,44 @@ class BarycentricAndGeometryOracle(unittest.TestCase):
 class UdimCoverageOracle(unittest.TestCase):
     @staticmethod
     def oracle_tiles(triangle):
-        tiles = set()
+        """Find positive-area intersections by exact projections on edge normals."""
+        points = [(Fraction(float(u)), Fraction(float(v))) for u, v in triangle]
+        (au, av), (bu, bv), (cu, cv) = points
+        if (bu - au) * (cv - av) == (bv - av) * (cu - au):
+            return []
+
+        axes = [(1, 0), (0, 1)]
+        for (u0, v0), (u1, v1) in zip(points, points[1:] + points[:1]):
+            axes.append((v0 - v1, u1 - u0))
+        projections = []
+        for du, dv in axes:
+            projected = [du * u + dv * v for u, v in points]
+            projections.append((du, dv, min(projected), max(projected)))
+
+        tiles = []
         for v in range(4):
             for u in range(10):
-                cell = [(u, v), (u + 1, v), (u + 1, v + 1), (u, v + 1)]
-                if convex_intersection_area(triangle, cell) > 0:
-                    tiles.add(1001 + u + 10 * v)
-        return sorted(tiles)
+                for du, dv, triangle_min, triangle_max in projections:
+                    origin = du * u + dv * v
+                    tile_min = origin + min(0, du) + min(0, dv)
+                    tile_max = origin + max(0, du) + max(0, dv)
+                    # Require strict overlap so edge and vertex contact contribute no area.
+                    if triangle_max <= tile_min or tile_max <= triangle_min:
+                        break
+                else:
+                    tiles.append(1001 + u + 10 * v)
+        return tiles
 
     def test_hand_built_required_tiles(self):
         cases = [
             ([[0.2, 0.2], [0.8, 0.2], [0.2, 0.8]], [1001]),
             ([[0.5, 0.2], [1.5, 0.2], [0.5, 0.8]], [1001, 1002]),
+            ([[0.25, 0.25], [1.0000000005, 0.25], [1.0000000005, 0.75]], [1001, 1002]),
             ([[0.2, 0.2], [1.0, 0.5], [0.2, 0.8]], [1001]),
             ([[1.0, 0.1], [1.0, 0.9], [0.3, 0.5]], [1001]),
             ([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], [1001]),
-            ([[0.2, 0.2], [1.8, 0.2], [0.2, 1.8]], [1001, 1002, 1011]),
+            # Use exactly representable coordinates for contact at the tile corner (1, 1).
+            ([[0.25, 0.25], [1.75, 0.25], [0.25, 1.75]], [1001, 1002, 1011]),
             ([[1.0, 1.0], [1.5, 1.2], [1.2, 1.6]], [1012]),
             ([[0.5, 1.5], [3.5, 1.5], [2.0, 2.5]], [1011, 1012, 1013, 1014, 1022, 1023]),
             ([[9.2, 0.2], [9.8, 0.2], [9.5, 0.8]], [1010]),
@@ -702,7 +725,7 @@ class UdimCoverageOracle(unittest.TestCase):
                 self.assertEqual(result['required_tiles'], expected)
                 self.assertTrue(result['passed'])
 
-    def test_random_triangles_match_halfspace_tiles(self):
+    def test_random_triangles_match_separating_axis_oracle(self):
         rng = np.random.default_rng(901)
         for _ in range(120):
             triangle = rng.uniform(0, 1, (1, 2)) * [8, 3] + rng.uniform(-1.2, 1.2, (3, 2))
@@ -720,7 +743,9 @@ class UdimCoverageOracle(unittest.TestCase):
         result = udim_coverage.analyze([[[9.5, 0.2], [10.5, 0.2], [9.5, 0.8]]], [1010])
         self.assertEqual(result['required_tiles'], [1010])
         self.assertEqual(result['outside_domain_triangles'], 1)
-        result = udim_coverage.analyze([[[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]]], [1001])
+        degenerate = [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]]
+        self.assertEqual(self.oracle_tiles(degenerate), [])
+        result = udim_coverage.analyze([degenerate], [1001])
         self.assertEqual(result['degenerate_triangles'], 1)
         self.assertEqual(result['required_tiles'], [])
 
