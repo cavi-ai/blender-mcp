@@ -10,7 +10,7 @@ from pathlib import Path
 from cavi_mcp_core import proc
 from cavi_mcp_core import workspace as core_workspace
 
-from .importing import MAX_BYTES, MAX_GEOMETRY
+from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .paths import destination
 
 MLX_MAX_FACES = 500000
@@ -48,14 +48,15 @@ PROVIDERS = {
         "quality": {
             "default": ("--resolution", "512"),
             "fast": ("--steps", "6", "--resolution", "512"),
+            "high": ("--resolution", "1024"),
         },
         "vertex_colors": True,
         "guides": True,
-        # Atlas export duplicates each triangle corner; also bound the embedded GLB.
-        "fast_max_faces": min(180_000, MAX_GEOMETRY // 3),
+        # Atlas export duplicates each triangle corner.
+        "atlas_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
-QUALITIES = ("fast", "default")
+QUALITIES = ("fast", "default", "high")
 IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_VIEWS = 5
 # mlx-agent keeps the smallest bbox side at least two voxels of TRELLIS.2's 32³ sparse structure.
@@ -109,7 +110,9 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         extra += ["--bbox", *(str(size) for size in bbox)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
-    max_faces = settings.get("fast_max_faces", MLX_MAX_FACES) if quality == "fast" else MLX_MAX_FACES
+    max_faces = MLX_MAX_FACES
+    if quality in ("fast", "high"):
+        max_faces = settings.get("atlas_max_faces", MLX_MAX_FACES)
     command = [
         configured["PYTHON"],
         configured["AGENT"],
@@ -191,9 +194,11 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
     settings = PROVIDERS[provider]
     quality = "default" if quality is None else quality
     if quality not in QUALITIES:
-        raise ValueError("Quality must be fast or default")
+        raise ValueError("Quality must be fast, default or high")
     if quality != "default" and "quality" not in settings:
         raise ValueError("Quality tiers apply only to the triposg-mlx and trellis2-mlx providers")
+    if quality not in settings.get("quality", {"default": ()}):
+        raise ValueError("Quality high applies only to the trellis2-mlx provider")
     workspace = Path(workspace).resolve()
     source = inside(workspace, image, IMAGES, 16 * 1024 * 1024,
                     "Input image must be a workspace PNG, JPEG or WebP image of at most 16 MiB")
@@ -263,6 +268,11 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
             raise RuntimeError("Reconstruction did not produce a GLB")
         if size > MAX_BYTES:
             raise RuntimeError(f"Reconstruction GLB is {size} bytes; maximum is {MAX_BYTES} bytes")
+        if quality == "high":
+            try:
+                inspect_glb(temporary, generated.name)
+            except ValueError as exc:
+                raise RuntimeError(f"Reconstruction GLB cannot be imported: {exc}") from exc
         # Publish without replacing an existing destination, even if another writer won the race.
         os.link(generated, target)
     return {**report, "path": str(target), "bytes": target.stat().st_size}
