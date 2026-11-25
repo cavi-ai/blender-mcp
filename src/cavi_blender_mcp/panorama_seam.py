@@ -6,6 +6,12 @@ import sys
 from PIL import Image
 
 
+def seam_weights(width, band):
+    if not 0 < band < width // 2:
+        raise ValueError("The seam band must be narrower than half the panorama")
+    return [(index + 1) / band for index in range(band)]
+
+
 def wrap(source, band):
     """Crossfade the last ``band`` columns into the first column and keep the source size.
 
@@ -14,12 +20,11 @@ def wrap(source, band):
     """
     image = source.convert("RGB")
     width, height = image.size
-    if not 0 < band < width // 2:
-        raise ValueError("The seam band must be narrower than half the panorama")
+    weights = seam_weights(width, band)
     right = image.crop((width - band, 0, width, height))
     edge = image.crop((0, 0, 1, height)).resize((band, height), Image.NEAREST)
     mask = Image.new("L", (band, 1))
-    mask.putdata([round((index + 1) / band * 255) for index in range(band)])
+    mask.putdata([round(weight * 255) for weight in weights])
     blended = Image.composite(edge, right, mask.resize((band, height), Image.NEAREST))
     image.paste(blended, (width - band, 0))
     return image
@@ -36,16 +41,27 @@ def attribute(name, kind, value):
     return b"%s\0%s\0" % (name, kind) + struct.pack("<i", len(value)) + value
 
 
-def save_exr(image, path, white):
-    """Write an RGB image as uncompressed scanline OpenEXR with half-float B, G and R channels."""
+def save_exr(image, path, white, band):
+    """Write half-float OpenEXR with the panorama seam blended in scene-linear light."""
     width, height = image.size
-    halves = [struct.pack("<e", linear(code, white)) for code in range(256)]
+    weights = seam_weights(width, band)
+    seam = struct.Struct(f"<{band}e")
+    values = [linear(code, white) for code in range(256)]
+    halves = [struct.pack("<e", value) for value in values]
     low, high = bytes(half[0] for half in halves), bytes(half[1] for half in halves)
     planes = {}
-    for name, band in zip((b"R", b"G", b"B"), image.convert("RGB").split(), strict=True):
-        codes = band.tobytes()
+    for name, channel in zip((b"R", b"G", b"B"), image.convert("RGB").split(), strict=True):
+        codes = channel.tobytes()
         plane = bytearray(2 * len(codes))
         plane[0::2], plane[1::2] = codes.translate(low), codes.translate(high)
+        for row_start in range(0, len(codes), width):
+            row_end = row_start + width
+            seam_start = row_end - band
+            left = values[codes[row_start]]
+            right = (values[code] for code in codes[seam_start:row_end])
+            blended = [value * (1 - weight) + left * weight
+                       for value, weight in zip(right, weights, strict=True)]
+            seam.pack_into(plane, 2 * seam_start, *blended)
         planes[name] = plane
     window = struct.pack("<4i", 0, 0, width - 1, height - 1)
     channels = b"".join(name + b"\0" + struct.pack("<iB3x2i", 1, 0, 1, 1) for name in (b"B", b"G", b"R"))
@@ -70,9 +86,9 @@ def save_exr(image, path, white):
 
 
 if __name__ == "__main__":
+    band = int(sys.argv[3])
     with Image.open(sys.argv[1]) as raw:
-        wrapped = wrap(raw, int(sys.argv[3]))
-    if sys.argv[2].lower().endswith(".exr"):
-        save_exr(wrapped, sys.argv[2], float(sys.argv[4]))
-    else:
-        wrapped.save(sys.argv[2], format="PNG")
+        if sys.argv[2].lower().endswith(".exr"):
+            save_exr(raw, sys.argv[2], float(sys.argv[4]), band)
+        else:
+            wrap(raw, band).save(sys.argv[2], format="PNG")

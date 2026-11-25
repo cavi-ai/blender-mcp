@@ -104,14 +104,18 @@ class PanoramaTests(unittest.TestCase):
         with Image.open(self.work / "sky.png") as published:
             codes = published.convert("RGB")
         brightest = (0, 0)
-        for x in range(0, 2048, 89):
+        seam_start = report["width"] - report["seam_band"]
+        for x in range(0, seam_start, 89):
             for y in (0, 511, 1023):
                 for value, code in zip(pixel(x, y), codes.getpixel((x, y)), strict=True):
                     self.assertAlmostEqual(value, scene_linear(code), delta=scene_linear(code) / 500)
                 brightest = max(brightest, (pixel(x, y)[0], codes.getpixel((x, y))[0]))
         self.assertGreater(brightest[0], 4)
         self.assertGreater(brightest[1], 230)
-        self.assertLess(abs(pixel(2047, 300)[0] - pixel(0, 300)[0]), 0.05)
+        # The fixture fades from nearly black on the right to white on the left.
+        midpoint = seam_start + report["seam_band"] // 2 - 1
+        self.assertEqual(pixel(midpoint, 300), (8.0, 8.0, 8.0))
+        self.assertEqual(pixel(2047, 300), pixel(0, 300))
         self.assertFalse(list(self.work.glob(".cavi-panorama-*")))
 
     def test_a_ramp_jumps_at_its_seam_until_it_is_wrapped(self):
