@@ -2,22 +2,57 @@
 
 import json
 import math
+from itertools import combinations_with_replacement
 
 import bpy
 import numpy as np
-from mathutils.bvhtree import BVHTree
 
+from .blender_spatial import tree as triangle_tree
 from .mapping import measure_triangle, summarize
 from .mesh_topology import report as topology_defects
 from .naming import lint, rules
+from .spatial_query import chunks, intersects
 from .uv_layout import measured_overlap
 
 MAX_TRIANGLES = 100000
 MAX_VERTICES = 100000
+MAX_SELF_INTERSECTION_PAIR_TESTS = 64_000_000
+MAX_SELF_INTERSECTION_CANDIDATES = 1_000_000
 CHECKS = {"naming", "topology", "lightmap", "transforms", "origin", "materials"}
 MATERIAL_INPUTS = {"Base Color": "sRGB", "Emission Color": "sRGB", "Normal": "Non-Color",
                    "Roughness": "Non-Color", "Metallic": "Non-Color", "Alpha": "Non-Color"}
 CONFIG_TAG = "cavi_material_config"
+
+
+def _self_overlap_candidates(corners):
+    """Collect triangle indices from bounded native queries, or None on budget exhaustion."""
+    if len(corners) < 2:
+        return []
+    source = corners.tolist()
+    pairs = []
+    work = count = 0
+    # Leaves contain at most 128 triangles, so a single overlap call cannot allocate
+    # more than 128 squared pairs. Charge the potential work even if it returns no pairs.
+    for left, right in combinations_with_replacement(chunks(source), 2):
+        if not intersects(left["bounds"], right["bounds"]):
+            continue
+        work += len(left["indices"]) * len(right["indices"])
+        if work > MAX_SELF_INTERSECTION_PAIR_TESTS:
+            return None
+        for leaf in (left, right):
+            if "tree" not in leaf:
+                leaf["tree"] = triangle_tree([source[i] for i in leaf["indices"]])
+        overlap = np.asarray(left["tree"].overlap(right["tree"]), np.int64).reshape(-1, 2)
+        if left is right:
+            distinct = overlap[overlap[:, 0] != overlap[:, 1]]
+            overlap = np.unique(np.sort(distinct, axis=1), axis=0)
+        count += len(overlap)
+        if count > MAX_SELF_INTERSECTION_CANDIDATES:
+            return None
+        if len(overlap):
+            pairs.append(np.stack([np.asarray(left["indices"])[overlap[:, 0]],
+                                   np.asarray(right["indices"])[overlap[:, 1]]], axis=1))
+    return np.concatenate(pairs) if pairs else []
 
 
 def topology(value, unit_scale):
@@ -48,11 +83,7 @@ def topology(value, unit_scale):
     mesh.loop_triangles.foreach_get("vertices", triangles)
     triangle_faces = np.empty(len(mesh.loop_triangles), np.int64)
     mesh.loop_triangles.foreach_get("polygon_index", triangle_faces)
-    candidates = []
-    if len(triangle_faces):
-        tree = BVHTree.FromPolygons(points.tolist(), triangles.reshape(-1, 3).tolist(),
-                                    all_triangles=True, epsilon=0.0)
-        candidates = tree.overlap(tree)
+    candidates = _self_overlap_candidates(points[triangles.reshape(-1, 3)])
     return {"non_manifold_edges": int(((edge_faces == 0) | (edge_faces > 2)).sum()),
             "boundary_edges": int((edge_faces == 1).sum()),
             "loose_vertices": int((~used).sum()),

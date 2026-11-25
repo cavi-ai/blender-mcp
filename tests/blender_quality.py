@@ -159,5 +159,32 @@ assert "coplanar face overlaps" in topology_report["not_checked"], topology_repo
 bpy.context.scene.unit_settings.scale_length = 0.01
 assert topology_defects()[1][1] == [0, 2, 0, 0]
 bpy.context.scene.unit_settings.scale_length = 1
+
+left = [(0, -1, 0), (0, 1, 0), (2, 1, 0)]
+right = [(0, 0, -1), (0, 0, 1), (2, 0, 1)]
+# Equal numbers of distant triangles put the crossing faces on opposite sides of the BVH partition.
+spaced = left + right + [(x + dx, dy, 0) for gap in range(10, 650, 10) for x in (-gap, gap)
+                         for dx, dy in ((0, 0), (1, 0), (0, 1))]
+split_crossing = topology_case("CrossChunkCrossing", spaced,
+                               [(i, i + 1, i + 2) for i in range(0, len(spaced), 3)])
+stack = left * 1100 + right * 1100
+dense_crossings = topology_case("DenseCrossings", stack,
+                                [(i, i + 1, i + 2) for i in range(0, len(stack), 3)])
+dense_points = topology_case("DenseCoincidence", [(i * 1e-8, 0, 0) for i in range(1500)], [])
+bounded = bridge.dispatch("inspect_mesh_quality", {
+    "names": [dense_crossings, dense_points, split_crossing], "checks": ["topology", "transforms"]})
+for item in bounded["objects"]:
+    assert item["checks"]["transforms"]["scale_applied"], item
+stacked, close, split = (item["checks"]["topology"] for item in bounded["objects"])
+assert stacked["self_intersecting_face_pairs"] is None, stacked
+assert not stacked["self_intersecting_face_pairs_complete"], stacked
+assert stacked["self_intersecting_face_pair_examples"] == [], stacked
+assert stacked["coincident_vertex_pairs"] == 6 * 1100 * 1099 // 2, stacked
+assert close["coincident_vertex_pairs"] is None, close
+assert not close["coincident_vertex_pairs_complete"], close
+assert close["self_intersecting_face_pairs"] == 0, close
+assert split["self_intersecting_face_pairs_complete"], split
+assert split["self_intersecting_face_pairs"] == 1, split
+assert split["self_intersecting_face_pair_examples"] == [[0, 1]], split
 print(json.dumps({"read_only_inspection": True, "physical_density": True, "slot_binding": True,
-                  "topology_defects": True}))
+                  "topology_defects": True, "bounded_topology": True}))

@@ -222,6 +222,12 @@ Read-only. Measures exact static mesh names.
 
 Refuses modifiers, shape keys and rigs.
 
+The `topology` check reports coincident vertices and crossing face pairs. If a
+search exceeds its per-object budget, `coincident_vertex_pairs_complete` or
+`self_intersecting_face_pairs_complete` is `false`, the corresponding count is
+`null`, and its examples are empty. The remaining checks and objects still
+return their results.
+
 ## inspect_uv_layout
 
 Read-only source UV preflight. Treats the exact selected meshes as **one texture

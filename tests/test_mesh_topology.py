@@ -79,9 +79,17 @@ class MeshTopologyTests(unittest.TestCase):
         cluster, _ = build([(2, 3, 4)] * 2000, [])
         self.assertEqual(cluster["coincident_vertex_pairs"], 2000 * 1999 // 2)
         self.assertEqual(cluster["coincident_vertex_pair_examples"], [[0, j] for j in range(1, 33)])
+        self.assertTrue(cluster["coincident_vertex_pairs_complete"])
+
+    def test_dense_coincidence_search_preserves_other_topology_counts(self):
+        needle = [(0, 0, 0), (1, 0, 0), (.5, .005, 0)]
         dense = [(i * 1e-8, 0, 0) for i in range(1500)]
-        with self.assertRaisesRegex(ValueError, "candidate"):
-            build(dense, [])
+        result, _ = build(needle + dense, [(0, 1, 2)])
+        self.assertFalse(result["coincident_vertex_pairs_complete"])
+        self.assertIsNone(result["coincident_vertex_pairs"])
+        self.assertEqual(result["coincident_vertex_pair_examples"], [])
+        self.assertEqual(result["sliver_triangles"], 1)
+        self.assertEqual(result["self_intersecting_face_pairs"], 0)
 
     def test_a_needle_triangle_is_a_sliver_unless_its_face_has_zero_area(self):
         needle = [(0, 0, 0), (1, 0, 0), (.5, .005, 0)]
@@ -99,6 +107,15 @@ class MeshTopologyTests(unittest.TestCase):
         self.assertEqual(separate["self_intersecting_face_pair_examples"], [[0, 1]])
         shared, _ = build(fin, [(0, 1, 2, 3), (0, 4, 5)])
         self.assertEqual(shared["self_intersecting_face_pairs"], 0)
+
+    def test_triangle_sections_with_matching_endpoints_cross_but_point_contact_does_not(self):
+        left = [(0, -1, 0), (0, 1, 0), (2, 1, 0)]
+        right = [(0, 0, -1), (0, 0, 1), (2, 0, 1)]
+        faces = [(0, 1, 2), (5, 4, 3)]
+        crossing, _ = build(left + right, faces)
+        self.assertEqual(crossing["self_intersecting_face_pair_examples"], [[0, 1]])
+        contact, _ = build(left + [(x + 1, y, z) for x, y, z in right], faces)
+        self.assertEqual(contact["self_intersecting_face_pairs"], 0)
 
 
 if __name__ == "__main__":

@@ -5,8 +5,8 @@ EXAMPLES = 32
 # Metres after object rotation/scale and scene unit scale; Blender's Merge by Distance default.
 COINCIDENT_DISTANCE_M = 1e-4
 SLIVER_ANGLE_DEGREES = 1.0
-MAX_COINCIDENT_CANDIDATES = 1000000
-# Dimensionless margin: an edge touching a triangle's boundary or ending on it does not cross it.
+MAX_COINCIDENT_CANDIDATES = 1_000_000
+# Dimensionless barycentric margin for testing crossings through both triangle interiors.
 CROSSING_EPSILON = 1e-6
 CHUNK_PAIRS = 65536
 _CELL_LIMIT = 2.0 ** 40
@@ -35,7 +35,7 @@ def _cell_keys(cells):
 
 
 def _near_pairs(points, distance):
-    """Sorted index pairs of distinct points closer than distance, from distance-sized hash cells."""
+    """Sorted index pairs closer than distance, or None if the candidate limit is exceeded."""
     if len(points) < 2:
         return np.empty((0, 2), np.int64)
     cells = np.clip(np.floor(points / distance), -_CELL_LIMIT, _CELL_LIMIT).astype(np.int64)
@@ -53,8 +53,7 @@ def _near_pairs(points, distance):
     owners, firsts, counts = (np.concatenate(values) for values in (owners, firsts, counts))
     total = int(counts.sum())
     if total > MAX_COINCIDENT_CANDIDATES:
-        raise ValueError(f"Coincident-vertex search exceeds {MAX_COINCIDENT_CANDIDATES} candidate "
-                         "pairs; merge vertices by distance first")
+        return None
     run = np.repeat(np.arange(len(owners)), counts)
     local = np.arange(total) - np.repeat(np.cumsum(counts) - counts, counts)
     pairs = np.sort(np.stack([owners[run], order[firsts[run] + local]], 1), 1)
@@ -69,6 +68,8 @@ def coincident_vertices(points, distance=COINCIDENT_DISTANCE_M):
     unique, inverse, sizes = np.unique(points[finite], axis=0, return_inverse=True,
                                        return_counts=True)
     near = _near_pairs(unique, distance)
+    if near is None:
+        return None, []
     count = int((sizes * (sizes - 1) // 2).sum() + (sizes[near[:, 0]] * sizes[near[:, 1]]).sum())
     if not count:
         return 0, []
@@ -110,58 +111,61 @@ def sliver_triangles(points, triangles, triangle_faces, excluded_faces,
     return len(found), np.stack([found, triangle_faces[found]], 1)[:EXAMPLES].tolist()
 
 
-def _crosses(start, end, a, b, c):
-    """Segments that pass through a triangle's interior strictly between their endpoints."""
-    direction, first, second = end - start, b - a, c - a
-    h = np.cross(direction, second)
-    det = (first * h).sum(1)
-    scale = (np.linalg.norm(direction, axis=1) * np.linalg.norm(first, axis=1)
-             * np.linalg.norm(second, axis=1))
-    valid = np.abs(det) > 1e-12 * scale
-    det = np.where(valid, det, 1.)
-    offset = start - a
-    k = np.cross(offset, first)
-    u = (offset * h).sum(1) / det
-    v = (direction * k).sum(1) / det
-    t = (second * k).sum(1) / det
+def _plane_interval(corners, origin, normal, axis):
+    """Project the section of an inset triangle cut by a plane onto their intersection axis."""
     e = CROSSING_EPSILON
-    return valid & (u > e) & (v > e) & (u + v < 1 - e) & (t > e) & (t < 1 - e)
+    inner = (1 - 3 * e) * corners + e * corners.sum(axis=1, keepdims=True)
+    distance = np.einsum("nki,ni->nk", inner - origin[:, None, :], normal)
+    next_distance = np.roll(distance, -1, axis=1)
+    delta = distance - next_distance
+    cut = (delta != 0) & (np.minimum(distance, next_distance) <= 0) & (
+        np.maximum(distance, next_distance) >= 0)
+    weight = np.divide(distance, delta, out=np.zeros_like(distance), where=cut)
+    projected = np.einsum("nki,ni->nk", inner, axis)
+    hits = projected + weight * (np.roll(projected, -1, axis=1) - projected)
+    return np.where(cut, hits, np.inf).min(axis=1), np.where(cut, hits, -np.inf).max(axis=1)
+
+
+def _crosses(left, right):
+    """Nonparallel triangles whose plane sections overlap through both interiors."""
+    origin = left[:, :1, :]
+    left, right = left - origin, right - origin
+    left_normal = np.cross(left[:, 1], left[:, 2])
+    right_normal = np.cross(right[:, 1] - right[:, 0], right[:, 2] - right[:, 0])
+    axis = np.cross(left_normal, right_normal)
+    length = np.linalg.norm(axis, axis=1)
+    scale = np.linalg.norm(left_normal, axis=1) * np.linalg.norm(right_normal, axis=1)
+    nonparallel = length > 1e-12 * scale
+    axis /= np.where(nonparallel, length, 1.)[:, None]
+    left_min, left_max = _plane_interval(left, right[:, 0], right_normal, axis)
+    right_min, right_max = _plane_interval(right, left[:, 0], left_normal, axis)
+    return nonparallel & (np.maximum(left_min, right_min) < np.minimum(left_max, right_max))
 
 
 def _share_vertex(face_pairs, loop_vertices, loop_starts, loop_totals):
-    sides = []
-    span = int(loop_vertices.max(initial=0)) + 1
-    for column in (0, 1):
-        faces = face_pairs[:, column]
-        sizes = loop_totals[faces]
-        owner = np.repeat(np.arange(len(faces)), sizes)
-        loops = (np.repeat(loop_starts[faces] - (np.cumsum(sizes) - sizes), sizes)
-                 + np.arange(sizes.sum()))
-        sides.append(owner * span + loop_vertices[loops])
-    shared = np.zeros(len(face_pairs), bool)
-    shared[np.intersect1d(*sides) // span] = True
-    return shared
+    # Cache vertices per face so a large n-gon is stored once regardless of its crossing count.
+    vertices = {face: set(loop_vertices[loop_starts[face]:loop_starts[face] + loop_totals[face]])
+                for face in np.unique(face_pairs)}
+    return np.fromiter((not vertices[a].isdisjoint(vertices[b]) for a, b in face_pairs),
+                       bool, count=len(face_pairs))
 
 
 def self_intersections(points, triangles, triangle_faces, loop_vertices, loop_starts,
                        loop_totals, candidates):
-    """Face pairs without a shared vertex where an edge of one triangle crosses the other.
+    """Face pairs without a shared vertex whose triangles cross through their interiors.
 
-    candidates must contain every intersecting triangle pair; extra pairs are rejected here.
+    candidates contains potential intersections, or None when the search exceeded its budget.
     """
-    pairs = np.sort(_pairs(candidates), 1)
+    if candidates is None:
+        return None, []
+    pairs = _pairs(candidates)
     faces = triangle_faces[pairs]
     pairs = pairs[faces[:, 0] != faces[:, 1]]
     found = [np.empty((0, 2), np.int64)]
     for begin in range(0, len(pairs), CHUNK_PAIRS):
         part = pairs[begin:begin + CHUNK_PAIRS]
         left, right = points[triangles[part[:, 0]]], points[triangles[part[:, 1]]]
-        hit = np.zeros(len(part), bool)
-        for one, other in ((left, right), (right, left)):
-            for k in range(3):
-                hit |= _crosses(one[:, k], one[:, (k + 1) % 3], other[:, 0], other[:, 1],
-                                other[:, 2])
-        found.append(part[hit])
+        found.append(part[_crosses(left, right)])
     crossed = np.unique(np.sort(triangle_faces[np.concatenate(found)].reshape(-1, 2), 1), axis=0)
     crossed = crossed[~_share_vertex(crossed, loop_vertices, loop_starts, loop_totals)]
     return len(crossed), crossed[:EXAMPLES].tolist()
@@ -172,7 +176,7 @@ def report(points, loop_vertices, loop_edges, loop_starts, loop_totals, edge_cou
     """Topology defect counts with at most EXAMPLES ascending examples each.
 
     points are metres; triangles index points and map to faces through triangle_faces;
-    candidates are triangle index pairs that may intersect.
+    candidates are triangle index pairs that may intersect, or None for an incomplete search.
     """
     points = np.asarray(points, np.float64).reshape(-1, 3)
     loop_vertices = np.asarray(loop_vertices, np.int64)
@@ -189,10 +193,12 @@ def report(points, loop_vertices, loop_edges, loop_starts, loop_totals, edge_cou
     return {"inconsistent_winding_edges": winding[0],
             "inconsistent_winding_edge_examples": winding[1],
             "coincident_vertex_pairs": coincident[0],
+            "coincident_vertex_pairs_complete": coincident[0] is not None,
             "coincident_vertex_pair_examples": coincident[1],
             "coincident_distance_m": COINCIDENT_DISTANCE_M,
             "sliver_triangles": slivers[0],
             "sliver_triangle_examples": slivers[1],
             "sliver_angle_degrees": SLIVER_ANGLE_DEGREES,
             "self_intersecting_face_pairs": crossings[0],
+            "self_intersecting_face_pairs_complete": crossings[0] is not None,
             "self_intersecting_face_pair_examples": crossings[1]}
