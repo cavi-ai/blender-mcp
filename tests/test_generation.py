@@ -508,6 +508,16 @@ class Trellis2MlxTests(TripoSGMlxTests):
             self.assert_nothing_published()
         self.assertFalse((self.record / "image.png").exists())
 
+    def test_a_bbox_outside_the_glb_position_range_is_refused_before_the_agent(self):
+        with patch.dict(os.environ, self.settings("ok")):
+            for size in (1e-50, 1e40):
+                path = f"mesh-{size}.glb"
+                with self.subTest(size=size):
+                    with self.assertRaisesRegex(ValueError, "bbox.*float32"):
+                        generate(self.work, "input.png", path, bbox=(size, size, size))
+                    self.assertFalse((self.work / path).exists())
+                    self.assertFalse((self.record / "image.png").exists())
+
     def test_views_and_guides_outside_the_contract_are_refused_before_the_agent(self):
         for options, message in (
             ({"views": ["../side.png"]}, "Each view"),

@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import math
 import os
 import tempfile
 import time
@@ -61,6 +60,9 @@ IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_VIEWS = 5
 # mlx-agent keeps the smallest bbox side at least two voxels of TRELLIS.2's 32³ sparse structure.
 MAX_BOX_RATIO = 16
+# The provider writes bbox endpoints at ±half the side length as float32 GLB positions.
+MIN_BOX_SIZE = 2.0 ** -148
+MAX_BOX_SIZE = float.fromhex("0x1.fffffep+128")
 
 
 def envelope_error(result):
@@ -200,9 +202,12 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
         raise ValueError("Views, guides and bbox apply only to the trellis2-mlx provider")
     if bbox is not None:
         if (guide is not None or not isinstance(bbox, (list, tuple)) or len(bbox) != 3
-                or any(type(size) not in (int, float) or not math.isfinite(size) or size <= 0 for size in bbox)
+                or any(type(size) not in (int, float) or not MIN_BOX_SIZE <= size <= MAX_BOX_SIZE for size in bbox)
                 or max(bbox) > MAX_BOX_RATIO * min(bbox)):
-            raise ValueError(f"bbox takes three sizes above 0, at most {MAX_BOX_RATIO} times apart, and no guide")
+            raise ValueError(
+                f"bbox takes three sizes with half-widths in the positive float32 range, "
+                f"at most {MAX_BOX_RATIO} times apart, and no guide"
+            )
         bbox = [float(size) for size in bbox]
     if len(views) > MAX_VIEWS:
         raise ValueError(f"Provide at most {MAX_VIEWS} views")
