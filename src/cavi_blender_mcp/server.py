@@ -86,8 +86,9 @@ mcp = BlenderServer(
         "Call scene_info first; if the bridge is not running, `cavi-blender-mcp runtime start` "
         "launches Blender with it. Before edits, call session_control inspect, claim its "
         "project_id and pass lease_id. Paths are relative to the Blender session workspace; "
-        "saves and exports refuse existing paths. Check edits with render_preview or "
-        "review_sheet. Never retry an uncertain mutation; follow next_action."
+        "saves and exports refuse existing paths. Use each parameter's documented units. "
+        "Inspect, edit, then check with render_preview or review_sheet. Pass inspection hashes "
+        "only for actions that accept them. Never retry an uncertain mutation; follow next_action."
     ),
 )
 Number = Annotated[float, Field(strict=True, allow_inf_nan=False)]
@@ -332,7 +333,7 @@ async def inspect_mesh_quality(
     texture_resolution: Annotated[tuple[Annotated[StrictInt, Field(ge=1, le=4096)],
                               Annotated[StrictInt, Field(ge=1, le=4096)]], Field(description="Pixels")] = (1024, 1024),
     uv_layer: Annotated[str | None, Field(min_length=1, max_length=63, description="UV map")] = None,
-    checks: Annotated[list[Check] | None, Field(max_length=6, description="Empty: all checks")] = None,
+    checks: Annotated[list[Check] | None, Field(max_length=6, description="Omitted or empty: none run")] = None,
     naming: Annotated[NamingRules | None, Field(description="Rules")] = None,
     lightmap_uv: Annotated[str, Field(min_length=1, max_length=63, description="Lightmap UVs")] = "UVMap_Lightmap",
     lightmap_resolution: Annotated[StrictInt, Field(ge=16, le=4096, description="Lightmap pixels")] = 64,
@@ -443,6 +444,7 @@ async def inspect_skin_clearance(
         rows = result.get('garments') if isinstance(result, dict) else None
         if (not isinstance(rows, list) or len(rows) != len(garments)
                 or any(not isinstance(row, dict) or 'worst_support' not in row
+                       or ('ambiguity_examples' in row and not isinstance(row['ambiguity_examples'], list))
                        or (region_attribute is not None and any(
                            not isinstance(region, dict) or 'worst_support' not in region
                            for region in row['regions'])) for row in rows)):

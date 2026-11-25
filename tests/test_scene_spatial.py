@@ -156,12 +156,21 @@ class SceneSpatialTests(unittest.TestCase):
     def test_distance_proof_reuses_group_bounds(self):
         h = self.helpers()
         a = ((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))
-        b = ((.1, .1, 0.), (.9, .1, 0.), (.1, .9, 0.))
-        with patch.object(h, '_group_bounds', wraps=h._group_bounds) as bound:
-            proof = h.prove_distance([a] * 128, [b] * 128, 1., 64)
+        b = ((.75, .75, 0.), (1., .75, 0.), (.75, 1., 0.))
+        groups = []
+        init = h._Node.__init__
+
+        def record_bounds(node, surface, indices):
+            groups.append((surface, tuple(indices)))
+            init(node, surface, indices)
+
+        # Overlapping boxes keep both subject branches in the queue against the same context.
+        with patch.object(h._Node, '__init__', record_bounds):
+            proof = h.prove_distance([a] * 32, [b] * 32, 1., 2000)
         self.assertTrue(proof['proven'])
-        self.assertEqual(proof['upper_m'], 0.)
-        self.assertLessEqual(bound.call_count, 32)
+        self.assertGreater(proof['upper_m'], 0.)
+        self.assertEqual(len(groups), 6)
+        self.assertEqual(len(set(groups)), len(groups))
 
     def test_an_exhausted_distance_budget_does_not_claim_the_minimum(self):
         helpers = self.helpers()

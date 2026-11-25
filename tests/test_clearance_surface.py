@@ -78,14 +78,21 @@ class ClearanceSurfaceTests(unittest.TestCase):
         calls = []
         def call(operation, params):
             calls.append(params)
-            return {'garments': [{'worst_support': None, 'regions': [{'worst_support': None}]}]}
+            return {'garments': [{'worst_support': None, 'ambiguity_examples': [], 'regions': [{'worst_support': None}]}]}
         with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=call)):
             asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002))
             asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
                         region_attribute='role', include_worst_support=True))
         self.assertNotIn('include_worst_support', calls[0])
         self.assertIs(calls[1]['include_worst_support'], True)
-        for result in ({'garments': [{}]}, {'garments': [{'worst_support': None, 'regions': [{}]}]}):
+        older = {'garments': [{'worst_support': None, 'regions': [{'worst_support': None}]}]}
+        with patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=lambda *_: older)):
+            result = asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,
+                                 region_attribute='role', include_worst_support=True))
+            self.assertNotIn('ambiguity_examples', result['garments'][0])
+        for result in ({'garments': [{}]}, {'garments': [{'worst_support': None, 'ambiguity_examples': None,
+                                                         'regions': [{'worst_support': None}]}]},
+                       {'garments': [{'worst_support': None, 'ambiguity_examples': [], 'regions': [{}]}]}):
             with (patch.object(server, 'BridgeClient', return_value=SimpleNamespace(call=lambda *_, value=result: value)),
                   self.assertRaises(UnexpectedToolError)):
                 asyncio.run(server.inspect_skin_clearance('Body', ['Coat'], 1, 25, .002,

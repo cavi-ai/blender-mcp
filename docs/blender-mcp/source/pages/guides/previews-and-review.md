@@ -19,6 +19,10 @@ image.
 | `orthographic` | Use an orthographic camera |
 | `settings` | Optional temporary display controls and PNG precision |
 
+The perspective camera sits 3.5 times the bounding radius from the center,
+with a minimum distance of 2 Blender units. Very small meshes can occupy
+only a small part of the image.
+
 Workbench checks shape. Eevee checks materials under temporary studio lighting
 at up to 1024 pixels and requires material colors.
 
@@ -44,7 +48,8 @@ preview settings apply only while the image is rendered.
 `review_sheet` renders up to six views into one contact sheet exactly
 `resolution` pixels wide.
 
-Views: `front`, `back`, `left`, `right`, `top` and `persp`.
+Views: `front`, `back`, `left`, `right`, `top` and `persp`. The `persp` view
+uses the same camera distance rule as a perspective `render_preview`.
 
 Modes:
 
