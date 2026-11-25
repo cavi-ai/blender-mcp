@@ -69,21 +69,37 @@ def shared_constraints(schema):
 
 
 def short_references(schema):
-    """Rename only unscoped local definitions; literal JSON data stays untouched."""
+    """Rename only unscoped local definitions; literal JSON data stays untouched.
+
+    Definitions that only point to another definition are bypassed.
+    """
     if not isinstance(schema, dict) or not schema.get('$defs') or preserve_structure(schema):
         return schema
+
+    def pointer(name):
+        return '#/$defs/'+name.replace('~', '~0').replace('/', '~1')
+    defined = {pointer(name) for name in schema['$defs']}
+    links = {pointer(name): value['$ref'] for name, value in schema['$defs'].items()
+             if isinstance(value, dict) and value.keys() == {'$ref'} and value['$ref'] in defined}
+
+    def target(reference):
+        seen = []
+        while reference in links and reference not in seen:
+            seen.append(reference)
+            reference = links[reference]
+        return None if reference in seen else reference
+    aliases = {reference: end for reference in links if (end := target(reference)) is not None}
+    empty = {pointer(name) for name, value in schema['$defs'].items() if value == {}}
+    kept = [name for name in schema['$defs'] if pointer(name) not in aliases.keys() | empty]
     alphabet = string.ascii_letters + string.digits
     names = {name: alphabet[index] if index < len(alphabet) else f'd{index}'
-             for index, name in enumerate(schema['$defs'])}
-    references = {'#/$defs/'+name.replace('~', '~0').replace('/', '~1'): '#/$defs/'+short
-                  for name, short in names.items()}
-    empty = {'#/$defs/'+name.replace('~','~0').replace('/','~1')
-             for name,value in schema['$defs'].items() if value=={}}
+             for index, name in enumerate(kept)}
+    references = {pointer(name): '#/$defs/'+short for name, short in names.items()}
     unknown = []
 
     def check(node):
         reference = node.get('$ref', '')
-        if isinstance(reference, str) and reference.startswith('#/$defs/') and reference not in references:
+        if isinstance(reference, str) and reference.startswith('#/$defs/') and reference not in defined:
             unknown.append(reference)
         return node
 
@@ -92,18 +108,19 @@ def short_references(schema):
         return schema
 
     def rewrite(node):
-        if node.get('$ref') in empty:
+        reference = aliases.get(node.get('$ref'), node.get('$ref'))
+        if reference in empty:
             return {key:value for key,value in node.items() if key!='$ref'}
-        if node.get('$ref') in references:
-            node['$ref'] = references[node['$ref']]
+        if reference in references:
+            node['$ref'] = references[reference]
         return node
 
     result = map_schema(schema, rewrite)
-    result['$defs'] = {names[name]: value for name, value in result['$defs'].items() if value!={}}
+    result['$defs'] = {names[name]: value for name, value in result['$defs'].items() if name in names}
     if not result['$defs']:
         result.pop('$defs')
     return map_schema(result,lambda node:{key:value for key,value in node.items()
-                                          if key!='additionalProperties' or value!={}})
+        if not (key == 'additionalProperties' and value == {})})
 
 
 class BlenderServer(CoreServer):

@@ -65,6 +65,35 @@ class CatalogTests(unittest.TestCase):
         encoded = lambda value: len(json.dumps(short_references(value), separators=(',', ':')))
         self.assertLessEqual(encoded(shared_constraints(source)), encoded(source))
 
+    def test_short_references_drop_alias_definitions_and_preserve_defaults(self):
+        from cavi_blender_mcp.catalog import short_references
+
+        name = {'type': 'string', 'minLength': 1, 'maxLength': 63}
+        source = {'$defs': {'Name': {'$ref': '#/$defs/Shared'}, 'Shared': name},
+            'type': 'object', 'additionalProperties': False,
+            'properties': {'bone': {'$ref': '#/$defs/Name', 'description': 'Bone'},
+                           'target': {'anyOf': [{'$ref': '#/$defs/Name'}, {'type': 'null'}]},
+                           'kind': {'const': 'IK', 'default': 'IK'},
+                           'flag': {'const': True, 'default': 1}},
+            'required': ['bone']}
+        original = copy.deepcopy(source)
+        compact = short_references(source)
+        self.assertEqual(source, original)
+        self.assertEqual(list(compact['$defs'].values()), [name])
+        shared = '#/$defs/' + next(iter(compact['$defs']))
+        self.assertEqual(compact['properties']['bone'], {'$ref': shared, 'description': 'Bone'})
+        self.assertEqual(compact['properties']['target']['anyOf'][0], {'$ref': shared})
+        self.assertEqual(compact['properties']['kind'], {'const': 'IK', 'default': 'IK'})
+        self.assertEqual(compact['properties']['flag'], {'const': True, 'default': 1})
+        for value in ({}, {'bone': 'a'}, {'bone': ''}, {'bone': 'a' * 64}, {'bone': 'a', 'target': None},
+                      {'bone': 'a', 'target': 'a' * 64}, {'bone': 'a', 'kind': 'IK'},
+                      {'bone': 'a', 'kind': 'FK'}, {'bone': 'a', 'flag': True}, {'bone': 'a', 'flag': 1}):
+            self.assertEqual(Draft202012Validator(source).is_valid(value),
+                             Draft202012Validator(compact).is_valid(value))
+        cycle = {'$defs': {'A': {'$ref': '#/$defs/B'}, 'B': {'$ref': '#/$defs/A'}},
+                 'properties': {'x': {'$ref': '#/$defs/A'}}}
+        self.assertEqual(len(short_references(cycle)['$defs']), 2)
+
     def test_shared_constraints_reuse_an_existing_definition_container_when_profitable(self):
         from cavi_blender_mcp.catalog import shared_constraints, short_references
 

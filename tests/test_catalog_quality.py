@@ -36,6 +36,17 @@ class CatalogQualityTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(validator.is_valid({'action': 'array', 'name': 'Cube', 'offset': '1'}))
         self.assertFalse(validator.is_valid({'action': 'solidify', 'name': 'Plane', 'offset': 2}))
 
+    async def test_rig_constraint_discovery_advertises_type_defaults(self):
+        tools = {tool.name: tool for tool in await server.mcp.list_tools()}
+        constraint = tools['rig_edit'].input_schema['properties']['constraint']
+        defaults = {}
+        for variant in constraint['anyOf']:
+            if 'properties' in variant:
+                self.assertNotIn('type', variant['required'])
+                field = variant['properties']['type']
+                defaults[field['const']] = field.get('default')
+        self.assertEqual(defaults, {'IK': 'IK', 'LIMIT_ROTATION': 'LIMIT_ROTATION'})
+
     async def test_every_tool_explains_its_inputs_and_result(self):
         for tool in await server.mcp.list_tools():
             with self.subTest(tool=tool.name):
