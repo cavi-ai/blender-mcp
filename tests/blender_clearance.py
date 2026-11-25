@@ -246,6 +246,8 @@ assert result['body_topology'][0]['components'] == 2
 result = inspect('Probe', body='NestedBody', surface_samples='vertices', sample_frames=[1], include_worst_support=True)
 assert not result['complete'] and 'union_boundary_unresolved' in result['issues'], result
 assert result['garments'][0]['ambiguous_samples'] == 1
+examples = result['garments'][0]['ambiguity_examples']
+assert len(examples) == 1 and examples[0]['causes'] == ['union_boundary_unresolved'], examples
 assert result['garments'][0]['worst_support'] is None and result['garments'][0]['min_clearance_m'] is None
 result = inspect('Probe', body='DisjointBody', surface_samples='vertices', sample_frames=[1], include_worst_support=True)
 assert result['complete'] and result['garments'][0]['min_clearance_m'] < 0, result

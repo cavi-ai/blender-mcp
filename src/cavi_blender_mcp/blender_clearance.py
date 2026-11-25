@@ -268,6 +268,9 @@ def inspect(p, find_object):
                             _, _, _, proximity = part[0].find_nearest(nearest)
                             if proximity is None or proximity <= EPSILON or inside_component(nearest, part, budget) is not False:
                                 uncertain = True
+                                if reasons is not None:
+                                    # A confirmed inside classification has resolved any earlier ray ambiguity.
+                                    reasons = {'union_boundary_unresolved'}
                                 if 'union_boundary_unresolved' not in issues:
                                     issues.append('union_boundary_unresolved')
                                 break
