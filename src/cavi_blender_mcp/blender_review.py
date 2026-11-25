@@ -11,7 +11,7 @@ from mathutils import Euler, Vector
 
 from .blender_geometry import triangle_count, unit_scale
 from .blender_lookup import RENDERLESS, number, obj, output_file
-from .framing import effective_fov, fit_sphere
+from .framing import fit_perspective
 
 VIEWS = {"front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0),
          "top": (0, 0, 1), "persp": (1.5, -2, 1.4)}
@@ -156,14 +156,12 @@ def prepare(meshes, mode, params, stack, radius):
     return shown, stats
 
 
-def place_camera(camera, view, center, radius):
+def place_camera(camera, view, center, radius, meshes):
     data = camera.data
     if view == "persp":
         data.type = "PERSP"
         render = bpy.context.scene.render
-        fov = effective_fov(data.lens, data.sensor_width, data.sensor_height, data.sensor_fit,
-                            render.resolution_x, render.resolution_y)
-        distance, data.clip_start, data.clip_end = fit_sphere(radius, *fov)
+        distance, data.clip_start, data.clip_end = fit_perspective(data, render, radius, meshes)
     else:
         data.type = "ORTHO"
         data.ortho_scale = radius * 2.2
@@ -282,7 +280,7 @@ def review(p):
         sheet = np.full((height, width, 4), 0.12, np.float32)
         sheet[..., 3] = 1
         for index, view in enumerate(views):
-            place_camera(camera, view, center, radius)
+            place_camera(camera, view, center, radius, shown)
             render.filepath = str(Path(folder) / f"{index}.png")
             if "FINISHED" not in bpy.ops.render.render(write_still=True):
                 raise RuntimeError("Review tile render did not finish")

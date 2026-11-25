@@ -36,7 +36,7 @@ from .blender_lookup import (
     vector,
 )
 from .bridge_contract import expected_bridge
-from .framing import effective_fov, fit_sphere
+from .framing import fit_perspective
 from .geometry import validate_mesh
 from .source_identity import LoadedSource
 
@@ -1263,10 +1263,8 @@ def preview(p):
         render.resolution_x = render.resolution_y = resolution
         render.resolution_percentage = 100
         if not orthographic:
-            fov = effective_fov(camera_data.lens, camera_data.sensor_width,
-                                camera_data.sensor_height, camera_data.sensor_fit,
-                                resolution, resolution)
-            distance, camera_data.clip_start, camera_data.clip_end = fit_sphere(radius, *fov)
+            distance, camera_data.clip_start, camera_data.clip_end = fit_perspective(
+                camera_data, render, radius, meshes)
             camera.location = center + direction.normalized() * distance
         render.image_settings.file_format = "PNG"
         if settings is not None:
