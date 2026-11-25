@@ -247,8 +247,7 @@ def triangle_distance(a, b):
     return best
 
 
-# Batched float64 twins of the scalar functions above. Each repeats the scalar operation
-# order and branches; only the final Euclidean norms may differ by a few ulp.
+# Batched float64 twins of the scalar functions above, with the same operation order.
 def _numpy():
     import numpy
 
@@ -272,17 +271,22 @@ def _vclamp(np, value):
     return np.where(value < 0, 0., np.where(value > 1, 1., value))
 
 
+def _vnorm(np, vectors):
+    # Evaluate all three components together to avoid rounding an intermediate norm.
+    flat = vectors.reshape(-1, 3)
+    return np.fromiter(map(math.hypot, *flat.T.tolist()), dtype=np.float64,
+                       count=len(flat)).reshape(vectors.shape[:-1])
+
+
 def _vdist(np, a, b):
-    delta = a - b
-    return np.hypot(np.hypot(delta[..., 0], delta[..., 1]), delta[..., 2])
+    return _vnorm(np, a - b)
 
 
 def _unit_normals(np, triangles):
     """Unit normals scaled by ``1 / math.hypot`` as point_triangle_distance does."""
     cross = _vcross(np, triangles[..., 1, :] - triangles[..., 0, :],
                     triangles[..., 2, :] - triangles[..., 0, :])
-    flat = cross.reshape(-1, 3).T.tolist()
-    length = np.array(list(map(math.hypot, *flat)), dtype=np.float64).reshape(cross.shape[:-1])
+    length = _vnorm(np, cross)
     valid = length != 0
     with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
         scale = np.where(valid, 1 / np.where(valid, length, 1.), 0.)
@@ -383,10 +387,6 @@ def triangle_distances(a, b):
     return _triangle_pairs(np, a, b, *_unit_normals(np, a), *_unit_normals(np, b))
 
 
-def _group_bounds(triangles, indices):
-    return bounds([point for index in indices for point in triangles[index]])
-
-
 def _gap(a, b):
     total = 0.
     for i in range(3):
@@ -421,13 +421,12 @@ class _Surface:
 
 
 class _Node:
-    __slots__ = ('box', 'children', 'high', 'indices', 'low', 'surface')
+    __slots__ = ('box', 'children', 'indices', 'surface')
 
     def __init__(self, surface, indices):
         self.surface, self.indices = surface, indices
-        self.low = surface.lows[indices].min(axis=0)
-        self.high = surface.highs[indices].max(axis=0)
-        self.box = [self.low.tolist(), self.high.tolist()]
+        self.box = [surface.lows[indices].min(axis=0).tolist(),
+                    surface.highs[indices].max(axis=0).tolist()]
         self.children = None
 
     def split(self):
@@ -441,25 +440,21 @@ class _Node:
         return self.children
 
 
-def _leaf_work(left, right):
-    """Most budget units one leaf pair can spend in ``_near_pairs``."""
-    k, m = len(left.indices), len(right.indices)
-    return k * m if k == 1 or m == 1 else k + m + k * m
-
-
-def _near_pairs(np, left, right, best):
-    """Triangle pairs whose boxes are closer than ``best``, and the budget units spent."""
+def _near_pairs(np, left, right, best, limit):
+    """Take up to ``limit`` candidate pairs and return the lowest omitted box gap."""
     a, b = left.surface, right.surface
     rows, cols = left.indices, right.indices
-    work = 0
-    if len(rows) > 1 and len(cols) > 1:
-        work = len(rows) + len(cols)
-        rows = rows[_box_gaps(np, a.lows[rows], a.highs[rows], right.low, right.high) < best]
-        cols = cols[_box_gaps(np, left.low, left.high, b.lows[cols], b.highs[cols]) < best]
-    near = _box_gaps(np, a.lows[rows][:, None], a.highs[rows][:, None],
-                     b.lows[cols][None], b.highs[cols][None]) < best
-    i, j = np.nonzero(near)
-    return rows[i], cols[j], work + len(i)
+    gaps = _box_gaps(np, a.lows[rows][:, None], a.highs[rows][:, None],
+                    b.lows[cols][None], b.highs[cols][None])
+    i, j = np.nonzero(gaps < best)
+    omitted_gap = None
+    if len(i) > limit:
+        candidate_gaps = gaps[i, j]
+        order = np.argsort(candidate_gaps, kind='stable')
+        omitted_gap = float(candidate_gaps[order[limit]])
+        kept = order[:limit]
+        i, j = i[kept], j[kept]
+    return rows[i], cols[j], omitted_gap
 
 
 def prove_distance(subjects, context, upper, budget):
@@ -470,9 +465,9 @@ def prove_distance(subjects, context, upper, budget):
     be treated as the minimum.
 
     Budget units: one per node-pair split and one per exact triangle-pair distance.
-    A leaf pair of at most ``PROOF_LEAF_TRIANGLES`` triangles a side, both sides
-    with two or more, also costs one per triangle box tested against the other
-    leaf's box. ``tests`` reports the units spent and never exceeds ``budget``.
+    Leaf box scans are bounded by ``PROOF_LEAF_TRIANGLES`` squared pairs and a
+    partial scan evaluates the closest candidate boxes first. ``tests`` reports
+    the units spent and never exceeds ``budget``.
     """
     if type(budget) is not int or budget < 0:
         raise ValueError('Distance proof budget must be a nonnegative integer')
@@ -499,25 +494,24 @@ def prove_distance(subjects, context, upper, budget):
 
     left, right = _Node(a, np.arange(len(a.vertices))), _Node(b, np.arange(len(b.vertices)))
     pending = [(_gap(left.box, right.box), len(left.indices) * len(right.indices), counter, left, right)]
-    stopped = None
+    stopped = math.inf
     while pending:
         gap, _, _, left, right = heappop(pending)
         if gap >= best:
             continue
         if work >= budget:
-            if queued:
-                best = flush(best)
-                if gap >= best:
-                    continue
             stopped = gap
             break
         leaf = max(len(left.indices), len(right.indices)) <= PROOF_LEAF_TRIANGLES
-        if leaf and _leaf_work(left, right) <= budget - work:
-            rows, cols, spent = _near_pairs(np, left, right, best)
-            work += spent
+        if leaf:
+            rows, cols, omitted_gap = _near_pairs(np, left, right, best, budget - work)
+            work += len(rows)
             if len(rows):
                 queued.append((rows, cols))
                 queued_pairs += len(rows)
+            if omitted_gap is not None:
+                stopped = omitted_gap
+                break
             if queued_pairs >= PROOF_BATCH_PAIRS:
                 best = flush(best)
             continue
@@ -529,9 +523,9 @@ def prove_distance(subjects, context, upper, budget):
             heappush(pending, (_gap(l.box, r.box), len(l.indices) * len(r.indices), counter, l, r))
     if queued:
         best = flush(best)
-    if stopped is None:
-        return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
     lower = min(stopped, pending[0][0]) if pending else stopped
+    if lower >= best:
+        return {'proven': True, 'lower_m': best, 'upper_m': best, 'tests': work}
     return {'proven': False, 'lower_m': lower, 'upper_m': best, 'tests': work}
 
 

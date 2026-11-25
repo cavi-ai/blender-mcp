@@ -116,6 +116,40 @@ class SpatialBatchTests(unittest.TestCase):
             sq.point_triangle_distances([(0., 0., 0.)], [TRIANGLE[:2]])
         self.assertEqual(sq.triangle_distances([], []).shape, (0,))
 
+    def test_proof_keeps_exact_three_axis_distance(self):
+        left = ((0., 0., 0.), (-1., 0., 0.), (0., -1., 0.))
+        right = ((6., 3., 2.), (7., 3., 2.), (6., 4., 2.))
+        # The closest vertices differ by (6, 3, 2), with a norm of exactly 7.
+        sampled_upper = float(sq.point_triangle_distances([left[0]], [right])[0])
+        for upper in (sampled_upper, 8.):
+            with self.subTest(upper=upper):
+                proof = sq.prove_distance([left], [right], upper, budget=1)
+                self.assertTrue(proof['proven'])
+                self.assertEqual(proof['lower_m'], 7.)
+                self.assertEqual(proof['upper_m'], 7.)
+        self.assertEqual(sampled_upper, 7.)
+
+    def test_larger_budget_preserves_completed_proof(self):
+        subjects = [
+            ((-7, 3, 4), (-2, -5, -6), (-3, 5, -2)),
+            ((-2, -3, 5), (-5, -1, -5), (-1, -1, 1)),
+            ((-4, 1, 0), (-4, 0, 2), (-4, -5, -3)),
+        ]
+        context = [
+            ((7, 1, -1), (3, -1, 0), (0, 3, 3)),
+            ((5, 1, 1), (0, -3, -4), (7, -5, -6)),
+            ((5, 0, -2), (0, 4, 2), (6, -3, 0)),
+        ]
+        exact = brute_force(subjects, context)
+        for budget in range(6, 16):
+            with self.subTest(budget=budget):
+                proof = sq.prove_distance(subjects, context, upper=7.0710678118654755,
+                                          budget=budget)
+                self.assertLessEqual(proof['tests'], budget)
+                self.assertTrue(proof['proven'], proof)
+                self.assertAlmostEqual(proof['lower_m'], exact, places=14)
+                self.assertAlmostEqual(proof['upper_m'], exact, places=14)
+
     def test_finished_proofs_equal_the_brute_force_minimum(self):
         cases = {
             'separated': (soup(1, 48, (0., 0., 0.)), soup(2, 48, (1.2, 0., 0.))),
