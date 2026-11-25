@@ -48,6 +48,7 @@ PROVIDERS = {
         "quality": {
             "default": ("--resolution", "512"),
             "fast": ("--steps", "6", "--resolution", "512"),
+            "high": ("--resolution", "1024"),
         },
         "vertex_colors": True,
         "guides": True,
@@ -55,7 +56,7 @@ PROVIDERS = {
         "fast_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
-QUALITIES = ("fast", "default")
+QUALITIES = ("fast", "default", "high")
 IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_VIEWS = 5
 # mlx-agent keeps the smallest bbox side at least two voxels of TRELLIS.2's 32³ sparse structure.
@@ -191,9 +192,11 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
     settings = PROVIDERS[provider]
     quality = "default" if quality is None else quality
     if quality not in QUALITIES:
-        raise ValueError("Quality must be fast or default")
+        raise ValueError("Quality must be fast, default or high")
     if quality != "default" and "quality" not in settings:
         raise ValueError("Quality tiers apply only to the triposg-mlx and trellis2-mlx providers")
+    if quality not in settings.get("quality", {"default": ()}):
+        raise ValueError("Quality high applies only to the trellis2-mlx provider")
     workspace = Path(workspace).resolve()
     source = inside(workspace, image, IMAGES, 16 * 1024 * 1024,
                     "Input image must be a workspace PNG, JPEG or WebP image of at most 16 MiB")

@@ -37,6 +37,7 @@ TIERS = {
     (False, "fast"): (25, 256, "adaptive"),
     (True, "default"): (None, 512, "off"),
     (True, "fast"): (6, 512, "off"),
+    (True, "high"): (None, 1024, "off"),
 }
 tier = TIERS[trellis, os.environ.get("FAKE_AGENT_QUALITY", "default")]
 record = Path(os.environ["FAKE_AGENT_RECORD"])

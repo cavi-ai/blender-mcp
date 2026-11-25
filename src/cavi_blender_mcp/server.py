@@ -1299,7 +1299,7 @@ async def asset_io(
     image: Annotated[str | None, Field(description="generate needs workspace image")] = None,
     prompt: Annotated[str | None, Field(max_length=1000, description="generate: panorama text")] = None,
     resolution: Annotated[StrictInt | None, Field(ge=64, le=192, description='generate: TripoSR grid; default 128')] = None,
-    quality: Annotated[Literal["fast", "default"] | None, Field(description='generate: MLX speed tier')] = None,
+    quality: Annotated[Literal["fast", "default", "high"] | None, Field(description='generate: MLX tier')] = None,
     views: Annotated[list[str] | None, Field(max_length=5, description="generate: TRELLIS.2 more views")] = None,
     guide: Annotated[str | None, Field(description="generate: TRELLIS.2 shape GLB")] = None,
     bbox: Annotated[Vector3 | None, Field(description="generate: TRELLIS.2 XYZ size")] = None,

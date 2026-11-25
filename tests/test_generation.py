@@ -339,10 +339,27 @@ class TripoSGMlxTests(unittest.TestCase):
         self.assertTrue((self.work / "mesh.glb").is_file())
 
     def test_unknown_quality_is_refused_before_any_asset(self):
-        with self.assertRaisesRegex(ValueError, "fast or default"):
+        with self.assertRaisesRegex(ValueError, "fast, default or high"):
+            self.generate(quality="ultra")
+        self.assert_nothing_published()
+        self.assertFalse((self.record / "image.png").exists())
+
+    def test_high_quality(self):
+        with self.assertRaisesRegex(ValueError, "high applies only to the trellis2-mlx"):
             self.generate(quality="high")
         self.assert_nothing_published()
         self.assertFalse((self.record / "image.png").exists())
+
+    def test_the_tool_schema_offers_the_high_tier(self):
+        settings = {**self.settings("ok"), "CAVI_BLENDER_WORKSPACE": str(self.work)}
+        with (
+            patch.dict(os.environ, settings),
+            patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
+            self.assertRaisesRegex(Exception, "high applies only to the trellis2-mlx"),
+        ):
+            asyncio.run(server.mcp.call_tool("asset_io", {
+                "action": "generate", "path": "mesh.glb", "image": "input.png", "quality": "high"}))
+        self.assert_nothing_published()
 
     def test_the_agent_receives_the_framed_image(self):
         self.generate()
@@ -443,6 +460,23 @@ class Trellis2MlxTests(TripoSGMlxTests):
         with self.assertRaisesRegex(RuntimeError, "166666 faces"):
             self.generate("oversized", quality="fast", FAKE_AGENT_QUALITY="fast")
         self.assert_nothing_published()
+
+    def test_high_quality(self):
+        # The fake agent accepts only resolution 1024, the checkpoint's own steps and 500,000 faces.
+        result = self.generate(quality="high", FAKE_AGENT_QUALITY="high")
+        self.assertEqual((result["quality"], result["faces"]), ("high", 499990))
+        self.assertTrue((self.work / "mesh.glb").is_file())
+
+    def test_the_tool_schema_offers_the_high_tier(self):
+        settings = {**self.settings("ok", FAKE_AGENT_QUALITY="high"), "CAVI_BLENDER_WORKSPACE": str(self.work)}
+        with (
+            patch.dict(os.environ, settings),
+            patch.object(server, "call", side_effect=AssertionError("Unrelated scene accessed")),
+        ):
+            result = asyncio.run(server.mcp.call_tool("asset_io", {
+                "action": "generate", "path": "mesh.glb", "image": "input.png", "quality": "high"}))
+        self.assertIn('"quality":"high"', str(result).replace(" ", "").replace("'", '"'))
+        self.assertTrue((self.work / "mesh.glb").is_file())
 
     def test_oversized_output_reports_actual_bytes(self):
         with self.assertRaisesRegex(RuntimeError, "67108865.*67108864"):
