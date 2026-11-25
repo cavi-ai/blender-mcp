@@ -102,16 +102,11 @@ meshes, plus `proposed_world_delta` (a 4×4 world matrix applied to the subjects
 `min_clearance_m` and `samples_per_side`. It returns metre world bounds, geometry/query
 identities, bounded triangle intersection pairs and bidirectional sampled nearest
 surface gaps with fixed safety budgets. Bounds are broadphase only. `distance_m` is the
-closest sample. A finished search sets `continuous_minimum_proven` and
-`distance_lower_bound_m` to the exact triangle distance; an exhausted search leaves the
-minimum unproven. Neither result is a solid-containment proof. See [placement and surface
-clearance](../guides/scene-inspection.md#placement-and-surface-clearance) for limits
-and an example. This mode excludes other `scene_info` arguments.
-
-`max_pair_tests` bounds the distance proof in work units: one per node-pair split,
-one per exact triangle-pair distance, and one per triangle box test inside a leaf
-pair when both leaves hold two or more triangles. `tests` reports the units spent
-and never exceeds the budget. Batched evaluation does not change results.
+closest sample. The search reports `distance_lower_bound_m` and
+`distance_upper_bound_m`. When `continuous_minimum_proven` is true, both bounds
+equal the proven surface distance. Check solid containment separately. See [placement and
+surface clearance](../guides/scene-inspection.md#placement-and-surface-clearance)
+for limits and an example. This mode excludes other `scene_info` arguments.
 
 ### Modifier controls
 
@@ -171,21 +166,7 @@ Read-only. Measures exact static mesh names.
 Refuses modifiers, shape keys and rigs.
 
 The `topology` check reports `non_manifold_edges`, `boundary_edges`, `loose_vertices`,
-`zero_area_faces` and `ngons`, plus these defect fields. Distances and angles use
-metres after object rotation, scale and scene unit scale.
-
-| Field | Meaning |
-| --- | --- |
-| `inconsistent_winding_edges`, `inconsistent_winding_edge_examples` | Edges shared by exactly two faces that traverse the edge in the same direction; edge indices |
-| `coincident_vertex_pairs`, `coincident_vertex_pair_examples` | Vertex pairs within `coincident_distance_m`; `[vertex, vertex]` |
-| `coincident_distance_m` | Coincidence distance, 1e-4 m |
-| `sliver_triangles`, `sliver_triangle_examples` | Triangles of non-zero-area faces whose smallest angle is below `sliver_angle_degrees`; `[triangle, face]` |
-| `sliver_angle_degrees` | Sliver threshold, 1.0 |
-| `self_intersecting_face_pairs`, `self_intersecting_face_pair_examples` | Face pairs whose triangles cross; `[face, face]` |
-
-Each examples list holds at most 32 entries in ascending order; counts cover all
-findings. Face pairs that share a vertex, coplanar overlaps and edge contacts are
-not counted as self-intersections, and `not_checked` lists them when `topology` runs.
+`zero_area_faces` and `ngons`.
 
 ## inspect_uv_layout
 
@@ -387,7 +368,7 @@ Mutating. Actions: `create`, `edit_bones`, `bind`, `weights`, `pose`, `keyframe`
 | `start_frame`, `end_frame`, `frame_step` | `bake`; positive fractional steps supported, at most 4096 samples |
 | `new_name`, `action_name`, `names` | `bake`; independent rig/action and optional skinned copies |
 | `skinning_mode` | `bake`; `preserve` or `linear` |
-| `constraint` | `constraint`; `type` `IK` or `LIMIT_ROTATION`; `owner_space` `WORLD`, `POSE`, `LOCAL` (default) or `LOCAL_WITH_PARENT` |
+| `constraint` | `constraint`; `type` `IK` or `LIMIT_ROTATION`. For `LIMIT_ROTATION`, `owner_space` is `WORLD`, `POSE`, `LOCAL` (default) or `LOCAL_WITH_PARENT` |
 | `strip_settings.blend_type` | `REPLACE`, `COMBINE`, `ADD`, `SUBTRACT` or `MULTIPLY` |
 | `strip_settings.extrapolation` | `NOTHING`, `HOLD` or `HOLD_FORWARD` |
 
@@ -406,13 +387,15 @@ Lease-free. Returns a PNG MCP image.
 | `color_mode` | `material` or `vertex` |
 | `renderer` | `workbench` or `eevee` |
 | `orthographic` | Boolean |
+| `settings.bit_depth` | PNG bit depth as a string, `"8"` or `"16"` (default) |
 
 Eevee requires material colors and at most 1024 pixels.
 
 The result carries a PNG image block plus structured `path` and `mime_type`
 (`image/png`) fields. The receipt identifies the file written in the session
-workspace; image blocks remain available to visual clients. A perspective camera is
-placed from its effective field of view to fit the bounding sphere with a 10% margin.
+workspace; image blocks remain available to visual clients.
+
+[Guide](../guides/previews-and-review.md)
 
 ## session_control
 
@@ -533,14 +516,15 @@ binds existing finishes to source polygons. It reuses the first matching slot or
 appends one, retaining other slots and all UV, skin and shape-key data.
 
 `move_vertices` translates declared `vertex_indices` while retaining morph offsets.
-Its optional `amount` enables physical proportional falloff along connected source
-edges; `vertex_edit.falloff` records the metric and sampled weights.
+Its optional `amount` sets the proportional falloff radius in metres along connected
+source edges. `vertex_edit.falloff` records the metric and sampled weights.
 For a bounded proportional edit, supply `face_indices`, `amount`, and the current
 `expected_mesh_sha256`. Choose seed vertices in the selected region’s interior.
 The falloff follows selected face edges and holds shared and open-edge boundary
 vertices fixed. Use this option for a single-sided edit.
-Optional `symmetry_axis` plus `symmetry_tolerance_m` reflect displacements to
-unique reciprocal source counterparts; `vertex_edit.symmetry` reports pairing.
+Optional `symmetry_axis` (`X`, `Y` or `Z`) plus `symmetry_tolerance_m` reflect
+displacements to unique reciprocal source counterparts. `vertex_edit.symmetry`
+reports pairing.
 
 `extrude_faces` extrudes a declared region using `face_indices`
 and a local `offset`; optional `expected_mesh_sha256` guards against stale
@@ -607,7 +591,7 @@ Actions: `assign`, `inspect`, `set_inputs`, `set_image`, `make_unique`, `connect
 lease-free; shader edits require ownership. Inspect native shader inputs/outputs
 and shared owners before tuning defaults through nested `group_path` nodes.
 `set_image` replaces an image binding with a packed native workspace snapshot and
-explicit color/alpha interpretation: `alpha_mode` is `STRAIGHT` (default), `PREMUL`,
+explicit color/alpha interpretation. `image.alpha_mode` is `STRAIGHT` (default), `PREMUL`,
 `CHANNEL_PACKED` or `NONE`. Optional `image.tiles` declares an exact UDIM set for an
 `<UDIM>` filename pattern. See [authored shader controls](../guides/materials-and-uvs.md#tune-an-authored-shader-graph).
 
@@ -768,8 +752,7 @@ Lease-free. Returns one PNG contact sheet.
 | `texture_resolution`, `uv_layer` | Pixels or `[width, height]`; UV map |
 
 The result carries a PNG image block plus structured `path` and `mime_type`
-(`image/png`) fields. The `persp` view is placed from the camera's effective field of
-view to fit the bounding sphere with a 10% margin; orthographic views are unchanged.
+(`image/png`) fields.
 
 [Guide](../guides/previews-and-review.md)
 
@@ -834,8 +817,8 @@ model matching `action`: `camera`, `light`, `world`, `render` or `compositor`.
   persist with the project. `scene_info(name=...)` reads camera/light definitions.
   `file_format` is `png` (default), `exr` or `tiff`.
 
-Production PNG/TIFF default to 16-bit; EXR supports half or full float through
-`bit_depth="16"` or `"32"`. Explicit 8-bit PNG/TIFF remain available. Output paths
+For `bit_depth`, PNG and TIFF accept `"8"` or `"16"` (default). EXR accepts
+`"16"` (half float, default) or `"32"` (full float). Output paths
 must be new workspace files. `max_pixels` defaults to 16777216 and may be raised
 explicitly for larger images. `cycles_time_limit` limits Cycles sampling; it is
 not a wall-clock deadline for scene preparation or Eevee. The result reports elapsed

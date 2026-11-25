@@ -70,9 +70,7 @@ source face indices may change after any topology edit.
 New side faces require UV layout and material review. Plan extrusion before
 final unwrap and baking; existing cap/unselected UVs are retained. The tool does
 not automatically pack the new surfaces or detect global self-intersections.
-Run topology and UV checks, then inspect the silhouette before export. The
-`topology` check of `inspect_mesh_quality` reports inconsistent winding,
-coincident vertices, sliver triangles and self-intersecting face pairs.
+Run topology and UV checks, then inspect the silhouette before export.
 
 Use `unwrap_faces` with the returned `side_faces` and geometry hash to lay out
 the new surfaces while retaining the cap and unselected UVs.

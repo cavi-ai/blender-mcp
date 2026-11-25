@@ -7,19 +7,12 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
-### Added
-
-- `inspect_mesh_quality` `topology` reports inconsistent winding edges, coincident vertex pairs, sliver triangles and self-intersecting face pairs with up to 32 examples each.
-
 ### Changed
 
-- Spatial distance proofs batch triangle tests with numpy; results are unchanged and `max_pair_tests` counts work units.
-- The MCP instructions state length units and the `expected_mesh_sha256` / `expected_uv_sha256` guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other schema value.
+- The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.
 
 ### Fixed
 
-- Perspective previews in `render_preview` and `review_sheet` frame the bounding sphere from the camera's effective field of view, so small assets fill the frame.
-- Zero-area clip triangles report zero UV intersection area.
 - The `inspect_mesh_quality` `checks` description states that an omitted or empty list runs no checks.
 
 ## 0.60.0 - 2026-11-21

@@ -94,10 +94,7 @@ Optional `checks` add:
 - `naming`: lint against `mesh_prefix`, `lod_suffix` and
   `collision_prefixes`
 - `topology`: non-manifold and boundary edges, loose vertices, zero-area faces
-  and n-gons, plus edges whose two faces disagree on winding, coincident
-  vertex pairs, sliver triangles and self-intersecting face pairs, each with up
-  to 32 examples. See the [tool reference](../reference/tools.md#inspect_mesh_quality)
-  for thresholds and exclusions
+  and n-gons
 - `lightmap`: presence of `lightmap_uv` at `lightmap_resolution`. `overlap_ratio`
   is a cell-center raster. `exact_overlap_pairs` is the analytic count when
   `overlap_proven` is true. `pairwise_overlap_area_uv2` sums analytic pair areas,

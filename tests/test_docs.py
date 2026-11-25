@@ -225,19 +225,23 @@ def schema_strings(node, found):
 
 class ToolReferenceTests(unittest.TestCase):
     def test_reference_names_every_schema_enum_value(self):
-        found = set()
-        for tool in asyncio.run(server.mcp.list_tools()):
-            schema_strings(tool.input_schema, found)
-        # Numeric strings are sample counts and axis letters are single-character tokens.
-        found = {v for v in found if not v.isdigit() and v not in {"X", "Y", "Z"}}
         reference = (PAGES / "reference" / "tools.md").read_text()
-        spans = "\n".join(re.findall(r"`([^`\n]+)`", reference))
-        missing = [
-            v for v in found
-            if not re.search(rf"(?<![\w-]){re.escape(v)}(?![\w-])", spans)
-        ]
+        sections = dict(re.findall(
+            r"^## ([a-z_]+)\n(.*?)(?=^## |\Z)", reference, re.MULTILINE | re.DOTALL
+        ))
+        missing = {}
+        for tool in asyncio.run(server.mcp.list_tools()):
+            values = set()
+            schema_strings(tool.input_schema, values)
+            spans = "\n".join(re.findall(r"`([^`\n]+)`", sections.get(tool.name, "")))
+            undocumented = [
+                value for value in sorted(values)
+                if not re.search(rf"(?<![\w-]){re.escape(value)}(?![\w-])", spans)
+            ]
+            if undocumented:
+                missing[tool.name] = undocumented
         self.maxDiff = None
-        self.assertEqual(sorted(missing), [])
+        self.assertEqual(missing, {})
 
 
 if __name__ == "__main__":
