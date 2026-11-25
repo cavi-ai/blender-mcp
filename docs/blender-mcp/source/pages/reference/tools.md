@@ -745,7 +745,8 @@ count, and exported object names.
 `triposg-mlx` and `trellis2-mlx` providers. With `trellis2-mlx` it also takes
 `views` (up to five more workspace images) and `guide` (a workspace GLB that
 sets the shape and frame). With `prompt` in place of `image` it writes a
-wrapping 2048×1024 panorama PNG for `scene_edit` `world.hdri`.
+wrapping 2048×1024 panorama for `scene_edit` `world.hdri`: a PNG, or a
+half-float scene-linear EXR for a `.exr` path.
 
 [Guide](../guides/asset-import-export.md) and
 [local generation](../guides/local-generation.md).

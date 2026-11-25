@@ -13,6 +13,7 @@ adds its lines under Unreleased and never edits a version.
 - `inspect_skin_clearance` with `include_worst_support` reports up to 16 `ambiguity_examples` per garment, with the probe, nearest body triangle and causes of each unresolved classification.
 - `asset_io` `action="generate"` takes a TRELLIS.2 `bbox` that fits the generated shape and bounds to X, Y and Z sizes.
 - `asset_io` `action="generate"` takes `quality="high"`, which runs `trellis2-mlx` at resolution 1024.
+- `asset_io` `action="generate"` with `prompt` and a `.exr` path writes a half-float scene-linear panorama whose 8-bit white reaches 16.
 
 ### Changed
 
