@@ -7,6 +7,10 @@ adds its lines under Unreleased and never edits a version.
 
 ## Unreleased
 
+### Added
+
+- `inspect_mesh_quality` `topology` reports inconsistent winding edges, coincident vertex pairs, sliver triangles and self-intersecting face pairs with up to 32 examples each, and marks budget-limited searches incomplete.
+
 ### Changed
 
 - The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.
