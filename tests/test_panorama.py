@@ -139,7 +139,7 @@ class PanoramaTests(unittest.TestCase):
             self.assertAlmostEqual(pixel(x, 100)[0], decoded / (1 - decoded * 7 / 8), delta=decoded / 100)
         self.assertEqual(pixel(1023, 100), pixel(0, 100))
         for key, value in (("CAVI_IMAGE_MLX_WIDTH", "1025"), ("CAVI_IMAGE_MLX_SEAM_BAND", "512"),
-                           ("CAVI_IMAGE_MLX_WHITE", "0.5"), ("CAVI_IMAGE_MLX_FAST_TIMEOUT", "0")):
+                           ("CAVI_IMAGE_MLX_FAST_TIMEOUT", "0")):
             with (
                 self.subTest(key=key),
                 self.assertRaisesRegex(RuntimeError, key),
@@ -147,6 +147,19 @@ class PanoramaTests(unittest.TestCase):
             ):
                 panorama(self.work, "a sunny meadow", "other.png", "fast" if "FAST" in key else None)
             self.assertFalse((self.work / "other.png").exists())
+
+    def test_exr_refuses_invalid_white_before_running_the_agent(self):
+        for value in ("0.5", "70000"):
+            with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, "CAVI_IMAGE_MLX_WHITE"):
+                self.generate(path="sky.exr", CAVI_IMAGE_MLX_WHITE=value)
+            self.assertFalse((self.work / "sky.exr").exists())
+            self.assertFalse((self.record / "request.json").exists())
+
+    def test_png_ignores_the_exr_white_setting(self):
+        report = self.generate(CAVI_IMAGE_MLX_WHITE="bad")
+        self.assertNotIn("white", report)
+        with Image.open(self.work / "sky.png") as published:
+            self.assertEqual(published.format, "PNG")
 
     def test_a_ramp_jumps_at_its_seam_until_it_is_wrapped(self):
         ramp = Image.linear_gradient("L").rotate(90, expand=True).transpose(Image.FLIP_LEFT_RIGHT)

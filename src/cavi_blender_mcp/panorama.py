@@ -19,6 +19,7 @@ WIDTH = 2048
 BAND = 128
 # Scene-linear value that 8-bit white reaches in an EXR panorama, four stops above display white.
 WHITE = 16.0
+MAX_EXR_WHITE = 65_504  # Largest finite half-float value.
 STEPS = {"default": 30, "fast": 12}
 TIMEOUT = 1800
 SEED = 42
@@ -41,13 +42,13 @@ def panorama(workspace, prompt, path, quality=None):
     if width % 2 or band >= width // 2:
         raise RuntimeError(f"{PREFIX}_WIDTH must be even and {PREFIX}_SEAM_BAND narrower than half of it")
     height = width // 2
-    white = tunable(PREFIX, "WHITE", WHITE, quality)
     steps = tunable(PREFIX, "STEPS", STEPS[quality], quality)
     seed = tunable(PREFIX, "SEED", SEED, quality, minimum=0)
     timeout = tunable(PREFIX, "TIMEOUT", TIMEOUT, quality)
     workspace = Path(workspace).resolve()
     target = destination(workspace, path, {".png", ".exr"})
     extension = target.suffix.lower()
+    white = tunable(PREFIX, "WHITE", WHITE, quality, maximum=MAX_EXR_WHITE) if extension == ".exr" else WHITE
     configured = {}
     for suffix in SUFFIXES:
         key = f"{PREFIX}_{suffix}"

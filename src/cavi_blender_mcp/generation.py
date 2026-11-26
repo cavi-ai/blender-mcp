@@ -26,7 +26,7 @@ PROVIDERS = {
         "worker": "neural_worker.py",
         "timeout": 180,
         "threads": 4,
-        "worker_options": {"resolution": 128, "seed": 0, "max_faces": 500_000, "chunk_size": 16384},
+        "worker_options": {"resolution": 128, "seed": 0, "max_faces": MAX_GEOMETRY, "chunk_size": 16384},
     },
     "triposg": {
         "prefix": "CAVI_TRIPOSG",
@@ -34,7 +34,7 @@ PROVIDERS = {
         "worker": "triposg_worker.py",
         "timeout": 600,
         "threads": 4,
-        "worker_options": {"steps": 50, "guidance": 7.0, "seed": 0, "max_faces": 500_000},
+        "worker_options": {"steps": 50, "guidance": 7.0, "seed": 0, "max_faces": MAX_GEOMETRY},
     },
     "triposg-mlx": {
         "prefix": "CAVI_TRIPOSG_MLX",
@@ -44,7 +44,7 @@ PROVIDERS = {
         "model": "TripoSG",
         "frame": "triposg_frame.py",
         "seed": 42,
-        "max_faces": 500_000,
+        "max_faces": MAX_GEOMETRY,
         # mlx-agent options of each quality tier.
         "quality": {
             "default": {"steps": 50, "resolution": 512, "denoiser-cache": "off"},
@@ -59,7 +59,7 @@ PROVIDERS = {
         "model": "TRELLIS.2",
         "frame": "trellis2_frame.py",
         "seed": 42,
-        "max_faces": {"default": 500_000, "fast": ATLAS_MAX_FACES, "high": ATLAS_MAX_FACES},
+        "max_faces": {"default": MAX_GEOMETRY, "fast": ATLAS_MAX_FACES, "high": ATLAS_MAX_FACES},
         # Steps None keeps the converted checkpoint's sampler steps and guidance.
         "quality": {
             "default": {"steps": None, "resolution": 512},
@@ -80,11 +80,11 @@ MIN_BOX_SIZE = 2.0 ** -148
 MAX_BOX_SIZE = float.fromhex("0x1.fffffep+128")
 
 
-def tunable(prefix, name, default, quality="default", minimum=1):
+def tunable(prefix, name, default, quality="default", minimum=1, maximum=None):
     """``{prefix}_{QUALITY}_{NAME}``, else ``{prefix}_{NAME}``, else ``default``.
 
-    A value parses as its default's type, an integer when the default is None: a number of at least ``minimum``, or
-    one lowercase option word.
+    A value parses as its default's type, an integer when the default is None: a number within the given bounds,
+    or one lowercase option word.
     """
     kind = type(default) if isinstance(default, (str, float)) else int
     for key in (f"{prefix}_{quality.upper()}_{name}", f"{prefix}_{name}"):
@@ -99,8 +99,10 @@ def tunable(prefix, name, default, quality="default", minimum=1):
             value = kind(raw)
         except ValueError:
             value = None
-        if value is None or not math.isfinite(value) or value < minimum:
-            raise RuntimeError(f"{key} must be {'a number' if kind is float else 'an integer'} of at least {minimum}")
+        if (value is None or (kind is float and not math.isfinite(value)) or value < minimum
+                or (maximum is not None and value > maximum)):
+            bounds = f"of at least {minimum}" if maximum is None else f"between {minimum} and {maximum}"
+            raise RuntimeError(f"{key} must be {'a number' if kind is float else 'an integer'} {bounds}")
         return value
     return default
 
@@ -146,7 +148,7 @@ def mlx_options(settings, quality):
         if value is not None:
             options += [f"--{option}", str(value)]
     seed = tunable(prefix, "SEED", settings["seed"], quality, minimum=0)
-    max_faces = tunable(prefix, "MAX_FACES", tiered(settings["max_faces"], quality), quality)
+    max_faces = tunable(prefix, "MAX_FACES", tiered(settings["max_faces"], quality), quality, maximum=MAX_GEOMETRY)
     return [*options, "--seed", str(seed), "--max-faces", str(max_faces)], max_faces
 
 
@@ -275,13 +277,19 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
     target = destination(workspace, path, {".glb"})
     if resolution is not None and provider != "triposr":
         raise ValueError("Resolution applies only to the TripoSR provider")
-    worker_options = {name: tunable(prefix, name.upper(), default, quality,
-                                    minimum=0 if name in ("seed", "guidance") else 1)
-                      for name, default in settings.get("worker_options", {}).items()}
+    worker_options = {}
+    for name, default in settings.get("worker_options", {}).items():
+        if name == "resolution" and resolution is not None:
+            worker_options[name] = resolution
+        else:
+            worker_options[name] = tunable(
+                prefix, name.upper(), default, quality,
+                minimum=0 if name in ("seed", "guidance") else 1,
+                maximum=MAX_GEOMETRY if name == "max_faces" else None,
+            )
     if provider == "triposr":
-        if resolution is not None:
-            worker_options["resolution"] = resolution
-        if type(worker_options["resolution"]) is not int or not 64 <= worker_options["resolution"] <= 192:
+        resolved = worker_options["resolution"]
+        if type(resolved) is not int or not 64 <= resolved <= 192:
             raise ValueError("Resolution must be between 64 and 192")
     timeout = tunable(prefix, "TIMEOUT", tiered(settings["timeout"], quality), quality)
     threads = tunable(prefix, "THREADS", settings["threads"], quality)

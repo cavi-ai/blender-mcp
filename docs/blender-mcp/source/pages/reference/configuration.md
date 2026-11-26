@@ -64,11 +64,11 @@ example, `CAVI_TRELLIS2_MLX_HIGH_TIMEOUT=3000` raises only the `high` tier's lim
 | `RESOLUTION` | `triposr` (64–192, a request `resolution` wins), MLX mesh providers | `triposr` 128; `triposg-mlx` 512 (`fast` 256); `trellis2-mlx` 512 (`high` 1024) |
 | `DENOISER_CACHE` | `triposg-mlx` | `off` (`fast` `adaptive`) |
 | `GUIDANCE` | `triposg`; 0 or more | 7.0 |
-| `MAX_FACES` | Mesh providers | 500,000; `trellis2-mlx` `fast` and `high` 166,666 |
+| `MAX_FACES` | Mesh providers; 1–500,000 | 500,000; `trellis2-mlx` `fast` and `high` 166,666 |
 | `CHUNK_SIZE` | `triposr` renderer | 16384 |
 | `WIDTH` | Panorama; even, height is half | 2048 |
 | `SEAM_BAND` | Panorama; under half the width | 128 |
-| `WHITE` | Panorama EXR; 1.0 or more | 16.0 |
+| `WHITE` | Panorama EXR; 1.0–65,504 | 16.0 |
 
 ## MCP client
 

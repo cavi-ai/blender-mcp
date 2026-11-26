@@ -202,7 +202,10 @@ class GenerationTests(unittest.TestCase):
 
     def test_torch_workers_receive_their_configured_options(self):
         cases = (
-            ("triposr", {"CAVI_TRIPOSR_SEED": "5", "CAVI_TRIPOSR_CHUNK_SIZE": "4096", "CAVI_TRIPOSR_RESOLUTION": "64",
+            ("triposr", {"CAVI_TRIPOSR_RESOLUTION": "64", "CAVI_TRIPOSR_THREADS": "8",
+                         "CAVI_TRIPOSR_TIMEOUT": "900"}, None,
+             {"resolution": 64, "seed": 0, "max_faces": 500000, "chunk_size": 16384}),
+            ("triposr", {"CAVI_TRIPOSR_SEED": "5", "CAVI_TRIPOSR_CHUNK_SIZE": "4096", "CAVI_TRIPOSR_RESOLUTION": "bad",
                          "CAVI_TRIPOSR_THREADS": "8", "CAVI_TRIPOSR_TIMEOUT": "900"}, 96,
              {"resolution": 96, "seed": 5, "max_faces": 500000, "chunk_size": 4096}),
             ("triposg", {"CAVI_TRIPOSG_STEPS": "30", "CAVI_TRIPOSG_GUIDANCE": "4.5", "CAVI_TRIPOSG_SEED": "5",
@@ -211,7 +214,7 @@ class GenerationTests(unittest.TestCase):
              {"steps": 30, "guidance": 4.5, "seed": 5, "max_faces": 200000}),
         )
         for provider, configured, resolution, options in cases:
-            with self.subTest(provider=provider), tempfile.TemporaryDirectory() as root:
+            with self.subTest(provider=provider, resolution=resolution), tempfile.TemporaryDirectory() as root:
                 work = Path(root)
                 (work / "input.png").write_bytes(b"input")
                 prefix = generation.PROVIDERS[provider]["prefix"]
@@ -230,6 +233,20 @@ class GenerationTests(unittest.TestCase):
                     generate(work, "input.png", "mesh.glb", resolution)
                 self.assertEqual(sent[0][:2], (options, "8"))
                 self.assertGreater(sent[0][2], 890)
+
+    def test_torch_face_caps_above_the_import_limit_are_refused_before_runtime_setup(self):
+        with tempfile.TemporaryDirectory() as root:
+            work = Path(root)
+            (work / "input.png").write_bytes(b"input")
+            for provider in ("triposr", "triposg"):
+                key = f"CAVI_{provider.upper()}_MAX_FACES"
+                with (
+                    self.subTest(provider=provider),
+                    patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": provider, key: "600000"}, clear=True),
+                    self.assertRaisesRegex(RuntimeError, rf"{key}.*500000"),
+                ):
+                    generate(work, "input.png", "mesh.glb")
+            self.assertEqual(list(work.iterdir()), [work / "input.png"])
 
     def test_a_competing_output_is_never_replaced(self):
         with tempfile.TemporaryDirectory() as root:
@@ -332,6 +349,13 @@ class TripoSGMlxTests(unittest.TestCase):
     def assert_nothing_published(self):
         self.assertFalse((self.work / "mesh.glb").exists())
         self.assertFalse(list(self.work.glob(".cavi-generation-*")))
+
+    def test_mlx_face_caps_above_the_import_limit_are_refused_before_running_the_agent(self):
+        key = f"{self.prefix}_DEFAULT_MAX_FACES"
+        with self.assertRaisesRegex(RuntimeError, rf"{key}.*500000"):
+            self.generate(**{key: "600000"})
+        self.assert_nothing_published()
+        self.assertFalse((self.record / "arguments.json").exists())
 
     def test_success_publishes_the_mesh_and_reports_the_run(self):
         report = self.generate()
