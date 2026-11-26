@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import hashlib
+import json
 import os
 import signal
 import sys
@@ -198,6 +199,37 @@ class GenerationTests(unittest.TestCase):
                 generate(work, "input.png", "mesh.glb")
             self.assertFalse((work / "mesh.glb").exists())
             self.assertFalse(list(work.glob(".cavi-generation-*")))
+
+    def test_torch_workers_receive_their_configured_options(self):
+        cases = (
+            ("triposr", {"CAVI_TRIPOSR_SEED": "5", "CAVI_TRIPOSR_CHUNK_SIZE": "4096", "CAVI_TRIPOSR_RESOLUTION": "64",
+                         "CAVI_TRIPOSR_THREADS": "8", "CAVI_TRIPOSR_TIMEOUT": "900"}, 96,
+             {"resolution": 96, "seed": 5, "max_faces": 500000, "chunk_size": 4096}),
+            ("triposg", {"CAVI_TRIPOSG_STEPS": "30", "CAVI_TRIPOSG_GUIDANCE": "4.5", "CAVI_TRIPOSG_SEED": "5",
+                         "CAVI_TRIPOSG_DEFAULT_MAX_FACES": "200000", "CAVI_TRIPOSG_THREADS": "8",
+                         "CAVI_TRIPOSG_TIMEOUT": "900"}, None,
+             {"steps": 30, "guidance": 4.5, "seed": 5, "max_faces": 200000}),
+        )
+        for provider, configured, resolution, options in cases:
+            with self.subTest(provider=provider), tempfile.TemporaryDirectory() as root:
+                work = Path(root)
+                (work / "input.png").write_bytes(b"input")
+                prefix = generation.PROVIDERS[provider]["prefix"]
+                runtime = {f"{prefix}_{key}": str(work) for key in ("PYTHON", "SOURCE", "WEIGHTS")}
+                sent = []
+
+                def complete(command, timeout, env, sent=sent):
+                    sent.append((json.loads(command[4]), env["OMP_NUM_THREADS"], timeout))
+                    Path(command[3]).write_bytes(b"generated-glb")
+                    return proc.Result(0, '{"triangles": 12}', "")
+
+                with (
+                    patch.dict(os.environ, {"CAVI_GENERATION_PROVIDER": provider, **runtime, **configured}),
+                    patch.object(proc, "run_sync", side_effect=complete),
+                ):
+                    generate(work, "input.png", "mesh.glb", resolution)
+                self.assertEqual(sent[0][:2], (options, "8"))
+                self.assertGreater(sent[0][2], 890)
 
     def test_a_competing_output_is_never_replaced(self):
         with tempfile.TemporaryDirectory() as root:
@@ -467,6 +499,27 @@ class Trellis2MlxTests(TripoSGMlxTests):
         self.assertEqual((result["quality"], result["faces"]), ("high", 166_666))
         imported = inspect_glb(self.work, "mesh.glb")
         self.assertEqual((imported["vertices"], imported["triangles"]), (499_998, 166_666))
+
+    def test_configured_values_reach_the_agent(self):
+        # A tier's own variable wins over the provider-wide one.
+        configured = {"CAVI_TRELLIS2_MLX_HIGH_RESOLUTION": "1536", "CAVI_TRELLIS2_MLX_STEPS": "8",
+                      "CAVI_TRELLIS2_MLX_SEED": "7", "CAVI_TRELLIS2_MLX_HIGH_MAX_FACES": "90000",
+                      "CAVI_TRELLIS2_MLX_TIMEOUT": "5", "CAVI_TRELLIS2_MLX_HIGH_TIMEOUT": "3000"}
+        expect = {"steps": 8, "resolution": 1536, "seed": 7, "max_faces": 90000, "timeout": 2970}
+        result = self.generate(quality="high", FAKE_AGENT_QUALITY="high", FAKE_AGENT_EXPECT=json.dumps(expect),
+                               **configured)
+        self.assertEqual(result["faces"], 90000)
+        sent = json.loads((self.record / "arguments.json").read_text())
+        self.assertEqual([sent[name] for name in ("steps", "resolution", "seed", "max_faces")], [8, 1536, 7, 90000])
+        self.assertGreater(sent["timeout"], 2900)
+
+    def test_invalid_configured_values_are_refused_before_any_asset(self):
+        for key, value in (("CAVI_TRELLIS2_MLX_HIGH_TIMEOUT", "0"), ("CAVI_TRELLIS2_MLX_SEED", "-1"),
+                           ("CAVI_TRELLIS2_MLX_STEPS", "six"), ("CAVI_TRELLIS2_MLX_RESOLUTION", "nan")):
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
+                self.generate(quality="high", FAKE_AGENT_QUALITY="high", **{key: value})
+            self.assert_nothing_published()
+        self.assertFalse((self.record / "arguments.json").exists())
 
     def test_high_quality_refuses_a_glb_over_the_import_budget(self):
         with self.assertRaisesRegex(RuntimeError, "GLB cannot be imported.*geometry exceeds the import budget"):

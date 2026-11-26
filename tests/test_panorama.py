@@ -118,6 +118,36 @@ class PanoramaTests(unittest.TestCase):
         self.assertEqual(pixel(2047, 300), pixel(0, 300))
         self.assertFalse(list(self.work.glob(".cavi-panorama-*")))
 
+    def test_configured_values_reach_the_image_agent_and_the_seam(self):
+        configured = {"CAVI_IMAGE_MLX_WIDTH": "1024", "CAVI_IMAGE_MLX_DEFAULT_STEPS": "4", "CAVI_IMAGE_MLX_STEPS": "99",
+                      "CAVI_IMAGE_MLX_SEED": "3", "CAVI_IMAGE_MLX_SEAM_BAND": "64", "CAVI_IMAGE_MLX_WHITE": "8",
+                      "CAVI_IMAGE_MLX_TIMEOUT": "600",
+                      "FAKE_IMAGE_EXPECT": json.dumps({"width": 1024, "height": 512, "seed": 3, "timeout": 600})}
+        self.generate(path="sky.png", **configured)
+        report = self.generate(path="sky.exr", **configured)
+        request = json.loads((self.record / "request.json").read_text())
+        self.assertEqual([request[name] for name in ("width", "height", "steps", "seed")], [1024, 512, 4, 3])
+        self.assertEqual([report[name] for name in ("width", "height", "steps", "seam_band", "white")],
+                         [1024, 512, 4, 64, 8.0])
+        _, _, pixel = read_exr(self.work / "sky.exr")
+        with Image.open(self.work / "sky.png") as published:
+            self.assertEqual(published.size, (1024, 512))
+            codes = published.convert("RGB")
+        for x in (0, 300, 900):
+            encoded = codes.getpixel((x, 100))[0] / 255
+            decoded = encoded / 12.92 if encoded <= 0.04045 else ((encoded + 0.055) / 1.055) ** 2.4
+            self.assertAlmostEqual(pixel(x, 100)[0], decoded / (1 - decoded * 7 / 8), delta=decoded / 100)
+        self.assertEqual(pixel(1023, 100), pixel(0, 100))
+        for key, value in (("CAVI_IMAGE_MLX_WIDTH", "1025"), ("CAVI_IMAGE_MLX_SEAM_BAND", "512"),
+                           ("CAVI_IMAGE_MLX_WHITE", "0.5"), ("CAVI_IMAGE_MLX_FAST_TIMEOUT", "0")):
+            with (
+                self.subTest(key=key),
+                self.assertRaisesRegex(RuntimeError, key),
+                patch.dict(os.environ, {**self.settings, **configured, key: value}),
+            ):
+                panorama(self.work, "a sunny meadow", "other.png", "fast" if "FAST" in key else None)
+            self.assertFalse((self.work / "other.png").exists())
+
     def test_a_ramp_jumps_at_its_seam_until_it_is_wrapped(self):
         ramp = Image.linear_gradient("L").rotate(90, expand=True).transpose(Image.FLIP_LEFT_RIGHT)
         ramp = ramp.resize((512, 256)).convert("RGB")

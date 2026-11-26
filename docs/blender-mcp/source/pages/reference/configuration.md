@@ -42,9 +42,33 @@ These are read by the MCP server. All must be absolute local paths.
 | `CAVI_IMAGE_MLX_MODEL` | Converted image-generation model directory for `generate` with `prompt` |
 
 Only the selected provider's paths are required. The worker sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`,
-`HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS=4`. `triposg-mlx` and `trellis2-mlx` find
-the mlx-agent backend under `$XDG_DATA_HOME/mlx-workbench/backends`. See
+`HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `OMP_NUM_THREADS` to the configured `THREADS`. `triposg-mlx` and
+`trellis2-mlx` find the mlx-agent backend under `$XDG_DATA_HOME/mlx-workbench/backends`. See
 [Generate a mesh locally](../guides/local-generation.md).
+
+## Generation settings
+
+Each setting is read from `<PREFIX>_<QUALITY>_<NAME>`, then `<PREFIX>_<NAME>`, then the default below.
+`<PREFIX>` is the provider's variable prefix (`CAVI_TRIPOSR`, `CAVI_TRIPOSG`, `CAVI_TRIPOSG_MLX`,
+`CAVI_TRELLIS2_MLX`, or `CAVI_IMAGE_MLX` for panoramas) and `<QUALITY>` is `FAST`, `DEFAULT` or `HIGH`. For
+example, `CAVI_TRELLIS2_MLX_HIGH_TIMEOUT=3000` raises only the `high` tier's limit, while
+`CAVI_TRELLIS2_MLX_TIMEOUT` applies to every tier without its own value. Numbers are integers except
+`GUIDANCE` and `WHITE`; a value outside its range is refused before any work starts.
+
+| Name | Applies to | Default |
+| --- | --- | --- |
+| `TIMEOUT` | Every provider; seconds | `triposr` 180, `triposg` 600, `triposg-mlx` 600, `trellis2-mlx` 600 (`high` 3000), panorama 1800 |
+| `THREADS` | Mesh providers; `OMP_NUM_THREADS` | 4 |
+| `SEED` | Every provider; 0 or more | `triposr` 0, `triposg` 0, MLX mesh providers 42, panorama 42 |
+| `STEPS` | `triposg`, MLX providers, panorama | `triposg` 50; `triposg-mlx` 50 (`fast` 25); `trellis2-mlx` the checkpoint's (`fast` 6); panorama 30 (`fast` 12) |
+| `RESOLUTION` | `triposr` (64–192, a request `resolution` wins), MLX mesh providers | `triposr` 128; `triposg-mlx` 512 (`fast` 256); `trellis2-mlx` 512 (`high` 1024) |
+| `DENOISER_CACHE` | `triposg-mlx` | `off` (`fast` `adaptive`) |
+| `GUIDANCE` | `triposg`; 0 or more | 7.0 |
+| `MAX_FACES` | Mesh providers | 500,000; `trellis2-mlx` `fast` and `high` 166,666 |
+| `CHUNK_SIZE` | `triposr` renderer | 16384 |
+| `WIDTH` | Panorama; even, height is half | 2048 |
+| `SEAM_BAND` | Panorama; under half the width | 128 |
+| `WHITE` | Panorama EXR; 1.0 or more | 16.0 |
 
 ## MCP client
 

@@ -43,7 +43,15 @@ TIERS = {
     (True, "high"): (None, 1024, "off"),
 }
 tier = TIERS[trellis, quality]
+# The built-in defaults each run must send; FAKE_AGENT_EXPECT names configured values instead.
+expected = {
+    "steps": tier[0], "resolution": tier[1], "denoiser_cache": tier[2], "seed": 42,
+    "max_faces": None if quality == "high" else (166666 if trellis and quality == "fast" else 500000),
+    "timeout": 3000 if quality == "high" else 600,
+    **json.loads(os.environ.get("FAKE_AGENT_EXPECT", "{}")),
+}
 record = Path(os.environ["FAKE_AGENT_RECORD"])
+(record / "arguments.json").write_text(json.dumps(vars(arguments)))
 out = Path(arguments.out)
 
 
@@ -73,10 +81,10 @@ valid = (
     and out.suffix == ".glb"
     and not out.exists()
     and out.parent.is_dir()
-    and (arguments.steps, arguments.resolution, arguments.denoiser_cache) == tier
-    and arguments.seed == 42
-    and (quality == "high" or arguments.max_faces == (166666 if trellis and quality == "fast" else 500000))
-    and 1 <= arguments.timeout <= 600
+    and [getattr(arguments, name) for name in ("steps", "resolution", "denoiser_cache", "seed")]
+    == [expected[name] for name in ("steps", "resolution", "denoiser_cache", "seed")]
+    and expected["max_faces"] in (None, arguments.max_faces)
+    and 1 <= arguments.timeout <= expected["timeout"]
 )
 if not valid:
     reply("error", code="invalid_arguments", exit_code=2)

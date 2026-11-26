@@ -20,6 +20,7 @@ adds its lines under Unreleased and never edits a version.
 - The MCP instructions point clients to parameter-specific units and action-specific hash guards. The tool reference lists every `mesh_edit` modifier kind, `object_edit` primitive type and other string enum value.
 - `scene_info` spatial distance proofs compute triangle distances in numpy batches.
 - The tool catalog bypasses schema definitions that only point to another definition.
+- Generation and panorama timeouts, steps, seeds, grids, face caps, threads, seam band and EXR white are read from `<PREFIX>_<QUALITY>_<NAME>`, then `<PREFIX>_<NAME>`, over built-in defaults; `trellis2-mlx` `high` defaults to 3000 seconds.
 
 ### Fixed
 
