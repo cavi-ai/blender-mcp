@@ -10,24 +10,22 @@ from pathlib import Path
 
 from triposg_frame import frame
 
-MAX_TRIANGLES = 500000
 
-
-def bounded(vertices, faces):
+def bounded(vertices, faces, max_faces):
     import pymeshlab
     import trimesh
 
-    if len(faces) > MAX_TRIANGLES:
+    if len(faces) > max_faces:
         meshes = pymeshlab.MeshSet()
         meshes.add_mesh(pymeshlab.Mesh(vertices, faces))
         meshes.meshing_decimation_quadric_edge_collapse(
-            targetfacenum=MAX_TRIANGLES, preservenormal=True, preservetopology=True, qualitythr=0.5
+            targetfacenum=max_faces, preservenormal=True, preservetopology=True, qualitythr=0.5
         )
         reduced = meshes.current_mesh()
         vertices, faces = reduced.vertex_matrix(), reduced.face_matrix()
     mesh = trimesh.Trimesh(vertices, faces, process=False)
-    if not 0 < len(mesh.faces) <= MAX_TRIANGLES:
-        raise ValueError(f"Reconstruction must have between 1 and {MAX_TRIANGLES} faces")
+    if not 0 < len(mesh.faces) <= max_faces:
+        raise ValueError(f"Reconstruction must have between 1 and {max_faces} faces")
     mesh.fix_normals()
     return mesh
 
@@ -38,7 +36,8 @@ def main():
     import numpy as np
     import torch
 
-    source, output = Path(sys.argv[1]), Path(sys.argv[2])
+    # Options: steps, guidance, seed and max_faces, resolved by the server from its configuration.
+    source, output, options = Path(sys.argv[1]), Path(sys.argv[2]), json.loads(sys.argv[3])
     sys.path.insert(0, os.environ["CAVI_TRIPOSG_SOURCE"])
     # The flash decoder needs a CUDA-only extension; the hierarchical decoder uses scikit-image.
     sys.modules["diso"] = types.SimpleNamespace(DiffDMC=None)
@@ -74,14 +73,14 @@ def main():
         with torch.inference_mode():
             vertices, faces = pipeline(
                 image=prepared,
-                generator=torch.Generator(device="cpu").manual_seed(0),
-                num_inference_steps=50,
-                guidance_scale=7.0,
+                generator=torch.Generator(device="cpu").manual_seed(options["seed"]),
+                num_inference_steps=options["steps"],
+                guidance_scale=options["guidance"],
                 use_flash_decoder=False,
             ).samples[0]
         if vertices is None:
             raise ValueError("Reconstruction has no surface")
-        mesh = bounded(np.asarray(vertices, dtype=np.float32), np.ascontiguousarray(faces))
+        mesh = bounded(np.asarray(vertices, dtype=np.float32), np.ascontiguousarray(faces), options["max_faces"])
         mesh.export(str(output))
     print(
         json.dumps(

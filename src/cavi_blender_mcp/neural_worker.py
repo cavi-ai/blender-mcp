@@ -101,9 +101,11 @@ def main():
     from omegaconf import OmegaConf
     from skimage.measure import marching_cubes
 
-    torch.set_num_threads(4)
-    torch.manual_seed(0)
-    source, output, resolution = Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3])
+    # Options: resolution, seed, max_faces and chunk_size, resolved by the server from its configuration.
+    source, output, options = Path(sys.argv[1]), Path(sys.argv[2]), json.loads(sys.argv[3])
+    resolution, max_faces = options["resolution"], options["max_faces"]
+    torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))
+    torch.manual_seed(options["seed"])
     weights = Path(os.environ["CAVI_TRIPOSR_WEIGHTS"])
     sys.path.insert(0, os.environ["CAVI_TRIPOSR_SOURCE"])
     # The upstream CUDA extension is unnecessary for CPU isosurface extraction.
@@ -134,13 +136,13 @@ def main():
         state = torch.load(weights / "model.ckpt", map_location="cpu", weights_only=True, mmap=True)
         model.load_state_dict(state)
         del state
-        model.renderer.set_chunk_size(16384)
+        model.renderer.set_chunk_size(options["chunk_size"])
         prepared = prepare_image(source)
         with torch.inference_mode():
             codes = model([prepared], device="cpu")
             mesh = model.extract_mesh(codes, has_vertex_color=True, resolution=resolution)[0]
-        if not 0 < len(mesh.faces) <= 500000:
-            raise ValueError("Reconstructed mesh exceeded 500000 faces or was empty")
+        if not 0 < len(mesh.faces) <= max_faces:
+            raise ValueError(f"Reconstructed mesh exceeded {max_faces} faces or was empty")
         mesh = clean_mesh(mesh)
         mesh.visual.vertex_colors = linearize_vertex_colors(mesh.visual.vertex_colors)
         # TripoSR uses Z-up with its conditioning view along +X. glTF uses Y-up.

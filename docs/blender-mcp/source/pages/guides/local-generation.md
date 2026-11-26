@@ -16,7 +16,10 @@ defaults to `triposr`.
 | `triposr` | Vertex-colored surface, resolution 64–192 | CPU, four threads | 180 seconds |
 | `triposg` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MPS), CUDA or CPU | 600 seconds |
 | `triposg-mlx` | Uncolored surface, at most 500,000 triangles | Apple Silicon (MLX) through mlx-agent | 600 seconds |
-| `trellis2-mlx` | Vertex-colored surface, at most 500,000 faces | Apple Silicon (MLX) through mlx-agent | 600 seconds |
+| `trellis2-mlx` | Vertex-colored surface, at most 500,000 faces | Apple Silicon (MLX) through mlx-agent | 600 seconds, `high` 3000 |
+
+The steps, seeds, grids, face caps, threads and timeouts on this page are defaults; each one is set
+per provider and quality tier in [Generation settings](../reference/configuration.md#generation-settings).
 
 ## Prepare TripoSR
 
@@ -217,7 +220,8 @@ The prompt is sent with "seamless 360 degree equirectangular panorama, level
 horizon" appended, at seed 42 and 30 steps (`quality="fast"`: 12). The last
 128 columns are faded into the first and the image is resized back to 2:1, so
 its right edge continues into its left. A `.png` path keeps the 8-bit image,
-which is low dynamic range.
+which is low dynamic range. The size, seed, steps, seam band, EXR white and timeout are defaults set in
+[Generation settings](../reference/configuration.md#generation-settings).
 
 A `.exr` path writes uncompressed half-float RGB in scene-linear Rec. 709. Each
 8-bit value is decoded from sRGB, then expanded with an inverse Reinhard curve

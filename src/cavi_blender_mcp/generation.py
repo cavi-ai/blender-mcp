@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import math
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -13,47 +15,59 @@ from cavi_mcp_core import workspace as core_workspace
 from .importing import MAX_BYTES, MAX_GEOMETRY, inspect_glb
 from .paths import destination
 
-MLX_MAX_FACES = 500000
+# Atlas export duplicates each triangle corner.
+ATLAS_MAX_FACES = min(180_000, MAX_GEOMETRY // 3)
+# Built-in defaults. Each named value is read from CAVI_<PROVIDER>_<QUALITY>_<NAME>, then CAVI_<PROVIDER>_<NAME>;
+# a mapping holds one default per quality tier.
 PROVIDERS = {
     "triposr": {
         "prefix": "CAVI_TRIPOSR",
         "suffixes": ("PYTHON", "SOURCE", "WEIGHTS"),
         "worker": "neural_worker.py",
         "timeout": 180,
+        "threads": 4,
+        "worker_options": {"resolution": 128, "seed": 0, "max_faces": MAX_GEOMETRY, "chunk_size": 16384},
     },
     "triposg": {
         "prefix": "CAVI_TRIPOSG",
         "suffixes": ("PYTHON", "SOURCE", "WEIGHTS"),
         "worker": "triposg_worker.py",
         "timeout": 600,
+        "threads": 4,
+        "worker_options": {"steps": 50, "guidance": 7.0, "seed": 0, "max_faces": MAX_GEOMETRY},
     },
     "triposg-mlx": {
         "prefix": "CAVI_TRIPOSG_MLX",
         "suffixes": ("PYTHON", "AGENT", "MODEL"),
         "timeout": 600,
+        "threads": 4,
         "model": "TripoSG",
         "frame": "triposg_frame.py",
+        "seed": 42,
+        "max_faces": MAX_GEOMETRY,
+        # mlx-agent options of each quality tier.
         "quality": {
-            "default": ("--steps", "50", "--resolution", "512"),
-            "fast": ("--steps", "25", "--resolution", "256", "--denoiser-cache", "adaptive"),
+            "default": {"steps": 50, "resolution": 512, "denoiser-cache": "off"},
+            "fast": {"steps": 25, "resolution": 256, "denoiser-cache": "adaptive"},
         },
     },
     "trellis2-mlx": {
         "prefix": "CAVI_TRELLIS2_MLX",
         "suffixes": ("PYTHON", "AGENT", "MODEL"),
-        "timeout": 600,
+        "timeout": {"default": 600, "fast": 600, "high": 3000},
+        "threads": 4,
         "model": "TRELLIS.2",
         "frame": "trellis2_frame.py",
-        # Default keeps the converted checkpoint's sampler steps and guidance.
+        "seed": 42,
+        "max_faces": {"default": MAX_GEOMETRY, "fast": ATLAS_MAX_FACES, "high": ATLAS_MAX_FACES},
+        # Steps None keeps the converted checkpoint's sampler steps and guidance.
         "quality": {
-            "default": ("--resolution", "512"),
-            "fast": ("--steps", "6", "--resolution", "512"),
-            "high": ("--resolution", "1024"),
+            "default": {"steps": None, "resolution": 512},
+            "fast": {"steps": 6, "resolution": 512},
+            "high": {"steps": None, "resolution": 1024},
         },
         "vertex_colors": True,
         "guides": True,
-        # Atlas export duplicates each triangle corner.
-        "atlas_max_faces": min(180_000, MAX_GEOMETRY // 3),
     },
 }
 QUALITIES = ("fast", "default", "high")
@@ -64,6 +78,38 @@ MAX_BOX_RATIO = 16
 # The provider writes bbox endpoints at ±half the side length as float32 GLB positions.
 MIN_BOX_SIZE = 2.0 ** -148
 MAX_BOX_SIZE = float.fromhex("0x1.fffffep+128")
+
+
+def tunable(prefix, name, default, quality="default", minimum=1, maximum=None):
+    """``{prefix}_{QUALITY}_{NAME}``, else ``{prefix}_{NAME}``, else ``default``.
+
+    A value parses as its default's type, an integer when the default is None: a number within the given bounds,
+    or one lowercase option word.
+    """
+    kind = type(default) if isinstance(default, (str, float)) else int
+    for key in (f"{prefix}_{quality.upper()}_{name}", f"{prefix}_{name}"):
+        raw = os.environ.get(key, "").strip()
+        if not raw:
+            continue
+        if kind is str:
+            if re.fullmatch(r"[a-z0-9][a-z0-9-]*", raw):
+                return raw
+            raise RuntimeError(f"{key} must be one lowercase option word")
+        try:
+            value = kind(raw)
+        except ValueError:
+            value = None
+        if (value is None or (kind is float and not math.isfinite(value)) or value < minimum
+                or (maximum is not None and value > maximum)):
+            bounds = f"of at least {minimum}" if maximum is None else f"between {minimum} and {maximum}"
+            raise RuntimeError(f"{key} must be {'a number' if kind is float else 'an integer'} {bounds}")
+        return value
+    return default
+
+
+def tiered(value, quality):
+    """The default for ``quality`` from a per-tier mapping, or the one default for every tier."""
+    return value[quality] if isinstance(value, dict) else value
 
 
 def envelope_error(result):
@@ -93,8 +139,21 @@ def run(command, env, timeout, deadline, describe=None):
     return result
 
 
-def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality, views=(), guide=None,
-             bbox=None):
+def mlx_options(settings, quality):
+    """The configured mlx-agent options for ``quality`` and the face cap its result must meet."""
+    prefix = settings["prefix"]
+    options = []
+    for option, default in settings["quality"][quality].items():
+        value = tunable(prefix, option.upper().replace("-", "_"), default, quality)
+        if value is not None:
+            options += [f"--{option}", str(value)]
+    seed = tunable(prefix, "SEED", settings["seed"], quality, minimum=0)
+    max_faces = tunable(prefix, "MAX_FACES", tiered(settings["max_faces"], quality), quality, maximum=MAX_GEOMETRY)
+    return [*options, "--seed", str(seed), "--max-faces", str(max_faces)], max_faces
+
+
+def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality, options, max_faces,
+             views=(), guide=None, bbox=None):
     """Frame the images for the model, then run the mlx-agent mesh command."""
     framed = generated.with_name("framed.png")
     frame = Path(__file__).with_name(settings["frame"])
@@ -110,9 +169,6 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         extra += ["--bbox", *(str(size) for size in bbox)]
     # The agent stops itself first, so a timeout is reported by its envelope.
     agent_timeout = max(1, int(deadline - time.monotonic()) - 30)
-    max_faces = MLX_MAX_FACES
-    if quality in ("fast", "high"):
-        max_faces = settings.get("atlas_max_faces", MLX_MAX_FACES)
     command = [
         configured["PYTHON"],
         configured["AGENT"],
@@ -124,12 +180,8 @@ def mlx_mesh(settings, configured, source, generated, env, timeout, deadline, qu
         str(framed),
         "--out",
         str(generated),
-        *settings["quality"][quality],
+        *options,
         *extra,
-        "--seed",
-        "42",
-        "--max-faces",
-        str(max_faces),
         "--timeout",
         str(agent_timeout),
         "--json",
@@ -192,6 +244,7 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
             "CAVI_GENERATION_PROVIDER must be triposr, triposg, triposg-mlx or trellis2-mlx"
         )
     settings = PROVIDERS[provider]
+    prefix = settings["prefix"]
     quality = "default" if quality is None else quality
     if quality not in QUALITIES:
         raise ValueError("Quality must be fast, default or high")
@@ -222,18 +275,29 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
         guide = inside(workspace, guide, {".glb"}, 64 * 1024 * 1024,
                        "The guide must be a workspace GLB of at most 64 MiB")
     target = destination(workspace, path, {".glb"})
+    if resolution is not None and provider != "triposr":
+        raise ValueError("Resolution applies only to the TripoSR provider")
+    worker_options = {}
+    for name, default in settings.get("worker_options", {}).items():
+        if name == "resolution" and resolution is not None:
+            worker_options[name] = resolution
+        else:
+            worker_options[name] = tunable(
+                prefix, name.upper(), default, quality,
+                minimum=0 if name in ("seed", "guidance") else 1,
+                maximum=MAX_GEOMETRY if name == "max_faces" else None,
+            )
     if provider == "triposr":
-        resolution = 128 if resolution is None else resolution
-        if type(resolution) is not int or not 64 <= resolution <= 192:
+        resolved = worker_options["resolution"]
+        if type(resolved) is not int or not 64 <= resolved <= 192:
             raise ValueError("Resolution must be between 64 and 192")
-        arguments = [str(resolution)]
-    else:
-        if resolution is not None:
-            raise ValueError("Resolution applies only to the TripoSR provider")
-        arguments = []
+    timeout = tunable(prefix, "TIMEOUT", tiered(settings["timeout"], quality), quality)
+    threads = tunable(prefix, "THREADS", settings["threads"], quality)
+    if "quality" in settings:
+        options, max_faces = mlx_options(settings, quality)
     configured = {}
     for suffix in settings["suffixes"]:
-        key = f"{settings['prefix']}_{suffix}"
+        key = f"{prefix}_{suffix}"
         value = os.environ.get(key)
         if not value or not Path(value).is_absolute() or not Path(value).exists():
             raise RuntimeError(f"Configure {key} with an existing absolute local path")
@@ -243,22 +307,21 @@ def generate(workspace, image, path, resolution=None, quality=None, views=None, 
         HF_HUB_OFFLINE="1",
         TRANSFORMERS_OFFLINE="1",
         HF_HUB_DISABLE_IMPLICIT_TOKEN="1",
-        OMP_NUM_THREADS="4",
+        OMP_NUM_THREADS=str(threads),
     )
-    timeout = settings["timeout"]
     deadline = time.monotonic() + timeout
     with tempfile.TemporaryDirectory(prefix=".cavi-generation-", dir=workspace) as temporary:
         generated = Path(temporary) / "mesh.glb"
         if "frame" in settings:
             report = mlx_mesh(settings, configured, source, generated, env, timeout, deadline, quality,
-                              views, guide, bbox)
+                              options, max_faces, views, guide, bbox)
         else:
             command = [
                 configured["PYTHON"],
                 str(Path(__file__).with_name(settings["worker"])),
                 str(source),
                 str(generated),
-                *arguments,
+                json.dumps(worker_options),
             ]
             report = json.loads(run(command, env, timeout, deadline).stdout)
         if not generated.is_file():

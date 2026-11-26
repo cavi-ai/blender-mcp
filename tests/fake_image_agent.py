@@ -20,9 +20,14 @@ arguments = parser.parse_args()
 record = Path(os.environ["FAKE_IMAGE_RECORD"])
 (record / "request.json").write_text(json.dumps(vars(arguments)))
 out = Path(arguments.out)
+# The built-in defaults; FAKE_IMAGE_EXPECT names configured values instead.
+expected = {"width": 2048, "height": 1024, "seed": 42, "timeout": 1800,
+            **json.loads(os.environ.get("FAKE_IMAGE_EXPECT", "{}"))}
 valid = ((arguments.command, arguments.kind) == ("convert", "generate") and Path(arguments.path).is_dir()
-         and out.suffix == ".png" and not out.exists() and (arguments.width, arguments.height) == (2048, 1024)
-         and arguments.seed == 42 and 1 <= arguments.timeout <= 1800)
+         and out.suffix == ".png" and not out.exists()
+         and (arguments.width, arguments.height, arguments.seed) == (expected["width"], expected["height"],
+                                                                     expected["seed"])
+         and 1 <= arguments.timeout <= expected["timeout"])
 if not valid or os.environ.get("FAKE_IMAGE_MODE") == "error":
     print(json.dumps({"status": "error", "data": {}, "error": {"code": "invalid_arguments", "message": "refused"}}))
     sys.exit(2)
